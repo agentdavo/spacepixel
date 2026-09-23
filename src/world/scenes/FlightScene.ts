@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Scene, Vector3 } from 'three';
+import { Color, PerspectiveCamera, Scene, Vector3 } from 'three';
 import type { FrameContext } from '@/core/Engine';
 import type { GameScene } from '../GameScene';
 import { WorldSpace } from '@/core/WorldSpace';
@@ -411,9 +411,21 @@ export class FlightScene implements GameScene, FlightHostScene {
 
   /** Strata take the current system's nebula colours. */
   private paintPlanes(): void {
-    const neb = this.view.system.backdrop.nebula;
-    const at = (x: number) => neb.reduce((best, s) => (Math.abs(s.at - x) < Math.abs(best.at - x) ? s : best)).color;
-    this.planes?.setPalette(at(0.77), this.view.system.backdrop.wisp, at(0.5));
+    if (!this.planes) return;
+    const sys = this.view.system;
+    const neb = sys.backdrop.nebula;
+    const at = (x: number) => new Color(neb.reduce((best, s) => (Math.abs(s.at - x) < Math.abs(best.at - x) ? s : best)).color);
+    // Tame the sky's colours: strata are painted scenery, never the loudest thing in frame.
+    const tame = (c: Color, sMax: number, lMax: number) => {
+      const hsl = { h: 0, s: 0, l: 0 };
+      c.getHSL(hsl);
+      return c.setHSL(hsl.h, Math.min(hsl.s, sMax), Math.min(hsl.l, lMax));
+    };
+    const a = tame(at(0.77), 0.55, 0.42);
+    const b = tame(new Color(sys.backdrop.wisp).lerp(a, 0.55), 0.5, 0.42);
+    this.planes.setPalette(a, b, tame(at(0.5), 0.6, 0.2));
+    // Special skies (Dead Zone, Anchor, Nexus) belong to their set pieces.
+    this.planes.setDensity(sys.id === 'monolith' ? 0 : sys.faction === 'unknown' ? 0.35 : 1);
   }
 
   // ── FlightHostScene ────────────────────────────────────────────────

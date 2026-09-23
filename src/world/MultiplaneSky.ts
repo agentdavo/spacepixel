@@ -75,12 +75,14 @@ export class MultiplaneSky {
   private readonly haze: Node = uniform(new Color('#1b1446'));
   private readonly master: Node = uniform(1);
   private readonly farD: Node;
+  private readonly opacity: Node = uniform(0);
 
   constructor(opts: Partial<MultiplaneOptions> = {}) {
     this.opts = { ...MULTIPLANE_DEFAULT, ...opts };
     const o = this.opts;
     this.count = o.layers * o.cardsPerLayer;
     this.farD = uniform(o.layers * KM);
+    this.opacity.value = o.opacity;
     let s = (o.seed * 48271 + 7) | 0;
     const rand = () => {
       s = (Math.imul(s, 1664525) + 1013904223) | 0;
@@ -117,7 +119,7 @@ export class MultiplaneSky {
     const vMask: Node = varyingProperty('vec4', 'vMpMask');
     const vLook: Node = varyingProperty('vec4', 'vMpLook');
     const vFade: Node = varyingProperty('float', 'vMpFade');
-    const opacity: Node = uniform(o.opacity);
+    const opacity: Node = this.opacity;
 
     mat.positionNode = Fn(() => {
       const c: Node = attribute('card', 'vec4');
@@ -162,10 +164,15 @@ export class MultiplaneSky {
   }
 
   /** Take colours from the system's sky so strata belong to it. */
-  setPalette(a: string, b: string, haze: string): void {
-    (this.colA.value as Color).set(a);
-    (this.colB.value as Color).set(b);
-    (this.haze.value as Color).set(haze);
+  setPalette(a: Color, b: Color, haze: Color): void {
+    (this.colA.value as Color).copy(a);
+    (this.colB.value as Color).copy(b);
+    (this.haze.value as Color).copy(haze);
+  }
+
+  /** 0 = no strata, 1 = default; special skies turn them down so the set piece leads. */
+  setDensity(d: number): void {
+    this.opacity.value = this.opts.opacity * d;
   }
 
   /**
