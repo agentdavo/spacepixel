@@ -9,6 +9,7 @@ export const SCENES: Record<string, () => Promise<GameScene>> = {
   paint: async () => new (await import('./PaintShopScene')).PaintShopScene(),
   dogfight: async () => new (await import('./DogfightScene')).DogfightScene(),
   fx: async () => new (await import('./FxTestScene')).FxTestScene(),
+  comms: async () => new (await import('./CommsTestScene')).CommsTestScene(),
   setpieces: async () => new (await import('./SetPieceScene')).SetPieceScene(),
 };
 

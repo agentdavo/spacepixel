@@ -262,11 +262,13 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
   const cq = cos(quadAng);
   const sq = sin(quadAng);
   const nDeb = vec3(nq.x.mul(cq).sub(nq.y.mul(sq)), nq.x.mul(sq).add(nq.y.mul(cq)), nq.z);
+  // NB: shared by colorNode, mrtNode and depthNode — keep it a plain
+  // expression (a .toVar() here would only be declared in one of those graphs).
   const nView: Node = select(isDebris, nDeb, nSphere);
   const nWorld = normalize(camWorld.mul(vec4(nView, 0)).xyz);
   const ndl = dot(nWorld, LightRig.keyDirection);
-  const lit = ndl.greaterThan(0.2);
-  const mid = ndl.greaterThan(-0.3);
+  const hi = ndl.greaterThan(0.72);
+  const lit = ndl.greaterThan(-0.12);
   const rimOn: Node = float(1)
     .sub(nz)
     .greaterThan(0.72)
@@ -289,18 +291,18 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
     const fire = fireRamp(fireStep, pal);
 
     // SMOKE: three-tone cel ball, red-hot for its first couple of frames.
-    const smokeLit = byPal(pal, c3('#7d6e88'), c3('#6f7b9a'), c3('#80668a'));
-    const smokeMid = byPal(pal, c3('#4d4262'), c3('#414b6a'), c3('#4d3a5c'));
-    const smokeDark = byPal(pal, c3('#281f36'), c3('#1f2540'), c3('#2a1832'));
-    const smokeCel = select(lit, smokeLit.mul(LightRig.keyColor), select(mid, smokeMid, smokeDark));
+    const smokeHi = byPal(pal, c3('#b3a3b5'), c3('#a3b0c8'), c3('#b69ab8'));
+    const smokeLit = byPal(pal, c3('#85768f'), c3('#74819f'), c3('#886c90'));
+    const smokeDark = byPal(pal, c3('#3b3050'), c3('#2f3656'), c3('#3d2448'));
+    const smokeCel = select(hi, smokeHi, select(lit, smokeLit, smokeDark)).mul(select(lit, LightRig.keyColor, vec3(1)));
     const smokeHot = fireRamp(select(tq.lessThan(0.06), float(3), float(4)), pal);
     const smoke = select(tq.lessThan(0.12).and(nz.greaterThan(0.25).or(tq.lessThan(0.06))), smokeHot, smokeCel);
 
     // PUFF: white missile smoke with blue-violet shadow; white-hot while young.
     const puffLit = c3('#ffffff').mul(LightRig.keyColor);
-    const puffMid = c3('#e2e4f0');
+    const puffMid = c3('#e9e9f2').mul(LightRig.keyColor);
     const puffDark = mix(c3('#b3b8d8'), LightRig.shadowTint, 0.15);
-    const puffCel = select(lit, puffLit, select(mid, puffMid, puffDark));
+    const puffCel = select(hi, puffLit, select(lit, puffMid, puffDark));
     const puffHot = select(
       age.lessThan(0.025),
       c3('#ffffff', 3),
