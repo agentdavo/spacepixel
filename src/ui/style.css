@@ -1,0 +1,88 @@
+:root {
+  --crt-green: #7dffb2;
+  --crt-amber: #ffc46b;
+  --crt-cyan: #6fe6ff;
+  --crt-pink: #ff5fb4;
+  --bg: #05040c;
+  --panel: rgba(6, 12, 18, 0.72);
+  --font-mono: 'Share Tech Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-display: 'Oxanium', 'Eurostile', 'Bank Gothic', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--crt-green);
+  font-family: var(--font-mono);
+}
+
+#viewport {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+#ui-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud-debug {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid rgba(125, 255, 178, 0.35);
+  border-left: 3px solid var(--crt-green);
+  font-size: 12px;
+  line-height: 1.55;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 6px rgba(125, 255, 178, 0.55);
+  min-width: 260px;
+}
+
+.hud-debug .title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  color: #fff;
+  text-shadow: 0 0 8px rgba(111, 230, 255, 0.8);
+}
+
+.hud-debug .sub { color: var(--crt-cyan); }
+.hud-debug .warn { color: var(--crt-amber); }
+.hud-debug .keys { margin-top: 6px; color: rgba(125, 255, 178, 0.7); }
+.hud-debug b { color: #fff; font-weight: normal; }
+
+.hud-shot {
+  position: absolute;
+  right: 22px;
+  bottom: 18px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.35em;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 0 8px rgba(255, 95, 180, 0.8);
+}
+
+.hud-error {
+  position: absolute;
+  inset: 20% 15% auto 15%;
+  padding: 18px 22px;
+  background: rgba(40, 0, 12, 0.9);
+  border: 1px solid var(--crt-pink);
+  color: #ffd0e4;
+  white-space: pre-wrap;
+  font-size: 13px;
+  pointer-events: auto;
+}

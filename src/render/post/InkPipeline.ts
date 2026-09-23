@@ -1,0 +1,199 @@
+import { Color, Vector4, type Camera, type Scene } from 'three';
+import { RenderPipeline, type WebGPURenderer, type TextureNode } from 'three/webgpu';
+import type { ShaderNode as Node } from '@/render/tsl';
+import {
+  pass,
+  uniform,
+  screenUV,
+  vec3,
+  vec4,
+  float,
+  mix,
+  exp,
+  clamp,
+  smoothstep,
+  length,
+  dot,
+  fract,
+  sin,
+  renderOutput,
+  select,
+  log2,
+} from 'three/tsl';
+import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js';
+import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
+import { sceneMRT } from '../materials/InkChannels';
+import { inkEdgeWGSL } from './shaders/inkEdge.wgsl';
+import { makeInkEdgeTSL } from './shaders/inkEdge.tsl';
+import type { DebugView } from '@/core/Flags';
+
+export interface InkSettings {
+  enabled: boolean;
+  /** Base line radius in physical pixels. */
+  lineRadius: number;
+  silhouetteThreshold: number;
+  creaseThreshold: number;
+  regionThreshold: number;
+  /** Silhouettes sample further out → heavier outer contours. */
+  silhouetteScale: number;
+  boilAmount: number;
+  /** Boil re-seeds this many times per second (12 = animating "on twos"). */
+  boilRate: number;
+  boilFrequency: number;
+  inkColor: Color;
+  /** Aerial-perspective haze for scale: distant hulls & lines fade into it. */
+  hazeColor: Color;
+  /** Distance (km) at which haze reaches ~63%. */
+  hazeDistance: number;
+  hazeStrength: number;
+  bloomStrength: number;
+  bloomRadius: number;
+  bloomThreshold: number;
+}
+
+export const DEFAULT_INK: InkSettings = {
+  enabled: true,
+  lineRadius: 1.0,
+  silhouetteThreshold: 0.03,
+  creaseThreshold: 0.22,
+  regionThreshold: 0.004,
+  silhouetteScale: 1.8,
+  boilAmount: 0.35,
+  boilRate: 12,
+  boilFrequency: 42,
+  inkColor: new Color('#120d1f'),
+  hazeColor: new Color('#5b4b8a'),
+  hazeDistance: 9,
+  hazeStrength: 0.55,
+  bloomStrength: 0.55,
+  bloomRadius: 0.35,
+  bloomThreshold: 1.0,
+};
+
+/**
+ * The OVA render pipeline (Milestone 3):
+ *
+ *   scene pass ──MRT──► output (HDR cel colour)
+ *                   ├─► gbuf  (view normal, linear depth km)
+ *                   └─► ink   (ink weight, region id)
+ *        │
+ *        ├─ ink edges (raw WGSL on WebGPU / TSL twin on WebGL2)
+ *        ├─ aerial haze on inked surfaces → sells kilometre-scale capital ships
+ *        ├─ ink composite (distant lines fade toward haze)
+ *        ├─ HDR bloom from emissives only (engines, beams, glints)
+ *        ├─ tone map + sRGB (renderOutput)
+ *        ├─ cel "film" grade: vignette + fine grain
+ *        └─ FXAA
+ */
+export class InkPipeline {
+  readonly pipeline: RenderPipeline;
+  readonly settings: InkSettings;
+  readonly scenePass: ReturnType<typeof pass>;
+  readonly isWebGPU: boolean;
+
+  private readonly params = uniform(new Vector4());
+  private readonly params2 = uniform(new Vector4());
+  private readonly inkColor = uniform(new Color());
+  private readonly hazeColor = uniform(new Color());
+  private readonly hazeParams = uniform(new Vector4());
+  private readonly inkOn = uniform(1);
+  private readonly grainSeed = uniform(0);
+
+  private view: DebugView = 'final';
+  private pixelRatio = 1;
+  private nodes!: Record<DebugView, Node>;
+
+  constructor(renderer: WebGPURenderer, scene: Scene, camera: Camera, isWebGPU: boolean, settings: Partial<InkSettings> = {}) {
+    this.isWebGPU = isWebGPU;
+    this.settings = { ...DEFAULT_INK, ...settings };
+
+    const scenePass = pass(scene, camera);
+    scenePass.setMRT(sceneMRT());
+    this.scenePass = scenePass;
+
+    const color = scenePass.getTextureNode('output');
+    const gbuf = scenePass.getTextureNode('gbuf') as unknown as TextureNode;
+    const ink = scenePass.getTextureNode('ink') as unknown as TextureNode;
+
+    // ── edge detection ────────────────────────────────────────────────
+    const edgeData: Node = isWebGPU
+      ? inkEdgeWGSL({ gbuf, ink, uv: screenUV, params: this.params, params2: this.params2 })
+      : makeInkEdgeTSL(gbuf, ink)(screenUV, this.params, this.params2);
+    const edges = vec4(edgeData).toVar('inkEdges');
+
+    // ── haze + ink composite (linear HDR) ─────────────────────────────
+    const g = gbuf.sample(screenUV);
+    const inkSample = ink.sample(screenUV);
+    const depthKm = g.a;
+    const surface = inkSample.r.greaterThan(0.0);
+    const haze = select(
+      surface,
+      float(1).sub(exp(depthKm.div(this.hazeParams.x).negate())).mul(this.hazeParams.y).mul(inkSample.b),
+      float(0),
+    );
+    const lit = mix(color.rgb, this.hazeColor, haze);
+    const lineColor = mix(this.inkColor, this.hazeColor, haze.mul(0.85));
+    const inked = mix(lit, lineColor, edges.x.mul(this.inkOn));
+
+    // Bloom reads the pre-ink HDR buffer so only true emissives glow.
+    const glow = bloom(color, this.settings.bloomStrength, this.settings.bloomRadius, this.settings.bloomThreshold);
+    const hdr = vec4(inked.add(glow.rgb), 1.0);
+
+    // ── display transform + film grade ────────────────────────────────
+    const display = renderOutput(hdr);
+    const centered = screenUV.sub(0.5);
+    const vignette = float(1).sub(smoothstep(0.35, 0.95, length(centered.mul(vec3(1.25, 1.0, 0).xy))));
+    const grain = fract(sin(dot(screenUV.add(this.grainSeed), vec3(12.9898, 78.233, 0).xy)).mul(43758.5453)).sub(0.5);
+    const graded = display.rgb.mul(mix(0.78, 1.0, vignette)).add(grain.mul(0.025));
+    const final = fxaa(vec4(clamp(graded, 0, 1), 1.0));
+
+    // ── debug views ───────────────────────────────────────────────────
+    const showDepth = log2(depthKm.mul(1000).add(1)).div(20);
+    this.nodes = {
+      final,
+      color: renderOutput(color),
+      normal: vec4(g.rgb, 1),
+      depth: vec4(vec3(float(1).sub(showDepth)), 1),
+      id: vec4(fract(inkSample.g.mul(vec3(1.0, 7.13, 13.7))).mul(inkSample.r), 1),
+      edges: vec4(vec3(1).sub(vec3(edges.y, edges.z, edges.w).mul(vec3(0.2, 0.9, 0.9))), 1),
+    };
+
+    this.pipeline = new RenderPipeline(renderer, final);
+    this.pipeline.outputColorTransform = false;
+    this.applySettings();
+  }
+
+  applySettings(): void {
+    const s = this.settings;
+    this.params.value.set(s.lineRadius * this.pixelRatio, s.silhouetteThreshold, s.creaseThreshold, s.regionThreshold);
+    this.params2.value.set(s.silhouetteScale, s.boilAmount, 0, s.boilFrequency);
+    this.inkColor.value.copy(s.inkColor);
+    this.hazeColor.value.copy(s.hazeColor);
+    this.hazeParams.value.set(s.hazeDistance, s.hazeStrength, 0, 0);
+    this.inkOn.value = s.enabled ? 1 : 0;
+  }
+
+  setView(view: DebugView): void {
+    if (view === this.view) return;
+    this.view = view;
+    this.pipeline.outputNode = this.nodes[view];
+    // Debug views need the raw buffer, so skip the manual display transform.
+    this.pipeline.needsUpdate = true;
+  }
+
+  /** Scale line radius with pixel ratio so ink looks identical on hi-dpi screens. */
+  resize(_w: number, _h: number, pixelRatio: number): void {
+    this.pixelRatio = pixelRatio;
+    this.applySettings();
+  }
+
+  update(time: number): void {
+    // Stepped clock → lines re-trace 12×/s like hand-inked animation.
+    this.params2.value.z = Math.floor(time * this.settings.boilRate) % 97;
+    this.grainSeed.value = (Math.floor(time * 24) % 64) * 0.013;
+  }
+
+  render(): void {
+    this.pipeline.render();
+  }
+}
