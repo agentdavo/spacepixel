@@ -84,7 +84,7 @@ async function boot(): Promise<void> {
     ready: true,
     frame: () => engine.frameContext.frame,
     backend: info.backendName,
-    hooks: { ...window.__VANGUARD__?.hooks, perf: () => engine.perf.summary() },
+    hooks: { ...window.__VANGUARD__?.hooks, perf: () => engine.perf.summary(), step: (n: number) => engine.step(n) },
   };
   console.info(`[vanguard] ${info.backendName} backend · ${info.adapterDescription}`);
 

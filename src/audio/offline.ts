@@ -1,3 +1,4 @@
+import { PROLOGUE } from '@/cinema/prologue';
 import { GameAudio, type AudioFrame, type AudioMissileEvent, type AudioShip, type AudioWeaponEvent, type Mood } from './index';
 
 /**
@@ -72,7 +73,34 @@ const music = (mood: Mood, seconds: number, intensity: number, rampTo?: number):
   },
 });
 
+/** The prologue's soundtrack: the same music/sound cues the Cinema fires, on the same clock. */
+const prologue = (): Scenario => {
+  const seconds = PROLOGUE.reduce((a, sh) => a + sh.dur, 0) + 1.5;
+  return {
+    seconds,
+    setup: (s) => {
+      s.audio.autoMood = false;
+      s.frame.player.alive = false;
+      s.frame.player.throttle = 0;
+    },
+    tick: (s) => {
+      let start = 0;
+      for (const sh of PROLOGUE) {
+        for (const m of sh.music ?? []) if (s.at(start + m.at)) s.audio.music.setMood(m.mood, m.fade ?? 2);
+        for (const c of sh.sound ?? []) {
+          if (!s.at(start + c.at)) continue;
+          if (c.sfx) s.audio.sfx.play(c.sfx, { gain: c.gain ?? 1 });
+          if (c.stinger) s.audio.stinger(c.stinger);
+          if (c.radio) s.audio.radio(c.radio);
+        }
+        start += sh.dur;
+      }
+    },
+  };
+};
+
 export const SCENARIOS: Record<string, Scenario> = {
+  prologue: prologue(),
   'music-title': music('title', 48, 0.5),
   'music-briefing': music('briefing', 20, 0.2),
   'music-cruise': music('cruise', 24, 0.1),

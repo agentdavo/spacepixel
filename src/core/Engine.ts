@@ -76,14 +76,22 @@ export class Engine {
 
   start(): void {
     this.timer.connect(document);
+    if (flags.record) return; // frame-stepped by the recorder via step()
     this.renderer.setAnimationLoop((t) => this.tick(t));
+  }
+
+  /** Recording: advance exactly `n` frames of 1/record s, then wait for the GPU. */
+  async step(n: number): Promise<void> {
+    for (let i = 0; i < n; i++) this.tick(performance.now());
+    const device = (this.renderer.backend as { device?: GPUDevice }).device;
+    await device?.queue.onSubmittedWorkDone();
   }
 
   private tick(timestamp: number): void {
     this.perf.begin(timestamp);
     this.timer.update(timestamp);
     const realDt = this.timer.getDelta();
-    const dt = flags.shot ? 1 / 60 : Math.min(realDt, 1 / 20);
+    const dt = flags.record ? 1 / flags.record : flags.shot ? 1 / 60 : Math.min(realDt, 1 / 20);
 
     this.ctx.dt = dt;
     this.ctx.time += dt;

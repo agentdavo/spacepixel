@@ -5,6 +5,8 @@
  *   ?ink=0           disable the ink-line pass
  *   ?view=normal|depth|ink|id|edges|color   debug G-buffer views
  *   ?shot=1          deterministic "screenshot mode" (fixed time, no UI chrome)
+ *   ?record=24       frame-stepped capture at N fps (with shot=1): no rAF loop,
+ *                    the harness calls __VANGUARD__.hooks.step(n)
  *   ?t=12.5          start time in seconds (useful with shot mode)
  *   ?scene=flight    which scene to boot (flight | showcase | spatial | hangar)
  *   ?cam=0..n        camera preset
@@ -19,6 +21,8 @@ export interface Flags {
   view: DebugView;
   shot: boolean;
   startTime: number;
+  /** Capture fps for frame-stepped recording (0 = off). */
+  record: number;
   scene: string;
   cam: number;
   hud: boolean;
@@ -42,6 +46,7 @@ export const flags: Flags = {
   view: VIEWS.includes(rawView) ? rawView : 'final',
   shot: q.get('shot') === '1',
   startTime: Number(q.get('t') ?? 0) || 0,
+  record: Number(q.get('record') ?? 0) || 0,
   scene: q.get('scene') ?? '',
   cam: Number(q.get('cam') ?? 0) || 0,
   hud: q.get('hud') !== '0',
