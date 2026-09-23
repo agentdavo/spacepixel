@@ -54,6 +54,10 @@ export class Perf {
   gpuMode: GpuTimingMode = 'none';
   frames = 0;
   overBudget = 0;
+  /** Frames > 2× budget after warmup (hitches the player feels). */
+  hitches = 0;
+  /** Shader compilation etc. — excluded from steady-state percentiles. */
+  warmupFrames = 60;
 
   private frameStart = 0;
   private lastRaf = -1;
@@ -82,9 +86,11 @@ export class Perf {
   end(consumedInputTime: number): void {
     const now = performance.now();
     const cpu = now - this.frameStart;
-    this.cpu.push(cpu);
     this.frames++;
+    if (this.frames <= this.warmupFrames) return;
+    this.cpu.push(cpu);
     if (cpu > this.budgetMs) this.overBudget++;
+    if (cpu > this.budgetMs * 2) this.hitches++;
     if (consumedInputTime >= 0) this.inputToSubmit.push(now - consumedInputTime);
 
     // One GPU measurement in flight at a time; never stall the frame on it.
@@ -123,7 +129,8 @@ export class Perf {
       interval: { p50: r(this.interval.percentile(0.5)), p95: r(this.interval.percentile(0.95)) },
       inputToSubmit: { p50: r(this.inputToSubmit.percentile(0.5)), p95: r(this.inputToSubmit.percentile(0.95)) },
       inputToGpu: { p50: r(this.inputToGpu.percentile(0.5)), p95: r(this.inputToGpu.percentile(0.95)) },
-      overBudgetPct: r((this.overBudget / Math.max(1, this.frames)) * 100),
+      overBudgetPct: r((this.overBudget / Math.max(1, this.frames - this.warmupFrames)) * 100),
+      hitches: this.hitches,
     };
   }
 }

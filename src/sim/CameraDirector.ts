@@ -123,7 +123,7 @@ export class CameraDirector {
         const dist = _v.length();
         _v.divideScalar(Math.max(dist, 1e-3));
         ship.up(_up);
-        this.eye.copy(ship.position).addScaledVector(_v, -28).addScaledVector(_up, 7);
+        this.eye.copy(ship.position).addScaledVector(_v, -42).addScaledVector(_up, 10);
         _look.copy(ship.position).lerp(tgt.position, 0.65);
         this.lookAt(_look, _up);
         fov = Math.max(26, Math.min(62, 2 * Math.atan2(tgt.radius * 3 + 20, dist) * (180 / Math.PI) + 30));

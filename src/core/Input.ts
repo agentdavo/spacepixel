@@ -8,7 +8,8 @@
  *
  * Mouse: virtual joystick — cursor offset from screen centre is a rate
  * command (with deadzone). Keyboard: W/S throttle, A/D yaw, arrows pitch/yaw,
- * Q/E roll, Shift afterburner, X kill throttle, Z flight-assist toggle.
+ * Q/E roll, Shift afterburner, X kill throttle, Z flight-assist toggle,
+ * Space/LMB guns, F/RMB missile salvo, T next target.
  * Gamepad: left stick pitch/yaw, right stick X roll, triggers throttle,
  * A/south = afterburner.
  */
@@ -21,6 +22,10 @@ export interface ControlState {
   afterburner: boolean;
   flightAssistToggle: boolean; // edge-triggered
   fire: boolean;
+  /** Missile salvo request (edge-triggered). Optional so AI code can ignore it. */
+  missile?: boolean;
+  /** Cycle target (edge-triggered). */
+  nextTarget?: boolean;
 }
 
 const DEADZONE = 0.06;
@@ -51,6 +56,8 @@ export class Input {
   private mouseActive = false;
   private mouseDown = false;
   private faEdge = false;
+  private missileEdge = false;
+  private targetEdge = false;
 
   constructor(private target: HTMLElement | Window = window) {
     const t = this.target as Window;
@@ -58,6 +65,8 @@ export class Input {
       if (e.repeat) return;
       this.keys.add(e.code);
       if (e.code === 'KeyZ') this.faEdge = true;
+      if (e.code === 'KeyF') this.missileEdge = true;
+      if (e.code === 'KeyT') this.targetEdge = true;
       if (e.code === 'Tab') e.preventDefault();
       this.mark(e.timeStamp);
     });
@@ -71,7 +80,13 @@ export class Input {
       this.mouseActive = true;
       this.mark(e.timeStamp);
     });
+    t.addEventListener('contextmenu', (e) => e.preventDefault());
     t.addEventListener('pointerdown', (e) => {
+      if (e.button === 2) {
+        this.missileEdge = true;
+        this.mark(e.timeStamp);
+        return;
+      }
       this.mouseDown = true;
       this.mark(e.timeStamp);
     });
@@ -102,7 +117,9 @@ export class Input {
     s.afterburner = k.has('ShiftLeft') || k.has('ShiftRight') || k.has('Tab');
     s.fire = this.mouseDown || k.has('Space');
     s.flightAssistToggle = this.faEdge;
-    this.faEdge = false;
+    s.missile = this.missileEdge;
+    s.nextTarget = this.targetEdge;
+    this.faEdge = this.missileEdge = this.targetEdge = false;
 
     // Mouse virtual joystick (adds to keyboard, clamped).
     if (this.mouseActive) {
