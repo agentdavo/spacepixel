@@ -1,94 +1,114 @@
-# PROJECT VANGUARD
+# PROJECT VANGUARD: THE LONG DARK
 
 **Retro OVA cel-shaded space combat for the web** — Three.js (WebGPU renderer,
-TSL + hand-written WGSL), TypeScript, Vite.
+TSL + hand-written WGSL, compute particles), TypeScript (strict), Vite. No
+image or audio assets: every ship, sky, portrait, sound and note of music is
+generated.
 
 ![Hero shot](docs/screenshots/m03-hero.jpg)
 
-Inspired by 1990s OVA space opera (Macross, Wing Commander): bold ink lines,
-hard cel bands, stark rim light, painted nebula skies, and a ship roster that
-runs from 17 m interceptors to 2.6 km dreadnoughts. See the
-[series bible](docs/LORE.md) for the setting and factions, and the
-[roadmap](docs/ROADMAP.md) for milestone status.
+Four hundred years after the Shattering broke the galaxy's gate network,
+the Terran Directorate and the Zenith Hegemony fight a slow war over
+Ebon-gas — the black-light isotope that keeps six relit Lanterns burning.
+You fly Vanguard, the squadron that goes through first. And beyond a gate
+that leads nowhere, something is counting down the primes.
+
+- Series bible: [docs/LORE.md](docs/LORE.md)
+- Campaign (20 episodes, 4 chapters): [docs/CAMPAIGN.md](docs/CAMPAIGN.md)
+- Milestones: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 ## Running
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173
-npm run build        # typecheck + production bundle
-npm run shot -- --jpg --shot 'hero:cam=0&t=3'   # headless screenshots → docs/screenshots
+npm run dev            # http://localhost:5173 — title card → campaign
+npm run build          # typecheck + production bundle
+npm test               # campaign runner + all 20 missions (node:test)
+npm run ai-sim         # headless dogfight/formation sim with pass/fail numbers
+npm run perf           # frame-time budgets (meaningful on real GPUs only)
+npm run shot -- --jpg --shot 'hero:cam=0&t=3'   # headless screenshots
 ```
 
-Needs a WebGPU browser (Chrome/Edge 113+, Safari 26+, Firefox 141+). Without
-WebGPU, three.js falls back to WebGL2 and the ink pass switches to its TSL twin.
+Needs a WebGPU browser (Chrome/Edge 113+, Safari 26+, Firefox 141+). WebGL2
+still runs (TSL ink twin), but compute particles are disabled there.
 
-### Controls (render test)
+## Controls
 
-| Key | Action |
+| | |
 |---|---|
-| `1`–`6` | View: final · raw colour · normals · depth · ink region ids · edge sources |
-| `I` | Toggle ink lines |
-| `B` | Toggle line boil |
-| `C` | Cycle camera shots |
+| Mouse / arrows | steer (virtual stick) · gamepad supported |
+| Q / E | roll |
+| W / S · X | throttle · kill throttle |
+| Shift | afterburner |
+| J | cruise drive (3 km/s) |
+| Z | flight assist on/off (Newtonian) |
+| Space / LMB | guns |
+| F / RMB | micro-missile salvo (needs lock) |
+| T | next target |
+| 1–4 | wing orders: form up · attack my target · engage at will · cover me |
+| Tab | tactical view (battle at ¼ speed) |
+| V · K | camera shots · cinematic auto-cutaways |
+| M | star map (click a system to plot a route) |
+| L | codex / archive |
+| N | mute |
+| F3 | dev panel (perf graph, latency) · F1–F6 G-buffer views |
 
-### URL flags
+## Scenes (`?scene=`)
 
-`?backend=webgl` force fallback · `?ink=0` · `?view=edges` · `?cam=2` ·
-`?shot=1` deterministic capture mode · `?t=3` start time · `?hud=0`.
+`flight` (default game) · `showcase` · `hangar` (model sheets) · `paint`
+(livery editor) · `spatial` (depth cues) · `dogfight` (AI demo) · `fx`
+(particles) · `setpieces&piece=monolith|megagate|derelict|nebula|bastion|pilgrimage|…`
+· `comms` · `audio`. Add `&episode=N` to `flight` to jump into a campaign
+episode.
 
-## Rendering pipeline
+## How it's built
 
-```
-scene pass ──MRT──► output  HDR cel colour
-                ├─► gbuf    view normal (rgb) + linear depth in km (a)
-                └─► ink     ink weight, hashed region id, haze factor
-      │
-      ├─ ink edges ─ WGSL on WebGPU (src/render/post/shaders/inkEdge.wgsl.ts)
-      │              TSL twin on WebGL2 (inkEdge.tsl.ts)
-      ├─ aerial haze on inked surfaces (sells km-scale capital ships)
-      ├─ ink composite (distant lines fade into haze)
-      ├─ bloom from emissives only
-      ├─ tone map → vignette + film grain
-      └─ FXAA
-```
+**Rendering.** A scene pass writes an MRT G-buffer (HDR cel colour; view
+normal + linear depth in km; ink weight + region id + haze). A hand-written
+WGSL kernel draws the ink: inverse-depth Laplacian silhouettes (flat plating
+never fires, line weight is scale-invariant), normal creases, and region-id
+panel lines, with 12 Hz "line boil". Then aerial haze, emissive-only bloom,
+tone map, grade, speed lines / chromatic focal distortion, FXAA. Dynamic
+resolution holds the frame budget.
 
-**Ink edges** combine three sources:
-1. **Silhouettes** — Laplacian of *inverse* linear depth. 1/z is linear in
-   screen space for planes, so flat plating never fires at any angle; the
-   response is normalised so a fighter and a dreadnought get identical line
-   weight. Only the near side of a depth jump is inked.
-2. **Creases** — normal discontinuities.
-3. **Regions** — hashed per-part ids from the ship builder, which gives
-   mechanical panel lining with no extra geometry.
+**Space.** Universe positions are float64 on the CPU; the GPU only ever
+sees camera-relative coordinates (`WorldSpace`), so a 3 km dreadnought
+2,600 km from the origin — or a moon-sized sphere 30,000 km away — doesn't
+jitter. Space dust, asteroid belts and haze lanes give parallax and speed.
 
-A stepped-clock noise wobble ("line boil", 12 Hz — animating on twos) makes the
-lines shimmer like hand-traced cels.
+**Simulation.** Every ship — player, wingmen, enemies, capitals — flies the
+same `FlightModel` from the same `ControlState`; only the writer differs
+(input vs AI). The ship responds on the frame the input arrives; only the
+camera lags. Plain arrays and functions: `Fleet`, `Weapons` (swept-sphere
+bolts, tracking beams), `Missiles` (proportional navigation + Itano
+spirals), `Capitals` (flak, lances, hangars), `ai/*` (behaviour selection,
+maneuvers, formations, turrets).
 
-**Cel material** (`CelMaterial`): banded ramp lookup on half-Lambert, coloured
-shadow tint from the system's light rig, hard specular glints, rim light
-masked toward a rim source, canopy streaks, vertex-driven emissives.
+**Story.** Missions are data (`src/game/campaign`), run by
+`CampaignRunner` (tested) through a small host adapter: story roles →
+teams (renegades, defectors, provokable neutrals), plot armour, script
+cues, escorts, dwell zones, set pieces, radio chatter with procedural
+anime portraits, codex unlocks, eyecatches and debriefs.
 
-## Asset pipeline
-
-Ships are **data**: a `Blueprint` lists parts (lofted chamfered hull sections,
-wings, cylinders, domes, tori) with paint slots, mirror flags and region
-groups, plus engine mounts and hardpoints. `buildShip()` compiles a blueprint
-into a single merged mesh (one draw call per hull) with per-vertex paint and
-surface data, engine plume meshes and hardpoint sockets. Liveries come from
-the faction table, so any design can be repainted. glTF models can be
-imported through `AssetLibrary.loadModel()`, which converts their materials to
-the cel look.
+**Sound.** Web Audio synthesis only: faction weapons, explosions, engine and
+jump loops, lock tones, radio; a generative OVA-style score with moods that
+follow the fight and the story.
 
 ## Layout
 
 ```
 src/
-  core/      Engine loop, flags, event bus
-  render/    renderer factory, light rig, materials, post pipeline + WGSL
-  assets/    blueprint types, hull kit, ship builder, factions, blueprints
-  world/     painted backdrop, planets, scenes
-  ui/        HUD overlay + CRT styles
-scripts/     headless screenshot harness (Playwright + SwiftShader WebGPU)
-docs/        lore, roadmap, screenshots
+  core/      engine loop, input, perf, floating origin, flags
+  render/    renderer, light rig, cel/glow materials, ink pipeline + WGSL
+  assets/    blueprint format, hull kit, ship builder, 11 designs
+  sim/       flight, fleet, weapons, missiles, capitals, cameras, ai/
+  fx/        WebGPU compute particles, trails
+  world/     sky, planets, gates, dust, asteroids, set pieces, scenes
+  universe/  seeded Meridian Reach + special locations
+  game/      campaign data, runner, session, missions, profile
+  audio/     synthesis engine, SFX, generative music
+  ui/        HUD, star map, comms, codex, eyecatch, screens
+tests/       node:test suites (runner + campaign data)
+scripts/     screenshots, perf, AI sim, audio render (headless)
+docs/        lore, campaign, roadmap, screenshots
 ```
