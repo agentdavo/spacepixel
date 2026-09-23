@@ -5,6 +5,10 @@ latency measured from day one with pass/fail numbers; camera-relative
 rendering designed in; direct code over architecture; strict TypeScript;
 lore last.
 
+Scale rule: space is huge — lay it out in kilometres. Physics runs in
+metres, but anything placed in the world (strata, belts, set pieces,
+spawn rings, HUD ranges) is thought of in 1 km steps.
+
 ## Batch 1 — engine & game (first versions: all in)
 
 | # | Milestone | Status | Where |
@@ -18,7 +22,7 @@ lore last.
 | 7–9 | Fighters → carriers → dreadnoughts (11 designs, articulated) | ✅ | `src/assets/blueprints/*`, `?scene=hangar` |
 | 10 | Lasers, beams, impacts, shields | ✅ | `src/sim/Weapons.ts`, `src/world/WeaponVisuals.ts` |
 | 11 | Micro-missile swarms, lock HUD | ✅ | `src/sim/Missiles.ts`, `src/ui/FlightHud.ts` |
-| 12 | GPU compute particles | 🔧 agent | `src/fx/*`, `?scene=fx` |
+| 12 | GPU compute particles | ✅ | `src/fx/*`, `?scene=fx` |
 | 13 | Wingman AI, formations, orders | ✅ | `src/sim/ai/Squadron.ts` |
 | 14 | Enemy AI, maneuvers, turrets | ✅ | `src/sim/ai/*`, `npm run ai-sim` |
 | 15 | Universe + star map | ✅ | `src/universe/*`, `src/ui/StarMap.ts` |
@@ -28,7 +32,10 @@ lore last.
 | 19 | CRT HUD, title, briefing | ✅ | `src/ui/Screens.ts` |
 | 20 | Perf: budgets, latency, dynamic resolution | ✅ (ongoing) | `src/core/Perf.ts`, `npm run perf` |
 
-Spatial depth: space dust streaks, asteroid belts, haze lanes (`?scene=spatial`).
+Spatial depth: space dust streaks, asteroid belts, haze lanes (`?scene=spatial`),
+and a **multiplane sky** — Disney's multiplane camera rebuilt for 6DOF: 16
+painted cel strata, one per kilometre (`?planes=0|16|32`,
+`src/world/MultiplaneSky.ts`).
 
 ## Batch 2 — narrative (in progress)
 

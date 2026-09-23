@@ -20,6 +20,7 @@ const [width, height] = opt('size', '1280x720').split('x').map(Number);
 const cpuBudget = Number(opt('cpu-budget', '4'));
 const gpuBudget = Number(opt('gpu-budget', '8'));
 const port = Number(opt('port', '5198'));
+const extra = opt('query', '');
 
 const server = await createServer({ server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'warn' });
 await server.listen();
@@ -29,7 +30,7 @@ const browser = await chromium.launch({
 let code = 0;
 try {
   const page = await browser.newPage({ viewport: { width, height } });
-  await page.goto(`http://127.0.0.1:${port}/?scene=${scene}&demo=1&hud=0`, { waitUntil: 'commit' });
+  await page.goto(`http://127.0.0.1:${port}/?scene=${scene}&demo=1&hud=0${extra ? '&' + extra : ''}`, { waitUntil: 'commit' });
   await page.waitForFunction((n) => window.__VANGUARD__?.error || window.__VANGUARD__?.frame?.() >= n, frames, { timeout: 600_000, polling: 500 });
   const res = await page.evaluate(() => ({
     err: window.__VANGUARD__?.error,

@@ -56,7 +56,7 @@ export interface HazeCloudOptions {
  * radial falloff. Sampling a 128² texture is far cheaper per pixel than live
  * fBm, which matters because these quads are big and overlap.
  */
-function bakePuffTexture(seed: number): DataTexture {
+export function bakePuffTexture(seed: number): DataTexture {
   const N = 128;
   const G = 16;
   let s = (seed * 69069 + 1) | 0;

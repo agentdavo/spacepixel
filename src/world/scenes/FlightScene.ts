@@ -16,6 +16,7 @@ import { CombatFx } from '../CombatFx';
 import { StarSystemView, type GateInstance } from '../StarSystemView';
 import { Hyperspace } from '../Hyperspace';
 import { SpaceDust } from '../SpaceDust';
+import { MultiplaneSky } from '../MultiplaneSky';
 import { generateUniverse, specialSystem } from '@/universe/generate';
 import { CampaignSession, type FlightHostScene } from '@/game/CampaignSession';
 import { SYSTEM_FALLBACK } from '@/game/campaign/missions';
@@ -77,6 +78,11 @@ export class FlightScene implements GameScene, FlightHostScene {
   private starMap: StarMap;
   private hyperspace = new Hyperspace();
   private dust = new SpaceDust();
+  /** ?planes=N km strata (default 16, 0 = off). */
+  private planes: MultiplaneSky | null = (() => {
+    const n = Number(new URLSearchParams(location.search).get('planes') ?? 16);
+    return n > 0 ? new MultiplaneSky({ layers: Math.min(64, n) }) : null;
+  })();
   private jumpPhase: JumpPhase = 'none';
   private jumpT = 0;
   private jumpTo = '';
@@ -121,8 +127,13 @@ export class FlightScene implements GameScene, FlightHostScene {
   constructor() {
     this.systemId = this.universe.start;
     this.view = new StarSystemView(this.universe.systems.get(this.systemId)!, this.scene, this.world.root);
+    this.paintPlanes();
     this.scene.add(this.hyperspace.mesh);
     this.scene.add(this.dust.object);
+    if (this.planes) {
+      this.scene.add(this.planes.mesh);
+      this.paintPlanes();
+    }
     this.capitals = new Capitals(this.fleet, this.weapons);
 
     // Start 2.6 km short of the first Lantern, flying at it.
@@ -315,6 +326,10 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.view.update(time);
     this.dust.update(this.world.eye, pf.velocity, dt);
     this.dust.object.visible = this.jumpPhase !== 'tunnel';
+    if (this.planes) {
+      this.planes.update(this.world.eye, pf.speed);
+      this.planes.mesh.visible = this.jumpPhase !== 'tunnel';
+    }
 
     // 6b. Audio: one frame of facts, read by the audio façade.
     this.updateAudio(realDt);
@@ -394,6 +409,13 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
   }
 
+  /** Strata take the current system's nebula colours. */
+  private paintPlanes(): void {
+    const neb = this.view.system.backdrop.nebula;
+    const at = (x: number) => neb.reduce((best, s) => (Math.abs(s.at - x) < Math.abs(best.at - x) ? s : best)).color;
+    this.planes?.setPalette(at(0.77), this.view.system.backdrop.wisp, at(0.5));
+  }
+
   // ── FlightHostScene ────────────────────────────────────────────────
   currentSystemId(): string {
     return this.systemId;
@@ -421,6 +443,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.view.dispose();
       this.systemId = sys.id;
       this.view = new StarSystemView(sys, this.scene, this.world.root);
+      this.paintPlanes();
       this.gateSide.clear();
     }
     // Clear the free-flight cast: missions bring their own squad and enemies.
@@ -554,6 +577,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.view.dispose();
     this.systemId = this.jumpTo;
     this.view = new StarSystemView(this.universe.systems.get(this.systemId)!, this.scene, this.world.root);
+    this.paintPlanes();
     this.view.group.visible = false;
     this.view.backdrop.group.visible = false;
     this.gateSide.clear();
