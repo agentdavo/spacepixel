@@ -260,6 +260,105 @@ export class FlightHud {
     }
   }
 
+  /**
+   * M17 tactical overlay: reference grid on the player's altitude plane,
+   * range rings, every ship as a symbol with an altitude stalk to the grid
+   * and a 3 s velocity vector. Friendly = circle, hostile = diamond.
+   */
+  drawTactical(player: ShipEntity, fleet: Fleet, cam: PerspectiveCamera, world: WorldSpace, status: string): void {
+    const c = this.ctx;
+    const pp = player.flight.position;
+    const y0 = pp.y;
+    const line = (a: Vector3, b: Vector3) => {
+      const pa = this.project(a, world, cam);
+      const pb = this.project(b, world, cam);
+      if (!pa || !pb) return;
+      c.moveTo(pa.x, pa.y);
+      c.lineTo(pb.x, pb.y);
+    };
+    // Grid (500 m) snapped to world so it slides under the ship.
+    const step = 500;
+    const ext = 4000;
+    const gx = Math.round(pp.x / step) * step;
+    const gz = Math.round(pp.z / step) * step;
+    c.strokeStyle = 'rgba(111,230,255,0.16)';
+    c.lineWidth = 1;
+    c.beginPath();
+    for (let k = -ext; k <= ext; k += step) {
+      line(_r.set(gx + k, y0, gz - ext), _vt.set(gx + k, y0, gz + ext));
+      line(_r.set(gx - ext, y0, gz + k), _vt.set(gx + ext, y0, gz + k));
+    }
+    c.stroke();
+    // Range rings.
+    c.strokeStyle = 'rgba(111,230,255,0.35)';
+    for (const r of [1000, 2000, 3000]) {
+      c.beginPath();
+      for (let a = 0; a <= 64; a++) {
+        const t = (a / 64) * Math.PI * 2;
+        const p = this.project(_r.set(pp.x + Math.cos(t) * r, y0, pp.z + Math.sin(t) * r), world, cam);
+        if (!p) continue;
+        if (a === 0) c.moveTo(p.x, p.y);
+        else c.lineTo(p.x, p.y);
+      }
+      c.stroke();
+    }
+    // Ships.
+    for (const s of fleet.ships) {
+      if (!s.alive) continue;
+      const sp = s.flight.position;
+      const p = this.project(sp, world, cam);
+      const g = this.project(_r.set(sp.x, y0, sp.z), world, cam);
+      if (!p || !g) continue;
+      const hostile = s.faction !== player.faction;
+      const col = s === player ? '#ffffff' : hostile ? PINK : GREEN;
+      c.strokeStyle = col;
+      c.fillStyle = col;
+      c.lineWidth = 1.3;
+      // Altitude stalk + foot.
+      c.setLineDash([3, 3]);
+      c.beginPath();
+      c.moveTo(g.x, g.y);
+      c.lineTo(p.x, p.y);
+      c.stroke();
+      c.setLineDash([]);
+      c.beginPath();
+      c.ellipse(g.x, g.y, 5, 2.5, 0, 0, Math.PI * 2);
+      c.stroke();
+      // Velocity vector (3 s).
+      const v = this.project(_vt.copy(sp).addScaledVector(s.flight.velocity, 3), world, cam);
+      if (v) {
+        c.beginPath();
+        c.moveTo(p.x, p.y);
+        c.lineTo(v.x, v.y);
+        c.stroke();
+      }
+      // Symbol.
+      c.beginPath();
+      if (s === player) {
+        c.moveTo(p.x, p.y - 8);
+        c.lineTo(p.x + 6, p.y + 6);
+        c.lineTo(p.x - 6, p.y + 6);
+        c.closePath();
+      } else if (hostile) {
+        c.moveTo(p.x, p.y - 7);
+        c.lineTo(p.x + 7, p.y);
+        c.lineTo(p.x, p.y + 7);
+        c.lineTo(p.x - 7, p.y);
+        c.closePath();
+      } else {
+        c.arc(p.x, p.y, 6, 0, Math.PI * 2);
+      }
+      c.stroke();
+      c.fillText(`${s.name.toUpperCase()}  ${(sp.y - y0 >= 0 ? '+' : '') + Math.round(sp.y - y0)}m`, p.x + 10, p.y - 8);
+    }
+    c.fillStyle = '#6fe6ff';
+    c.fillText('TACTICAL // TIME ×0.25 · 1 FORM UP · 2 ATTACK MY TARGET · 3 ENGAGE AT WILL · 4 COVER ME · WHEEL ZOOM', 24, 60);
+    if (status) {
+      c.fillStyle = '#ffffff';
+      c.fillText(status, 24, 80);
+    }
+  }
+
   private brackets(x: number, y: number, h: number, l: number): void {
     const c = this.ctx;
     c.beginPath();

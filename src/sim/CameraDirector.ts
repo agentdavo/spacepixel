@@ -18,11 +18,12 @@ import type { FlightModel } from './FlightModel';
  *   flyby   static camera planted ahead of the ship's path; auto-ends once
  *           the ship is well past
  *   track   rides behind a moving subject (missile cam) looking down its path
+ *   tactical high overhead, north-up relative to the ship's heading (M17)
  *
  * Aiming never uses the director's camera — HUD marks are projected from the
  * ship's real nose — so cutaways can't make the player miss.
  */
-export type ShotKind = 'chase' | 'lock' | 'orbit' | 'flyby' | 'track';
+export type ShotKind = 'chase' | 'lock' | 'orbit' | 'flyby' | 'track' | 'tactical';
 
 export interface Subject {
   position: Vector3; // universe (float64)
@@ -57,6 +58,9 @@ export class CameraDirector {
   private baseMode: ShotKind = 'chase';
   private time = 0;
   private fov = 58;
+  /** Tactical view altitude above the player (m); mouse wheel zooms. */
+  tacticalHeight = 2600;
+  private tacHeading = new Vector3(0, 0, 1);
 
   constructor(
     readonly camera: PerspectiveCamera,
@@ -151,6 +155,18 @@ export class CameraDirector {
         ship.forward(_v);
         _w.subVectors(ship.position, s.anchor);
         if (_w.dot(_v) > 140 && this.time - s.t0 > 1.0) s.until = this.time;
+        break;
+      }
+
+      case 'tactical': {
+        // Overhead, trailing slightly so the ship's heading points "up" the
+        // screen; heading is damped so the map doesn't spin with every jink.
+        ship.forward(_v).setY(0);
+        if (_v.lengthSq() > 1e-4) this.tacHeading.lerp(_v.normalize(), 1 - Math.exp(-1.5 * dt)).normalize();
+        const hgt = this.tacticalHeight;
+        this.eye.copy(ship.position).addScaledVector(this.tacHeading, -hgt * 0.45).add(_w.set(0, hgt, 0));
+        this.lookAt(_look.copy(ship.position).addScaledVector(this.tacHeading, hgt * 0.12), _up.copy(this.tacHeading));
+        fov = 50;
         break;
       }
 

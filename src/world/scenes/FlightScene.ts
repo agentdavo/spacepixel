@@ -75,6 +75,10 @@ export class FlightScene implements GameScene {
   private gateSide = new Map<GateInstance, number>();
   private cathedral = assets.ship('choir-cathedral');
   private mission: MissionRunner | null = null;
+  private tactical = false;
+  private orderStatus = '';
+  /** Current standing order for the wing (M13); the AI reads this. */
+  wingOrder: 'formUp' | 'attackMyTarget' | 'engageAtWill' | 'coverMe' = 'formUp';
   private missionTime = 0;
   private jumps = 0;
   private kills = new Map<string, number>();
@@ -132,13 +136,23 @@ export class FlightScene implements GameScene {
     this.chase.snap(this.player.flight);
     this.playerSubject = { position: this.player.flight.position, velocity: this.player.flight.velocity, radius: 9 };
     if (flags.demo) input.override = demoPilot(this);
-    window.addEventListener('keydown', (e) => this.onKey(e.code));
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Tab') e.preventDefault();
+      this.onKey(e.code);
+    });
+    window.addEventListener('wheel', (e) => {
+      if (this.tactical) this.director.tacticalHeight = Math.min(12000, Math.max(600, this.director.tacticalHeight * (e.deltaY > 0 ? 1.12 : 0.89)));
+    });
     // ?cam=1 padlock · ?cam=2 orbit target · ?cam=3 track target
     const t0 = this.bandits[0].ship.flight;
     const s0: Subject = { position: t0.position, velocity: t0.velocity, radius: 8 };
     if (flags.cam === 1) this.director.setBase('lock', s0);
     if (flags.cam === 2) this.director.cut('orbit', s0, Infinity);
     if (flags.cam === 3) this.director.cut('track', s0, Infinity);
+    if (flags.cam === 4) {
+      this.tactical = true;
+      this.director.cut('tactical', null, Infinity);
+    }
     this.hud = new FlightHud(document.getElementById('ui-root')!);
     this.starMap = new StarMap(document.getElementById('ui-root')!, this.universe, () => this.systemId);
     this.placeCapitals();
@@ -164,9 +178,11 @@ export class FlightScene implements GameScene {
     this.cathedral.root.rotation.set(0.05, 2.2, 0.08);
   }
 
-  update({ dt, time }: FrameContext): void {
+  update({ dt: realDt, time }: FrameContext): void {
     const c = this.player.controls;
     const pf = this.player.flight;
+    // Tactical view runs the battle at quarter speed so orders can be given.
+    const dt = this.tactical ? realDt * 0.25 : realDt;
 
     // 1. Flight for every ship (player controls were sampled this frame).
     this.fleet.step(dt);
@@ -236,7 +252,7 @@ export class FlightScene implements GameScene {
     // 6. Camera (the only thing allowed to lag), then rebase the world on it.
     const tgt = this.lock.target;
     const tgtSubject: Subject | null = tgt ? { position: tgt.flight.position, velocity: tgt.flight.velocity, radius: tgt.radius } : null;
-    this.director.update(pf, tgtSubject, dt);
+    this.director.update(pf, tgtSubject, realDt);
     this.world.eye.copy(this.director.eye);
     this.world.sync(this.camera);
 
@@ -252,7 +268,8 @@ export class FlightScene implements GameScene {
     postFx.speed = Math.min(1, pf.speed / pf.spec.boostSpeed);
     this.hyperspace.update(dt, this.jumpPhase === 'tunnel' ? Math.min(1, this.jumpT * 3, (TUNNEL - this.jumpT) * 3) : 0, 60, this.camera.quaternion);
     this.hud.update(pf, this.camera, this.world, time);
-    if (this.jumpPhase === 'none') {
+    if (this.tactical) this.hud.drawTactical(this.player, this.fleet, this.camera, this.world, this.orderStatus);
+    else if (this.jumpPhase === 'none') {
       this.hud.drawTargets(this.player, this.fleet, this.lock, this.camera, this.world, time);
       const nav = this.navGate();
       if (nav) this.hud.drawNav(this.universe.systems.get(nav.link.to)!.name, nav.center, pf.position, this.camera, this.world, time);
@@ -459,8 +476,22 @@ export class FlightScene implements GameScene {
       this.cinematic = !this.cinematic;
     } else if (code === 'KeyM') {
       this.starMap.toggle();
+    } else if (code === 'Tab') {
+      this.tactical = !this.tactical;
+      if (this.tactical) this.director.cut('tactical', null, Infinity);
+      else this.director.cut('chase', null, Infinity);
+    } else if (code === 'Digit1' || code === 'Digit2' || code === 'Digit3' || code === 'Digit4') {
+      const orders = ['formUp', 'attackMyTarget', 'engageAtWill', 'coverMe'] as const;
+      const labels = ['FORM ON ME', 'ATTACK MY TARGET', 'ENGAGE AT WILL', 'COVER ME'];
+      const i = Number(code.slice(5)) - 1;
+      this.wingOrder = orders[i];
+      this.orderStatus = `VANGUARD 1 → WING: "${labels[i]}"   · COPY, LEAD.`;
+      this.onWingOrder?.(this.wingOrder);
     }
   }
+
+  /** Set by the AI integration to receive wing orders. */
+  onWingOrder: ((o: FlightScene['wingOrder']) => void) | null = null;
 
   cycleCamera(): void {
     this.onKey('KeyV');

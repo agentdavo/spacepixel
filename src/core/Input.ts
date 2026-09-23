@@ -118,7 +118,7 @@ export class Input {
     s.roll = axis(['KeyQ'], ['KeyE']);
     s.throttleDelta = axis(['KeyS'], ['KeyW']);
     s.throttleSet = k.has('KeyX') ? 0 : null;
-    s.afterburner = k.has('ShiftLeft') || k.has('ShiftRight') || k.has('Tab');
+    s.afterburner = k.has('ShiftLeft') || k.has('ShiftRight');
     s.fire = this.mouseDown || k.has('Space');
     s.flightAssistToggle = this.faEdge;
     s.missile = this.missileEdge;

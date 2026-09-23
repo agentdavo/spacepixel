@@ -37,9 +37,10 @@ export class DebugHud implements Updatable {
     if (flags.hud) root.append(this.el, this.shotEl);
 
     window.addEventListener('keydown', (e) => {
-      const n = Number(e.key);
-      if (n >= 1 && n <= VIEWS.length) {
-        this.view = VIEWS[n - 1];
+      const fn = /^F([1-6])$/.exec(e.code);
+      if (fn) {
+        e.preventDefault();
+        this.view = VIEWS[Number(fn[1]) - 1];
         this.ink.setView(this.view);
       } else if (e.key === 'i' || e.key === 'I') {
         this.ink.settings.enabled = !this.ink.settings.enabled;
@@ -81,8 +82,9 @@ export class DebugHud implements Updatable {
       <div>GPU      p50 <b>${p.gpu.p50}</b> p95 <b>${p.gpu.p95}</b> ms <span class="sub">(${p.gpuMode})</span></div>
       <div>INPUT→SUBMIT <b>${p.inputToSubmit.p50}</b> ms · →GPU <b>${p.inputToGpu.p50}</b> ms</div>
       <div>VIEW     <b>${this.view.toUpperCase()}</b> · INK <b>${s.enabled ? 'ON' : 'OFF'}</b> · BOIL <b>${s.boilAmount > 0 ? 'ON' : 'OFF'}</b></div>
-      <div class="keys">[1-6] view  [I] ink  [B] boil  [C] camera</div>
-      <div class="keys">mouse/arrows steer · Q/E roll · W/S throttle · SHIFT burner · Z assist · X stop</div>`;
+      <div class="keys">[F1-F6] view  [I] ink  [B] boil  [C] camera</div>
+      <div class="keys">mouse/arrows steer · Q/E roll · W/S throttle · SHIFT burner · Z assist · X stop</div>
+      <div class="keys">SPACE guns · F salvo · T target · J cruise · V cam · M map · TAB tactical · 1-4 wing orders</div>`;
     this.el.append(this.graph);
     this.shotEl.textContent = this.game.cameraLabel?.() ?? this.sceneName.toUpperCase();
   }
