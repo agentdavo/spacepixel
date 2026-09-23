@@ -27,7 +27,6 @@ import {
   normalize,
   positionWorld,
   pow,
-  reflect,
   select,
   sin,
   smoothstep,
@@ -52,10 +51,10 @@ const PROXY_FAR = 1.25e6;
 /** Written depth is clamped inside the Backdrop sparkle shell (0.9 × 400 km) so sky sprites never draw over it. */
 const DEPTH_CLAMP = 330_000;
 /** Halo extent in body radii. */
-const HALO = 1.7;
+const HALO = 2.6;
 
 /**
- * The Builder monolith: a sphere the size of a moon (default R = 1 400 km).
+ * The Builder monolith: a sphere the size of a moon (default R = 1 600 km).
  *
  * Rendering (floating-origin safe at any range):
  *  - Nothing is ever drawn at true scale. Each frame a unit-sphere PROXY is
@@ -115,7 +114,7 @@ export class Monolith implements SetPiece {
     this.position.copy(anchor);
     this.group.position.copy(anchor);
     this.group.name = `setpiece:monolith:${tag}`;
-    this.radius = num(params, 'radius', 1_400_000);
+    this.radius = num(params, 'radius', 1_600_000);
     this.broadcastParam = bool(params, 'broadcast', false);
     this.spin = num(params, 'spin', 0.0004);
     const tint: Node = uniform(new Color(str(params, 'tint', '#8a6cff')));
@@ -222,12 +221,10 @@ export class Monolith implements SetPiece {
     const mid = vec3(0.028, 0.019, 0.058);
     const top = vec3(0.05, 0.036, 0.1);
     const col: Node = mix(mix(shadow, mid, lit), top, hi).toVar();
-    const sheen: Node = pow(max(dot(reflect(h.dir, N), L), 0.0), 28.0);
-    col.addAssign(vec3(0.16, 0.14, 0.3).mul(smoothstep(0.35, 0.4, sheen)).mul(0.35));
 
     // The lattice: four octaves of an impossibly precise grid.
-    const g0 = this.gridLines(w, 6, 0.01);
-    const g1 = this.gridLines(w, 48, 0.018);
+    const g0 = this.gridLines(w, 6, 0.014);
+    const g1 = this.gridLines(w, 48, 0.02);
     const g2 = this.gridLines(w, 384, 0.03);
     const g3 = this.gridLines(w, 3072, 0.05);
     const lattice: Node = g0.mul(1.0).add(g1.mul(0.5)).add(g2.mul(0.32)).add(g3.mul(0.22));
@@ -236,7 +233,7 @@ export class Monolith implements SetPiece {
     const lat: Node = acos(Nl.y.clamp(-1, 1));
     const wave: Node = pow(sin(this.uTime.mul(0.9).sub(lat.mul(9.0))).mul(0.5).add(0.5), 6.0);
     const node: Node = pow(g0.mul(g1), 0.5);
-    const gain: Node = float(0.14).add(this.uBreath.mul(wave.mul(2.6).add(0.25)));
+    const gain: Node = float(0.2).add(this.uBreath.mul(wave.mul(2.6).add(0.25)));
     col.addAssign(vec3(tint).mul(lattice.mul(gain)).mul(mix(0.55, 1.0, lit)));
     col.addAssign(vec3(0.9, 0.85, 1.0).mul(node.mul(this.uBreath).mul(wave).mul(1.6)));
 
@@ -281,11 +278,16 @@ export class Monolith implements SetPiece {
 
       // Razor limb line: ~1.5 px, brightest where the star is behind the limb.
       const razor: Node = exp(x.div(pw.mul(1.1)).negate());
-      const razorI: Node = float(0.5).add(smoothstep(-0.2, 0.9, facing).mul(4.5)).add(smoothstep(0.2, 0.9, rimFacing).mul(1.2));
+      const razorI: Node = float(0.1)
+        .add(smoothstep(-0.1, 0.9, facing).mul(3.5))
+        .add(pow(max(facing, 0.0), 24.0).mul(14.0))
+        .add(smoothstep(0.3, 0.95, rimFacing).mul(0.9));
+      // Where the hidden star grazes the limb: a hard anime flare point.
+      const flare: Node = pow(max(facing, 0.0), 60.0).mul(exp(x.mul(-9.0))).mul(1.6);
       // Corona: a stepped (cel) soft glow + a tight inner sheath.
-      const corona: Node = exp(x.mul(-16.0)).mul(0.22).add(exp(x.mul(-70.0)).mul(0.5));
-      const coronaStep: Node = floor(corona.mul(7.0)).div(7.0);
-      const lightSide: Node = smoothstep(-0.6, 0.9, facing).mul(0.8).add(0.2);
+      const corona: Node = exp(x.mul(-16.0)).mul(0.2).add(exp(x.mul(-70.0)).mul(0.45)).add(exp(x.mul(-2.2)).mul(0.07));
+      const coronaStep: Node = floor(corona.mul(9.0)).div(9.0);
+      const lightSide: Node = smoothstep(-0.7, 0.95, facing).mul(0.9).add(0.1);
 
       // Gravitational lens: point-mass deflection with the Einstein ring at ~1.22 R.
       const theta: Node = acos(dot(dir, cHat).clamp(-1, 1));
@@ -296,13 +298,13 @@ export class Monolith implements SetPiece {
       const perp: Node = normalize(dir.sub(cHat.mul(dot(dir, cHat))).add(vec3(1e-7, 0, 0)));
       const src: Node = cHat.mul(cos(beta)).add(perp.mul(sin(beta)));
       const lensed: Node = this.stars(src, 170, 0.62, 0.2, 1.8).add(this.stars(src, 60, 0.88, 0.12, 3.0));
-      const lensMask: Node = float(1).sub(smoothstep(1.0, HALO * 0.92, p)).mul(front);
+      const lensMask: Node = float(1).sub(smoothstep(1.0, 1.65, p)).mul(front);
       const ringD: Node = abs(theta.sub(thetaE)).div(max(fwidth(theta), 1e-7));
       const einstein: Node = exp(ringD.mul(-0.7)).mul(0.35).add(exp(abs(p.sub(1.22)).mul(-40.0)).mul(0.05));
 
       const glow: Node = vec3(tint)
         .mul(coronaStep.mul(lightSide))
-        .add(vec3(0.92, 0.88, 1.0).mul(razor.mul(razorI)))
+        .add(vec3(0.92, 0.88, 1.0).mul(razor.mul(razorI).add(flare)))
         .add(vec3(0.75, 0.7, 1.0).mul(einstein))
         .mul(front);
       const starCol: Node = vec3(0.85, 0.9, 1.0).mul(lensed).mul(lensMask);

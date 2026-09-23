@@ -56,36 +56,43 @@ function aroundKey(cosK: number, az: number, out: Vector3): Vector3 {
 }
 
 const tmpA = new Vector3();
-const MONO_R = 1_400_000;
+const MONO_R = 1_600_000;
+/** Skim frame: up = surface normal, forward = tangent heading roughly toward the terminator. */
+const skimUp = aroundKey(0.35, 0.5, new Vector3());
+const skimSide = new Vector3().crossVectors(key, skimUp).normalize();
+const skimFwd = new Vector3().crossVectors(skimUp, skimSide).normalize().negate();
+function skim(alt: number, t: number, o: Vector3): Vector3 {
+  return o.copy(skimUp).multiplyScalar(MONO_R + alt).addScaledVector(skimFwd, t * 900);
+}
 
 const SHOTS: Record<SetPieceKind, Shot[]> = {
   monolith: [
     {
-      name: 'SKY · 9 000 km',
+      name: 'SKY · 6 000 km',
       fov: 55,
-      eye: (_t, o) => aroundKey(-0.15, 0.9, o).multiplyScalar(9_000_000),
-      look: (_t, o) => o.set(0, 0, 0).addScaledVector(side, 1.4e6),
-      ref: (_t, o) => aroundKey(-0.15, 0.9, o).multiplyScalar(9_000_000 - 70).addScaledVector(side, 26).addScaledVector(upk, -9),
+      eye: (_t, o) => aroundKey(-0.2, 0.9, o).multiplyScalar(6_000_000),
+      look: (_t, o) => o.set(0, 0, 0).addScaledVector(side, 1.2e6).addScaledVector(upk, -0.4e6),
+      ref: (_t, o) => aroundKey(-0.2, 0.9, o).multiplyScalar(6_000_000 - 70).addScaledVector(side, 30).addScaledVector(upk, -12),
     },
     {
-      name: 'ECLIPSE · 40 000 km',
+      name: 'ECLIPSE · 30 000 km',
       fov: 40,
-      eye: (_t, o) => aroundKey(-0.72, 2.2, o).multiplyScalar(40_000_000),
+      eye: (_t, o) => aroundKey(-0.8, 2.2, o).multiplyScalar(30_000_000),
       look: (_t, o) => o.set(0, 0, 0),
     },
     {
       name: 'SKIM · 60 km',
       fov: 60,
-      eye: (t, o) => aroundKey(0.45, 0.4, o).multiplyScalar(MONO_R + 60_000).addScaledVector(side, t * 900),
-      look: (_t, o) => aroundKey(0.45, 0.4, tmpA).multiplyScalar(MONO_R - 40_000).add(aroundKey(0.1, 2.0, o).multiplyScalar(900_000)),
-      ref: (t, o) => aroundKey(0.45, 0.4, o).multiplyScalar(MONO_R + 60_000 - 14).addScaledVector(side, t * 900 + 60),
+      eye: (t, o) => skim(60_000, t, o),
+      look: (t, o) => skim(60_000, t, o).add(tmpA.copy(skimFwd).multiplyScalar(1000)).addScaledVector(skimUp, -150),
+      ref: (t, o) => skim(60_000, t, o).addScaledVector(skimFwd, 70).addScaledVector(skimUp, -12).addScaledVector(skimSide, 18),
     },
     {
       name: 'CONTACT · 8 km',
       fov: 58,
-      eye: (_t, o) => aroundKey(0.6, 1.2, o).multiplyScalar(MONO_R + 8_000),
-      look: (_t, o) => aroundKey(0.6, 1.2, tmpA).multiplyScalar(MONO_R).add(aroundKey(0.0, 1.2, o).multiplyScalar(60_000)),
-      ref: (_t, o) => aroundKey(0.6, 1.2, o).multiplyScalar(MONO_R + 8_000 - 20).add(aroundKey(0.0, 1.2, tmpA).multiplyScalar(80)),
+      eye: (t, o) => skim(8_000, t, o),
+      look: (t, o) => skim(8_000, t, o).add(tmpA.copy(skimFwd).multiplyScalar(1000)).addScaledVector(skimUp, -420),
+      ref: (t, o) => skim(8_000, t, o).addScaledVector(skimFwd, 60).addScaledVector(skimUp, -14).addScaledVector(skimSide, -12),
     },
   ],
   derelict: [
