@@ -4,6 +4,7 @@ import type { BackdropPreset } from '@/world/Backdrop';
 import type { LightPreset } from '@/render/LightRig';
 import type { PlanetPreset } from '@/world/Planet';
 import type { ColorStop } from '@/render/materials/PaletteRamp';
+import type { EconFaction, StationKind } from '@/game/economy';
 
 /**
  * Milestone 15 — universe data.
@@ -31,6 +32,29 @@ export interface PlanetSite {
   tilt: [number, number, number];
 }
 
+/**
+ * A dockable station (docking & trade). Generated deterministically from the
+ * seed by `universe/stations.ts`; the model is built by `world/Station.ts`.
+ * The docking bay sits on the station's +axis end; ships approach flying
+ * along −axis down a corridor that extends out along +axis.
+ */
+export interface StationSite {
+  id: string;
+  name: string;
+  kind: StationKind;
+  faction: EconFaction;
+  /** System-local position (metres, before SYSTEM_OFFSET). */
+  position: Vector3;
+  /** Unit vector out of the docking bay, along the approach corridor. */
+  axis: Vector3;
+  /** Unit vector ⟂ axis (station roll). */
+  up: Vector3;
+  /** Orbital ports: index of the planet under the landing corridor. */
+  planet?: number;
+  /** Model variation seed. */
+  seed: number;
+}
+
 export interface StarSystem {
   id: string;
   name: string;
@@ -43,6 +67,8 @@ export interface StarSystem {
   backdrop: BackdropPreset;
   planets: PlanetSite[];
   gates: GateLink[];
+  /** Dockable stations (1–3 per generated system; none in off-map locations). */
+  stations: StationSite[];
   /** 0..1 — how dangerous (drives garrison size / encounter density). */
   threat: number;
   /** Hand-authored flavour for key systems only. */

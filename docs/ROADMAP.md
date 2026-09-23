@@ -32,6 +32,11 @@ spawn rings, HUD ranges) is thought of in 1 km steps.
 | 19 | CRT HUD, title, briefing | ✅ | `src/ui/Screens.ts` |
 | 20 | Perf: budgets, latency, dynamic resolution | ✅ (ongoing) | `src/core/Perf.ts`, `npm run perf` |
 
+Docking & trade: seeded stations per system (refinery, salvage yard,
+bastion, free port, orbital port), friendly carrier hangars, ILS approach +
+auto-dock cutaway, docked market / repair / rearm / rumours, persisted
+ledger (`src/game/economy.ts`, `src/world/Docking.ts`, `src/ui/DockScreen.ts`).
+
 Spatial depth: space dust streaks, asteroid belts, haze lanes (`?scene=spatial`),
 and a **multiplane sky** — Disney's multiplane camera rebuilt for 6DOF: 16
 painted cel strata, one per kilometre (`?planes=0|16|32`,

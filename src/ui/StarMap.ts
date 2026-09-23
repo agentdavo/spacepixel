@@ -28,7 +28,7 @@ export class StarMap {
     private currentId: () => string,
   ) {
     this.canvas.style.cssText =
-      'position:absolute;inset:0;width:100%;height:100%;display:none;z-index:10;pointer-events:auto;cursor:crosshair;background:rgba(3,6,12,0.88)';
+      'position:absolute;inset:0;width:100%;height:100%;display:none;z-index:24;pointer-events:auto;cursor:crosshair;background:rgba(3,6,12,0.88)';
     root.append(this.canvas);
     this.ctx = this.canvas.getContext('2d')!;
     this.canvas.addEventListener('pointermove', (e) => (this.hover = this.pick(e.clientX, e.clientY)));
@@ -158,6 +158,11 @@ export class StarMap {
       }
       c.fillStyle = sys.id === this.hover ? '#ffffff' : col;
       c.fillText(sys.name.toUpperCase(), p.x + r + 7, p.y + 4);
+      // Stations: one small square per dock, in its owner's colour.
+      sys.stations.forEach((st, i) => {
+        c.fillStyle = FACTION_COLOR[st.faction] ?? '#fff';
+        c.fillRect(p.x + r + 8 + i * 7, p.y + 9, 4, 4);
+      });
     }
 
     // Header + hover details.
@@ -173,8 +178,12 @@ export class StarMap {
       c.fillStyle = '#ffffff';
       c.fillText(`${hv.name.toUpperCase()} · CLASS ${hv.starClass} · ${hv.faction.toUpperCase()} · THREAT ${(hv.threat * 100).toFixed(0)}%`, 40, h - 50);
       if (hv.blurb) c.fillText(hv.blurb, 40, h - 32);
+      hv.stations.forEach((st, i) => {
+        c.fillStyle = FACTION_COLOR[st.faction] ?? '#fff';
+        c.fillText(`■ ${st.name.toUpperCase()} · ${st.kind === 'orbital' ? 'ORBITAL PORT' : st.kind.toUpperCase()}`, 40, h - 70 - (hv.stations.length - 1 - i) * 16);
+      });
     }
     c.fillStyle = 'rgba(125,255,178,0.7)';
-    c.fillText('[M] close · click a system to plot a route · fly through the marked Lantern to jump', w - 560, h - 32);
+    c.fillText('[M] close · click a system to plot a route · fly through the marked Lantern to jump · ■ = dockable station', w - 760, h - 32);
   }
 }

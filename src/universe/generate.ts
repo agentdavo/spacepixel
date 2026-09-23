@@ -4,6 +4,7 @@ import { LIGHT_PRESETS, type LightPreset } from '@/render/LightRig';
 import { PLANETS, type PlanetPreset } from '@/world/Planet';
 import type { ColorStop } from '@/render/materials/PaletteRamp';
 import type { StarSystem, Universe } from './Universe';
+import { placeStations } from './stations';
 
 /**
  * Seeded Meridian Reach generator. Six hand-placed key systems anchor the
@@ -134,6 +135,7 @@ export function generateUniverse(seed = 1994, count = 22): Universe {
       backdrop: p.id === 'meridian' ? BACKDROPS.meridian : makeBackdrop(rnd, hue, p.name),
       planets: [],
       gates: [],
+      stations: [],
       threat: faction === 'choir' ? 0.7 + rnd() * 0.3 : faction === 'contested' ? 0.4 + rnd() * 0.3 : faction === 'unknown' ? 1 : rnd() * 0.3,
       blurb: p.key?.blurb,
     };
@@ -165,6 +167,17 @@ export function generateUniverse(seed = 1994, count = 22): Universe {
         normal: dir,
       });
     }
+  }
+
+  // Stations last: they sit near planets and Lanterns, on their own PRNG stream.
+  for (const sys of systems.values()) {
+    sys.stations = placeStations(seed, {
+      id: sys.id,
+      name: sys.name,
+      faction: sys.faction,
+      planets: sys.planets.map((pl) => ({ name: pl.preset.name, position: pl.position, radius: pl.preset.radius })),
+      gates: sys.gates,
+    });
   }
 
   return { seed, systems, start: 'meridian' };
@@ -281,6 +294,7 @@ export function specialSystem(id: string): StarSystem | null {
     backdrop,
     planets: [],
     gates: [{ to: 'meridian', position: dir.clone().multiplyScalar(22_000), normal: dir }],
+    stations: [],
     threat: id === 'deadzone' ? 0.6 : 0.3,
     blurb: k.blurb,
   };

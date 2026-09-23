@@ -49,9 +49,27 @@ still runs (TSL ink twin), but compute particles are disabled there.
 | Tab | tactical view (battle at ¼ speed) |
 | V · K | camera shots · cinematic auto-cutaways |
 | M | star map (click a system to plot a route) |
+| G | request docking within 5 km of a station / friendly carrier (again to cancel) |
 | L | codex / archive |
 | N | mute |
 | F3 | dev panel (perf graph, latency) · F1–F6 G-buffer views |
+
+## Docking & trade
+
+Every system has 1–3 stations (seeded): Lantern refineries, fossil-salvage
+yards, military bastions, free ports and orbital ports with a landing
+tether down to the planet; friendly carriers dock at their bow hangar. Press
+**G** within 5 km (no hostiles within 10 km, standing above −50), fly the
+ILS corridor, and guidance takes the ship under 1 km (OVA cutaway, iris to
+the berth). Docked: buy/sell eight commodities (prices from station type,
+faction, slow drift and your own market pressure), repair, rearm missile
+rails, read the rumour ticker, launch (**Enter**). Keys on the dock screen:
+↑↓ select · →/B buy · ←/V sell · Shift ×5 · R repair · E rearm. Shares,
+cargo, standing and rails persist in localStorage. Captures:
+`?scene=flight&dock=approach|auto|docked|launch[&station=<id>][&cargo=demo]`.
+Pure economy + tests: `src/game/economy.ts`, `tests/economy.test.ts`.
+
+![Docked](docs/screenshots/dock-screen.jpg)
 
 ## Scenes (`?scene=`)
 

@@ -138,6 +138,16 @@ export class CampaignRunner {
     this.trigger((t) => t.on === 'start');
   }
 
+  /**
+   * Docking hook (free-roam trade): the player berthed at `stationId`. Sets
+   * the story flags `docked` and `docked:<stationId>`, so a mission can key
+   * an objective or a chatter beat off it (`{ on: 'flag', flag: 'docked' }`).
+   */
+  onDocked(stationId: string): void {
+    this.setFlag('docked');
+    this.setFlag(`docked:${stationId}`);
+  }
+
   setFlag(name: string): void {
     if (this.flags.has(name)) return;
     this.flags.add(name);

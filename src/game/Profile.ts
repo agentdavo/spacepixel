@@ -59,3 +59,27 @@ export function saveProfile(p: PilotProfile): void {
     /* storage unavailable — the change lasts for this session only */
   }
 }
+
+// ── Trade ledger (docking & trade): shares, cargo, standing, missile rails ──
+// Kept under its own key so the pilot profile above stays untouched.
+import { newLedger, normaliseLedger, type TradeLedger } from './economy';
+
+const LEDGER_KEY = 'vanguard.trade.v1';
+
+export function loadLedger(): TradeLedger {
+  try {
+    const raw = localStorage.getItem(LEDGER_KEY);
+    if (raw) return normaliseLedger(JSON.parse(raw));
+  } catch {
+    /* storage unavailable */
+  }
+  return newLedger();
+}
+
+export function saveLedger(l: TradeLedger): void {
+  try {
+    localStorage.setItem(LEDGER_KEY, JSON.stringify(l));
+  } catch {
+    /* storage unavailable — trades last for this session only */
+  }
+}

@@ -1,0 +1,191 @@
+/* ══ Docking & trade: cutaway framing + docked screen ════════════════════
+   Layering inside #ui-root: 16 cinema bars · 22 dock screen (under the
+   CRT overlay at 50, over the HUD canvas and comms).                    */
+
+/* ── cutaway framing: letterbox, ink frame, caption plate, iris ───────── */
+.dock-cinema {
+  position: absolute;
+  inset: 0;
+  z-index: 16;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s steps(2);
+}
+.dock-cinema.show { opacity: 1; }
+.dock-cinema .bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 11vh;
+  background: #000;
+  transform: scaleY(0);
+  transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.dock-cinema .bar.top { top: 0; transform-origin: top; }
+.dock-cinema .bar.bottom { bottom: 0; transform-origin: bottom; }
+.dock-cinema.show .bar { transform: scaleY(1); }
+/* Ink panel frame: a heavy brush border with a cut corner, like a cel mount. */
+.dock-cinema .frame {
+  position: absolute;
+  inset: calc(11vh + 10px) 14px;
+  border: 5px solid #0a0710;
+  outline: 1.5px solid rgba(255, 255, 255, 0.18);
+  outline-offset: -9px;
+  clip-path: polygon(0 0, calc(100% - 46px) 0, 100% 46px, 100% 100%, 46px 100%, 0 calc(100% - 46px));
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55);
+}
+.dock-cinema .plate {
+  position: absolute;
+  left: 5vw;
+  bottom: calc(11vh + 26px);
+  padding: 8px 18px 9px 16px;
+  background: linear-gradient(90deg, rgba(4, 3, 14, 0.92), rgba(4, 3, 14, 0.6));
+  border-left: 4px solid #ff7a1c;
+  transform: skewX(-10deg) translateX(-24px);
+  opacity: 0;
+  transition: opacity 0.2s steps(3), transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+  color: #fff;
+  font-family: var(--font-display);
+}
+.dock-cinema.show .plate { opacity: 1; transform: skewX(-10deg); }
+.dock-cinema .plate small { display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.35em; color: var(--crt-cyan); }
+.dock-cinema .plate b { display: block; font-size: 26px; font-weight: 800; letter-spacing: 0.12em; text-shadow: 3px 3px 0 #ff3fa8, 6px 6px 0 rgba(43, 78, 168, 0.8); }
+.dock-cinema .plate span { display: block; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.22em; color: var(--crt-amber); margin-top: 3px; }
+.dock-cinema .tc {
+  position: absolute;
+  right: 5vw;
+  top: calc(11vh + 22px);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: rgba(255, 255, 255, 0.75);
+}
+.dock-cinema .tc::before { content: '● '; color: #ff3f5f; animation: blink 1s steps(1) infinite; }
+/* Iris-out to black (the OVA transition into the berth). */
+.dock-cinema .iris {
+  position: absolute;
+  inset: 0;
+  --r: 150vmax;
+  background: radial-gradient(circle at 50% 50%, transparent 0 var(--r), #000 calc(var(--r) + 1px));
+}
+
+/* ── docked screen ────────────────────────────────────────────────────── */
+.dock-screen {
+  --fc: #6fe6ff;
+  position: absolute;
+  inset: 4vh 4vw;
+  z-index: 22;
+  pointer-events: auto;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 20px 26px 14px;
+  background: rgba(3, 10, 8, 0.86);
+  border: 1px solid rgba(125, 255, 178, 0.4);
+  box-shadow: 0 0 40px rgba(125, 255, 178, 0.1) inset, 6px 6px 0 rgba(0, 0, 0, 0.55);
+  clip-path: polygon(0 0, calc(100% - 34px) 0, 100% 34px, 100% 100%, 34px 100%, 0 calc(100% - 34px));
+  color: var(--crt-green);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-shadow: 0 0 6px rgba(125, 255, 178, 0.45);
+  animation: dock-in 0.28s steps(4);
+}
+@keyframes dock-in {
+  0% { opacity: 0; transform: translateY(12px) skewX(-4deg); }
+  100% { opacity: 1; transform: none; }
+}
+.dock-screen.choir { --fc: #ff5fb4; }
+.dock-screen.rustwake { --fc: #ffc46b; }
+.dock-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 18px; border-bottom: 1px solid rgba(125, 255, 178, 0.25); padding-bottom: 10px; }
+.dock-head .stripe { width: 240px; height: 8px; margin-bottom: 10px; background: repeating-linear-gradient(90deg, #ff7a1c 0 30px, transparent 30px 37px, #2b4ea8 37px 67px, transparent 67px 74px); }
+.dock-screen.choir .dock-head .stripe { background: repeating-linear-gradient(90deg, #ff3fa8 0 30px, transparent 30px 37px, #5d4a86 37px 67px, transparent 67px 74px); }
+.dock-screen.rustwake .dock-head .stripe { background: repeating-linear-gradient(90deg, #ffd21f 0 30px, transparent 30px 37px, #b0643a 37px 67px, transparent 67px 74px); }
+.dock-head .kicker { font-size: 11px; letter-spacing: 0.3em; color: var(--fc); }
+.dock-head h2 {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(22px, 3.2vw, 40px);
+  letter-spacing: 0.08em;
+  color: #fff;
+  text-shadow: 3px 3px 0 #ff3fa8, 6px 6px 0 rgba(43, 78, 168, 0.8);
+  transform: skewX(-8deg);
+  transform-origin: left bottom;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dock-stats { display: grid; grid-template-columns: repeat(3, auto); gap: 4px 22px; text-align: right; font-size: 12px; letter-spacing: 0.12em; }
+.dock-stats span { color: rgba(125, 255, 178, 0.65); }
+.dock-stats b { display: block; font-family: var(--font-display); font-size: 20px; color: #fff; letter-spacing: 0.06em; font-weight: 700; }
+.dock-body { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(250px, 1fr); gap: 22px; min-height: 0; }
+.dock-body h3 { margin: 0 0 8px; font-family: var(--font-display); font-size: 13px; letter-spacing: 0.3em; color: var(--fc); font-weight: 700; }
+.dock-market { min-height: 0; overflow: auto; }
+.dock-market table { width: 100%; border-collapse: collapse; }
+.dock-market th { text-align: right; font-weight: normal; font-size: 11px; letter-spacing: 0.18em; color: rgba(125, 255, 178, 0.55); padding: 0 8px 6px; }
+.dock-market th:first-child, .dock-market td:first-child { text-align: left; }
+.dock-market td { padding: 5px 8px; text-align: right; border-top: 1px solid rgba(125, 255, 178, 0.1); white-space: nowrap; }
+.dock-market tr.sel td { background: rgba(125, 255, 178, 0.1); }
+.dock-market tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--fc); }
+.dock-market tr.none td { color: rgba(125, 255, 178, 0.28); }
+.dock-market td .unit { display: block; font-size: 10px; color: rgba(125, 255, 178, 0.5); letter-spacing: 0.1em; }
+.dock-market td.name { color: #fff; }
+.dock-market .tag { font-size: 10px; letter-spacing: 0.15em; padding: 1px 5px; border: 1px solid currentColor; }
+.dock-market .tag.surplus { color: var(--crt-green); }
+.dock-market .tag.demand { color: var(--crt-amber); }
+.dock-market .tag.steady { color: rgba(125, 255, 178, 0.45); border-color: transparent; }
+.dock-market .held { color: var(--crt-cyan); }
+.dock-market .ask { color: #fff; }
+.dock-btn {
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--crt-green);
+  background: rgba(0, 20, 12, 0.6);
+  border: 1px solid rgba(125, 255, 178, 0.45);
+  padding: 3px 9px;
+  cursor: pointer;
+  text-shadow: inherit;
+}
+.dock-btn:hover:not(:disabled) { background: rgba(125, 255, 178, 0.18); color: #fff; }
+.dock-btn:disabled { opacity: 0.3; cursor: default; }
+.dock-blurb { margin-top: 10px; min-height: 2.6em; color: rgba(125, 255, 178, 0.75); font-size: 12px; line-height: 1.5; }
+.dock-services { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.dock-svc { padding: 10px 12px; border: 1px solid rgba(125, 255, 178, 0.2); background: rgba(0, 16, 10, 0.5); }
+.dock-svc .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.dock-svc .meter { height: 8px; margin: 7px 0 9px; border: 1px solid rgba(125, 255, 178, 0.4); }
+.dock-svc .meter i { display: block; height: 100%; background: var(--crt-amber); }
+.dock-svc .pips { letter-spacing: 0.2em; color: #fff; }
+.dock-rep { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 10px; font-size: 12px; }
+.dock-rep .bar { position: relative; height: 6px; margin-top: 5px; background: rgba(125, 255, 178, 0.12); }
+.dock-rep .bar i { position: absolute; top: 0; bottom: 0; }
+.dock-rep .bar::after { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: rgba(255, 255, 255, 0.5); }
+.dock-log { flex: 1; min-height: 3em; font-size: 12px; line-height: 1.55; color: rgba(125, 255, 178, 0.8); overflow: hidden; }
+.dock-log .err { color: #ff5f7a; }
+.dock-log .ok { color: #fff; }
+.dock-launch {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: 0.3em;
+  padding: 10px 18px;
+  color: #fff;
+  background: linear-gradient(90deg, rgba(255, 122, 28, 0.85), rgba(255, 63, 168, 0.75));
+  border: none;
+  cursor: pointer;
+  transform: skewX(-10deg);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.6);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+}
+.dock-launch:hover { filter: brightness(1.15); }
+.dock-launch small { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; font-weight: normal; margin-left: 10px; opacity: 0.8; }
+.dock-ticker { overflow: hidden; white-space: nowrap; border-top: 1px solid rgba(125, 255, 178, 0.25); padding-top: 8px; font-size: 12px; letter-spacing: 0.08em; color: var(--crt-amber); }
+.dock-ticker span { display: inline-block; padding-left: 100%; animation: dock-ticker 90s linear -14s infinite; }
+.dock-ticker em { font-style: normal; color: var(--fc); margin: 0 18px; }
+@keyframes dock-ticker { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+.dock-keys { font-size: 11px; color: rgba(125, 255, 178, 0.5); letter-spacing: 0.12em; }
+@media (max-width: 900px) {
+  .dock-body { grid-template-columns: 1fr; overflow: auto; }
+  .dock-head { grid-template-columns: 1fr; }
+  .dock-stats { text-align: left; }
+}
