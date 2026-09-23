@@ -1,6 +1,6 @@
 import { Matrix4, Quaternion, Vector3, type Group } from 'three';
 import type { ControlState } from '@/core/Input';
-import type { FactionId } from '@/assets/Blueprint';
+import type { FactionId, Livery } from '@/assets/Blueprint';
 import type { ShipModel } from '@/assets/ShipBuilder';
 import { assets } from '@/assets/AssetLibrary';
 import { FlightModel, KESTREL_SPEC, type FlightSpec } from './FlightModel';
@@ -80,8 +80,8 @@ export class Fleet {
 
   constructor(private root: Group) {}
 
-  spawn(blueprintId: string, faction: FactionId, position: Vector3, facing: Vector3, opts: Partial<ShipEntity> = {}): ShipEntity {
-    const model = assets.ship(blueprintId);
+  spawn(blueprintId: string, faction: FactionId, position: Vector3, facing: Vector3, opts: Partial<ShipEntity> = {}, livery?: Partial<Livery>): ShipEntity {
+    const model = assets.ship(blueprintId, livery);
     this.root.add(model.root);
     const flight = new FlightModel(SPECS[blueprintId] ?? (model.radius > 200 ? CAPITAL_SPEC : KESTREL_SPEC));
     flight.position.copy(position);

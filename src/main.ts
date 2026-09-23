@@ -95,8 +95,8 @@ async function boot(): Promise<void> {
       game.startMission?.(FIRST_LIGHT);
       return;
     }
-    if (choice === 'hangar') {
-      await load('hangar');
+    if (choice === 'hangar' || choice === 'paint') {
+      await load(choice);
       return;
     }
     return; // showcase: stay

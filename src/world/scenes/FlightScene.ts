@@ -10,6 +10,7 @@ import { Fleet, faceAlong, type ShipEntity } from '@/sim/Fleet';
 import { Weapons } from '@/sim/Weapons';
 import { Missiles, type LockState } from '@/sim/Missiles';
 import { Capitals } from '@/sim/Capitals';
+import { loadProfile } from '@/game/Profile';
 import { WeaponVisuals } from '../WeaponVisuals';
 import { StarSystemView, type GateInstance } from '../StarSystemView';
 import { Hyperspace } from '../Hyperspace';
@@ -114,7 +115,8 @@ export class FlightScene implements GameScene {
     const fwd = gate0.link.normal.clone();
     const ORIGIN = gate0.center.clone().addScaledVector(fwd, -2600).add(new Vector3(0, -60, 0));
     const GATE = gate0.center;
-    this.player = this.fleet.spawn('vf27-kestrel', 'concord', ORIGIN, fwd, { isPlayer: true, name: 'Vanguard 1' });
+    const profile = loadProfile();
+    this.player = this.fleet.spawn('vf27-kestrel', 'concord', ORIGIN, fwd, { isPlayer: true, name: 'Vanguard 1' }, profile.livery);
     this.player.controls = input.state; // the player's controls ARE the input
     this.player.flight.velocity.copy(fwd).multiplyScalar(150);
     this.player.flight.throttle = 0.7;

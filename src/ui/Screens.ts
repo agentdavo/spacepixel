@@ -5,9 +5,10 @@ import type { MissionDef } from '@/game/Missions';
  * style.css with the CRT treatment. Each screen resolves a promise when the
  * player moves on, so the boot flow in main.ts reads top to bottom.
  */
-export function titleScreen(root: HTMLElement): Promise<'launch' | 'map' | 'hangar' | 'showcase'> {
-  const items: { id: 'launch' | 'map' | 'hangar' | 'showcase'; label: string }[] = [
+export function titleScreen(root: HTMLElement): Promise<'launch' | 'map' | 'hangar' | 'paint' | 'showcase'> {
+  const items: { id: 'launch' | 'map' | 'hangar' | 'paint' | 'showcase'; label: string }[] = [
     { id: 'launch', label: 'LAUNCH — EPISODE 01' },
+    { id: 'paint', label: 'PAINT SHOP' },
     { id: 'hangar', label: 'HANGAR / MODEL SHEETS' },
     { id: 'showcase', label: 'SHOWCASE' },
   ];
