@@ -72,7 +72,7 @@ const BATCHES = 1024;
  * uploads just the used range (one writeBuffer). The single compute pass
  * runs over window ∪ newly-claimed slots; a thread whose slot lies in this
  * frame's claimed range [head, head+spawn) binary-searches the request table
- * (prefix sums in q0.w, ≤11 steps) and initialises its particle from hashed
+ * (prefix sums in q0.w, log2(maxRequests)+1 = 12 steps) and initialises its particle from hashed
  * randoms; every other thread integrates its particle. One dispatch per frame.
  *
  * ── Floating origin ──────────────────────────────────────────────────────
@@ -155,6 +155,8 @@ export class Particles {
   private updateId = 0;
   private dispatchedId = 0;
   private backendChecked = false;
+  private hasWork = false;
+  /** dt passed to the last update() (trails use it to stagger puff ages). */
   lastDt = 1 / 60;
 
   constructor(opts: ParticleOptions = {}) {
@@ -398,8 +400,6 @@ export class Particles {
     this.frameMaxLife = 0;
     this.hasWork = window > 0;
   }
-
-  private hasWork = false;
 
   // ── GPU ─────────────────────────────────────────────────────────────
 
