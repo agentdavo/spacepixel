@@ -73,6 +73,7 @@ opens the Reach up around them and gets the game in front of players.
 | 3 | Attract mode / trailer — title idles into the prologue and flybys | runs unattended 10 min | 🔧 idle title → prologue reel |
 | 4 | Photo mode + clip capture (headless webm/GIF from recorded input) | 1080p clip from a replay | |
 | 5 | **Stations** — refineries, salvage yards, bastions, free ports, 1–3 per system | seeded, on star map | 🔧 |
+| 5b | **Living Reach** — painted planets (giants, terrestrial, volcanic, burning, Lantern-lit), moons, shattered moons, fly-through rings; timetable traffic, patrol wings, raider ambushes, arrivals flashes | seeded & deterministic, stations/gates untouched (`tests/reach.test.ts`) | 🔧 |
 | 6 | **Docking** — request within 5 km, ILS corridor, auto-dock under 1 km, launch | hostiles within 10 km block it | 🔧 |
 | 7 | **Trade** — commodities, supply/demand per station, cargo, credits | pure, unit-tested economy | 🔧 |
 | 8 | Repair, rearm, reputation per faction | persists in profile | 🔧 |

@@ -49,6 +49,7 @@ still runs (TSL ink twin), but compute particles are disabled there.
 | Tab | tactical view (battle at ¼ speed) |
 | V · K | camera shots · cinematic auto-cutaways |
 | M | star map (click a system to plot a route) |
+| H | hail the ship under your nose (name, flag, route, manifest) |
 | G | request docking within 5 km of a station / friendly carrier (again to cancel) |
 | L | codex / archive |
 | N | mute |
@@ -70,6 +71,42 @@ cargo, standing and rails persist in localStorage. Captures:
 Pure economy + tests: `src/game/economy.ts`, `tests/economy.test.ts`.
 
 ![Docked](docs/screenshots/dock-screen.jpg)
+
+## The living Reach
+
+**Planets.** Every system is surveyed on its own seeded stream *after* the
+generator and station placement, so lanes, gates, stations and campaign
+positions never move: original planets keep name, position, radius and ring
+and gain a kind and a look; new planets, moons and landmarks are appended
+well clear of everything. One painted shader (`src/world/planets/`) covers
+banded gas / ice giants with great storms and ring shadow, height-ramp
+terrestrial worlds (contour-band posterisation, Worley craters, caps, two-tone
+cloud decks, cyclones), volcanic and burning worlds (glowing crack networks
+and lava seas), Lantern-lit worlds (black-light veins) and night-side city
+lights on inhabited worlds (from the station data). Landmarks: shattered
+moons (tumbling chiselled fragments + rubble), burning worlds, Lantern-lit
+worlds. Moons orbit slowly outside rings and station altitudes. Fly into a
+ring plane and the disc becomes a place: a wrapping field of ice and rock
+chunks thins with height and vanishes in the gaps. Every body has a name and
+a line of flavour — on the star map survey panel and the HUD nav.
+
+**Traffic.** Each system has a lane graph (Lanterns, stations, the belt) with
+a timetable that is a pure function of the clock (`src/universe/traffic.ts`):
+freighters, Ebon tankers, liners, couriers, miners, patrol wings of 2–4.
+`src/world/Traffic.ts` materialises the sailings within 24 km (budget 22
+ships, nearest first, parked past 32 km) and flies them with the same
+FlightModel: slow off the node, lane cruise, slow approach, into a docking bay
+or through a Lantern (jump flash; arrivals flash in on the timetable second).
+Haulers are neutral (shoot one and it turns); patrols fly their flag and answer
+distress calls and hostiles; Rustwake raiders ambush haulers in lawless and
+border systems at a deterministic point on the lane — a distress call you can
+fly to, with a bounty and standing when you break it. Hull choices are data
+(`TRAFFIC_ROLES[role].hulls[flag]`, first id that exists), so civilian designs
+drop in without code. Far ships ride the timetable (snapped every 8th frame),
+mid-range ones steer every 3rd frame. The star map shows lane volume
+(thickness, convoy dots), per-system traffic halos, raider warnings and a
+survey panel. Captures: `?reach=body|ring|lane|ambush [&sys=<id>] [&body=<name|index>] [&side=lit|term|night]`,
+`?traffic=0` for A/B.
 
 ## Scenes (`?scene=`)
 

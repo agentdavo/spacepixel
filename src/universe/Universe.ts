@@ -30,6 +30,32 @@ export interface PlanetSite {
   preset: PlanetPreset;
   position: Vector3;
   tilt: [number, number, number];
+  /** One line of survey flavour (star map, HUD nav). Filled by `universe/bodies.ts`. */
+  description?: string;
+  /** Landmark tag ('shattered moon', 'Lantern-lit world', 'burning world', …) for the nav list. */
+  landmark?: string;
+  /** Bodies added by the survey pass (never moves an original planet or its stations). */
+  added?: boolean;
+  moons?: MoonSite[];
+}
+
+/**
+ * A moon on a slow circular orbit around its planet (see `moonPosition`).
+ * Orbits sit outside rings and station altitudes, inside 45% of the planet's
+ * distance from the system origin, so they never sweep through the Lanterns.
+ */
+export interface MoonSite {
+  preset: PlanetPreset;
+  description: string;
+  landmark?: string;
+  /** Orbit radius, metres (centre to centre). */
+  orbit: number;
+  /** Seconds per orbit. */
+  period: number;
+  phase: number;
+  /** Orbit plane: inclination and ascending-node angle, radians. */
+  incline: number;
+  node: number;
 }
 
 /**
