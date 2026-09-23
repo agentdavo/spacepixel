@@ -1,6 +1,6 @@
 import type { Engine, FrameContext, Updatable } from '@/core/Engine';
 import type { InkPipeline } from '@/render/post/InkPipeline';
-import type { ShowcaseScene } from '@/world/ShowcaseScene';
+import type { GameScene } from '@/world/GameScene';
 import type { DebugView } from '@/core/Flags';
 import { flags } from '@/core/Flags';
 
@@ -20,7 +20,8 @@ export class DebugHud implements Updatable {
   constructor(
     private engine: Engine,
     private ink: InkPipeline,
-    private showcase: ShowcaseScene,
+    private game: GameScene,
+    private sceneName: string,
     root: HTMLElement,
   ) {
     this.el = document.createElement('div');
@@ -38,7 +39,7 @@ export class DebugHud implements Updatable {
         this.ink.settings.enabled = !this.ink.settings.enabled;
         this.ink.applySettings();
       } else if (e.key === 'c' || e.key === 'C') {
-        this.showcase.setShot(this.showcase.shot + 1);
+        this.game.cycleCamera?.();
       } else if (e.key === 'b' || e.key === 'B') {
         this.ink.settings.boilAmount = this.ink.settings.boilAmount > 0 ? 0 : 0.35;
         this.ink.applySettings();
@@ -70,6 +71,6 @@ export class DebugHud implements Updatable {
       <div>FRAME    <b>${stats.fps.toFixed(1)}</b> fps · <b>${stats.frameMs.toFixed(1)}</b> ms</div>
       <div>VIEW     <b>${this.view.toUpperCase()}</b> · INK <b>${s.enabled ? 'ON' : 'OFF'}</b> · BOIL <b>${s.boilAmount > 0 ? 'ON' : 'OFF'}</b></div>
       <div class="keys">[1-6] view  [I] ink  [B] boil  [C] camera</div>`;
-    this.shotEl.textContent = `CAM ${this.showcase.shot + 1} · ${this.showcase.shots[this.showcase.shot].name}`;
+    this.shotEl.textContent = this.game.cameraLabel?.() ?? this.sceneName.toUpperCase();
   }
 }

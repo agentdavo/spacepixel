@@ -2,7 +2,7 @@ import { flags } from '@/core/Flags';
 import { Engine } from '@/core/Engine';
 import { createRenderer } from '@/render/RendererFactory';
 import { InkPipeline } from '@/render/post/InkPipeline';
-import { ShowcaseScene } from '@/world/ShowcaseScene';
+import { SCENES, DEFAULT_SCENE } from '@/world/scenes';
 import { DebugHud } from '@/ui/DebugHud';
 
 declare global {
@@ -12,6 +12,8 @@ declare global {
       frame: () => number;
       backend: string;
       error?: string;
+      /** Scene-specific test hooks (e.g. scripted input for screenshots). */
+      hooks?: Record<string, unknown>;
     };
   }
 }
@@ -31,28 +33,29 @@ async function boot(): Promise<void> {
   const info = await createRenderer(canvas);
   const engine = new Engine(info);
 
-  const showcase = new ShowcaseScene();
-  showcase.setShot(flags.cam);
-  engine.onResize(showcase);
+  const sceneName = SCENES[flags.scene] ? flags.scene : DEFAULT_SCENE;
+  const game = await SCENES[sceneName]();
+  engine.onResize(game);
 
-  const ink = new InkPipeline(info.renderer, showcase.scene, showcase.camera, info.isWebGPU);
+  const ink = new InkPipeline(info.renderer, game.scene, game.camera, info.isWebGPU);
   ink.settings.enabled = flags.ink;
   ink.applySettings();
   ink.setView(flags.view);
   engine.onResize(ink);
 
-  engine.addSystem(showcase);
+  engine.addSystem(game);
   engine.addSystem({ update: (ctx) => ink.update(ctx.time) });
-  engine.addSystem(new DebugHud(engine, ink, showcase, document.getElementById('ui-root')!));
+  engine.addSystem(new DebugHud(engine, ink, game, sceneName, document.getElementById('ui-root')!));
   engine.setRender(() => ink.render());
 
   engine.start();
   window.__VANGUARD__ = {
+    ...window.__VANGUARD__,
     ready: true,
     frame: () => engine.frameContext.frame,
     backend: info.backendName,
   };
-  console.info(`[vanguard] ${info.backendName} backend · ${info.adapterDescription}`);
+  console.info(`[vanguard] ${info.backendName} backend · ${info.adapterDescription} · scene=${sceneName}`);
 }
 
 boot().catch(fail);

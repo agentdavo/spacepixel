@@ -1,5 +1,7 @@
 import { MathUtils, PerspectiveCamera, Scene, Vector3 } from 'three';
-import type { FrameContext, Updatable, ResizeAware } from '@/core/Engine';
+import type { FrameContext } from '@/core/Engine';
+import type { GameScene } from './GameScene';
+import { flags } from '@/core/Flags';
 import type { ShipModel } from '@/assets/ShipBuilder';
 import { assets } from '@/assets/AssetLibrary';
 import { Backdrop, BACKDROPS } from './Backdrop';
@@ -18,7 +20,7 @@ interface CameraShot {
  * to lock down the look — Vanguard Kestrels in formation, inbound Choir
  * Cantors, a Cathedral dreadnought on the horizon and the gas giant Castellan.
  */
-export class ShowcaseScene implements Updatable, ResizeAware {
+export class ShowcaseScene implements GameScene {
   readonly scene = new Scene();
   readonly camera = new PerspectiveCamera(36, 16 / 9, 0.5, 1_200_000);
   readonly backdrop: Backdrop;
@@ -116,6 +118,15 @@ export class ShowcaseScene implements Updatable, ResizeAware {
     this.cathedral.root.position.set(-900, 950, -6200);
     this.cathedral.root.rotation.set(0.04, -2.3, 0.1);
     this.scene.add(this.cathedral.root);
+    this.setShot(flags.cam);
+  }
+
+  cycleCamera(): void {
+    this.setShot(this.shot + 1);
+  }
+
+  cameraLabel(): string {
+    return `CAM ${this.shot + 1} · ${this.shots[this.shot].name}`;
   }
 
   setShot(i: number): void {

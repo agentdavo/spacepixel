@@ -3,7 +3,7 @@
  * Headless screenshot harness.
  *
  *   node scripts/screenshot.mjs [--out docs/screenshots] [--size 1600x900]
- *        [--frames 90] [--shot name:query ...] [--webgl] [--jpg]
+ *        [--frames 90] [--shot name:query ...] [--webgl] [--jpg] [--port 5199]
  *
  * Boots a Vite dev server, opens Chromium with WebGPU enabled (SwiftShader
  * Vulkan when no GPU is present), waits for N rendered frames and captures.
@@ -24,15 +24,16 @@ const [width, height] = opt('size', '1600x900').split('x').map(Number);
 const frames = Number(opt('frames', '45'));
 const webgl = args.includes('--webgl');
 const jpg = args.includes('--jpg');
+const port = Number(opt('port', '5199'));
 const shots = [];
 args.forEach((a, i) => a === '--shot' && shots.push(args[i + 1]));
 if (!shots.length) shots.push('showcase:cam=0&t=3');
 
 mkdirSync(outDir, { recursive: true });
 
-const server = await createServer({ server: { port: 5199, host: '127.0.0.1' }, logLevel: 'warn' });
+const server = await createServer({ server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'warn' });
 await server.listen();
-const base = 'http://127.0.0.1:5199/';
+const base = `http://127.0.0.1:${port}/`;
 
 const browser = await chromium.launch({
   args: [

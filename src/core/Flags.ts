@@ -6,7 +6,7 @@
  *   ?view=normal|depth|ink|id|edges|color   debug G-buffer views
  *   ?shot=1          deterministic "screenshot mode" (fixed time, no UI chrome)
  *   ?t=12.5          start time in seconds (useful with shot mode)
- *   ?scene=showcase  which scene to boot
+ *   ?scene=flight    which scene to boot (flight | showcase | spatial | hangar)
  *   ?cam=0..n        showcase camera preset
  */
 export type DebugView = 'final' | 'color' | 'normal' | 'depth' | 'id' | 'edges';
@@ -33,7 +33,7 @@ export const flags: Flags = {
   view: VIEWS.includes(rawView) ? rawView : 'final',
   shot: q.get('shot') === '1',
   startTime: Number(q.get('t') ?? 0) || 0,
-  scene: q.get('scene') ?? 'showcase',
+  scene: q.get('scene') ?? '',
   cam: Number(q.get('cam') ?? 0) || 0,
   hud: q.get('hud') !== '0',
 };
