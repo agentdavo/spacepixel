@@ -2,6 +2,8 @@ import { Timer } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { RendererInfo } from '@/render/RendererFactory';
 import { flags } from './Flags';
+import { Perf } from './Perf';
+import { input } from './Input';
 
 export interface FrameContext {
   /** Seconds since the previous frame, clamped to avoid physics explosions. */
@@ -36,12 +38,14 @@ export class Engine {
 
   /** Rolling frame-time stats for the debug overlay / profiler. */
   readonly stats = { fps: 0, frameMs: 0 };
+  readonly perf: Perf;
   private statAccum = 0;
   private statFrames = 0;
 
   constructor(info: RendererInfo) {
     this.info = info;
     this.renderer = info.renderer;
+    this.perf = new Perf(info.renderer, flags.budget);
     window.addEventListener('resize', () => this.handleResize());
   }
 
@@ -70,6 +74,7 @@ export class Engine {
   }
 
   private tick(timestamp: number): void {
+    this.perf.begin(timestamp);
     this.timer.update(timestamp);
     const realDt = this.timer.getDelta();
     const dt = flags.shot ? 1 / 60 : Math.min(realDt, 1 / 20);
@@ -78,8 +83,12 @@ export class Engine {
     this.ctx.time += dt;
     this.ctx.frame++;
 
+    // Input is sampled exactly once, first thing, and read directly by the
+    // sim on this same frame.
+    input.sample(this.ctx.time);
     for (const s of this.systems) s.update(this.ctx);
     this.renderFn();
+    this.perf.end(input.consumedInputTime);
 
     this.statAccum += realDt;
     this.statFrames++;

@@ -7,7 +7,9 @@
  *   ?shot=1          deterministic "screenshot mode" (fixed time, no UI chrome)
  *   ?t=12.5          start time in seconds (useful with shot mode)
  *   ?scene=flight    which scene to boot (flight | showcase | spatial | hangar)
- *   ?cam=0..n        showcase camera preset
+ *   ?cam=0..n        camera preset
+ *   ?budget=8.3      frame budget (ms) for the perf graph / pass-fail
+ *   ?demo=1          scripted autopilot (implied by shot mode)
  */
 export type DebugView = 'final' | 'color' | 'normal' | 'depth' | 'id' | 'edges';
 
@@ -20,6 +22,10 @@ export interface Flags {
   scene: string;
   cam: number;
   hud: boolean;
+  /** Frame budget in ms (pass/fail line on the perf graph). */
+  budget: number;
+  /** Scripted autopilot for demos / captures. */
+  demo: boolean;
 }
 
 const q = new URLSearchParams(window.location.search);
@@ -36,4 +42,6 @@ export const flags: Flags = {
   scene: q.get('scene') ?? '',
   cam: Number(q.get('cam') ?? 0) || 0,
   hud: q.get('hud') !== '0',
+  budget: Number(q.get('budget') ?? 0) || 1000 / 60,
+  demo: q.get('demo') === '1' || q.get('shot') === '1',
 };

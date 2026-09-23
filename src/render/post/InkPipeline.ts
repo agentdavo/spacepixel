@@ -19,6 +19,10 @@ import {
   renderOutput,
   select,
   log2,
+  atan,
+  floor,
+  vec2,
+  time,
 } from 'three/tsl';
 import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
@@ -26,6 +30,7 @@ import { sceneMRT } from '../materials/InkChannels';
 import { inkEdgeWGSL } from './shaders/inkEdge.wgsl';
 import { makeInkEdgeTSL } from './shaders/inkEdge.tsl';
 import type { DebugView } from '@/core/Flags';
+import { postFx } from './PostFx';
 
 export interface InkSettings {
   enabled: boolean;
@@ -98,6 +103,8 @@ export class InkPipeline {
   private readonly hazeParams = uniform(new Vector4());
   private readonly inkOn = uniform(1);
   private readonly grainSeed = uniform(0);
+  private readonly boost = uniform(0);
+  private readonly speed = uniform(0);
 
   private view: DebugView = 'final';
   private pixelRatio = 1;
@@ -131,7 +138,13 @@ export class InkPipeline {
       float(1).sub(exp(depthKm.div(this.hazeParams.x).negate())).mul(this.hazeParams.y).mul(inkSample.b),
       float(0),
     );
-    const lit = mix(color.rgb, this.hazeColor, haze);
+    // Afterburner focal distortion: radial chromatic split of the lit frame.
+    const caDir = screenUV.sub(0.5);
+    const caAmt = this.boost.mul(0.006).add(this.speed.mul(0.0015));
+    const litR = color.sample(screenUV.add(caDir.mul(caAmt))).r;
+    const litB = color.sample(screenUV.sub(caDir.mul(caAmt))).b;
+    const caColor = vec3(litR, color.g, litB);
+    const lit = mix(caColor, this.hazeColor, haze);
     const lineColor = mix(this.inkColor, this.hazeColor, haze.mul(0.85));
     const inked = mix(lit, lineColor, edges.x.mul(this.inkOn));
 
@@ -144,7 +157,19 @@ export class InkPipeline {
     const centered = screenUV.sub(0.5);
     const vignette = float(1).sub(smoothstep(0.35, 0.95, length(centered.mul(vec3(1.25, 1.0, 0).xy))));
     const grain = fract(sin(dot(screenUV.add(this.grainSeed), vec3(12.9898, 78.233, 0).xy)).mul(43758.5453)).sub(0.5);
-    const graded = display.rgb.mul(mix(0.78, 1.0, vignette)).add(grain.mul(0.025));
+    // Anime speed lines: radial streaks on the frame edges while boosting.
+    const ang = atan(centered.y, centered.x.mul(1.7));
+    const sector = floor(ang.mul(38.0).add(floor(time.mul(24.0)).mul(7.31)));
+    const lineHash = fract(sin(sector.mul(91.17)).mul(43758.5453));
+    const radius = length(centered.mul(vec2(1.7, 1.0)));
+    const along = fract(radius.mul(1.5).sub(time.mul(3.0)).add(lineHash));
+    const dash = smoothstep(0.0, 0.25, along).mul(float(1).sub(smoothstep(0.55, 0.9, along)));
+    const streak = smoothstep(0.82, 0.9, lineHash).mul(smoothstep(0.3, 0.8, radius)).mul(dash);
+    const speedLines = streak.mul(this.boost).mul(0.9);
+    const graded = display.rgb
+      .mul(mix(0.78, 1.0, vignette))
+      .add(grain.mul(0.025))
+      .add(vec3(0.85, 0.95, 1.0).mul(speedLines));
     const final = fxaa(vec4(clamp(graded, 0, 1), 1.0));
 
     // ── debug views ───────────────────────────────────────────────────
@@ -188,6 +213,8 @@ export class InkPipeline {
   }
 
   update(time: number): void {
+    this.boost.value = postFx.boost;
+    this.speed.value = postFx.speed;
     // Stepped clock → lines re-trace 12×/s like hand-inked animation.
     this.params2.value.z = Math.floor(time * this.settings.boilRate) % 97;
     this.grainSeed.value = (Math.floor(time * 24) % 64) * 0.013;

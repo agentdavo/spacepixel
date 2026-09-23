@@ -25,6 +25,7 @@ export async function createRenderer(canvas: HTMLCanvasElement): Promise<Rendere
     forceWebGL: flags.forceWebGL,
     powerPreference: 'high-performance',
     reversedDepthBuffer: true,
+    trackTimestamp: true, // GPU timings when the adapter exposes timestamp-query
   });
 
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));

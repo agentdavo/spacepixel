@@ -86,3 +86,11 @@ html, body {
   font-size: 13px;
   pointer-events: auto;
 }
+
+.hud-graph {
+  display: block;
+  margin-top: 6px;
+  width: 260px;
+  height: 64px;
+  border: 1px solid rgba(125, 255, 178, 0.25);
+}
