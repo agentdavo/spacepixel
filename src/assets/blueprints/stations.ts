@@ -1,5 +1,6 @@
 import type { Blueprint, FactionId, Part, Vec3 } from '../Blueprint';
 import { rng } from '../HullKit';
+import { hollowBay } from './bays';
 import type { StationKind } from '@/game/economy';
 
 /**
@@ -8,7 +9,7 @@ import type { StationKind } from '@/game/economy';
  * mouth is 150 × 100 m — a Kestrel (18 m) disappears into it.
  *
  * Every station shares a spine: a faceted hub along +Z, the docking bay at
- * the +Z end (lit mouth frame and slope lights), and a rotating habitat ring
+ * the +Z end (a hollow, lit hangar recess and slope lights), and a rotating habitat ring
  * on the `spin` channel turning about the docking axis — like the old
  * orbital stations, the bay sits on the axis so the ring never matters to a
  * pilot. The kind adds the character: Ebon tanks and a skimmer boom for a
@@ -18,6 +19,9 @@ import type { StationKind } from '@/game/economy';
  */
 export const BAY_Z = 6.05; // bay mouth plane (units)
 export const BAY_DEPTH = 1.1; // how far a ship slides inside (units)
+export const BAY_BACK = 4.72; // back wall (the hub's front face sits at 4.7)
+export const BAY_W = 1.5; // mouth opening (units)
+export const BAY_H = 1.0;
 
 const SPIN = { id: 'spin', pivot: [0, 0, -1.5] as Vec3, axis: [0, 0, 1] as Vec3, range: [0, 360] as [number, number], channel: 'spin', mirror: false };
 const SPIN2 = { id: 'spin2', pivot: [0, 0, -3.6] as Vec3, axis: [0, 0, 1] as Vec3, range: [360, 0] as [number, number], channel: 'spin', mirror: false };
@@ -44,13 +48,9 @@ function spine(): Part[] {
     },
     { name: 'hub-band', paint: 'accent', pos: [0, 0, -2.2], repeat: { count: 2, step: [0, 0, 3.4] }, shape: { kind: 'rib', radius: 1.31, thickness: 0.1, depth: 0.32, arc: 360, segments: 20 } },
     { name: 'hub-collar', paint: 'secondary', pos: [0, 0, 3.9], shape: { kind: 'rib', radius: 1.8, thickness: 0.16, depth: 0.5, arc: 360, segments: 20, c: 0.04 } },
-    // Docking bay: armoured block, dark mouth, lit frame.
-    { name: 'bay-block', paint: 'secondary', pos: [0, 0, 5.35], shape: { kind: 'box', w: 2.7, h: 2.0, d: 1.4, c: 0.3 } },
+    // Docking bay: a hollow recess in an armoured collar (see bays.ts).
+    ...hollowBay({ y: 0, mouth: BAY_Z, back: BAY_BACK, w: BAY_W, h: BAY_H, outerW: 2.7, outerH: 2.0, collarDepth: BAY_Z - 4.65 }),
     { name: 'bay-hood', paint: 'primary', pos: [0, 0.98, 5.5], shape: { kind: 'box', w: 2.2, h: 0.14, d: 1.2, c: 0.05 } },
-    { name: 'bay-mouth', paint: 'dark', pos: [0, 0, BAY_Z - 0.04], shape: { kind: 'box', w: 1.5, h: 1.0, d: 0.1, c: 0.12 } },
-    { name: 'bay-deck-light', paint: 'glass', emissive: 0.9, pos: [0, -0.42, BAY_Z - 0.02], shape: { kind: 'box', w: 1.3, h: 0.04, d: 0.06 } },
-    { name: 'bay-frame', paint: 'glow', emissive: 0.9, pos: [0, 0.56, BAY_Z], repeat: { count: 2, step: [0, -1.12, 0] }, shape: { kind: 'box', w: 1.62, h: 0.06, d: 0.08 } },
-    { name: 'bay-frame-side', paint: 'glow', emissive: 0.9, mirror: true, pos: [0.81, 0, BAY_Z], shape: { kind: 'box', w: 0.06, h: 1.1, d: 0.08 } },
     // Slope lights (VASI) either side of the mouth.
     { name: 'vasi', paint: 'glow', emissive: 1.6, mirror: true, pos: [1.15, 0.5, BAY_Z - 0.05], repeat: { count: 4, step: [0, -0.33, 0] }, shape: { kind: 'box', w: 0.18, h: 0.08, d: 0.08 } },
     { name: 'bay-stripe', paint: 'accent', mirror: true, pos: [1.2, 0, 5.35], repeat: { count: 3, step: [0, 0, -0.35] }, shape: { kind: 'box', w: 0.32, h: 1.9, d: 0.1 } },

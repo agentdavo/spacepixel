@@ -24,7 +24,8 @@ npm install
 npm run dev            # http://localhost:5173 — title card → campaign
 npm run build          # typecheck + production bundle
 npm test               # campaign runner + all 20 missions (node:test)
-npm run ai-sim         # headless dogfight/formation sim with pass/fail numbers
+npm run ai-sim         # headless dogfight/formation/station sim with pass/fail numbers
+npm run econ-sim       # trade-route balance on the seeded Reach (profit per hold, pass/fail bands)
 npm run perf           # frame-time budgets (meaningful on real GPUs only)
 npm run shot -- --jpg --shot 'hero:cam=0&t=3'   # headless screenshots
 ```
@@ -68,6 +69,28 @@ rails, read the rumour ticker, launch (**Enter**). Keys on the dock screen:
 cargo, standing and rails persist in localStorage. Captures:
 `?scene=flight&dock=approach|auto|docked|launch[&station=<id>][&cargo=demo]`.
 Pure economy + tests: `src/game/economy.ts`, `tests/economy.test.ts`.
+
+Bays are real hollow recesses (collar, dark liners, frame ribs, deck lights
+running inward, a lit berth door) behind a faint atmosphere curtain that
+ripples where the ship crosses it; the auto-dock cuts from a tracking shot
+to the mouth to the inside of the bay. Wingmen break off to hold points
+outside the corridor while you dock and re-form when you launch. Campaign
+episodes lock docking out unless the mission sets `allowDocking`.
+
+**Balance.** A safe run earns about 1.5–4k sh a hold (a fresh pilot's first
+run, capital-bound, ~1k); the fat margins (up to ~8k) are in contested and
+Hegemony space and the Null Lantern's shadow, where markets pay hazard
+premiums. Per-commodity pressure means a hold of one good sells badly —
+mix the hold. `npm run econ-sim` prints the best routes and asserts the
+bands (`src/game/econSim.ts`, `tests/econ-sim.test.ts`).
+
+**Collisions.** Hulls are solid: fighters are spheres, stations and capital
+ships get a few dozen proxy boxes / cylinders / rings built from their
+blueprint parts (spinning rings ride their joint). Hits bounce and scrape
+(damage from closing speed, sparks, camera shake); fast movers are swept
+so nothing tunnels at cruise. AI avoidance steers round the same proxies
+(`src/sim/Collision.ts`, `src/sim/CollisionProxies.ts`,
+`src/world/HullCollisions.ts`, `tests/collision.test.ts`).
 
 ![Docked](docs/screenshots/dock-screen.jpg)
 

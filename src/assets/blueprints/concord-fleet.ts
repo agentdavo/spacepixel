@@ -1,5 +1,6 @@
 import type { Blueprint, Part, Paint, Station, Vec3 } from '../Blueprint';
 import { band, sideX, topAt } from './kit';
+import { hollowBay } from './bays';
 
 /** Upright cylinder (lofted along Z, stood on Y) — masts, barbettes, stacks. */
 function post(name: string, paint: Paint, pos: Vec3, rBottom: number, rTop: number, height: number, segments = 8): Part {
@@ -233,6 +234,8 @@ const CV_POD: Station[] = [
 ];
 const DECK_Y = 0.97;
 const DECK_TOP = DECK_Y + 0.06;
+/** Bow hangar (hollow): mouth plane, back wall and opening, in units (1 = 100 m). */
+export const CV_BAY = { y: 0.05, mouth: 7.6, back: 6.92, w: 1.3, h: 0.7 };
 const ISLAND_X = 1.25;
 
 export const HESPERUS_DAWN: Blueprint = {
@@ -402,16 +405,11 @@ export const HESPERUS_DAWN: Blueprint = {
     { name: 'scorch', paint: 'dark', pos: [2.95, -0.55, -1.9], rot: [0, 0, 0], shape: { kind: 'box', w: 0.02, h: 0.3, d: 0.6 } },
     { name: 'patch', paint: 'metal', pos: [-2.95, -0.6, 0.8], shape: { kind: 'box', w: 0.02, h: 0.25, d: 0.5 } },
     bell('pod-bell', [2.3, -0.35, -5.55], 0.46, 0.7, true),
-    // Bow launch bay + stern bay.
-    { name: 'bow-bay', paint: 'dark', pos: [0, 0.05, 6.92], shape: { kind: 'box', w: 1.4, h: 0.7, d: 0.1, c: 0.15 } },
-    {
-      name: 'bow-bay-lights',
-      paint: 'glow',
-      emissive: 1.2,
-      pos: [0, 0.45, 6.93],
-      repeat: { count: 2, step: [0, -0.8, 0] },
-      shape: { kind: 'box', w: 1.3, h: 0.04, d: 0.06 },
-    },
+    // Bow launch bay (a hollow hangar block under the deck overhang — you
+    // fly into it: see bays.ts) + stern bay.
+    ...hollowBay({ id: 'bow-bay', y: CV_BAY.y, mouth: CV_BAY.mouth, back: CV_BAY.back, w: CV_BAY.w, h: CV_BAY.h, outerW: 1.8, outerH: 1.34, collarY: 0.24, collarDepth: CV_BAY.mouth - 6.8, paint: 'primary' }),
+    { name: 'bow-bay-band', paint: 'accent', pos: [0, 0.83, 7.3], shape: { kind: 'box', w: 1.82, h: 0.1, d: 0.12, c: 0.03 } },
+    { name: 'bow-bay-band-side', paint: 'accent', mirror: true, pos: [0.9, 0.05, 7.3], shape: { kind: 'box', w: 0.04, h: 0.7, d: 0.12 } },
     {
       name: 'drive-block',
       paint: 'metal',
@@ -434,7 +432,7 @@ export const HESPERUS_DAWN: Blueprint = {
   ],
   articulations: [{ id: 'radar', pivot: [ISLAND_X, DECK_TOP + 2.66, -0.8], axis: [0, 1, 0], range: [0, 360], channel: 'radar', mirror: false }],
   hardpoints: [
-    { id: 'bow-bay', pos: [0, 0.05, 7.0], kind: 'hangar' },
+    { id: 'bow-bay', pos: [0, CV_BAY.y, CV_BAY.mouth], kind: 'hangar' },
     { id: 'stern-bay', pos: [0, 0.5, -7.3], rot: [0, 180, 0], kind: 'hangar' },
     { id: 'pod-bay', pos: [2.3, -0.35, 5.9], kind: 'hangar', mirror: true },
     { id: 'catapult', pos: [0.55, DECK_TOP + 0.05, 3.4], kind: 'hangar', mirror: true },

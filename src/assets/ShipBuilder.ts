@@ -91,7 +91,7 @@ function eulerDeg(r: Vec3): Euler {
   return new Euler(MathUtils.degToRad(r[0]), MathUtils.degToRad(r[1]), MathUtils.degToRad(r[2]), 'XYZ');
 }
 
-function partMatrix(p: Part): Matrix4 {
+export function partMatrix(p: Part): Matrix4 {
   const pos = new Vector3(...(p.pos ?? [0, 0, 0]));
   const q = new Quaternion().setFromEuler(eulerDeg(p.rot ?? [0, 0, 0]));
   const s = new Vector3(...(p.scale ?? [1, 1, 1]));
@@ -99,7 +99,7 @@ function partMatrix(p: Part): Matrix4 {
 }
 
 /** Transform of repeat copy i (applied on top of the part matrix). */
-function repeatMatrix(p: Part, i: number): Matrix4 {
+export function repeatMatrix(p: Part, i: number): Matrix4 {
   if (!p.repeat || i === 0) return new Matrix4();
   const st = p.repeat.step ?? [0, 0, 0];
   const r = p.repeat.rot ?? [0, 0, 0];

@@ -2,7 +2,9 @@ import { Matrix4, Quaternion, Vector3, type PerspectiveCamera } from 'three';
 import { hostile, type Fleet, type ShipEntity } from '@/sim/Fleet';
 import type { EconFaction, MarketSpec } from '@/game/economy';
 import type { StarSystemView } from './StarSystemView';
-import { BAY_INSIDE, type StationView } from './Station';
+import { BAY_INSIDE, BAY_INTERIOR, type StationView } from './Station';
+import { CV_BAY, HESPERUS_DAWN } from '@/assets/blueprints/concord-fleet';
+import { BayCurtain } from './BayCurtain';
 
 /**
  * Docking (stations, friendly carriers, orbital ports).
@@ -39,6 +41,10 @@ export interface Dockable extends MarketSpec {
   radius: number;
   /** Parking depth inside the bay (m). */
   inside: number;
+  /** Bay interior: half width / half height of the mouth, depth to the back wall (m). */
+  interior: { hw: number; hh: number; depth: number };
+  /** Atmosphere curtain across the mouth (ripples as the ship crosses). */
+  curtain?: BayCurtain;
   station?: StationView;
   ship?: ShipEntity;
 }
@@ -52,7 +58,9 @@ const LAPSE_RANGE = 7500;
 const T_AUTO = 7.0;
 const T_LAUNCH = 3.4;
 const LAUNCH_RUN = 560;
-const CUT_B = 2.8;
+const CUT_B = 2.6;
+const CUT_C = 5.1;
+const LAUNCH_CUT = 1.25;
 
 const ECON = new Set<string>(['concord', 'choir', 'rustwake']);
 const _m = new Matrix4();
@@ -60,6 +68,7 @@ const _a = new Vector3();
 const _b = new Vector3();
 const _c = new Vector3();
 const _r = new Vector3();
+const _l = new Vector3();
 const _q = new Quaternion();
 const _bx = new Vector3();
 const _by = new Vector3();
@@ -88,6 +97,11 @@ export class DockingController {
   private sinceLaunch = 99;
   /** Captures: start the auto-dock this many seconds in. */
   skipTo = 0;
+  /**
+   * Set (with a reason) when docking isn't available right now — campaign
+   * episodes that don't allow it. Blocks requests and hides the prompt.
+   */
+  lockout: string | null = null;
   private orbitA = 0;
 
   constructor(
@@ -130,7 +144,10 @@ export class DockingController {
           center: st.center,
           radius: st.radius,
           inside: BAY_INSIDE,
+          interior: BAY_INTERIOR,
+          curtain: st.curtain,
           station: st,
+          risk: st.site.risk,
         };
         this.stationDocks.set(st, d);
       }
@@ -149,6 +166,18 @@ export class DockingController {
     if (d === undefined) {
       const sock = s.model.sockets.get('bow-bay') ?? [...s.model.sockets.values()].find((o) => o.userData.kind === 'hangar' && o.parent === s.model.root);
       if (!sock) return null;
+      // The Hesperus Dawn's bow hangar is a real hollow bay (bays.ts); other
+      // hulls fall back to a generic recess size and no curtain.
+      const hollow = s.model.blueprint.id === HESPERUS_DAWN.id && s.model.sockets.get('bow-bay') === sock;
+      const k = HESPERUS_DAWN.scale ?? 100;
+      const interior = hollow ? { hw: (CV_BAY.w / 2) * k, hh: (CV_BAY.h / 2) * k, depth: (CV_BAY.mouth - CV_BAY.back) * k } : { hw: 45, hh: 25, depth: 60 };
+      let curtain: BayCurtain | undefined;
+      if (hollow) {
+        curtain = new BayCurtain(interior.hw * 2, interior.hh * 2, '#6fe6ff');
+        curtain.mesh.position.copy(sock.position).addScaledVector(new Vector3(0, 0, 1).applyQuaternion(sock.quaternion), -3);
+        curtain.mesh.quaternion.copy(sock.quaternion);
+        s.model.root.add(curtain.mesh);
+      }
       d = {
         id: `carrier:${s.name}`,
         kind: 'carrier',
@@ -160,7 +189,9 @@ export class DockingController {
         velocity: s.flight.velocity,
         center: s.flight.position,
         radius: s.model.radius * 0.6,
-        inside: 70,
+        inside: hollow ? 32 : 40,
+        interior,
+        curtain,
         ship: s,
         local: sock.position.clone(),
         localFwd: new Vector3(0, 0, 1).applyQuaternion(sock.quaternion),
@@ -191,6 +222,10 @@ export class DockingController {
       this.phase = 'free';
       this.target = null;
       this.say('DOCKING REQUEST CANCELLED', '#ffc46b');
+      return;
+    }
+    if (this.lockout) {
+      this.say(this.lockout, '#ffc46b');
       return;
     }
     const d = this.nearest;
@@ -252,8 +287,11 @@ export class DockingController {
           best = d;
         }
       }
-      this.nearest = this.sinceLaunch > 4 ? best : null;
+      this.nearest = this.sinceLaunch > 4 && !this.lockout ? best : null;
     }
+    // Curtains: the berth we're flying into ripples where the ship crosses.
+    const inBay = this.phase === 'auto' || this.phase === 'launch' || this.phase === 'docked';
+    for (const d of all) d.curtain?.setShip(inBay && d === this.target ? this.toLocal(d, pf.position, _b) : null, dt);
 
     switch (this.phase) {
       case 'cleared': {
@@ -428,33 +466,41 @@ export class DockingController {
   /**
    * Cinematic camera while the sequence owns the ship. Writes the universe
    * eye and the camera's rotation/FOV; returns false when flight cameras rule.
+   *
+   * Auto-dock, three hard cuts (OVA style):
+   *   A  tracking off her port quarter, the lit bay stacked up ahead;
+   *   B  planted beside the mouth: she crosses the curtain into the lit recess;
+   *   C  inside, from the back corner: she glides in toward us and stops,
+   *      the curtain rippling and open space behind her.
+   * Launch: from inside behind her as she blasts out, then planted up the corridor.
    */
   camera(eye: Vector3, cam: PerspectiveCamera, dt: number): boolean {
     const d = this.target;
     if (!d || !this.busy) return false;
     const ship = this.player.flight.position;
+    const I = d.interior;
     let fov = 40;
     if (this.phase === 'auto') {
+      const local = this.toLocal(d, ship, _b);
       if (this.t < CUT_B) {
-        // Tracking off her port quarter: the ship big in the foreground, the
-        // station and its lit bay stacked up ahead of her.
-        this.toLocal(d, ship, _b);
-        _b.x -= 34;
-        _b.y += 11;
-        _b.z += 62;
-        this.toWorld(d, _b, eye);
+        local.x -= 34;
+        local.y += 11;
+        local.z += 62;
+        this.toWorld(d, local, eye);
         _c.copy(ship).lerp(d.bay, 0.12);
         fov = 44;
+      } else if (this.t < CUT_C) {
+        // Beside the mouth, a little out: looking past her into the bay.
+        this.toWorld(d, _a.set(I.hw * 1.05 + 14, I.hh * 0.75, Math.max(70, I.hh * 1.6)), eye);
+        this.toWorld(d, _l.set(0, 0, -I.depth * 0.35), _c);
+        _c.lerp(ship, 0.65);
+        fov = 42;
       } else {
-        // Reverse angle off her starboard quarter; the camera holds at the
-        // lip of the bay while she slides on into the dark.
-        this.toLocal(d, ship, _b);
-        _b.x += 46;
-        _b.y += 20;
-        _b.z = Math.max(150, _b.z + 70);
-        this.toWorld(d, _b, eye);
-        _c.copy(ship);
-        fov = 40;
+        // Inside, back corner: she comes through the curtain toward us.
+        this.toWorld(d, _a.set(-I.hw * 0.62, I.hh * 0.5, -(I.depth - Math.min(14, I.depth * 0.2))), eye);
+        this.toWorld(d, _l.set(0, 0, 0), _c);
+        _c.lerp(ship, 0.7);
+        fov = 52;
       }
     } else if (this.phase === 'docked') {
       this.orbitA += dt * 0.06;
@@ -466,6 +512,12 @@ export class DockingController {
         .addScaledVector(d.up, dist * 0.32);
       _c.copy(d.center);
       fov = 42;
+    } else if (this.t < LAUNCH_CUT) {
+      // Launch, inside: behind and above her, the mouth and open space ahead.
+      this.toWorld(d, _a.set(I.hw * 0.45, I.hh * 0.45, -(I.depth - Math.min(10, I.depth * 0.15))), eye);
+      this.toWorld(d, _l.set(0, -I.hh * 0.1, 0), _c);
+      _c.lerp(ship, 0.35);
+      fov = 50;
     } else {
       // Launch: planted 400 m up the corridor, she blasts out toward and past us.
       this.toWorld(d, _b.set(55, -22, 420), eye);

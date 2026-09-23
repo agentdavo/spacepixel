@@ -53,6 +53,8 @@ export interface StationSite {
   planet?: number;
   /** Model variation seed. */
   seed: number;
+  /** 0..1 danger of the system (economy hazard premium); see `systemRisk`. */
+  risk?: number;
 }
 
 export interface StarSystem {

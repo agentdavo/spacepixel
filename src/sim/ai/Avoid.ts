@@ -1,5 +1,6 @@
 import { Box3, Vector3 } from 'three';
 import type { ShipEntity } from '../Fleet';
+import type { Proxy } from '../Collision';
 import { isCapital } from './state';
 
 /**
@@ -27,6 +28,85 @@ interface CapitalHull {
 }
 
 const hulls = new WeakMap<ShipEntity, CapitalHull>();
+
+/**
+ * Capital ships with collision proxies (published each frame by the flight
+ * scene's HullCollisions): avoidance steers around these capsules instead
+ * of the single fitted hull capsule — the same shapes the ships bounce off.
+ */
+export const hostObstacles = new WeakMap<ShipEntity, Obstacle[]>();
+
+const _ax = new Vector3();
+const _ay = new Vector3();
+
+/**
+ * Collision proxies (world-placed) → avoidance capsules: a sphere or
+ * capsule as is, a box or cylinder as a capsule along its long axis
+ * (radius covering the cross-section), a ring as a chain of capsules round
+ * its circumference. `reuse` (the previous result for the same proxies) is
+ * updated in place.
+ */
+export function proxyObstacles(proxies: readonly Proxy[], reuse?: Obstacle[]): Obstacle[] {
+  const out = reuse ?? [];
+  let n = 0;
+  const next = (): Obstacle => (out[n] ??= { a: new Vector3(), b: new Vector3(), radius: 0 }, out[n++]);
+  for (const px of proxies) {
+    const w = px.world;
+    switch (w.kind) {
+      case 'sphere': {
+        const o = next();
+        o.a.copy(w.c);
+        o.b.copy(w.c);
+        o.radius = w.r;
+        break;
+      }
+      case 'capsule': {
+        const o = next();
+        o.a.copy(w.a);
+        o.b.copy(w.b);
+        o.radius = w.r;
+        break;
+      }
+      case 'box': {
+        const h = w.half;
+        const o = next();
+        // Long axis and the cross-section it leaves.
+        const ax = h.x >= h.y && h.x >= h.z ? 0 : h.y >= h.z ? 1 : 2;
+        const long = ax === 0 ? h.x : ax === 1 ? h.y : h.z;
+        const r = ax === 0 ? Math.hypot(h.y, h.z) : ax === 1 ? Math.hypot(h.x, h.z) : Math.hypot(h.x, h.y);
+        _ax.set(ax === 0 ? 1 : 0, ax === 1 ? 1 : 0, ax === 2 ? 1 : 0).applyQuaternion(w.q);
+        const k = Math.max(0, long - r * 0.5);
+        o.a.copy(w.c).addScaledVector(_ax, -k);
+        o.b.copy(w.c).addScaledVector(_ax, k);
+        o.radius = r;
+        break;
+      }
+      case 'cyl': {
+        const o = next();
+        _ax.set(0, 0, 1).applyQuaternion(w.q);
+        const k = Math.max(0, w.halfLen - w.r * 0.5);
+        o.a.copy(w.c).addScaledVector(_ax, -k);
+        o.b.copy(w.c).addScaledVector(_ax, k);
+        o.radius = w.halfLen > w.r ? w.r : Math.hypot(w.r, w.halfLen * 0.5);
+        break;
+      }
+      case 'ring': {
+        const segs = Math.max(8, Math.min(24, Math.round((w.R * 2 * Math.PI) / Math.max(w.r * 6, 60))));
+        for (let i = 0; i < segs; i++) {
+          const o = next();
+          const a0 = (i / segs) * Math.PI * 2;
+          const a1 = ((i + 1) / segs) * Math.PI * 2;
+          o.a.copy(w.c).add(_ay.set(Math.cos(a0) * w.R, Math.sin(a0) * w.R, 0).applyQuaternion(w.q));
+          o.b.copy(w.c).add(_ay.set(Math.cos(a1) * w.R, Math.sin(a1) * w.R, 0).applyQuaternion(w.q));
+          o.radius = w.r;
+        }
+        break;
+      }
+    }
+  }
+  out.length = n;
+  return out;
+}
 const _box = new Box3();
 
 /** Capsule fitted to a capital ship's hull (cached; world ends updated per call). */
@@ -94,8 +174,18 @@ export function avoidance(me: ShipEntity, ships: readonly ShipEntity[], obstacle
     if (o === me || !o.alive) continue;
     let u: number;
     if (isCapital(o)) {
-      const cap = capitalCapsule(o);
-      u = capsuleThreat(me, cap.a, cap.b, cap.radius, o.flight.velocity, out);
+      const list = hostObstacles.get(o);
+      if (list) {
+        u = 0;
+        for (let k = 0; k < list.length; k++) {
+          const ob = list[k];
+          if (!nearObstacle(me, ob, speed)) continue;
+          u = Math.max(u, capsuleThreat(me, ob.a, ob.b, ob.radius, o.flight.velocity, out));
+        }
+      } else {
+        const cap = capitalCapsule(o);
+        u = capsuleThreat(me, cap.a, cap.b, cap.radius, o.flight.velocity, out);
+      }
     } else {
       u = sphereThreat(me, o, out);
     }
@@ -103,6 +193,7 @@ export function avoidance(me: ShipEntity, ships: readonly ShipEntity[], obstacle
   }
   for (let i = 0; i < obstacles.length; i++) {
     const ob = obstacles[i];
+    if (!nearObstacle(me, ob, speed)) continue;
     const u = capsuleThreat(me, ob.a, ob.b, ob.radius, ZERO, out);
     if (u > urgency) urgency = u;
   }
@@ -112,6 +203,16 @@ export function avoidance(me: ShipEntity, ships: readonly ShipEntity[], obstacle
     else f.up(out);
   }
   return urgency;
+}
+
+/** Cheap cull: can `me` reach this capsule within the look-ahead (≤ 7 s, plus the avoidance margin)? */
+function nearObstacle(me: ShipEntity, ob: Obstacle, speed: number): boolean {
+  const half = ob.a.distanceTo(ob.b) / 2;
+  const reach = half + ob.radius + me.radius + 60 + speed * 7.25;
+  const mx = (ob.a.x + ob.b.x) / 2 - me.flight.position.x;
+  const my = (ob.a.y + ob.b.y) / 2 - me.flight.position.y;
+  const mz = (ob.a.z + ob.b.z) / 2 - me.flight.position.z;
+  return mx * mx + my * my + mz * mz < reach * reach;
 }
 
 function sphereThreat(me: ShipEntity, o: ShipEntity, acc: Vector3): number {
