@@ -41,6 +41,8 @@ export interface Beam {
   faction: FactionId;
   /** Where the beam currently terminates (hit point or full length). */
   end: Vector3;
+  /** Track this ship (sweeping lance) instead of firing along the owner's nose. */
+  aimTarget: ShipEntity | null;
 }
 
 export interface GunSpec {
@@ -101,7 +103,10 @@ export class Weapons {
   socketPosition(s: ShipEntity, socket: string, out: Vector3): Vector3 {
     const o = s.model.sockets.get(socket);
     if (!o) return out.copy(s.flight.position);
-    return out.copy(o.position).applyQuaternion(s.flight.orientation).add(s.flight.position);
+    // Direct children: local position. Nested (articulated) sockets: walk up to the root.
+    out.copy(o.position);
+    for (let p = o.parent; p && p !== s.model.root; p = p.parent) out.applyMatrix4(p.matrix);
+    return out.applyQuaternion(s.flight.orientation).add(s.flight.position);
   }
 
   /** Fire the ship's guns if its controls say so and it's off cooldown. */
@@ -142,10 +147,10 @@ export class Weapons {
   fireBeam(owner: ShipEntity, socket: string | null, length: number, width: number, duration: number, dps: number): Beam {
     let b = this.beams.find((x) => !x.active);
     if (!b) {
-      b = { active: false, owner, socket, origin: new Vector3(), dir: new Vector3(), length, width, life: 0, maxLife: duration, dps, faction: owner.faction, end: new Vector3() };
+      b = { active: false, owner, socket, origin: new Vector3(), dir: new Vector3(), length, width, life: 0, maxLife: duration, dps, faction: owner.faction, end: new Vector3(), aimTarget: null };
       this.beams.push(b);
     }
-    Object.assign(b, { active: true, owner, socket, length, width, life: duration, maxLife: duration, dps, faction: owner.faction });
+    Object.assign(b, { active: true, owner, socket, length, width, life: duration, maxLife: duration, dps, faction: owner.faction, aimTarget: null });
     return b;
   }
 
@@ -199,7 +204,12 @@ export class Weapons {
       }
       if (b.socket) this.socketPosition(b.owner, b.socket, b.origin);
       else b.origin.copy(b.owner.flight.position);
-      b.owner.flight.forward(b.dir);
+      if (b.aimTarget?.alive) {
+        // Sweep toward the target at a limited angular rate (dodgeable).
+        _f.subVectors(b.aimTarget.flight.position, b.origin).normalize();
+        if (b.life > b.maxLife - dt * 1.5) b.dir.copy(_f).add(_c.set(0.08, 0.05, 0)).normalize();
+        else b.dir.lerp(_f, 1 - Math.exp(-2.2 * dt)).normalize();
+      } else b.owner.flight.forward(b.dir);
       _d.copy(b.dir).multiplyScalar(b.length);
       let hitT = 1;
       let hitShip: ShipEntity | null = null;

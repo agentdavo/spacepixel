@@ -9,7 +9,7 @@ import { CameraDirector, type Subject } from '@/sim/CameraDirector';
 import { Fleet, faceAlong, type ShipEntity } from '@/sim/Fleet';
 import { Weapons } from '@/sim/Weapons';
 import { Missiles, type LockState } from '@/sim/Missiles';
-import { assets } from '@/assets/AssetLibrary';
+import { Capitals } from '@/sim/Capitals';
 import { WeaponVisuals } from '../WeaponVisuals';
 import { StarSystemView, type GateInstance } from '../StarSystemView';
 import { Hyperspace } from '../Hyperspace';
@@ -71,7 +71,9 @@ export class FlightScene implements GameScene {
   private jumpT = 0;
   private jumpTo = '';
   private gateSide = new Map<GateInstance, number>();
-  private cathedral = assets.ship('choir-cathedral');
+  readonly capitals: Capitals;
+  private cathedral!: ShipEntity;
+  private carrier!: ShipEntity;
   private mission: MissionRunner | null = null;
   private tactical = false;
   private orderStatus = '';
@@ -105,8 +107,7 @@ export class FlightScene implements GameScene {
     this.view = new StarSystemView(this.universe.systems.get(this.systemId)!, this.scene, this.world.root);
     this.scene.add(this.hyperspace.mesh);
     this.scene.add(this.dust.object);
-    this.world.root.add(this.cathedral.root);
-    this.cathedral.setThrottle(0.5);
+    this.capitals = new Capitals(this.fleet, this.weapons);
 
     // Start 2.6 km short of the first Lantern, flying at it.
     const gate0 = this.view.gates[0];
@@ -130,6 +131,12 @@ export class FlightScene implements GameScene {
       this.bandits.push({ ship, deadFor: 0, center: GATE.clone() });
     }
     this.lock.target = this.bandits[0].ship;
+
+    // Capital ships are fleet combatants: flak, lances, hangars.
+    this.cathedral = this.fleet.spawn('choir-cathedral', 'choir', GATE.clone().add(new Vector3(-5200, 1400, 9000)), new Vector3(-0.8, 0, -0.6).normalize(), { name: 'Cathedral Ascendant' });
+    this.capitals.register(this.cathedral, { launchBlueprint: 'choir-cantor', maxFighters: 3 });
+    this.carrier = this.fleet.spawn('cvs07-hesperus-dawn', 'concord', ORIGIN.clone().add(new Vector3(-2400, -500, -1800)), fwd, { name: 'Hesperus Dawn' });
+    this.capitals.register(this.carrier, { launchBlueprint: 'vf27-kestrel', maxFighters: 2 });
     this.onWingOrder = (o) => issueOrder(this.wingmen.map((w) => w.ship), o, this.player);
 
     this.visuals = new WeaponVisuals(this.weapons, this.missiles);
@@ -172,15 +179,26 @@ export class FlightScene implements GameScene {
     window.__VANGUARD__ = { ...window.__VANGUARD__, ready: false, frame: () => 0, backend: '', hooks: { ...window.__VANGUARD__?.hooks, scene: this } };
   }
 
-  /** Choir space gets a Cathedral parked off a gate; elsewhere it's hidden. */
+  /**
+   * Zenith space gets a Cathedral holding a far Lantern; Directorate space
+   * keeps the Hesperus Dawn near the arrival point. Capitals not present in
+   * this system are parked (dead + hidden) rather than destroyed.
+   */
   private placeCapitals(): void {
     const sys = this.view.system;
-    const show = sys.faction === 'choir' || sys.id === 'meridian';
-    this.cathedral.root.visible = show;
-    if (!show) return;
-    const g = this.view.gates[this.view.gates.length - 1];
-    this.cathedral.root.position.copy(g.center).add(new Vector3(-5200, 1400, 9000));
-    this.cathedral.root.rotation.set(0.05, 2.2, 0.08);
+    const park = (s: ShipEntity, on: boolean) => {
+      s.alive = on && s.hull > 0;
+      s.model.root.visible = s.alive;
+    };
+    const zenith = sys.faction === 'choir' || sys.id === 'meridian';
+    park(this.cathedral, zenith);
+    if (zenith) {
+      const g = this.view.gates[this.view.gates.length - 1];
+      this.cathedral.flight.position.copy(g.center).add(_v.set(-5200, 1400, 9000));
+    }
+    const home = sys.faction === 'concord';
+    park(this.carrier, home);
+    if (home) this.carrier.flight.position.copy(this.player.flight.position).add(_v.set(-2400, -500, -1800));
   }
 
   update({ dt: realDt, time }: FrameContext): void {
@@ -192,7 +210,10 @@ export class FlightScene implements GameScene {
     // 1. AI writes controls for every non-player ship (and the player on
     //    autopilot), then one flight step for everyone — same physics.
     this.player.target = this.lock.target; // "attack my target" reads this
-    if (this.jumpPhase === 'none') updateAI(this.fleet, dt, time);
+    if (this.jumpPhase === 'none') {
+      updateAI(this.fleet, dt, time);
+      this.capitals.step(dt);
+    }
     this.fleet.step(dt);
     for (const b of this.bandits) {
       if (b.ship.alive || b.deadFor < 0) continue;
@@ -349,7 +370,6 @@ export class FlightScene implements GameScene {
     this.view.backdrop.group.visible = v;
     for (const s of this.fleet.ships) if (!s.isPlayer) s.model.root.visible = v && s.alive;
     if (v) this.placeCapitals();
-    else this.cathedral.root.visible = false;
   }
 
   /** Swap star systems under cover of the tunnel; place the flight at the arrival Lantern. */

@@ -55,6 +55,19 @@ const SPECS: Record<string, FlightSpec> = {
   'choir-cantor': { ...KESTREL_SPEC, maxSpeed: 235, boostSpeed: 440, pitchRate: 2.3, yawRate: 1.4, rollRate: 4.0 },
 };
 
+/** Capital ships: slow, stately, barely turn. */
+const CAPITAL_SPEC: FlightSpec = {
+  ...KESTREL_SPEC,
+  maxSpeed: 45,
+  boostSpeed: 60,
+  mainAccel: 6,
+  boostAccel: 8,
+  lateralAccel: 4,
+  pitchRate: 0.05,
+  yawRate: 0.05,
+  rollRate: 0.05,
+};
+
 const _m = new Matrix4();
 const _o = new Vector3();
 const _up = new Vector3(0, 1, 0);
@@ -68,7 +81,7 @@ export class Fleet {
   spawn(blueprintId: string, faction: FactionId, position: Vector3, facing: Vector3, opts: Partial<ShipEntity> = {}): ShipEntity {
     const model = assets.ship(blueprintId);
     this.root.add(model.root);
-    const flight = new FlightModel(SPECS[blueprintId] ?? KESTREL_SPEC);
+    const flight = new FlightModel(SPECS[blueprintId] ?? (model.radius > 200 ? CAPITAL_SPEC : KESTREL_SPEC));
     flight.position.copy(position);
     flight.orientation.setFromRotationMatrix(_m.lookAt(facing, _o.set(0, 0, 0), _up));
     flight.velocity.copy(facing).normalize().multiplyScalar(flight.spec.maxSpeed * 0.6);
