@@ -49,4 +49,10 @@ export class LanternGate {
     this.inner.scale.y = radius * 0.02;
     this.group.add(this.inner);
   }
+
+  /** Event-surface shimmer strength (default 0.35; 0 hides it — a dead ring). */
+  setGlow(k: number): void {
+    this.inner.visible = k > 0;
+    (this.inner.material as GlowMaterial).intensity.value = k;
+  }
 }

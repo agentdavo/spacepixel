@@ -1,0 +1,234 @@
+/* ══ Cinema overlay: letterbox, grain, subtitles, title card ═══════════
+   A 1994 OVA cold open: 2.35:1 bars, outlined VHS-yellow subs, a date slug
+   typed in phosphor amber, and a title card in the eyecatch's livery.     */
+
+.cinema {
+  --bar: clamp(7vh, calc((100vh - 100vw / 2.35) / 2), 22vh);
+  --exit: 0;
+  --orange: #ff7a1c;
+  --cobalt: #2b4ea8;
+  --ivory: #f4efe4;
+  --sub: #fff6d8;
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+}
+.cinema > * { position: absolute; }
+
+.cn-bar {
+  left: 0;
+  right: 0;
+  height: var(--bar);
+  background: #000;
+  animation: cn-bar 0.9s cubic-bezier(0.7, 0, 0.25, 1) both;
+}
+.cn-top { top: 0; transform-origin: top; }
+.cn-bottom { bottom: 0; transform-origin: bottom; }
+@keyframes cn-bar { from { transform: scaleY(0); } }
+
+.cn-vignette {
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.5) 100%);
+  opacity: calc(1 - var(--exit));
+}
+.cn-grain {
+  inset: -60px;
+  opacity: 0.075;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: cn-grain 0.42s steps(5) infinite;
+}
+@keyframes cn-grain {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-23px, 11px); }
+  40% { transform: translate(17px, -29px); }
+  60% { transform: translate(-9px, 31px); }
+  80% { transform: translate(29px, 7px); }
+}
+
+/* ── subtitles ─────────────────────────────────────────────────────── */
+.cn-subs {
+  left: 8vw;
+  right: 8vw;
+  bottom: calc(var(--bar) + 2.4vh);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6vh;
+  pointer-events: none;
+}
+.cn-cap { pointer-events: none; will-change: opacity; }
+.cn-narration { text-align: center; }
+.cn-en {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(17px, 2.35vw, 34px);
+  line-height: 1.22;
+  letter-spacing: 0.02em;
+  color: var(--sub);
+  text-shadow:
+    2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000,
+    1.5px 1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px -1.5px 0 #000,
+    0 0 14px rgba(0, 0, 0, 0.85);
+}
+.cn-jp {
+  font-family: 'Hiragino Kaku Gothic Pro', 'Noto Sans JP', 'Yu Gothic', 'WenQuanYi Zen Hei', var(--font-display), sans-serif;
+  font-weight: 700;
+  font-size: clamp(12px, 1.35vw, 19px);
+  letter-spacing: 0.12em;
+  color: #cfe8ff;
+  margin-bottom: 0.3vh;
+  text-shadow: 1.5px 0 0 #000, -1.5px 0 0 #000, 0 1.5px 0 #000, 0 -1.5px 0 #000, 0 0 10px rgba(0, 0, 0, 0.9);
+}
+.cn-kicker {
+  display: inline-block;
+  margin-bottom: 0.7vh;
+  padding: 2px 10px 2px 12px;
+  font-family: var(--font-mono);
+  font-size: clamp(10px, 0.95vw, 14px);
+  letter-spacing: 0.34em;
+  color: #0d0a12;
+  background: var(--crt-amber, #ffc46b);
+  box-shadow: 3px 3px 0 var(--cobalt);
+  min-height: 1.3em;
+}
+
+/* Date slug: typed into the top letterbox bar. */
+.cn-slug {
+  left: 6vw;
+  top: calc(var(--bar) * 0.5);
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: clamp(11px, 1.1vw, 16px);
+  letter-spacing: 0.3em;
+  color: var(--crt-amber, #ffc46b);
+  text-shadow: 0 0 8px rgba(255, 196, 107, 0.6);
+  white-space: nowrap;
+}
+.cn-cursor { display: inline-block; width: 0.6em; margin-left: 2px; background: var(--crt-amber, #ffc46b); animation: blink 0.8s steps(1) infinite; }
+
+/* A single spoken word, centre frame. */
+.cn-word {
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%) scale(calc(1.18 - min(var(--age), 0.5) * 0.36));
+  text-align: center;
+}
+.cn-word-en {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(44px, 9vw, 150px);
+  letter-spacing: 0.08em;
+  color: var(--ivory);
+  -webkit-text-stroke: 3px #140c1c;
+  text-shadow: 5px 5px 0 #9b5cff, 10px 10px 0 #140c1c;
+  transform: skewX(-8deg);
+}
+.cn-word-jp {
+  font-family: 'WenQuanYi Zen Hei', 'Noto Sans JP', sans-serif;
+  font-size: clamp(14px, 1.6vw, 24px);
+  letter-spacing: 0.6em;
+  color: #e0c8ff;
+  text-shadow: 0 0 10px #000;
+}
+
+/* The Signal's prime count. */
+.cn-count {
+  right: 7vw;
+  top: calc(var(--bar) + 6vh);
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.cn-count-k { font-size: clamp(10px, 0.9vw, 13px); letter-spacing: 0.4em; color: #ff5fb4; }
+.cn-count-n {
+  font-size: clamp(34px, 5.2vw, 84px);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: #e9e4ff;
+  text-shadow: 0 0 18px rgba(155, 92, 255, 0.9), 0 0 2px #fff;
+}
+
+/* ── title card ───────────────────────────────────────────────────── */
+.cn-title {
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-54%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: var(--ivory);
+}
+.cn-t-stripe {
+  position: relative;
+  width: min(420px, 50vw);
+  height: 10px;
+  margin-bottom: 2.2vh;
+  background: repeating-linear-gradient(90deg, var(--orange) 0 36px, transparent 36px 44px, var(--cobalt) 44px 80px, transparent 80px 88px);
+  animation: cn-stripe 0.6s 0.1s cubic-bezier(0.7, 0, 0.25, 1) both;
+}
+@keyframes cn-stripe { from { transform: scaleX(0); } }
+.cn-title h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(48px, 9.5vw, 156px);
+  line-height: 0.9;
+  letter-spacing: 0.06em;
+  -webkit-text-stroke: 3px #140c1c;
+  text-shadow: 5px 5px 0 #ff3fa8, 10px 10px 0 rgba(43, 78, 168, 0.95), 10px 10px 0 #140c1c;
+  transform: skewX(-8deg);
+  animation: cn-slam 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes cn-slam {
+  from { transform: skewX(-8deg) scale(1.6); opacity: 0; letter-spacing: 0.4em; }
+}
+.cn-t-sub {
+  margin-top: 2.6vh;
+  padding: 4px 18px 4px 22px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(16px, 2.3vw, 36px);
+  letter-spacing: 0.55em;
+  color: #140c1c;
+  background: var(--ivory);
+  box-shadow: 6px 6px 0 var(--orange);
+  animation: cn-sub 0.5s 0.55s cubic-bezier(0.7, 0, 0.25, 1) both;
+}
+@keyframes cn-sub { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+.cn-t-jp {
+  margin-top: 1.8vh;
+  font-family: 'WenQuanYi Zen Hei', 'Noto Sans JP', sans-serif;
+  font-size: clamp(13px, 1.5vw, 22px);
+  letter-spacing: 1.1em;
+  color: #cfe8ff;
+  text-shadow: 0 0 10px #000;
+  animation: cn-fade 0.8s 1s both;
+}
+@keyframes cn-fade { from { opacity: 0; } }
+
+/* ── skip hint ────────────────────────────────────────────────────── */
+.cn-skip {
+  right: 3vw;
+  bottom: calc(var(--bar) * 0.5);
+  transform: translateY(50%);
+  font-family: var(--font-mono);
+  font-size: clamp(10px, 0.9vw, 13px);
+  letter-spacing: 0.24em;
+  color: rgba(244, 239, 228, 0.55);
+  transition: opacity 0.3s;
+  animation: cn-fade 1s 1.2s both;
+}
+.cn-skip b { color: var(--orange); }
+
+@media (max-width: 700px) {
+  .cn-subs { left: 4vw; right: 4vw; }
+  .cn-slug { left: 4vw; letter-spacing: 0.16em; }
+  .cn-skip { right: 4vw; letter-spacing: 0.1em; }
+}
