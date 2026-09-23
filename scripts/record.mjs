@@ -27,7 +27,7 @@ const port = Number(opt('port', 5270));
 const extra = opt('query', '');
 mkdirSync(out, { recursive: true });
 
-const server = await createServer({ server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'warn' });
+const server = await createServer({ server: { port, host: '127.0.0.1', strictPort: true, hmr: false }, logLevel: 'warn' });
 await server.listen();
 const browser = await chromium.launch({
   args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--use-angle=swiftshader', '--ignore-gpu-blocklist'],
