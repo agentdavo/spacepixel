@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "shot": "node scripts/screenshot.mjs",
     "perf": "node scripts/perf.mjs",
-    "test": "node --experimental-transform-types --no-warnings --test 'tests/*.test.ts'"
+    "test": "node --experimental-transform-types --no-warnings --test 'tests/*.test.ts'",
+    "ai-sim": "node scripts/ai-sim.mjs"
   },
   "dependencies": {
     "three": "^0.186.0"

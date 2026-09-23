@@ -91,6 +91,8 @@ export class DogfightScene implements GameScene {
   private tracerCol: Float32Array;
   private tracerGeo = new BufferGeometry();
   private overlay: HTMLDivElement | null = null;
+  private viewing: ShipEntity;
+  private locked: Subject | null = null;
 
   constructor() {
     LightRig.apply(LIGHT_PRESETS.meridian);
@@ -144,7 +146,16 @@ export class DogfightScene implements GameScene {
     if (flags.shot && flags.startTime > 0) {
       for (let t = 0; t < flags.startTime; t += 1 / 60) this.simulate(1 / 60, t);
     }
+    this.viewing = this.player;
     this.chase.snap(this.player.flight);
+    // ?cam=1 padlock on the target · ?cam=2 orbit the target.
+    if (flags.cam === 1) this.director.setBase('lock', null);
+    if (flags.cam === 2 && this.player.target) this.director.cut('orbit', this.subjects.get(this.player.target.id) ?? null, Infinity);
+    if (flags.shot) {
+      let a = 0;
+      for (const x of this.fleet.ships) if (x.alive) a++;
+      console.info(`[dogfight] t=${flags.startTime} alive=${a} shots=${this.guns.shots} hits=${this.guns.hits} kills=${this.guns.kills}`);
+    }
 
     window.addEventListener('keydown', (e) => this.onKey(e.code));
     if (flags.hud) {
@@ -182,16 +193,33 @@ export class DogfightScene implements GameScene {
   update({ dt, time }: FrameContext): void {
     this.simulate(dt, time);
 
-    const target = this.player.target && this.player.target.alive ? (this.subjects.get(this.player.target.id) ?? null) : null;
-    this.director.update(this.player.flight, target, dt);
+    // Camera rides the player; while the player is down, a surviving friendly.
+    const view = this.viewShip();
+    const tgtShip = view.target && view.target.alive ? view.target : null;
+    const target = tgtShip ? (this.subjects.get(tgtShip.id) ?? null) : null;
+    if (view !== this.viewing) {
+      this.viewing = view;
+      this.chase.snap(view.flight);
+    }
+    // Padlock follows retargets with a hard cut (OVA style).
+    if (this.director.kind === 'lock' && target && target !== this.locked) this.director.cut('lock', target, Infinity);
+    this.locked = target;
+    this.director.update(view.flight, target, dt);
     this.world.eye.copy(this.director.eye);
     this.world.sync(this.camera);
     this.backdrop.follow(this.camera);
     this.updateTracers();
 
     postFx.boost = this.chase.boostAmount;
-    postFx.speed = Math.min(1, this.player.flight.speed / this.player.flight.spec.boostSpeed);
+    postFx.speed = Math.min(1, view.flight.speed / view.flight.spec.boostSpeed);
     if (this.overlay) this.updateOverlay();
+  }
+
+  private viewShip(): ShipEntity {
+    if (this.player.alive) return this.player;
+    if (this.viewing.alive && this.viewing.faction === this.player.faction) return this.viewing;
+    for (const w of this.wing) if (w.alive) return w;
+    return this.player;
   }
 
   private nearestBandit(from: ShipEntity): ShipEntity | null {

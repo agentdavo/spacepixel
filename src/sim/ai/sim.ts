@@ -6,6 +6,7 @@ import { capitalCapsule, closestOnSegment, type Obstacle } from './Avoid';
 import { slotWorld, issueOrder, setFormation } from './Squadron';
 import { brainOf, PERSONALITIES, setPersonality, type FormationKind } from './state';
 import { setAutopilot, updateAI } from './index';
+import { createTurretSolution, turretAim, turretSelectTarget, TURRET_DEFAULTS, type TurretMount } from './Turret';
 
 /**
  * Headless AI scenarios (no renderer): FlightModel + AI + stand-in guns at a
@@ -374,6 +375,49 @@ export function defensiveScenario(seconds = 25): ScenarioResult {
   };
 }
 
+// ── G: turret solver — lead accuracy and arc limits ──────────────────────
+export function turretScenario(): ScenarioResult {
+  const fleet = new Fleet(new Group());
+  const targets = [
+    fleet.spawn('vf27-kestrel', 'concord', v(600, 300, 900), new Vector3(1, 0, 0)),
+    fleet.spawn('vf27-kestrel', 'concord', v(-900, 200, 400), new Vector3(0, 0.3, 1)),
+    fleet.spawn('vf27-kestrel', 'concord', v(100, -800, -200), new Vector3(-1, 0, 0)), // below the mount plane
+  ];
+  targets[0].flight.velocity.set(220, 0, 0);
+  targets[1].flight.velocity.set(0, 60, 200);
+  const mount: TurretMount = {
+    position: v(0, 0, 0),
+    forward: new Vector3(0, 0, 1),
+    up: new Vector3(0, 1, 0),
+    velocity: new Vector3(0, 0, 40), // the carrier is moving
+    ...TURRET_DEFAULTS,
+  };
+  const sol = createTurretSolution();
+  let worstMiss = 0;
+  for (const t of targets.slice(0, 2)) {
+    if (!turretAim(mount, t, sol)) {
+      worstMiss = Infinity;
+      continue;
+    }
+    // Fly the bolt and the target forward by the solved time of flight.
+    const boltV = sol.aimDir.clone().multiplyScalar(mount.boltSpeed).add(mount.velocity);
+    const bolt = mount.position.clone().addScaledVector(boltV, sol.time);
+    const tp = t.flight.position.clone().addScaledVector(t.flight.velocity, sol.time);
+    worstMiss = Math.max(worstMiss, bolt.distanceTo(tp));
+  }
+  const belowRejected = !turretAim(mount, targets[2], sol);
+  const picked = turretSelectTarget(mount, 'choir', fleet.ships, null, sol);
+  return {
+    name: 'turret targeting',
+    metrics: { worstLeadMiss: worstMiss.toFixed(3), picked: picked ? (sol.target?.name ?? '-') : 'none' },
+    checks: [
+      check('lead solution miss distance (m)', worstMiss, '< 0.5', worstMiss < 0.5),
+      check('target below elevation limit rejected', belowRejected ? 1 : 0, '== 1', belowRejected),
+      check('selects an in-arc target', picked && sol.target !== targets[2] ? 1 : 0, '== 1', picked && sol.target !== targets[2]),
+    ],
+  };
+}
+
 function countContacts(ships: readonly ShipEntity[]): number {
   let n = 0;
   for (let a = 0; a < ships.length; a++)
@@ -401,6 +445,7 @@ const SCENARIOS: [string, () => ScenarioResult][] = [
   ['coverMe', () => coverMeScenario()],
   ['capital', () => capitalScenario()],
   ['defensive', () => defensiveScenario()],
+  ['turret', () => turretScenario()],
   ['dogfight 1', () => dogfightScenario(1)],
   ['dogfight 2', () => dogfightScenario(2)],
   ['dogfight 3', () => dogfightScenario(3)],
