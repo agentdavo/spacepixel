@@ -35,7 +35,9 @@ spawn rings, HUD ranges) is thought of in 1 km steps.
 Spatial depth: space dust streaks, asteroid belts, haze lanes (`?scene=spatial`),
 and a **multiplane sky** — Disney's multiplane camera rebuilt for 6DOF: 16
 painted cel strata, one per kilometre (`?planes=0|16|32`,
-`src/world/MultiplaneSky.ts`).
+`src/world/MultiplaneSky.ts`). CPU cost is flat (p50 0.6 → 0.7 ms at 32 strata); GPU cost still to be measured on real hardware.
+
+![Multiplane strata](screenshots/multiplane-16km.jpg)
 
 ## Batch 2 — narrative (in progress)
 
