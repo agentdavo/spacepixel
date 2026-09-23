@@ -148,10 +148,10 @@ export class MultiplaneSky {
       const near: Node = float(1).sub(smoothstep(1000, this.farD, vLook.w));
       const lit = mix(this.colA, this.colB, vLook.y);
       const body = mix(mix(lit, this.haze, 0.5), this.haze.mul(0.3), near);
-      const rim = lit.mul(mix(1.0, 1.6, near));
+      const rim = lit.mul(mix(0.9, 1.25, near));
       const col = select(level.lessThan(1.5), rim, body);
       const alpha = level.greaterThan(0.5).select(mix(0.55, 1.0, level.div(3)), float(0));
-      return vec4(vec3(col), alpha.mul(opacity).mul(near.mul(2.5).add(1)).mul(vFade));
+      return vec4(vec3(col), alpha.mul(opacity).mul(near.mul(1.6).add(1)).mul(vFade));
     })();
     mat.mrtNode = noInkMRT();
 
