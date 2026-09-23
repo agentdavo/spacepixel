@@ -1,0 +1,140 @@
+import { Matrix4, Quaternion, Vector3, type Group } from 'three';
+import type { ControlState } from '@/core/Input';
+import type { FactionId } from '@/assets/Blueprint';
+import type { ShipModel } from '@/assets/ShipBuilder';
+import { assets } from '@/assets/AssetLibrary';
+import { FlightModel, KESTREL_SPEC, type FlightSpec } from './FlightModel';
+
+/**
+ * Every ship in a battle — player, wingmen, bandits — is a ShipEntity driven
+ * by the same FlightModel through the same ControlState. The only difference
+ * between the player and an AI is who writes `controls` each frame.
+ *
+ * Plain data + arrays; no component system. Systems (AI, weapons, damage)
+ * are functions that walk `fleet.ships`.
+ */
+export interface ShipEntity {
+  id: number;
+  name: string;
+  faction: FactionId;
+  flight: FlightModel;
+  model: ShipModel;
+  /** Written each frame by player input or an AI brain, read by flight + weapons. */
+  controls: ControlState;
+  hull: number;
+  hullMax: number;
+  shield: number;
+  shieldMax: number;
+  alive: boolean;
+  /** Current target (for AI, weapons lock, cameras). */
+  target: ShipEntity | null;
+  /** Collision / targeting radius, metres. */
+  radius: number;
+  isPlayer: boolean;
+  /** Free slot for AI state (owned by src/sim/ai). */
+  brain: unknown;
+  /** Seconds since last damage (shield regen delay, hit flashes). */
+  sinceHit: number;
+}
+
+export function emptyControls(): ControlState {
+  return {
+    pitch: 0,
+    yaw: 0,
+    roll: 0,
+    throttleDelta: 0,
+    throttleSet: null,
+    afterburner: false,
+    flightAssistToggle: false,
+    fire: false,
+  };
+}
+
+const SPECS: Record<string, FlightSpec> = {
+  'vf27-kestrel': KESTREL_SPEC,
+  'choir-cantor': { ...KESTREL_SPEC, maxSpeed: 235, boostSpeed: 440, pitchRate: 2.3, yawRate: 1.4, rollRate: 4.0 },
+};
+
+const _m = new Matrix4();
+const _o = new Vector3();
+const _up = new Vector3(0, 1, 0);
+
+export class Fleet {
+  readonly ships: ShipEntity[] = [];
+  private nextId = 1;
+
+  constructor(private root: Group) {}
+
+  spawn(blueprintId: string, faction: FactionId, position: Vector3, facing: Vector3, opts: Partial<ShipEntity> = {}): ShipEntity {
+    const model = assets.ship(blueprintId);
+    this.root.add(model.root);
+    const flight = new FlightModel(SPECS[blueprintId] ?? KESTREL_SPEC);
+    flight.position.copy(position);
+    flight.orientation.setFromRotationMatrix(_m.lookAt(facing, _o.set(0, 0, 0), _up));
+    flight.velocity.copy(facing).normalize().multiplyScalar(flight.spec.maxSpeed * 0.6);
+    const isCapital = model.radius > 200;
+    const hullMax = isCapital ? 20000 : 100;
+    const shieldMax = isCapital ? 8000 : 60;
+    const e: ShipEntity = {
+      id: this.nextId++,
+      name: `${model.blueprint.name}-${this.nextId}`,
+      faction,
+      flight,
+      model,
+      controls: emptyControls(),
+      hull: hullMax,
+      hullMax,
+      shield: shieldMax,
+      shieldMax,
+      alive: true,
+      target: null,
+      radius: model.radius * (isCapital ? 0.35 : 0.6),
+      isPlayer: false,
+      brain: null,
+      sinceHit: 99,
+      ...opts,
+    };
+    this.ships.push(e);
+    return e;
+  }
+
+  /** Step flight for all living ships and copy sim state to visuals. */
+  step(dt: number): void {
+    for (const s of this.ships) {
+      if (!s.alive) continue;
+      s.flight.step(s.controls, dt);
+      s.sinceHit += dt;
+      if (s.sinceHit > 3 && s.shield < s.shieldMax) s.shield = Math.min(s.shieldMax, s.shield + s.shieldMax * 0.15 * dt);
+      s.model.root.position.copy(s.flight.position);
+      s.model.root.quaternion.copy(s.flight.orientation);
+      s.model.setThrottle(s.flight.boosting ? 1.55 : 0.25 + s.flight.throttle * 0.9);
+    }
+  }
+
+  enemiesOf(s: ShipEntity): ShipEntity[] {
+    return this.ships.filter((o) => o.alive && o.faction !== s.faction);
+  }
+
+  alliesOf(s: ShipEntity): ShipEntity[] {
+    return this.ships.filter((o) => o.alive && o.faction === s.faction && o !== s);
+  }
+
+  /** Apply damage; shields absorb first. Returns true if this killed the ship. */
+  damage(s: ShipEntity, amount: number): boolean {
+    if (!s.alive) return false;
+    s.sinceHit = 0;
+    const absorbed = Math.min(s.shield, amount);
+    s.shield -= absorbed;
+    s.hull -= amount - absorbed;
+    if (s.hull <= 0) {
+      s.alive = false;
+      s.model.root.visible = false;
+      return true;
+    }
+    return false;
+  }
+}
+
+export function faceAlong(q: Quaternion, dir: Vector3): Quaternion {
+  return q.setFromRotationMatrix(_m.lookAt(dir, _o.set(0, 0, 0), _up));
+}
