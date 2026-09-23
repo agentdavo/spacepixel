@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Quaternion, Scene, Vector3 } from 'three';
+import { PerspectiveCamera, Scene, Vector3 } from 'three';
 import type { FrameContext } from '@/core/Engine';
 import type { GameScene } from '../GameScene';
 import { WorldSpace } from '@/core/WorldSpace';
@@ -20,14 +20,15 @@ import { FlightHud } from '@/ui/FlightHud';
 import { StarMap } from '@/ui/StarMap';
 import { postFx } from '@/render/post/PostFx';
 import { MissionRunner, type MissionContext, type MissionDef } from '@/game/Missions';
+import { updateAI, issueOrder, setFormation, setAutopilot, brainOf } from '@/sim/ai';
 
 /**
  * Milestones 4–6 + 10–11: one ship flying well, then shooting.
  *
  * Everything runs in float64 universe space ~2,600 km from the system origin
  * and renders camera-relative. The player is a ShipEntity whose controls ARE
- * the input state; wingmen and bandits are placeholders until the AI
- * milestone replaces their kinematic paths with brains writing controls.
+ * the input state; wingmen and bandits are AI brains writing the same
+ * ControlState into the same FlightModel (src/sim/ai).
  *
  * Frame order (deliberately flat):
  *   input (engine) → fleet flight → placeholders → targeting → weapons →
@@ -40,11 +41,8 @@ const EXIT = 0.9;
 
 interface Bandit {
   ship: ShipEntity;
-  a: number;
-  b: number;
-  r: number;
-  ph: number;
   deadFor: number;
+  /** Where reinforcements come from (arrival gate). */
   center: Vector3;
 }
 
@@ -124,18 +122,25 @@ export class FlightScene implements GameScene {
       const ship = this.fleet.spawn('vf27-kestrel', 'concord', slot.clone().add(ORIGIN), fwd, { name: `Vanguard ${i + 2}` });
       this.wingmen.push({ ship, slot });
     });
+    setFormation(this.wingmen.map((w) => w.ship), 'fingerFour', 40);
+    issueOrder(this.wingmen.map((w) => w.ship), 'formUp', this.player);
     for (let i = 0; i < 3; i++) {
-      const ship = this.fleet.spawn('choir-cantor', 'choir', GATE, fwd, { name: `Cantor ${i + 1}` });
-      this.bandits.push({ ship, a: 0.11 + i * 0.023, b: 0.07 + i * 0.019, r: 700 + i * 260, ph: i * 2.1, deadFor: 0, center: GATE.clone() });
+      const pos = GATE.clone().add(new Vector3((i - 1) * 300, 80 * i, 600));
+      const ship = this.fleet.spawn('choir-cantor', 'choir', pos, fwd.clone().negate(), { name: `Cantor ${i + 1}` });
+      this.bandits.push({ ship, deadFor: 0, center: GATE.clone() });
     }
     this.lock.target = this.bandits[0].ship;
+    this.onWingOrder = (o) => issueOrder(this.wingmen.map((w) => w.ship), o, this.player);
 
     this.visuals = new WeaponVisuals(this.weapons, this.missiles);
     this.scene.add(this.visuals.group);
 
     this.chase.snap(this.player.flight);
     this.playerSubject = { position: this.player.flight.position, velocity: this.player.flight.velocity, radius: 9 };
-    if (flags.demo) input.override = demoPilot(this);
+    if (flags.demo) {
+      setAutopilot(this.player, true);
+      input.override = demoMissiles(this);
+    }
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Tab') e.preventDefault();
       this.onKey(e.code);
@@ -184,37 +189,15 @@ export class FlightScene implements GameScene {
     // Tactical view runs the battle at quarter speed so orders can be given.
     const dt = this.tactical ? realDt * 0.25 : realDt;
 
-    // 1. Flight for every ship (player controls were sampled this frame).
+    // 1. AI writes controls for every non-player ship (and the player on
+    //    autopilot), then one flight step for everyone — same physics.
+    this.player.target = this.lock.target; // "attack my target" reads this
+    if (this.jumpPhase === 'none') updateAI(this.fleet, dt, time);
     this.fleet.step(dt);
-
-    // 2. Placeholders: kinematic wingmen formation + bandit orbits (→ M13/M14 AI).
-    const k = 1 - Math.exp(-2.2 * dt);
-    const kq = 1 - Math.exp(-3.5 * dt);
-    for (const w of this.wingmen) {
-      if (!w.ship.alive) continue;
-      const f = w.ship.flight;
-      f.position.lerp(_v.copy(w.slot).applyQuaternion(pf.orientation).add(pf.position), k);
-      f.velocity.copy(pf.velocity);
-      f.orientation.slerp(pf.orientation, kq);
-      w.ship.model.root.position.copy(f.position);
-      w.ship.model.root.quaternion.copy(f.orientation);
-    }
     for (const b of this.bandits) {
-      const s = b.ship;
-      if (!s.alive) {
-        b.deadFor += dt;
-        if (b.deadFor > 5) this.respawn(b);
-        continue;
-      }
-      const t = time + b.ph;
-      const f = s.flight;
-      _v.copy(f.position);
-      f.position.set(Math.sin(t * b.a * 6.28) * b.r, Math.sin(t * b.b * 6.28) * b.r * 0.35, Math.cos(t * b.a * 6.28) * b.r).add(b.center);
-      if (dt > 0) f.velocity.subVectors(f.position, _v).divideScalar(dt);
-      if (f.velocity.lengthSq() > 1) faceAlong(f.orientation, f.velocity);
-      s.model.root.position.copy(f.position);
-      s.model.root.quaternion.copy(f.orientation);
-      s.model.setThrottle(1.1);
+      if (b.ship.alive || b.deadFor < 0) continue;
+      b.deadFor += dt;
+      if (b.deadFor > 6) this.respawn(b);
     }
 
     // 2b. Lanterns: crossing a gate plane inside the ring starts a jump.
@@ -393,11 +376,14 @@ export class FlightScene implements GameScene {
     const hostile = this.view.system.threat > 0.35;
     this.bandits.forEach((b, i) => {
       b.center.copy(g.center).addScaledVector(out, 3500 + i * 400);
-      b.ship.alive = hostile;
-      b.ship.hull = b.ship.hullMax;
-      b.ship.shield = b.ship.shieldMax;
-      b.deadFor = hostile ? 0 : -1e9;
+      if (hostile) this.respawn(b);
+      else {
+        b.ship.alive = false;
+        b.ship.model.root.visible = false;
+        b.deadFor = -1e9; // quiet system: no reinforcements
+      }
     });
+    for (const w of this.wingmen) w.ship.flight.velocity.copy(pf.velocity);
     if (this.starMap.destination === this.systemId) this.starMap.destination = null;
     this.chase.snap(pf);
   }
@@ -439,14 +425,24 @@ export class FlightScene implements GameScene {
     this.lock.locked = false;
   }
 
+  /** Bring a bandit back 2–3 km out on the gate side, inbound. */
   private respawn(b: Bandit): void {
     const s = b.ship;
+    const f = s.flight;
+    const pp = this.player.flight.position;
+    const a = s.id * 2.39 + this.fleet.ships.length;
+    _v.subVectors(b.center, pp).normalize().multiplyScalar(2600).add(pp).add(_to.set(Math.cos(a) * 500, Math.sin(a) * 300, Math.sin(a * 1.3) * 500));
+    f.position.copy(_v);
+    faceAlong(f.orientation, _to.subVectors(pp, _v).normalize());
+    f.velocity.copy(_to).multiplyScalar(f.spec.maxSpeed * 0.7);
+    f.bodyRates.set(0, 0, 0);
     s.alive = true;
     s.hull = s.hullMax;
     s.shield = s.shieldMax;
+    s.target = null;
     s.model.root.visible = true;
+    brainOf(s).nextThink = 0;
     b.deadFor = 0;
-    b.ph += 3.7;
   }
 
   resize(w: number, h: number): void {
@@ -503,41 +499,16 @@ export class FlightScene implements GameScene {
 
 const _v = new Vector3();
 const _to = new Vector3();
-const _fw = new Vector3();
-const _q = new Quaternion();
 
 /**
- * Scripted pilot for demos and deterministic captures: steers at the current
- * target with a crude proportional stick, fires when it's on the nose, and
- * ripples a missile salvo whenever a lock is achieved.
+ * Demo/capture mode: the AI flies the player (autopilot); this only adds a
+ * missile salvo whenever a lock is achieved, so captures show the swarm.
  */
-function demoPilot(scene: FlightScene) {
+function demoMissiles(scene: FlightScene) {
   let lastSalvo = -10;
   return (s: ControlState, t: number): void => {
-    const p = scene.player.flight;
-    const tgt = scene.lock.target;
-    s.throttleDelta = 0;
-    s.throttleSet = 0.8;
-    s.afterburner = t % 14 > 4 && t % 14 < 6.5;
-    s.pitch = s.yaw = s.roll = 0;
-    s.fire = false;
-    s.missile = false;
-    if (!tgt) return;
-    _to.subVectors(tgt.flight.position, p.position).normalize();
-    _v.copy(_to).applyQuaternion(_q.copy(p.orientation).invert()); // body frame
-    s.yaw = clamp(-_v.x * 3, -1, 1); // ship right is -X
-    s.pitch = clamp(_v.y * 3, -1, 1);
-    s.roll = clamp(-_v.x * 1.5, -1, 1) * 0.6;
-    p.forward(_fw);
-    const dist = tgt.flight.position.distanceTo(p.position);
-    s.fire = _fw.dot(_to) > 0.985 && dist < 1800;
-    if (scene.lock.locked && t - lastSalvo > 4) {
-      s.missile = true;
-      lastSalvo = t;
-    }
+    s.missile = scene.lock.locked && t - lastSalvo > 4;
+    if (s.missile) lastSalvo = t;
   };
 }
 
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
