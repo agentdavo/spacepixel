@@ -129,6 +129,17 @@ function proceduralPlan(sys: StationSystemInput, rnd: () => number): Plan[] {
   });
 }
 
+/**
+ * Trade risk of a system, 0..1 (drives the economy's hazard premium).
+ * Home space and quiet Rustwake lanes sit at their low threat; contested
+ * lines and Hegemony space are dangerous for a Directorate pilot; the Null
+ * Lantern and anything one lane from it (the Dead Zone's shadow) top out.
+ */
+export function systemRisk(threat: number, faction: StationSystemInput['faction'], nearNull = false): number {
+  const r = faction === 'unknown' ? 1 : threat + (nearNull ? 0.3 : 0);
+  return Math.round(Math.min(1, Math.max(0, r)) * 100) / 100;
+}
+
 const _up = new Vector3(0, 1, 0);
 
 /** Any unit vector ⟂ `axis`, rolled by `roll` radians. */

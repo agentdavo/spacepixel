@@ -31,6 +31,8 @@ import { MissionRunner, type MissionContext, type MissionDef } from '@/game/Miss
 import { updateAI, issueOrder, setFormation, setAutopilot, brainOf } from '@/sim/ai';
 import { DockingController, berth, type Dockable } from '../Docking';
 import { DockScreen, DockCinema } from '@/ui/DockScreen';
+import { HullCollisions } from '../HullCollisions';
+import { WingDocking } from '../WingDocking';
 import { loadLedger, saveLedger } from '@/game/Profile';
 import { MISSILE_MAX, cargoUsed, dockingClearance, reputationForKill, type EconFaction, type TradeLedger } from '@/game/economy';
 
@@ -139,6 +141,10 @@ export class FlightScene implements GameScene, FlightHostScene {
    * The active CampaignRunner also gets `onDocked(id)` (sets flags).
    */
   onDocked: ((stationId: string) => void) | null = null;
+  /** Hull collisions (stations, capitals) + the same shapes as AI obstacles. */
+  private hulls: HullCollisions;
+  /** Wingmen hold off the corridor while the lead docks. */
+  private wingDock = new WingDocking();
 
   constructor() {
     this.systemId = this.universe.start;
@@ -187,6 +193,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.scene.add(this.visuals.group);
     this.combatFx = new CombatFx(this.weapons, this.missiles);
     this.scene.add(this.combatFx.fx.object);
+    this.hulls = new HullCollisions(this.fleet, () => (this.fxOn ? this.combatFx.fx : null));
 
     this.chase.snap(this.player.flight);
     this.playerSubject = { position: this.player.flight.position, velocity: this.player.flight.velocity, radius: 9 };
@@ -285,6 +292,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     // berthed, the world holds still (dt = 0) behind the dock screen.
     const dt = this.docking.frozen ? 0 : this.tactical ? realDt * 0.25 : realDt;
     this.ledger.clock += dt;
+    // Story episodes keep their pacing: no docking unless the mission allows it.
+    this.docking.lockout = this.campaign && !this.campaign.mission.allowDocking ? 'DOCKING UNAVAILABLE — EPISODE IN PROGRESS' : null;
 
     // 0. Supercruise: cruise speed scales with distance to the nearest mass
     //    (planet, Lantern, great set piece) and locks to 1× near hostiles.
@@ -294,12 +303,15 @@ export class FlightScene implements GameScene, FlightHostScene {
     //    autopilot), then one flight step for everyone — same physics.
     this.player.target = this.lock.target; // "attack my target" reads this
     if (this.jumpPhase === 'none') {
-      updateAI(this.fleet, dt, time);
+      updateAI(this.fleet, dt, time, this.hulls.obstacles);
+      this.wingDock.update(dt, this.docking, this.player, this.fleet, this.hulls.obstacles, this.wingOrder);
       this.capitals.step(dt);
       this.campaign?.preStep(dt);
     }
     this.fleet.step(dt);
     this.docking.update(this.docking.busy ? realDt : dt);
+    // Hulls are solid: bounce / scrape off stations and capitals (not while guidance owns the ship).
+    this.hulls.step(dt, this.view.stations, (s) => s.isPlayer && this.docking.busy, this.world.eye);
     for (const b of this.bandits) {
       if (b.ship.alive || b.deadFor < 0) continue;
       b.deadFor += dt;
@@ -359,7 +371,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     const tgt = this.lock.target;
     const tgtSubject: Subject | null = tgt ? { position: tgt.flight.position, velocity: tgt.flight.velocity, radius: tgt.radius } : null;
     this.director.update(pf, tgtSubject, realDt);
-    this.world.eye.copy(this.director.eye);
+    this.world.eye.copy(this.director.eye).add(this.hulls.shake);
     this.docking.camera(this.world.eye, this.camera, realDt);
     this.world.sync(this.camera);
 

@@ -4,7 +4,7 @@ import { LIGHT_PRESETS, type LightPreset } from '@/render/LightRig';
 import { PLANETS, type PlanetPreset } from '@/world/Planet';
 import type { ColorStop } from '@/render/materials/PaletteRamp';
 import type { StarSystem, Universe } from './Universe';
-import { placeStations } from './stations';
+import { placeStations, systemRisk } from './stations';
 
 /**
  * Seeded Meridian Reach generator. Six hand-placed key systems anchor the
@@ -178,6 +178,12 @@ export function generateUniverse(seed = 1994, count = 22): Universe {
       planets: sys.planets.map((pl) => ({ name: pl.preset.name, position: pl.position, radius: pl.preset.radius })),
       gates: sys.gates,
     });
+  }
+  // Trade risk: system threat, plus the Null Lantern's shadow on its neighbours.
+  const nearNull = new Set(systems.get('null')?.gates.map((g) => g.to) ?? []);
+  for (const sys of systems.values()) {
+    const risk = systemRisk(sys.threat, sys.faction, nearNull.has(sys.id));
+    for (const st of sys.stations) st.risk = risk;
   }
 
   return { seed, systems, start: 'meridian' };

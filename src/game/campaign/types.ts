@@ -192,6 +192,11 @@ export interface CampaignMission {
   };
   /** Debrief text shown on success. */
   debrief: string;
+  /**
+   * Free-roam docking (G) during this episode. Default false: story pacing
+   * owns the episode unless the mission is about a station call.
+   */
+  allowDocking?: boolean;
 }
 
 export interface Campaign {

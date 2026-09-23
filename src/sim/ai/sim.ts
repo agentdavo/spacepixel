@@ -7,6 +7,7 @@ import { slotWorld, issueOrder, setFormation } from './Squadron';
 import { brainOf, PERSONALITIES, setPersonality, type FormationKind } from './state';
 import { setAutopilot, updateAI } from './index';
 import { createTurretSolution, turretAim, turretSelectTarget, TURRET_DEFAULTS, type TurretMount } from './Turret';
+import { stationAvoidScenario, wingDockScenario } from './stationSim';
 
 /**
  * Headless AI scenarios (no renderer): FlightModel + AI + stand-in guns at a
@@ -444,6 +445,8 @@ const SCENARIOS: [string, () => ScenarioResult][] = [
   ['head-on', () => headOnScenario()],
   ['coverMe', () => coverMeScenario()],
   ['capital', () => capitalScenario()],
+  ['station avoid', () => stationAvoidScenario()],
+  ['wing dock', () => wingDockScenario()],
   ['defensive', () => defensiveScenario()],
   ['turret', () => turretScenario()],
   ['dogfight 1', () => dogfightScenario(1)],

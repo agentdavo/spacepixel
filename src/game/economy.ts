@@ -5,7 +5,7 @@
  * ledger, play-clock), so the same inputs always quote the same numbers and the
  * whole thing is unit-tested (`tests/economy.test.ts`).
  *
- *   mid  = base × station-kind × faction × (1 + slow drift) × player pressure
+ *   mid  = base × character(kind × faction) × hazard × (1 + slow drift) × player pressure
  *   buy  = mid × (1 + spread/2)      (what the station charges)
  *   sell = mid × (1 − spread/2)      (what the station pays)
  *   spread = kind spread, narrowed up to 30 % by honour, widened by hostility
@@ -14,6 +14,12 @@
  *   and pays well for rations; a bastion sells munitions and wants cores.
  * - Faction flavours it: the Directorate rations Ebon, the Hegemony holds the
  *   Tessaly fields, the Rustwake skims the dregs and sells to everyone.
+ *   Only CHARACTER (45 %) of that stance reaches the price: a safe haul pays
+ *   a living (1.5–4k sh a hold), not a jackpot.
+ * - Hazard: markets in dangerous space (contested lines, Hegemony space, the
+ *   Null Lantern's shadow; `MarketSpec.risk`) pay up to +30 % for what they
+ *   need and dump what they make 12 % cheaper — the fat runs need guns.
+ *   Balance: `npm run econ-sim` (bands asserted, also in tests/econ-sim.test.ts).
  * - Drift is two slow sines per (station, commodity), periods 7–80 minutes of
  *   play, ±11 %.
  * - Pressure: every unit the player sells here gluts the market (price falls
@@ -96,6 +102,13 @@ export interface MarketSpec {
   id: string;
   kind: StationKind;
   faction: EconFaction;
+  /**
+   * 0..1 danger of the space the market sits in (system threat, contested
+   * or hostile allegiance, the Null Lantern's neighbourhood). Missing = 0.
+   * Dangerous markets pay a hazard premium for what they need and dump what
+   * they make: the fat margins are where the guns are.
+   */
+  risk?: number;
 }
 
 export interface PressureCell {
@@ -225,13 +238,35 @@ export function stance(spec: MarketSpec, cid: CommodityId): 'surplus' | 'demand'
   return m < 0.86 ? 'surplus' : m > 1.18 ? 'demand' : 'steady';
 }
 
+/**
+ * How much of the kind × faction character reaches the price. The tables
+ * above read as the station's *stance* (surplus / demand labels); prices
+ * only move a fraction of that way, so a safe Ebon haul is a living, not a
+ * jackpot (balanced by `npm run econ-sim`).
+ */
+export const CHARACTER = 0.45;
+/** Hazard premium at full risk: demand goods pay this much more, surplus goods dump this much cheaper. */
+export const HAZARD_DEMAND = 0.3;
+export const HAZARD_SURPLUS = 0.12;
+/** Risk below this is ordinary traffic: no premium. */
+const HAZARD_FLOOR = 0.3;
+
+/** 0..1 hazard from a market's risk (0 in home space). */
+export function hazard(spec: MarketSpec): number {
+  return clamp(((spec.risk ?? 0) - HAZARD_FLOOR) / (1 - HAZARD_FLOOR), 0, 1);
+}
+
 /** Mid-market price (no spread, no tariff), or NaN if not traded here. */
 export function midPrice(spec: MarketSpec, cid: CommodityId, l: TradeLedger): number {
   const k = KIND_MUL[spec.kind][cid];
   if (k === undefined) return NaN;
   const f = FACTION_MUL[spec.faction][cid] ?? 1;
+  const raw = k * f;
+  let m = 1 + (raw - 1) * CHARACTER;
+  const h = hazard(spec);
+  if (h > 0) m *= raw > 1 ? 1 + HAZARD_DEMAND * h : raw < 1 ? 1 - HAZARD_SURPLUS * h : 1;
   const p = Math.exp(-PRESSURE_K * pressureAt(l, spec.id, cid));
-  return COMMODITY[cid].base * k * f * (1 + drift(spec.id, cid, l.clock)) * p;
+  return COMMODITY[cid].base * m * (1 + drift(spec.id, cid, l.clock)) * p;
 }
 
 export interface Quote {

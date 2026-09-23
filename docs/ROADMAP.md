@@ -36,6 +36,11 @@ Docking & trade: seeded stations per system (refinery, salvage yard,
 bastion, free port, orbital port), friendly carrier hangars, ILS approach +
 auto-dock cutaway, docked market / repair / rearm / rumours, persisted
 ledger (`src/game/economy.ts`, `src/world/Docking.ts`, `src/ui/DockScreen.ts`).
+Hollow hangar bays with an atmosphere curtain (`src/assets/blueprints/bays.ts`,
+`src/world/BayCurtain.ts`), hull collisions + AI avoidance from blueprint
+proxies (`src/sim/Collision.ts`, `npm run ai-sim` station scenarios), wingmen
+hold off the corridor (`src/world/WingDocking.ts`), balanced trade with
+hazard premiums (`npm run econ-sim`).
 
 Spatial depth: space dust streaks, asteroid belts, haze lanes (`?scene=spatial`),
 and a **multiplane sky** — Disney's multiplane camera rebuilt for 6DOF: 16
@@ -74,7 +79,7 @@ opens the Reach up around them and gets the game in front of players.
 | 4 | Photo mode + clip capture (headless webm/GIF from recorded input) | 1080p clip from a replay | |
 | 5 | **Stations** — refineries, salvage yards, bastions, free ports, 1–3 per system | seeded, on star map | 🔧 |
 | 6 | **Docking** — request within 5 km, ILS corridor, auto-dock under 1 km, launch | hostiles within 10 km block it | 🔧 |
-| 7 | **Trade** — commodities, supply/demand per station, cargo, credits | pure, unit-tested economy | 🔧 |
+| 7 | **Trade** — commodities, supply/demand per station, cargo, credits | pure, unit-tested economy; `npm run econ-sim` bands (safe 1.5–4k / hold, risky ≤ 9k) | 🔧 |
 | 8 | Repair, rearm, reputation per faction | persists in profile | 🔧 |
 | 9 | Planetary ports — orbital elevators / descent corridor to the surface port | seamless approach, no load screen | |
 | 10 | Contracts board — courier, escort, bounty jobs generated from station state | uses the campaign runner | |

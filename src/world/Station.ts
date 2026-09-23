@@ -1,7 +1,10 @@
 import { Color, Group, Matrix4, Mesh, Quaternion, Vector3 } from 'three';
 import type { StationSite } from '@/universe/Universe';
 import { buildShip, type ShipModel } from '@/assets/ShipBuilder';
-import { stationBlueprint, BAY_Z, BAY_DEPTH } from '@/assets/blueprints/stations';
+import { stationBlueprint, BAY_Z, BAY_DEPTH, BAY_BACK, BAY_W, BAY_H } from '@/assets/blueprints/stations';
+import { makeProxy, type Proxy } from '@/sim/Collision';
+import { proxiesFromModel } from '@/sim/CollisionProxies';
+import { BayCurtain } from './BayCurtain';
 import { cylinder } from '@/assets/HullKit';
 import { CelMaterial } from '@/render/materials/CelMaterial';
 import { LightPoints, LIGHT_PULSE, LIGHT_STEADY, LIGHT_STROBE, type LightSpec } from './setpieces/LightPoints';
@@ -26,6 +29,8 @@ const SCALE = 100;
 export const BAY_OFFSET = BAY_Z * SCALE;
 /** How deep inside the bay a docked ship parks (m). */
 export const BAY_INSIDE = BAY_DEPTH * SCALE * 0.7;
+/** Bay interior (m): half width, half height, depth from the mouth to the back wall. */
+export const BAY_INTERIOR = { hw: (BAY_W / 2) * SCALE, hh: (BAY_H / 2) * SCALE, depth: (BAY_Z - BAY_BACK) * SCALE };
 
 const _m = new Matrix4();
 const _x = new Vector3();
@@ -42,6 +47,10 @@ export class StationView {
   readonly radius: number;
   private lights: LightPoints;
   private spinRate: number;
+  /** The atmosphere curtain across the bay mouth (Docking drives its ripple). */
+  readonly curtain: BayCurtain;
+  private tether: { z: number; len: number } | null = null;
+  private proxies: Proxy[] | null = null;
 
   constructor(
     readonly site: StationSite,
@@ -88,6 +97,7 @@ export class StationView {
       const tether = new Mesh(cylinder(9, 14, len, 6), new CelMaterial({ color: '#8d94a8', ramp: 'classic', gloss: 0.5, inkId: 7400 }));
       tether.position.set(0, 0, -850 - len / 2);
       this.group.add(tether);
+      this.tether = { z: -850 - len / 2, len };
       for (let d = 0; d < len; d += 450) {
         specs.push({ pos: new Vector3(0, 0, -900 - d), color: glow, size: 14, mode: LIGHT_PULSE, rate: 0.4, phase: -d / 3000, gain: 1.8 });
         specs.push({ pos: new Vector3(0, 0, -900 - d), color: '#ffffff', size: 22, mode: LIGHT_STROBE, rate: 0.25, phase: -d / 6000, duty: 0.05, gain: 2.5 });
@@ -95,6 +105,10 @@ export class StationView {
     }
     this.lights = new LightPoints(specs, { minPixels: 2, glint: 0.8 });
     this.group.add(this.lights.mesh);
+    // The bay's atmosphere curtain, just inside the mouth.
+    this.curtain = new BayCurtain(BAY_W * SCALE, BAY_H * SCALE, glow);
+    this.curtain.mesh.position.set(0, 0, BAY_OFFSET - 4);
+    this.group.add(this.curtain.mesh);
 
     // Ring running lights ride the spin joint.
     const spin = this.model.articulations.get('spin');
@@ -117,11 +131,22 @@ export class StationView {
     this.model.setChannel('spin', (time * this.spinRate + (this.site.seed % 97) / 97) % 1);
     this.lights.update(time);
     this.ringLights?.update(time);
+    this.curtain.update(time);
+  }
+
+  /** Collision proxies (station frame, metres): the blueprint's parts plus the landing tether. */
+  collisionProxies(): Proxy[] {
+    if (!this.proxies) {
+      this.proxies = proxiesFromModel(this.model);
+      if (this.tether) this.proxies.push(makeProxy({ kind: 'cyl', c: new Vector3(0, 0, this.tether.z), q: new Quaternion(), r: 16, halfLen: this.tether.len / 2 }));
+    }
+    return this.proxies;
   }
 
   dispose(): void {
     this.lights.dispose();
     this.ringLights?.dispose();
+    this.curtain.dispose();
   }
 }
 

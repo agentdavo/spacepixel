@@ -15,6 +15,8 @@ import {
   rumours,
   sell,
   standingLabel,
+  hazard,
+  HAZARD_DEMAND,
   type CommodityId,
   type EconFaction,
   type MarketSpec,
@@ -106,7 +108,7 @@ export class DockScreen {
       <div class="dock-head">
         <div>
           <div class="stripe"></div>
-          <div class="kicker">${KIND_LABEL[ctx.station.kind]} · ${FACTION_LABEL[ctx.station.faction]} · ${esc(ctx.systemName.toUpperCase())} · BERTH ${ctx.berth}</div>
+          <div class="kicker">${KIND_LABEL[ctx.station.kind]} · ${FACTION_LABEL[ctx.station.faction]} · ${esc(ctx.systemName.toUpperCase())} · BERTH ${ctx.berth}${hazard(ctx.station) > 0 ? ` · <span style="color:#ff9b3f">HAZARD PAY +${Math.round(hazard(ctx.station) * HAZARD_DEMAND * 100)}%</span>` : ''}</div>
           <h2>${esc(ctx.station.name.toUpperCase())}</h2>
         </div>
         <div class="dock-stats"></div>
