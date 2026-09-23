@@ -46,6 +46,9 @@ export class PrologueScene implements GameScene {
   private exitT = -1;
   private finished = false;
   private readonly loop: boolean;
+  /** Shader warm-up: one black frame parked on each shot before the film starts. */
+  private warm = 0;
+  private readonly startT: number;
 
   constructor() {
     const q = new URLSearchParams(location.search);
@@ -62,6 +65,9 @@ export class PrologueScene implements GameScene {
     audio.autoMood = false;
     this.cinema = new Cinema(PROLOGUE, this.stage, this.world, this.camera, this.overlay, audio);
     this.cinema.t = flags.scene === 'prologue' ? flags.startTime : 0;
+    this.startT = this.cinema.t;
+    // Screenshots seek straight to their frame; the warm-up is for real playback.
+    if (flags.shot) this.warm = PROLOGUE.length + 1;
     this.cinema.onEnd = () => {
       if (this.exitOnSkip || !this.loop) this.finish();
       else window.setTimeout(() => !this.finished && this.cinema.seek(0), 1200);
@@ -95,6 +101,18 @@ export class PrologueScene implements GameScene {
 
   update(ctx: FrameContext): void {
     if (this.finished) return;
+    if (this.warm <= PROLOGUE.length) {
+      // Park on each set for one frame behind a black fade so every pipeline
+      // compiles now, not on the first cut into it (seek is silent: no
+      // captions, music or SFX). Then rewind to the real start.
+      let at = 0;
+      for (let i = 0; i < Math.min(this.warm, PROLOGUE.length - 1); i++) at += PROLOGUE[i].dur;
+      this.cinema.seek(this.warm < PROLOGUE.length ? at + PROLOGUE[this.warm].dur * 0.5 : this.startT);
+      this.warm++;
+      postFx.fade = 1;
+      this.overlay.el.style.visibility = this.warm <= PROLOGUE.length ? 'hidden' : '';
+      return;
+    }
     this.cinema.update(ctx.dt);
     const dt = ctx.dt;
     // Everything the weapons sim emitted this frame → flashes, beams, particles.
