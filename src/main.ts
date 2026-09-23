@@ -104,18 +104,35 @@ async function boot(): Promise<void> {
     await reel.done;
   }
 
-  /** The campaign loop: (prologue, once) → eyecatch → briefing → episode → debrief → next. */
-  async function runCampaign(): Promise<void> {
+  /**
+   * The career loop: (prologue, once) → eyecatch → briefing → episode →
+   * debrief → free flight from a Directorate station (trade, contracts) →
+   * "priority orders" at any Directorate station → the next episode. The
+   * campaign's order never changes; the player chooses when it continues.
+   * After the last episode the Reach simply stays open.
+   */
+  async function runCampaign(startFree = false): Promise<void> {
     const profile = loadProfile();
-    if (!profile.seenPrologue && profile.episode <= 1) {
+    if (!startFree && !profile.seenPrologue && profile.episode <= 1) {
       await playPrologue();
       profile.seenPrologue = true;
       saveProfile(profile);
     }
     let flight: FlightScene | null = null;
+    let free = startFree;
+    let fromEpisode = false;
     for (;;) {
-      const m: CampaignMission | undefined = MISSIONS[Math.min(profile.episode, MISSIONS.length) - 1];
-      if (!m) return;
+      const m: CampaignMission | undefined = MISSIONS[profile.episode - 1];
+      if (free || !m) {
+        if (!flight) flight = (await load(DEFAULT_SCENE)) as FlightScene;
+        const desk = flight.contracts;
+        // After an episode: the nearest Directorate berth. From the title: where you last docked.
+        const last = flight.ledger.lastDock;
+        const station = !fromEpisode && last && desk.hasBoard(last) ? last : desk.homeStation();
+        await flight.startFreeRoam(station, m ? { episode: m.episode, title: m.title, tagline: m.tagline } : null);
+        free = false;
+        if (!m) return; // unreachable: with nothing pending, free flight never ends
+      }
       await showEyecatch(uiRoot, { chapter: m.chapter, episode: m.episode, title: m.title, tagline: m.tagline });
       getAudio().music.setMood('briefing', 2);
       await briefingScreen(uiRoot, briefingOf(m));
@@ -125,8 +142,10 @@ async function boot(): Promise<void> {
       if (result.outcome === 'success' && next === 'continue') {
         profile.episode = Math.min(MISSIONS.length + 1, m.episode + 1);
         saveProfile(profile);
-        if (profile.episode > MISSIONS.length) return;
       }
+      // "Continue" opens the Reach (success or not); "retry" flies the episode again.
+      free = next === 'continue';
+      fromEpisode = true;
     }
   }
 
@@ -142,8 +161,8 @@ async function boot(): Promise<void> {
       continue;
     }
     getAudio().ui('confirm');
-    if (choice === 'launch') {
-      await runCampaign();
+    if (choice === 'launch' || choice === 'free') {
+      await runCampaign(choice === 'free');
       return;
     }
     if (choice === 'hangar' || choice === 'paint') {

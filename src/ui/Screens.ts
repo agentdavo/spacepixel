@@ -1,5 +1,5 @@
 import type { MissionDef } from '@/game/Missions';
-import { loadProfile } from '@/game/Profile';
+import { loadContracts, loadLedger, loadProfile } from '@/game/Profile';
 import { getAudio } from '@/audio';
 
 /**
@@ -7,7 +7,7 @@ import { getAudio } from '@/audio';
  * style.css with the CRT treatment. Each screen resolves a promise when the
  * player moves on, so the boot flow in main.ts reads top to bottom.
  */
-export type TitleChoice = 'launch' | 'map' | 'hangar' | 'paint' | 'showcase' | 'prologue' | 'attract';
+export type TitleChoice = 'launch' | 'free' | 'map' | 'hangar' | 'paint' | 'showcase' | 'prologue' | 'attract';
 
 export interface TitleOptions {
   /** Resolve with 'attract' after this long with no input (the prologue plays as an attract reel). */
@@ -15,8 +15,12 @@ export interface TitleOptions {
 }
 
 export function titleScreen(root: HTMLElement, opts: TitleOptions = {}): Promise<TitleChoice> {
+  const profile = loadProfile();
+  // A career in progress (an episode flown, a berth logged, a contract in hand) can fly free.
+  const career = profile.episode > 1 || !!loadLedger().lastDock || loadContracts().active.length > 0;
   const items: { id: TitleChoice; label: string }[] = [
-    { id: 'launch', label: `LAUNCH — EPISODE ${String(loadProfile().episode).padStart(2, '0')}` },
+    { id: 'launch', label: `LAUNCH — EPISODE ${String(profile.episode).padStart(2, '0')}` },
+    ...(career ? [{ id: 'free' as const, label: 'CONTINUE — FREE FLIGHT' }] : []),
     { id: 'prologue', label: 'PROLOGUE — THE LONG DARK' },
     { id: 'paint', label: 'PAINT SHOP' },
     { id: 'hangar', label: 'HANGAR / MODEL SHEETS' },

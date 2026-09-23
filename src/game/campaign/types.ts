@@ -87,7 +87,9 @@ export interface CodexEntry {
 export type Placement =
   | { at: 'player'; offset: [number, number, number] }
   | { at: 'gate'; gateIndex?: number; offset: [number, number, number] }
-  | { at: 'tag'; tag: string; offset: [number, number, number] };
+  | { at: 'tag'; tag: string; offset: [number, number, number] }
+  /** Absolute universe position (free-roam contracts, which know the system's geometry). */
+  | { at: 'point'; point: [number, number, number]; offset: [number, number, number] };
 
 export interface SpawnSpec {
   /** Blueprint id (see src/assets/blueprints). */

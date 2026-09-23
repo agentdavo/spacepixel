@@ -1,0 +1,125 @@
+/* ══ Dock tab: CONTRACTS — board list + OVA mission-brief card ══════════ */
+.ct { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 1.08fr); gap: 20px; min-height: 0; height: calc(100% - 26px); }
+.dock-panel:has(.ct) { overflow: hidden; }
+.ct-list { min-height: 0; overflow: auto; padding-right: 4px; }
+.ct-h { margin: 12px 0 6px; font-family: var(--font-display); font-size: 12px; letter-spacing: 0.28em; color: var(--fc); font-weight: 700; }
+.ct-h:first-child { margin-top: 0; }
+.ct-h.priority { color: #ff7a1c; }
+.ct-row {
+  display: grid;
+  grid-template-columns: 124px 34px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 1px 8px;
+  padding: 6px 8px 6px 10px;
+  border-top: 1px solid rgba(125, 255, 178, 0.1);
+  cursor: pointer;
+  align-items: baseline;
+}
+.ct-row:hover { background: rgba(125, 255, 178, 0.05); }
+.ct-row.sel { background: rgba(255, 179, 71, 0.1); box-shadow: inset 3px 0 0 #ffb347; }
+.ct-row .kind { font-size: 10px; letter-spacing: 0.16em; color: #ffb347; white-space: nowrap; }
+.ct-row .tier { font-size: 10px; letter-spacing: 0.05em; color: rgba(255, 255, 255, 0.55); }
+.ct-row .tier.t2 { color: #ffc46b; }
+.ct-row .tier.t3 { color: #ff5f7a; }
+.ct-row .title { color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-row .fee { color: #fff; font-family: var(--font-display); font-weight: 700; letter-spacing: 0.04em; }
+.ct-row .urgent { color: #ff5f7a; }
+.ct-row b { font-size: 11px; letter-spacing: 0.16em; padding: 1px 6px; border: 1px solid currentColor; font-weight: normal; }
+.ct-row b.pay { color: #061012; background: #7dffb2; border-color: #7dffb2; }
+.ct-row b.ready { color: #7dffb2; }
+.ct-row b.prio { color: #ff7a1c; }
+.ct-row .where { grid-column: 3 / 5; font-size: 10px; letter-spacing: 0.14em; color: rgba(125, 255, 178, 0.55); }
+.ct-row.priority { background: linear-gradient(90deg, rgba(255, 122, 28, 0.16), transparent 70%); }
+.ct-row.priority .kind { color: #ff7a1c; }
+.ct-empty { padding: 8px 10px; color: rgba(125, 255, 178, 0.45); font-size: 12px; }
+.ct-record { margin-top: 14px; padding-top: 8px; border-top: 1px dashed rgba(125, 255, 178, 0.2); font-size: 10px; letter-spacing: 0.16em; color: rgba(125, 255, 178, 0.55); }
+
+/* The brief card: a skewed cel with a stripe, a stamp and a CRT portrait. */
+.ct-card {
+  --cc: #7dffb2;
+  --fcol: #6fe6ff;
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  padding: 14px 18px 14px;
+  background: linear-gradient(160deg, rgba(10, 18, 30, 0.92), rgba(4, 8, 10, 0.92) 60%);
+  border: 1px solid color-mix(in srgb, var(--fcol) 45%, transparent);
+  clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 26px, 100% 100%, 26px 100%, 0 calc(100% - 26px));
+  box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
+  animation: ct-card-in 0.22s steps(3);
+}
+@keyframes ct-card-in {
+  0% { opacity: 0; transform: translateX(14px) skewX(-6deg); }
+  100% { opacity: 1; transform: none; }
+}
+.ct-card.empty { display: flex; align-items: center; justify-content: center; }
+.ct-card-head { position: relative; border-bottom: 1px solid rgba(255, 255, 255, 0.12); padding-bottom: 8px; margin-bottom: 10px; }
+.ct-stripe { width: 180px; height: 6px; margin-bottom: 8px; background: repeating-linear-gradient(90deg, #ff7a1c 0 24px, transparent 24px 30px, var(--fcol) 30px 54px, transparent 54px 60px); }
+.ct-kicker { font-size: 10px; letter-spacing: 0.3em; color: var(--fcol); }
+.ct-card h2 {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(16px, 1.7vw, 22px);
+  letter-spacing: 0.06em;
+  color: #fff;
+  text-shadow: 2px 2px 0 #ff3fa8, 4px 4px 0 rgba(43, 78, 168, 0.8);
+  transform: skewX(-8deg);
+  transform-origin: left bottom;
+  padding-right: 110px;
+}
+.ct-stamp {
+  position: absolute;
+  right: 4px;
+  top: 12px;
+  padding: 3px 10px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.22em;
+  border: 2px solid currentColor;
+  transform: rotate(-8deg);
+  color: #ffb347;
+  opacity: 0.9;
+}
+.ct-stamp.complete { color: #7dffb2; }
+.ct-stamp.priority { color: #ff7a1c; animation: blink 1.2s steps(1) infinite; }
+.ct-card-body { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px; min-height: 0; }
+.ct-client { display: flex; flex-direction: column; gap: 8px; }
+.ct-portrait { position: relative; width: 150px; height: 175px; border: 2px solid var(--cc); box-shadow: 0 0 14px color-mix(in srgb, var(--cc) 35%, transparent); background: #050807; overflow: hidden; }
+.ct-portrait canvas { width: 100%; height: 100%; display: block; }
+.ct-portrait i { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px); pointer-events: none; }
+.ct-who b { display: block; font-family: var(--font-display); font-size: 13px; letter-spacing: 0.18em; color: var(--cc); }
+.ct-who span { display: block; color: #fff; font-size: 12px; margin-top: 2px; }
+.ct-who small { display: block; font-size: 10px; letter-spacing: 0.08em; color: rgba(125, 255, 178, 0.6); margin-top: 3px; line-height: 1.35; }
+.ct-text { min-height: 0; overflow: auto; }
+.ct-brief { white-space: pre-wrap; color: #e8f5ee; font-size: 12px; line-height: 1.45; min-height: 6em; text-shadow: 0 0 5px rgba(125, 255, 178, 0.25); }
+.ct-cursor { display: inline-block; width: 0.55em; background: var(--crt-green); animation: blink 0.8s steps(1) infinite; }
+.ct-terms { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; margin: 10px 0 0; font-size: 11px; }
+.ct-terms dt { color: rgba(255, 179, 71, 0.85); letter-spacing: 0.18em; font-size: 10px; padding-top: 1px; }
+.ct-terms dd { margin: 0; color: #fff; }
+.ct-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 10px; }
+.ct-actions small { opacity: 0.65; margin-left: 6px; font-size: 10px; }
+.ct-accept {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.24em;
+  padding: 7px 16px;
+  color: #fff;
+  background: linear-gradient(90deg, rgba(255, 122, 28, 0.9), rgba(255, 63, 168, 0.75));
+  border: none;
+  cursor: pointer;
+  transform: skewX(-10deg);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6);
+}
+.ct-accept:hover { filter: brightness(1.15); }
+.dock-btn.warn { color: #ff5f7a; border-color: rgba(255, 95, 122, 0.5); }
+.ct-note { margin-top: 8px; font-size: 12px; color: rgba(125, 255, 178, 0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-note.ok { color: #fff; }
+.ct-note.err { color: #ff5f7a; }
+@media (max-width: 900px) {
+  .ct { grid-template-columns: 1fr; height: auto; }
+  .ct-card-body { grid-template-columns: 1fr; }
+}

@@ -299,6 +299,7 @@ export class CampaignRunner {
   resolve(p: Placement): Vector3 | null {
     const off = new Vector3(...p.offset);
     if (p.at === 'player') return off.add(this.host.playerPosition);
+    if (p.at === 'point') return off.add(new Vector3(...p.point));
     if (p.at === 'gate') {
       const g = this.host.gatePosition(p.gateIndex ?? 0);
       return g ? off.add(g) : null;

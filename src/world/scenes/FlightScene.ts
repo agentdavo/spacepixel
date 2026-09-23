@@ -33,6 +33,7 @@ import { DockingController, berth, type Dockable } from '../Docking';
 import { DockScreen, DockCinema } from '@/ui/DockScreen';
 import { loadLedger, saveLedger } from '@/game/Profile';
 import { MISSILE_MAX, cargoUsed, dockingClearance, reputationForKill, type EconFaction, type TradeLedger } from '@/game/economy';
+import { ContractDesk, type PriorityInfo } from '@/game/contracts/ContractDesk';
 
 /**
  * Milestones 4–6 + 10–11: one ship flying well, then shooting.
@@ -79,7 +80,7 @@ export class FlightScene implements GameScene, FlightHostScene {
   readonly universe: Universe = generateUniverse(1994);
   private systemId: string;
   private view: StarSystemView;
-  private starMap: StarMap;
+  readonly starMap: StarMap;
   private hyperspace = new Hyperspace();
   private dust = new SpaceDust();
   /** ?planes=N km strata (default 16, 0 = off). */
@@ -139,6 +140,8 @@ export class FlightScene implements GameScene, FlightHostScene {
    * The active CampaignRunner also gets `onDocked(id)` (sets flags).
    */
   onDocked: ((stationId: string) => void) | null = null;
+  /** Free-roam contracts: board, accepted jobs, live operations (src/game/contracts). */
+  readonly contracts: ContractDesk;
 
   constructor() {
     this.systemId = this.universe.start;
@@ -245,8 +248,11 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.starMap.destination = q.get('map');
       this.starMap.toggle();
     }
+    this.contracts = new ContractDesk(this);
     // ?dock=approach|auto|docked|launch [&station=<id|index>] [&cargo=demo]: docking captures.
     if (q.get('dock')) this.dockFlag(q.get('dock')!, q.get('station') ?? '', q.get('cargo') === 'demo');
+    // ?contract=<kind>&cphase=board|op|pay|map: contract captures.
+    this.contracts.stageFromQuery();
     if (q.get('dockui') === '0') this.dockScreen.close();
     window.__VANGUARD__ = { ...window.__VANGUARD__, ready: false, frame: () => 0, backend: '', hooks: { ...window.__VANGUARD__?.hooks, scene: this } };
   }
@@ -297,6 +303,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       updateAI(this.fleet, dt, time);
       this.capitals.step(dt);
       this.campaign?.preStep(dt);
+      this.contracts.preStep(dt);
     }
     this.fleet.step(dt);
     this.docking.update(this.docking.busy ? realDt : dt);
@@ -336,11 +343,12 @@ export class FlightScene implements GameScene, FlightHostScene {
         done({ outcome: this.campaign.runner.outcome as 'success' | 'failure', codex: [...this.campaign.unlockedTitles] });
       }
     }
+    this.contracts.update(dt, time);
 
     // 4b. Mission bookkeeping (kills by faction of the victim).
     for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship) this.kills.set(e.ship.faction, (this.kills.get(e.ship.faction) ?? 0) + 1);
     // Free-roam: shooting a faction's ships costs standing with its stations.
-    if (!this.campaign) for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship && e.shooter === this.player) this.ledger = reputationForKill(this.ledger, e.ship.faction as EconFaction);
+    if (!this.campaign) for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship && e.shooter === this.player && !this.contracts.owns(e.ship)) this.ledger = reputationForKill(this.ledger, e.ship.faction as EconFaction);
     if (this.mission) {
       this.missionTime += dt;
       const mc = this.missionCtx;
@@ -383,6 +391,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     postFx.speed = Math.min(1, pf.speed / pf.spec.boostSpeed);
     this.hyperspace.update(dt, this.jumpPhase === 'tunnel' ? Math.min(1, this.jumpT * 3, (TUNNEL - this.jumpT) * 3) : 0, 60, this.camera.quaternion);
     this.hud.navNoise = Math.max(postFx.navNoise, this.campaign?.mission.modifiers?.navDegraded ? 0.55 : 0);
+    this.contracts.draw(time, !this.docking.busy && !this.tactical && this.jumpPhase === 'none');
     if (this.docking.busy) {
       // Cutaway: the frame belongs to the cinematography.
       this.hud.clear();
@@ -780,8 +789,10 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.cinema.hide();
     this.onDocked?.(d.id);
     this.campaign?.runner.onDocked(d.id);
+    const notices = this.campaign ? [] : this.contracts.onDocked(d.id);
     this.lock.target = null;
     this.dockScreen.open({
+      notices,
       station: d,
       systemName: this.view.system.name,
       berth: berth(d),
@@ -865,16 +876,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.cinematic = false;
     const owner = [...this.universe.systems.values()].find((s) => s.stations.some((st) => st.id === sel));
     if (owner) this.warpTo(owner.id);
-    // A quiet approach: the free-flight bandits and the Cathedral stand down.
-    for (const b of this.bandits) {
-      b.ship.alive = false;
-      b.ship.model.root.visible = false;
-      b.deadFor = -1e9;
-    }
-    this.cathedral.alive = false;
-    this.cathedral.model.root.visible = false;
-    this.cathedral.hull = 0;
-    this.lock.target = null;
+    this.quiet();
     const list = this.docking.dockables();
     const p0 = this.player.flight.position;
     const d =
@@ -917,6 +919,105 @@ export class FlightScene implements GameScene, FlightHostScene {
         this.docking.t = Number(new URLSearchParams(location.search).get('dockt') ?? 0) || 0;
       }
     }
+  }
+
+  /** A quiet sky: the free-flight bandits and the Cathedral stand down (captures, free-flight starts). */
+  quiet(): void {
+    for (const b of this.bandits) {
+      b.ship.alive = false;
+      b.ship.model.root.visible = false;
+      b.deadFor = -1e9;
+    }
+    this.cathedral.alive = false;
+    this.cathedral.model.root.visible = false;
+    this.cathedral.hull = 0;
+    this.lock.target = null;
+  }
+
+  /** Put the player (and the wing, in slot) at a universe point, flying along `dir`. */
+  placePlayer(pos: Vector3, dir: Vector3, speed: number): void {
+    const pf = this.player.flight;
+    pf.position.copy(pos);
+    faceAlong(pf.orientation, dir);
+    pf.velocity.copy(dir).multiplyScalar(speed);
+    pf.throttle = 0.6;
+    for (const w of this.wingmen) {
+      w.ship.flight.position.copy(_v.copy(w.slot).applyQuaternion(pf.orientation).add(pf.position));
+      w.ship.flight.orientation.copy(pf.orientation);
+      w.ship.flight.velocity.copy(pf.velocity);
+    }
+    this.chase.snap(pf);
+  }
+
+  /**
+   * Berth at a station anywhere in the Reach (free-flight starts, salvage
+   * tows, captures): switch systems without a transit, revive the airframe
+   * at `hull` (0..1) and open the dock screen.
+   */
+  berthAt(stationId: string, hull = 1): boolean {
+    const owner = [...this.universe.systems.values()].find((s) => s.stations.some((st) => st.id === stationId));
+    if (!owner) return false;
+    this.docking.reset();
+    this.dockScreen.close();
+    this.cinema.hide();
+    if (owner.id !== this.systemId) {
+      this.warpTo(owner.id);
+      this.quiet();
+    }
+    const d = this.docking.dockables().find((x) => x.id === stationId);
+    if (!d) return false;
+    const p = this.player;
+    p.alive = true;
+    p.hull = Math.max(0.05, Math.min(1, hull)) * p.hullMax;
+    p.shield = p.shieldMax;
+    const pos = _to.copy(d.bay).addScaledVector(d.axis, 900);
+    this.placePlayer(pos.clone(), d.axis.clone().negate(), 60);
+    this.docking.berth(d);
+    return true;
+  }
+
+  /**
+   * Free flight between episodes (the career loop): the story is put away,
+   * the wing re-forms, and the pilot starts berthed at `stationId`. Resolves
+   * when priority orders are accepted at a Directorate station; with no
+   * episode pending the Reach simply stays open.
+   */
+  startFreeRoam(stationId: string, priority: PriorityInfo | null): Promise<void> {
+    this.campaign?.dispose();
+    this.campaign = null;
+    this.campaignDone = null;
+    this.lastOutcome = 'running';
+    // Park everything the episode left in the sky; the free-flight wing comes back.
+    const keep = new Set<ShipEntity>([this.player, ...this.wingmen.map((w) => w.ship)]);
+    for (const s of this.fleet.ships) {
+      if (keep.has(s)) continue;
+      s.alive = false;
+      s.model.root.visible = false;
+    }
+    for (const b of this.bandits) b.deadFor = -1e9;
+    this.cathedral.hull = this.carrier.hull = 0;
+    for (const w of this.wingmen) {
+      const s = w.ship;
+      s.alive = true;
+      s.hull = s.hullMax;
+      s.shield = s.shieldMax;
+      s.team = this.player.team;
+      s.model.root.visible = true;
+    }
+    setFormation(this.wingmen.map((w) => w.ship), 'fingerFour', 40);
+    issueOrder(this.wingmen.map((w) => w.ship), 'formUp', this.player);
+    this.audio.autoMood = true;
+    this.audio.music.setMood('cruise', 3);
+    if (!this.berthAt(stationId)) this.berthAt(this.contracts.homeStation());
+    this.contracts.priority = priority;
+    return new Promise((resolve) => {
+      this.contracts.onPriority = () => {
+        this.contracts.onPriority = null;
+        this.contracts.priority = null;
+        this.dockScreen.close();
+        resolve();
+      };
+    });
   }
 
   resize(w: number, h: number): void {
