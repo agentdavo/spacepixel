@@ -488,7 +488,7 @@ export const CODEX: CodexEntry[] = [
     title: 'A Chart, in Crayon',
     category: 'logs',
     body: p(
-      `Catalogued by the Office of Continuity as personal effect 0431-A, formerly of Capt. A. Oyelaran. Currently carried in the seat pocket of Kestrel airframe 0413 / Vanguard 2.`,
+      `Catalogued by the Office of Continuity as personal effect 0431-A, formerly of Capt. A. Oyelaran. Currently carried in the seat pocket of Vanguard 2's Kestrel.`,
       `The reverse of a standard Directorate ration card (see: The Board of Allocation). Drawn in wax crayon — blue, orange, and a green that has been used almost to the end. Six stars, correctly placed, labelled in capitals: MERIDEN (sic), ANKRIDGE (sic), TESSALY, HESPER, RUSTWAKE, NULL. Between every star and every other star, a line — fifteen in all, most of which correspond to no Lantern route that has ever existed.`,
       `From every star, additional lines run off every edge of the card. Along the right-hand edge, in the green crayon: THEY GO SOMEWHERE.`,
       `Below that, in the orange, smaller, the tail of the last letter running off the card: GRANDPA WHERE DO THEY G`,
