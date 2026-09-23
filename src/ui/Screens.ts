@@ -7,9 +7,17 @@ import { getAudio } from '@/audio';
  * style.css with the CRT treatment. Each screen resolves a promise when the
  * player moves on, so the boot flow in main.ts reads top to bottom.
  */
-export function titleScreen(root: HTMLElement): Promise<'launch' | 'map' | 'hangar' | 'paint' | 'showcase'> {
-  const items: { id: 'launch' | 'map' | 'hangar' | 'paint' | 'showcase'; label: string }[] = [
+export type TitleChoice = 'launch' | 'map' | 'hangar' | 'paint' | 'showcase' | 'prologue' | 'attract';
+
+export interface TitleOptions {
+  /** Resolve with 'attract' after this long with no input (the prologue plays as an attract reel). */
+  idleMs?: number;
+}
+
+export function titleScreen(root: HTMLElement, opts: TitleOptions = {}): Promise<TitleChoice> {
+  const items: { id: TitleChoice; label: string }[] = [
     { id: 'launch', label: `LAUNCH — EPISODE ${String(loadProfile().episode).padStart(2, '0')}` },
+    { id: 'prologue', label: 'PROLOGUE — THE LONG DARK' },
     { id: 'paint', label: 'PAINT SHOP' },
     { id: 'hangar', label: 'HANGAR / MODEL SHEETS' },
     { id: 'showcase', label: 'SHOWCASE' },
@@ -30,12 +38,23 @@ export function titleScreen(root: HTMLElement): Promise<'launch' | 'map' | 'hang
     getAudio().ui('move');
   };
   return new Promise((resolve) => {
-    const done = (i: number) => {
+    let idle = 0;
+    const settle = (v: TitleChoice) => {
+      window.clearTimeout(idle);
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointermove', poke);
       el.remove();
-      resolve(items[i].id);
+      resolve(v);
     };
+    const done = (i: number) => settle(items[i].id);
+    const poke = () => {
+      window.clearTimeout(idle);
+      if (opts.idleMs) idle = window.setTimeout(() => settle('attract'), opts.idleMs);
+    };
+    poke();
+    window.addEventListener('pointermove', poke);
     const onKey = (e: KeyboardEvent) => {
+      poke();
       if (e.code === 'ArrowDown' || e.code === 'KeyS') sel = (sel + 1) % items.length;
       else if (e.code === 'ArrowUp' || e.code === 'KeyW') sel = (sel + items.length - 1) % items.length;
       else if (e.code === 'Enter' || e.code === 'Space') return done(sel);
