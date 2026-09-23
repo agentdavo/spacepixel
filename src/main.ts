@@ -8,6 +8,7 @@ import type { GameScene } from '@/world/GameScene';
 import { DebugHud } from '@/ui/DebugHud';
 import { titleScreen, briefingScreen } from '@/ui/Screens';
 import { FIRST_LIGHT } from '@/game/Missions';
+import { DynamicResolution } from '@/core/DynamicResolution';
 
 declare global {
   interface Window {
@@ -55,6 +56,10 @@ async function boot(): Promise<void> {
     const pipeline = ink;
     engine.addSystem(game);
     engine.addSystem({ update: (ctx) => pipeline.update(ctx.time) });
+    if (flags.quality === 'low') pipeline.setRenderScale(0.75);
+    const dynres = new DynamicResolution(engine.perf, pipeline);
+    dynres.enabled = flags.dynres;
+    engine.addSystem({ update: (ctx) => dynres.update(ctx.dt) });
     if (!debugHud) debugHud = new DebugHud(engine, pipeline, game, name, uiRoot);
     debugHud.game = game;
     debugHud.sceneName = name;

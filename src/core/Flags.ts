@@ -26,6 +26,9 @@ export interface Flags {
   budget: number;
   /** Scripted autopilot for demos / captures. */
   demo: boolean;
+  /** low | med | high — starting render scale / pixel ratio cap; `auto` resolution follows GPU time. */
+  quality: 'low' | 'med' | 'high';
+  dynres: boolean;
 }
 
 const q = new URLSearchParams(window.location.search);
@@ -44,4 +47,6 @@ export const flags: Flags = {
   hud: q.get('hud') !== '0',
   budget: Number(q.get('budget') ?? 0) || 1000 / 60,
   demo: q.get('demo') === '1' || (q.get('shot') === '1' && q.get('demo') !== '0'),
+  quality: (['low', 'med', 'high'] as const).find((x) => x === q.get('quality')) ?? 'med',
+  dynres: q.get('dynres') !== '0' && q.get('shot') !== '1',
 };

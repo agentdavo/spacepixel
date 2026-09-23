@@ -28,7 +28,7 @@ export async function createRenderer(canvas: HTMLCanvasElement): Promise<Rendere
     trackTimestamp: true, // GPU timings when the adapter exposes timestamp-query
   });
 
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, flags.quality === 'high' ? 2 : flags.quality === 'med' ? 1.5 : 1));
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;

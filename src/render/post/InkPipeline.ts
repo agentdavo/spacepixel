@@ -111,6 +111,8 @@ export class InkPipeline {
 
   private view: DebugView = 'final';
   private pixelRatio = 1;
+  /** Scene-pass resolution scale (dynamic resolution). */
+  renderScale = 1;
   private nodes!: Record<DebugView, Node>;
 
   constructor(renderer: WebGPURenderer, scene: Scene, camera: Camera, isWebGPU: boolean, settings: Partial<InkSettings> = {}) {
@@ -205,12 +207,25 @@ export class InkPipeline {
 
   applySettings(): void {
     const s = this.settings;
-    this.params.value.set(s.lineRadius * this.pixelRatio, s.silhouetteThreshold, s.creaseThreshold, s.regionThreshold);
+    this.params.value.set(s.lineRadius * this.pixelRatio * this.renderScale, s.silhouetteThreshold, s.creaseThreshold, s.regionThreshold);
     this.params2.value.set(s.silhouetteScale, s.boilAmount, 0, s.boilFrequency);
     this.inkColor.value.copy(s.inkColor);
     this.hazeColor.value.copy(s.hazeColor);
     this.hazeParams.value.set(s.hazeDistance, s.hazeStrength, 0, 0);
     this.inkOn.value = s.enabled ? 1 : 0;
+  }
+
+  /**
+   * Render the scene pass at a fraction of native resolution. Ink radius is
+   * scaled with it so lines keep the same on-screen weight; the ink, grade
+   * and FXAA still run at output resolution.
+   */
+  setRenderScale(scale: number): void {
+    const s = Math.min(1, Math.max(0.5, scale));
+    if (Math.abs(s - this.renderScale) < 1e-3) return;
+    this.renderScale = s;
+    this.scenePass.setResolutionScale(s);
+    this.applySettings();
   }
 
   setView(view: DebugView): void {
