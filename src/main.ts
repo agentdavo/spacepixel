@@ -13,6 +13,7 @@ import type { CampaignMission } from '@/game/campaign/types';
 import { showEyecatch, showDebrief } from '@/ui/Eyecatch';
 import { loadProfile, saveProfile } from '@/game/Profile';
 import type { FlightScene } from '@/world/scenes/FlightScene';
+import type { PrologueScene } from '@/world/scenes/PrologueScene';
 import { getAudio } from '@/audio';
 import { DynamicResolution } from '@/core/DynamicResolution';
 
@@ -96,9 +97,21 @@ async function boot(): Promise<void> {
     return;
   }
 
-  /** The campaign loop: eyecatch → briefing → episode → debrief → next. */
+  /** The ~60 s cold open (src/cinema/prologue.ts); resolves when it ends or is skipped. */
+  async function playPrologue(): Promise<void> {
+    const reel = (await load('prologue')) as PrologueScene;
+    reel.exitOnSkip = true;
+    await reel.done;
+  }
+
+  /** The campaign loop: (prologue, once) → eyecatch → briefing → episode → debrief → next. */
   async function runCampaign(): Promise<void> {
     const profile = loadProfile();
+    if (!profile.seenPrologue && profile.episode <= 1) {
+      await playPrologue();
+      profile.seenPrologue = true;
+      saveProfile(profile);
+    }
     let flight: FlightScene | null = null;
     for (;;) {
       const m: CampaignMission | undefined = MISSIONS[Math.min(profile.episode, MISSIONS.length) - 1];
@@ -117,10 +130,17 @@ async function boot(): Promise<void> {
     }
   }
 
-  // Front end: title card over the live showcase → briefing → flight.
+  // Front end: title card over the live showcase → briefing → flight. Left
+  // idle, the title plays the prologue as an attract reel, then comes back.
   for (;;) {
     getAudio().music.setMood('title');
-    const choice = await titleScreen(uiRoot);
+    const choice = await titleScreen(uiRoot, { idleMs: 45_000 });
+    if (choice === 'prologue' || choice === 'attract') {
+      if (choice === 'prologue') getAudio().ui('confirm');
+      await playPrologue();
+      await load('showcase');
+      continue;
+    }
     getAudio().ui('confirm');
     if (choice === 'launch') {
       await runCampaign();

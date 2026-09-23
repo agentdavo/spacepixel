@@ -260,8 +260,10 @@ export class MegaGate implements SetPiece {
   readonly group = new Group();
   readonly position = new Vector3();
   readonly radius: number;
-  /** 0 = dormant … 1 = fully awake (smoothed timeline). */
+  /** 0 = dormant … 1 = fully awake (smoothed timeline). Scripts may write it directly while the gate is not awakening. */
   awake = 0;
+  /** Scripting hook (cutscenes): multiplier on the running lights, 0 = dead. */
+  lightGain = 1;
   private awakeT = 0;
   private awakening = false;
   private angleB = 0.4;
@@ -451,7 +453,7 @@ export class MegaGate implements SetPiece {
     this.uTime.value = ctx.time;
     this.uAwake.value = this.awake;
     this.lights.update(ctx.time);
-    this.lights.intensity.value = 0.35 + 0.65 * this.awake;
+    this.lights.intensity.value = (0.35 + 0.65 * this.awake) * this.lightGain;
     if (ctx.playerPos.distanceTo(this.position) < this.reach) ctx.setFlag(`${this.tag}-reached`);
   }
 

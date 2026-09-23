@@ -58,8 +58,18 @@ still runs (TSL ink twin), but compute particles are disabled there.
 `flight` (default game) · `showcase` · `hangar` (model sheets) · `paint`
 (livery editor) · `spatial` (depth cues) · `dogfight` (AI demo) · `fx`
 (particles) · `setpieces&piece=monolith|megagate|derelict|nebula|bastion|pilgrimage|…`
-· `comms` · `audio`. Add `&episode=N` to `flight` to jump into a campaign
-episode.
+· `comms` · `audio` · `prologue` (the ~60 s cold open; `&t=SECONDS` seeks,
+loops as an attract reel). Add `&episode=N` to `flight` to jump into a
+campaign episode.
+
+**Prologue.** A new profile sees the cold open once before Episode 1 (skip:
+Space / Esc / click); it is also on the title menu, and plays by itself when
+the title is left idle. Shots are plain data in `src/cinema/prologue.ts`, run
+by a small sequencer (`src/cinema/`): keyframed or rig-tracked cameras in km,
+postFx envelopes, captions, music / SFX / stage cues — all pure functions of
+time, so any frame can be seeked and screenshotted.
+
+![Prologue](docs/screenshots/prologue-2-shattering.jpg)
 
 ## How it's built
 
@@ -108,6 +118,7 @@ src/
   game/      campaign data, runner, session, missions, profile
   audio/     synthesis engine, SFX, generative music
   ui/        HUD, star map, comms, codex, eyecatch, screens
+  cinema/    cutscene sequencer + the prologue (shots, sets, overlay)
 tests/       node:test suites (runner + campaign data)
 scripts/     screenshots, perf, AI sim, audio render (headless)
 docs/        lore, campaign, roadmap, screenshots

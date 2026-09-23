@@ -11,6 +11,8 @@ export interface PilotProfile {
   liveryName: string;
   /** Next campaign episode to play (1-based). */
   episode: number;
+  /** The prologue cold open has played once (it runs before Episode 1 of a new profile). */
+  seenPrologue: boolean;
 }
 
 const KEY = 'vanguard.profile.v1';
@@ -40,7 +42,7 @@ export const LIVERY_PRESETS: { name: string; livery: Partial<Livery> }[] = [
 ];
 
 export function loadProfile(): PilotProfile {
-  const base: PilotProfile = { callsign: 'VANGUARD 1', livery: {}, liveryName: LIVERY_PRESETS[0].name, episode: 1 };
+  const base: PilotProfile = { callsign: 'VANGUARD 1', livery: {}, liveryName: LIVERY_PRESETS[0].name, episode: 1, seenPrologue: false };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) return { ...base, ...(JSON.parse(raw) as Partial<PilotProfile>) };
