@@ -13,11 +13,13 @@ import { assets } from '@/assets/AssetLibrary';
 import { WeaponVisuals } from '../WeaponVisuals';
 import { StarSystemView, type GateInstance } from '../StarSystemView';
 import { Hyperspace } from '../Hyperspace';
+import { SpaceDust } from '../SpaceDust';
 import { generateUniverse } from '@/universe/generate';
 import type { Universe } from '@/universe/Universe';
 import { FlightHud } from '@/ui/FlightHud';
 import { StarMap } from '@/ui/StarMap';
 import { postFx } from '@/render/post/PostFx';
+import { MissionRunner, type MissionContext, type MissionDef } from '@/game/Missions';
 
 /**
  * Milestones 4–6 + 10–11: one ship flying well, then shooting.
@@ -66,11 +68,28 @@ export class FlightScene implements GameScene {
   private view: StarSystemView;
   private starMap: StarMap;
   private hyperspace = new Hyperspace();
+  private dust = new SpaceDust();
   private jumpPhase: JumpPhase = 'none';
   private jumpT = 0;
   private jumpTo = '';
   private gateSide = new Map<GateInstance, number>();
   private cathedral = assets.ship('choir-cathedral');
+  private mission: MissionRunner | null = null;
+  private missionTime = 0;
+  private jumps = 0;
+  private kills = new Map<string, number>();
+  private missionCtx: MissionContext = {
+    time: 0,
+    systemId: '',
+    gateDistance: (to?: string) => {
+      const g = to ? this.view.gateTo(to) : this.view.gates[0];
+      return g ? g.center.distanceTo(this.player.flight.position) : Infinity;
+    },
+    kills: (f: string) => this.kills.get(f) ?? 0,
+    jumps: 0,
+    playerAlive: true,
+    allyAlive: (name: string) => this.fleet.ships.some((s) => s.name === name && s.alive),
+  };
   private cinematic = flags.demo;
   private wasBoosting = false;
   private lastCut = -10;
@@ -83,6 +102,7 @@ export class FlightScene implements GameScene {
     this.systemId = this.universe.start;
     this.view = new StarSystemView(this.universe.systems.get(this.systemId)!, this.scene, this.world.root);
     this.scene.add(this.hyperspace.mesh);
+    this.scene.add(this.dust.object);
     this.world.root.add(this.cathedral.root);
     this.cathedral.setThrottle(0.5);
 
@@ -96,7 +116,7 @@ export class FlightScene implements GameScene {
     this.player.flight.velocity.copy(fwd).multiplyScalar(150);
     this.player.flight.throttle = 0.7;
 
-    [new Vector3(-22, -4, -26), new Vector3(24, 3, -34)].forEach((slot, i) => {
+    [new Vector3(-46, -7, -34), new Vector3(52, 6, -50)].forEach((slot, i) => {
       const ship = this.fleet.spawn('vf27-kestrel', 'concord', slot.clone().add(ORIGIN), fwd, { name: `Vanguard ${i + 2}` });
       this.wingmen.push({ ship, slot });
     });
@@ -197,6 +217,18 @@ export class FlightScene implements GameScene {
     this.weapons.step(dt);
     this.missiles.step(dt);
 
+    // 4b. Mission bookkeeping (kills by faction of the victim).
+    for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship) this.kills.set(e.ship.faction, (this.kills.get(e.ship.faction) ?? 0) + 1);
+    if (this.mission) {
+      this.missionTime += dt;
+      const mc = this.missionCtx;
+      mc.time = this.missionTime;
+      mc.systemId = this.systemId;
+      mc.jumps = this.jumps;
+      mc.playerAlive = this.player.alive;
+      this.mission.update(mc);
+    }
+
     // 5. Cinematic cutaways (opt-in, K).
     if (this.cinematic) this.cutaways(time);
     this.wasBoosting = pf.boosting;
@@ -209,6 +241,9 @@ export class FlightScene implements GameScene {
     this.world.sync(this.camera);
 
     this.view.backdrop.follow(this.camera);
+    this.view.update(time);
+    this.dust.update(this.world.eye, pf.velocity, dt);
+    this.dust.object.visible = this.jumpPhase !== 'tunnel';
 
     // 7. Visuals + HUD in render space.
     this.visuals.update(this.world, dt);
@@ -223,7 +258,15 @@ export class FlightScene implements GameScene {
       if (nav) this.hud.drawNav(this.universe.systems.get(nav.link.to)!.name, nav.center, pf.position, this.camera, this.world, time);
     }
     this.hud.drawStatus(this.view.system.name, pf.cruise, this.jumpPhase !== 'none' ? `LANTERN TRANSIT → ${this.universe.systems.get(this.jumpTo)?.name ?? ''}` : '');
+    if (this.mission) this.hud.drawObjectives(this.mission, time);
     this.starMap.draw(time);
+  }
+
+  startMission(def: MissionDef): void {
+    this.mission = new MissionRunner(def);
+    this.missionTime = 0;
+    this.kills.clear();
+    this.jumps = 0;
   }
 
   /** Next gate on the plotted route, else the nearest Lantern. */
@@ -309,6 +352,7 @@ export class FlightScene implements GameScene {
   /** Swap star systems under cover of the tunnel; place the flight at the arrival Lantern. */
   private arrive(): void {
     const from = this.systemId;
+    this.jumps++;
     this.view.dispose();
     this.systemId = this.jumpTo;
     this.view = new StarSystemView(this.universe.systems.get(this.systemId)!, this.scene, this.world.root);

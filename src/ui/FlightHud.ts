@@ -4,6 +4,7 @@ import type { WorldSpace } from '@/core/WorldSpace';
 import type { Fleet, ShipEntity } from '@/sim/Fleet';
 import type { LockState } from '@/sim/Missiles';
 import { LASER } from '@/sim/Weapons';
+import type { MissionRunner } from '@/game/Missions';
 
 /**
  * Minimal flight HUD on one 2D canvas (M19 turns this into the full CRT HUD).
@@ -225,6 +226,38 @@ export class FlightHud {
       c.font = '13px "Share Tech Mono", monospace';
     }
     c.textAlign = 'left';
+  }
+
+  /** Objectives panel (top-right) + mission outcome banner. */
+  drawObjectives(m: MissionRunner, time: number): void {
+    const c = this.ctx;
+    const x = this.w - 340;
+    let y = 60;
+    c.fillStyle = 'rgba(0,10,6,0.55)';
+    c.fillRect(x - 12, y - 20, 330, 30 + m.def.objectives.length * 20);
+    c.fillStyle = '#ffffff';
+    c.fillText(`${m.def.episode} · ${m.def.title}`, x, y);
+    y += 22;
+    m.def.objectives.forEach((o, i) => {
+      const st = m.state[i];
+      if (st === 'locked') c.fillStyle = 'rgba(125,255,178,0.35)';
+      else if (st === 'done') c.fillStyle = GREEN;
+      else if (st === 'failed') c.fillStyle = RED;
+      else c.fillStyle = (time * 1.5) % 1 < 0.75 ? AMBER : '#ffffff';
+      const box = st === 'done' ? '[■]' : st === 'failed' ? '[×]' : '[ ]';
+      c.fillText(`${box} ${o.text}${o.optional ? ' (opt)' : ''}`, x, y);
+      y += 20;
+    });
+    if (m.outcome !== 'running') {
+      c.textAlign = 'center';
+      c.font = '800 44px "Oxanium", sans-serif';
+      c.fillStyle = m.outcome === 'success' ? '#ffffff' : RED;
+      c.shadowColor = m.outcome === 'success' ? 'rgba(255,122,28,0.9)' : 'rgba(255,0,60,0.9)';
+      c.fillText(m.outcome === 'success' ? 'MISSION COMPLETE' : 'MISSION FAILED', this.w / 2, this.h * 0.42);
+      c.font = '13px "Share Tech Mono", monospace';
+      c.textAlign = 'left';
+      c.shadowColor = 'rgba(125,255,178,0.6)';
+    }
   }
 
   private brackets(x: number, y: number, h: number, l: number): void {

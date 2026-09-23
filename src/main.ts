@@ -1,9 +1,13 @@
 import { flags } from '@/core/Flags';
 import { Engine } from '@/core/Engine';
+import { input } from '@/core/Input';
 import { createRenderer } from '@/render/RendererFactory';
 import { InkPipeline } from '@/render/post/InkPipeline';
 import { SCENES, DEFAULT_SCENE } from '@/world/scenes';
+import type { GameScene } from '@/world/GameScene';
 import { DebugHud } from '@/ui/DebugHud';
+import { titleScreen, briefingScreen } from '@/ui/Screens';
+import { FIRST_LIGHT } from '@/game/Missions';
 
 declare global {
   interface Window {
@@ -30,24 +34,38 @@ function fail(err: unknown): void {
 
 async function boot(): Promise<void> {
   const canvas = document.getElementById('viewport') as HTMLCanvasElement;
+  const uiRoot = document.getElementById('ui-root')!;
   const info = await createRenderer(canvas);
   const engine = new Engine(info);
 
-  const sceneName = SCENES[flags.scene] ? flags.scene : DEFAULT_SCENE;
-  const game = await SCENES[sceneName]();
-  engine.onResize(game);
+  let ink: InkPipeline | null = null;
+  let debugHud: DebugHud | null = null;
 
-  const ink = new InkPipeline(info.renderer, game.scene, game.camera, info.isWebGPU);
-  ink.settings.enabled = flags.ink;
-  ink.applySettings();
-  ink.setView(flags.view);
-  engine.onResize(ink);
+  /** (Re)build the running scene + its ink pipeline. */
+  async function load(name: string): Promise<GameScene> {
+    engine.clearSystems();
+    input.override = null;
+    const game = await SCENES[name]();
+    engine.onResize(game);
+    ink = new InkPipeline(info.renderer, game.scene, game.camera, info.isWebGPU);
+    ink.settings.enabled = flags.ink;
+    ink.applySettings();
+    ink.setView(flags.view);
+    engine.onResize(ink);
+    const pipeline = ink;
+    engine.addSystem(game);
+    engine.addSystem({ update: (ctx) => pipeline.update(ctx.time) });
+    if (!debugHud) debugHud = new DebugHud(engine, pipeline, game, name, uiRoot);
+    debugHud.game = game;
+    debugHud.sceneName = name;
+    engine.addSystem(debugHud);
+    engine.setRender(() => pipeline.render());
+    console.info(`[vanguard] scene=${name}`);
+    return game;
+  }
 
-  engine.addSystem(game);
-  engine.addSystem({ update: (ctx) => ink.update(ctx.time) });
-  engine.addSystem(new DebugHud(engine, ink, game, sceneName, document.getElementById('ui-root')!));
-  engine.setRender(() => ink.render());
-
+  const direct = flags.scene && SCENES[flags.scene];
+  const first = await load(direct ? flags.scene : 'showcase');
   engine.start();
   window.__VANGUARD__ = {
     ...window.__VANGUARD__,
@@ -56,7 +74,28 @@ async function boot(): Promise<void> {
     backend: info.backendName,
     hooks: { ...window.__VANGUARD__?.hooks, perf: () => engine.perf.summary() },
   };
-  console.info(`[vanguard] ${info.backendName} backend · ${info.adapterDescription} · scene=${sceneName}`);
+  console.info(`[vanguard] ${info.backendName} backend · ${info.adapterDescription}`);
+
+  if (direct) {
+    if (new URLSearchParams(location.search).get('mission') === '1') first.startMission?.(FIRST_LIGHT);
+    return;
+  }
+
+  // Front end: title card over the live showcase → briefing → flight.
+  for (;;) {
+    const choice = await titleScreen(uiRoot);
+    if (choice === 'launch') {
+      await briefingScreen(uiRoot, FIRST_LIGHT);
+      const game = await load(DEFAULT_SCENE);
+      game.startMission?.(FIRST_LIGHT);
+      return;
+    }
+    if (choice === 'hangar') {
+      await load('hangar');
+      return;
+    }
+    return; // showcase: stay
+  }
 }
 
 boot().catch(fail);

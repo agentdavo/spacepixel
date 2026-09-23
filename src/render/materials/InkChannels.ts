@@ -1,5 +1,9 @@
 import { mrt, output, vec4, float, normalView, positionView, packNormalToRGB, fract } from 'three/tsl';
 import type { ShaderNode as Node } from '@/render/tsl';
+import { MaterialBlending } from 'three';
+import { BlendMode } from 'three/webgpu';
+
+const MATERIAL_BLEND = new BlendMode(MaterialBlending);
 
 /**
  * Multiple-render-target layout shared by every material and the ink pass.
@@ -21,11 +25,18 @@ import type { ShaderNode as Node } from '@/render/tsl';
 export const DEPTH_SCALE = 0.001;
 
 export function sceneMRT() {
-  return mrt({
+  const m = mrt({
     output,
     gbuf: vec4(packNormalToRGB(normalView), positionView.z.negate().mul(DEPTH_SCALE)),
     ink: vec4(1.0, 0.0, 1.0, 1.0),
   });
+  // three only blends MRT attachments that opt in. Without this, additive /
+  // alpha effects (which write alpha 0 via noInkMRT) would OVERWRITE the
+  // G-buffer with zeros and get traced as black ink. Opaque materials have no
+  // blend state, so they still overwrite as intended.
+  m.setBlendMode('gbuf', MATERIAL_BLEND);
+  m.setBlendMode('ink', MATERIAL_BLEND);
+  return m;
 }
 
 /** Hash an integer-ish id into a well-separated 0..1 code (golden ratio walk). */

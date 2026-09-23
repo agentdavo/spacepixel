@@ -4,6 +4,8 @@ import { Backdrop } from './Backdrop';
 import { Planet } from './Planet';
 import { LanternGate } from './LanternGate';
 import { LightRig } from '@/render/LightRig';
+import { AsteroidField } from './AsteroidField';
+import { HazeClouds } from './HazeClouds';
 
 /**
  * Builds a StarSystem's data into renderable objects: sky + light rig
@@ -28,6 +30,8 @@ export class StarSystemView {
   readonly group = new Group();
   readonly backdrop: Backdrop;
   readonly gates: GateInstance[] = [];
+  /** Belt beside the first Lantern: parallax, cover and scale reference. */
+  readonly field: AsteroidField;
 
   constructor(
     readonly system: StarSystem,
@@ -54,7 +58,38 @@ export class StarSystemView {
       this.group.add(gate.group);
       this.gates.push({ link, gate, center });
     }
+    // A belt off to the side of the first lane, seeded per system. Rustwake
+    // space is dense; elsewhere it's sparse rubble.
+    const seed = [...system.id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+    const dense = system.faction === 'rustwake';
+    const k = dense ? 1 : 0.4;
+    this.field = new AsteroidField({
+      seed,
+      innerRadius: 1200,
+      outerRadius: dense ? 9000 : 6000,
+      thickness: 600,
+      clumps: dense ? 36 : 14,
+      classes: [
+        { detail: 0, count: Math.round(2600 * k), size: [1.2, 5], variants: 2 },
+        { detail: 1, count: Math.round(1200 * k), size: [5, 16], variants: 2 },
+        { detail: 2, count: Math.round(420 * k), size: [16, 70], variants: 2 },
+        { detail: 3, count: dense ? 50 : 18, size: [70, 400], variants: 2 },
+      ],
+    });
+    const g0 = this.gates[0];
+    if (g0) {
+      const side = new Vector3(0, 1, 0).cross(g0.link.normal).normalize();
+      this.field.group.position.copy(g0.center).addScaledVector(g0.link.normal, -4500).addScaledVector(side, 7000);
+    }
+    const puffs = this.field.clumps.map((c) => c.centre.clone());
+    const haze = new HazeClouds({ seed, centres: puffs, size: [500, 1500], opacity: dense ? 0.32 : 0.2, colors: ['#6a4f9a', '#2f7f9a'] });
+    this.field.group.add(haze.group);
+    this.group.add(this.field.group);
     worldRoot.add(this.group);
+  }
+
+  update(time: number): void {
+    this.field.update(time);
   }
 
   gateTo(id: string): GateInstance | undefined {

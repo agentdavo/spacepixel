@@ -14,4 +14,6 @@ export interface GameScene {
   cycleCamera?(): void;
   /** Optional: short label for the HUD corner. */
   cameraLabel?(): string;
+  /** Optional: begin a mission (flight scenes). */
+  startMission?(mission: import('@/game/Missions').MissionDef): void;
 }

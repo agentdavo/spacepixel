@@ -22,8 +22,8 @@ export class DebugHud implements Updatable {
   constructor(
     private engine: Engine,
     private ink: InkPipeline,
-    private game: GameScene,
-    private sceneName: string,
+    public game: GameScene,
+    public sceneName: string,
     root: HTMLElement,
   ) {
     this.el = document.createElement('div');

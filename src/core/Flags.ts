@@ -43,5 +43,5 @@ export const flags: Flags = {
   cam: Number(q.get('cam') ?? 0) || 0,
   hud: q.get('hud') !== '0',
   budget: Number(q.get('budget') ?? 0) || 1000 / 60,
-  demo: q.get('demo') === '1' || q.get('shot') === '1',
+  demo: q.get('demo') === '1' || (q.get('shot') === '1' && q.get('demo') !== '0'),
 };

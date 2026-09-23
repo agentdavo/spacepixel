@@ -49,6 +49,12 @@ export class Engine {
     window.addEventListener('resize', () => this.handleResize());
   }
 
+  /** Drop all update systems and resize targets (scene switch). */
+  clearSystems(): void {
+    this.systems.length = 0;
+    this.resizeTargets.length = 0;
+  }
+
   addSystem<T extends Updatable>(system: T): T {
     this.systems.push(system);
     return system;

@@ -94,3 +94,104 @@ html, body {
   height: 64px;
   border: 1px solid rgba(125, 255, 178, 0.25);
 }
+
+/* ── CRT treatment for the 2D HUD layer (M19) ─────────────────────────── */
+#ui-root::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.14) 3px),
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 62%, rgba(0, 0, 0, 0.35) 100%);
+  mix-blend-mode: multiply;
+  animation: crt-flicker 6s infinite steps(1);
+}
+@keyframes crt-flicker {
+  0%, 100% { opacity: 1; }
+  47% { opacity: 0.93; }
+  48% { opacity: 1; }
+  73% { opacity: 0.96; }
+}
+#ui-root canvas, .hud-debug, .hud-shot { filter: drop-shadow(0 0 1.5px rgba(125, 255, 178, 0.35)); }
+
+/* ── title card ───────────────────────────────────────────────────────── */
+.title-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: center;
+  padding: 0 8vw;
+  background: linear-gradient(90deg, rgba(4, 3, 14, 0.82) 0%, rgba(4, 3, 14, 0.55) 45%, rgba(4, 3, 14, 0) 75%);
+  color: #fff;
+}
+.title-screen .stripe {
+  width: 320px;
+  height: 10px;
+  margin-bottom: 18px;
+  background: repeating-linear-gradient(90deg, #ff7a1c 0 36px, transparent 36px 44px, #2b4ea8 44px 80px, transparent 80px 88px);
+}
+.title-screen h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(42px, 7vw, 104px);
+  line-height: 0.92;
+  letter-spacing: 0.06em;
+  text-shadow: 4px 4px 0 #ff3fa8, 8px 8px 0 rgba(43, 78, 168, 0.8);
+  transform: skewX(-8deg);
+}
+.title-screen .episode {
+  margin: 18px 0 44px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.4em;
+  color: var(--crt-cyan);
+  text-transform: uppercase;
+}
+.title-screen ul { list-style: none; margin: 0; padding: 0; }
+.title-screen li {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.3em;
+  padding: 8px 0 8px 18px;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: color 0.1s, border-color 0.1s, padding 0.1s;
+}
+.title-screen li.active { color: #fff; border-left-color: #ff7a1c; padding-left: 26px; text-shadow: 0 0 10px rgba(255, 122, 28, 0.7); }
+.title-screen .foot { position: absolute; left: 8vw; bottom: 34px; font-family: var(--font-mono); font-size: 12px; color: rgba(125, 255, 178, 0.7); letter-spacing: 0.12em; }
+
+/* ── briefing ─────────────────────────────────────────────────────────── */
+.briefing {
+  position: absolute;
+  inset: 5vh 6vw;
+  z-index: 20;
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 28px;
+  padding: 28px 32px;
+  background: rgba(3, 10, 8, 0.9);
+  border: 1px solid rgba(125, 255, 178, 0.4);
+  box-shadow: 0 0 40px rgba(125, 255, 178, 0.12) inset;
+  color: var(--crt-green);
+  font-family: var(--font-mono);
+  text-shadow: 0 0 6px rgba(125, 255, 178, 0.6);
+}
+.briefing h2 { margin: 0 0 6px; font-family: var(--font-display); letter-spacing: 0.25em; color: #fff; font-size: 20px; }
+.briefing .meta { color: var(--crt-amber); font-size: 12px; letter-spacing: 0.2em; margin-bottom: 18px; }
+.briefing .body { white-space: pre-wrap; line-height: 1.6; font-size: 14px; min-height: 12em; }
+.briefing .body .cursor { display: inline-block; width: 0.6em; background: var(--crt-green); animation: blink 0.8s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.briefing ol { padding-left: 1.4em; line-height: 1.8; }
+.briefing canvas { width: 100%; aspect-ratio: 4 / 3; border: 1px solid rgba(125, 255, 178, 0.3); background: rgba(0, 20, 12, 0.6); }
+.briefing .launch { margin-top: 18px; color: #fff; letter-spacing: 0.3em; animation: blink 1.2s steps(1) infinite; }
+@media (max-width: 800px) {
+  .briefing { grid-template-columns: 1fr; overflow: auto; }
+}
