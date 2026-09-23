@@ -102,3 +102,55 @@ test('runner: player death fails the mission', () => {
   r.update(0.1);
   assert.equal(r.outcome, 'failure');
 });
+
+const SCRIPTED: CampaignMission = {
+  ...MISSION,
+  id: 's',
+  codex: [],
+  codexOnStart: [],
+  spawns: [
+    { blueprint: 'x', faction: 'concord', count: 2, place: { at: 'player', offset: [0, 0, 0] }, tag: 'convoy', role: 'escort', routeTo: 'dock' },
+    { blueprint: 'x', faction: 'choir', count: 1, place: { at: 'player', offset: [0, 0, 100] }, tag: 'wave2', whenFlag: 'go', delay: 5 },
+  ],
+  setpieces: [
+    { kind: 'beacon', tag: 'dock', place: { at: 'player', offset: [0, 0, 3000] } },
+    { kind: 'beacon', tag: 'hold', place: { at: 'player', offset: [0, 0, 0] }, params: { hold: 2, radius: 100 } },
+    { kind: 'blackbox', tag: 'late-box', place: { at: 'player', offset: [0, 0, 50] }, params: { whenFlag: 'go' } },
+  ],
+  objectives: [
+    { id: 'cue', text: '', optional: true, hidden: true, done: (c) => c.time > 1, setsFlag: 'depart:convoy' },
+    { id: 'main', text: 'main', done: (c) => c.flag('never') },
+  ],
+  chatter: [],
+};
+
+test('runner: script cues, escorts, dwell, deferred spawns/pieces', () => {
+  const h = host();
+  const departed: number[] = [];
+  h.command = (verb, ships) => verb === 'depart' && departed.push(ships.length);
+  const r = new CampaignRunner(SCRIPTED, h);
+  r.begin();
+  assert.equal(r.escorts.length, 1);
+  assert.equal(r.dwells.length, 1);
+  assert.equal(r.ctx.alive('late-box'), false, 'deferred piece waits for its flag');
+
+  // Dwell: 2 s inside the 100 m zone.
+  for (let i = 0; i < 25; i++) r.update(0.1);
+  assert.ok(r.flags.has('hold-held'));
+  // Hidden cue fired its command flag at t > 1.
+  assert.deepEqual(departed, [2]);
+
+  // Delay counts from the flag, not mission start.
+  r.setFlag('go');
+  r.update(0.1);
+  assert.equal(r.ctx.alive('late-box'), true);
+  assert.equal(r.ctx.aliveCount('wave2'), 0);
+  for (let i = 0; i < 52; i++) r.update(0.1);
+  assert.equal(r.ctx.aliveCount('wave2'), 1);
+
+  // Escort arrival: move the convoy onto the dock.
+  const dock = r.resolve({ at: 'tag', tag: 'dock', offset: [0, 0, 0] })!;
+  for (const s of r.shipsTagged('convoy')) s.flight.position.copy(dock);
+  r.update(0.1);
+  assert.ok(r.flags.has('convoy-arrived'));
+});

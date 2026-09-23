@@ -27,6 +27,23 @@ export interface SetPieceHandle {
   readonly radius: number;
 }
 
+/** An escort group the host should fly along its route (AI flyToPoint). */
+export interface EscortRoute {
+  tag: string;
+  ships: ShipEntity[];
+  target: Vector3 | null;
+  halted: boolean;
+}
+
+/** A beacon the player must hold inside (HUD draws a ring + progress). */
+export interface DwellZone {
+  tag: string;
+  position: Vector3;
+  radius: number;
+  hold: number;
+  progress: number; // 0..1
+}
+
 export interface CampaignHost {
   playerPosition: Vector3;
   playerAlive: boolean;
@@ -40,6 +57,8 @@ export interface CampaignHost {
   playChatter(beat: ChatterBeat): void;
   unlockCodex(id: string): void;
   ships: readonly ShipEntity[];
+  /** Script commands from flags: cinematic destruction, or break off and leave. */
+  command?(verb: 'destroy' | 'depart', ships: ShipEntity[]): void;
 }
 
 interface TaggedShip {
@@ -54,7 +73,11 @@ export class CampaignRunner {
   time = 0;
 
   private tagged: TaggedShip[] = [];
-  private pieces: SetPieceHandle[] = [];
+  private pieces: (SetPieceHandle & { spec: SetPieceSpec })[] = [];
+  private flagTime = new Map<string, number>();
+  private halted = new Set<string>();
+  readonly escorts: EscortRoute[] = [];
+  readonly dwells: DwellZone[] = [];
   private pendingSpawns: SpawnSpec[];
   private pendingPieces: SetPieceSpec[];
   private fired = new Set<string>();
@@ -66,7 +89,9 @@ export class CampaignRunner {
     readonly mission: CampaignMission,
     private host: CampaignHost,
   ) {
-    this.state = mission.objectives.map((o, i) => (i === 0 || (o.optional && !o.hidden) ? 'active' : 'locked'));
+    // First objective + every optional (visible side objectives and hidden
+    // script cues) start active; the rest unlock in order.
+    this.state = mission.objectives.map((o, i) => (i === 0 || o.optional ? 'active' : 'locked'));
     this.pendingSpawns = [...mission.spawns];
     this.pendingPieces = [...mission.setpieces];
     const self = this;
@@ -116,6 +141,18 @@ export class CampaignRunner {
   setFlag(name: string): void {
     if (this.flags.has(name)) return;
     this.flags.add(name);
+    this.flagTime.set(name, this.time);
+    // Command flags drive the script (see missions.ts runtime notes).
+    const m = /^(destroy|depart|halt|resume):(.+)$/.exec(name);
+    if (m) {
+      const [, verb, tag] = m;
+      if (verb === 'halt') this.halted.add(tag);
+      else if (verb === 'resume') this.halted.delete(tag);
+      else {
+        const ships = this.shipsTagged(tag).filter((s) => s.alive);
+        this.host.command?.(verb as 'destroy' | 'depart', ships);
+      }
+    }
     this.trigger((t) => t.on === 'flag' && t.flag === name);
   }
 
@@ -131,6 +168,23 @@ export class CampaignRunner {
     this.time += dt;
     this.releaseSpawns();
     if (this.pendingPieces.length) this.releasePieces();
+
+    // Escorts: refresh routes; flag arrival when every survivor is within 800 m.
+    for (const e of this.escorts) {
+      e.halted = this.halted.has(e.tag);
+      if (!e.target) {
+        const spec = this.mission.spawns.find((s) => s.tag === e.tag);
+        if (spec?.routeTo) e.target = this.resolve({ at: 'tag', tag: spec.routeTo, offset: [0, 0, 0] });
+      }
+      const alive = e.ships.filter((s) => s.alive);
+      if (e.target && alive.length && alive.every((s) => s.flight.position.distanceTo(e.target!) < 800)) this.setFlag(`${e.tag}-arrived`);
+    }
+    // Beacon dwell zones.
+    for (const d of this.dwells) {
+      if (d.progress >= 1) continue;
+      if (this.host.playerPosition.distanceTo(d.position) <= d.radius) d.progress = Math.min(1, d.progress + dt / d.hold);
+      if (d.progress >= 1) this.setFlag(`${d.tag}-held`);
+    }
 
     // Chatter triggers that depend on continuous state.
     this.trigger((t) => {
@@ -168,8 +222,6 @@ export class CampaignRunner {
           this.state[next] = 'active';
           this.trigger((t) => t.on === 'objective-active' && t.objective === obj[next].id);
         }
-        // Hidden optionals reveal once the objective before them completes.
-        if (i + 1 < obj.length && obj[i + 1].optional && this.state[i + 1] === 'locked') this.state[i + 1] = 'active';
       }
     }
     if (!this.host.playerAlive) this.finish('failure');
@@ -196,18 +248,28 @@ export class CampaignRunner {
   private releasePieces(): void {
     for (let k = this.pendingPieces.length - 1; k >= 0; k--) {
       const sp = this.pendingPieces[k];
+      const gate = sp.params?.whenFlag;
+      if (typeof gate === 'string' && !this.flags.has(gate)) continue;
       const pos = this.resolve(sp.place);
       if (!pos) continue;
       this.pendingPieces.splice(k, 1);
-      this.pieces.push(this.host.spawnSetPiece(sp, pos));
+      const handle = this.host.spawnSetPiece(sp, pos);
+      this.pieces.push({ ...handle, tag: handle.tag, position: handle.position, radius: handle.radius, spec: sp });
+      const hold = sp.params?.hold;
+      if (sp.kind === 'beacon' && typeof hold === 'number') {
+        const r = sp.params?.radius;
+        this.dwells.push({ tag: sp.tag, position: handle.position, radius: typeof r === 'number' ? r : 300, hold, progress: 0 });
+      }
     }
   }
 
   private releaseSpawns(): void {
     for (let k = this.pendingSpawns.length - 1; k >= 0; k--) {
       const s = this.pendingSpawns[k];
-      if ((s.delay ?? 0) > this.time) continue;
       if (s.whenFlag && !this.flags.has(s.whenFlag)) continue;
+      // With a flag, the delay counts from when the flag was set.
+      const t0 = s.whenFlag ? (this.flagTime.get(s.whenFlag) ?? 0) : 0;
+      if ((s.delay ?? 0) > this.time - t0) continue;
       const base = this.resolve(s.place);
       if (!base) continue;
       this.pendingSpawns.splice(k, 1);
@@ -217,6 +279,9 @@ export class CampaignRunner {
         const ship = this.host.spawnShip(s, i, pos);
         const tag = s.tag ? (s.count > 1 ? `${s.tag}-${i + 1}` : s.tag) : `${s.blueprint}-${i + 1}`;
         this.tagged.push({ tag, ship });
+      }
+      if (s.role === 'escort' && s.tag) {
+        this.escorts.push({ tag: s.tag, ships: this.shipsTagged(s.tag), target: null, halted: false });
       }
     }
   }
