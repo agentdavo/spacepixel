@@ -91,6 +91,26 @@ opens the Reach up around them and gets the game in front of players.
 
 Design for 13–20: [docs/MULTIPLAYER.md](MULTIPLAYER.md).
 
+## Batch 4 — the hero's career (in progress)
+
+From a borrowed Kestrel to your own frigate: earn shares and standing, refit,
+buy the next hull, take on bigger adversaries.
+
+| # | Milestone | Pass/fail | Status |
+|---|---|---|---|
+| 1 | Per-ship stats, faction weapon families, damage types | Kestrel vs Cantor TTK 3–8 s | 🔧 |
+| 2 | Locational damage: capital subsystems, fighter zones, visible damage | subsystem effects felt | 🔧 |
+| 3 | Directional shields, collapse/regen visuals | facings on HUD | 🔧 |
+| 4 | Progression line T1→T6: Kestrel → heavy fighter → gunship → corvette → frigate | each tier flyable | 🔧 |
+| 5 | Rustwake line, civilian freighters/tankers/liners, mid-tier warships | in hangar | 🔧 |
+| 6 | Shipyard + outfitting (hardpoints, shields, armour, engines, reactor) | fit changes stats & model | queued |
+| 7 | Contracts board: courier, haul, escort, bounty, patrol, salvage, recon, sorties | seeded, tested | 🔧 |
+| 8 | Free-roam career loop between episodes | story resumes on demand | 🔧 |
+| 9 | Living Reach: ringed giants, moons, city lights, traffic lanes, patrols, pirates | perf budget holds | 🔧 |
+| 10 | People: concourse NPCs, branching dialog, rumours | ≥ 12 conversations | 🔧 |
+| 11 | Voices: procedural OVA voice synth (+ optional Web Speech), subtitles everywhere | < 17 chars/s | 🔧 |
+| 12 | Hollow hangar bays, collisions, economy rebalance | next ship in 30–60 min | 🔧 |
+
 ## Known issues
 
 - WebGL2 fallback lines are softer than the WGSL path.
