@@ -9,16 +9,17 @@ export interface Faction {
 }
 
 /**
- * See docs/LORE.md for the full background. Liveries are deliberately limited
+ * Internal ids are stable: concord = Terran Directorate, choir = Zenith
+ * Hegemony, rustwake = the Ebon-gas scavenger clans. See docs/LORE.md. Liveries are deliberately limited
  * palettes — three body colours and one hot accent — the way 90s mechanical
  * designers specified model sheets for the ink-and-paint department.
  */
 export const FACTIONS: Record<FactionId, Faction> = {
   concord: {
     id: 'concord',
-    name: 'Meridian Concord Defense Force',
-    short: 'MCDF',
-    motto: 'Hold the Lanterns. Keep the light.',
+    name: 'Terran Directorate',
+    short: 'TD',
+    motto: 'What was built can be kept. What is kept can be flown.',
     livery: {
       primary: '#eceae4',
       secondary: '#2b4ea8',
@@ -32,9 +33,9 @@ export const FACTIONS: Record<FactionId, Faction> = {
   },
   choir: {
     id: 'choir',
-    name: 'The Sable Choir',
-    short: 'CHOIR',
-    motto: 'Every gate is a throat. Every jump is a hymn.',
+    name: 'Zenith Hegemony',
+    short: 'ZH',
+    motto: 'Ascend, or be kept.',
     livery: {
       primary: '#5d4a86',
       secondary: '#1d1729',
@@ -48,7 +49,7 @@ export const FACTIONS: Record<FactionId, Faction> = {
   },
   rustwake: {
     id: 'rustwake',
-    name: 'Rustwake Salvage Compact',
+    name: 'Rustwake Ebon-Gas Clans',
     short: 'RWK',
     motto: 'Nothing in the black is ever truly lost.',
     livery: {

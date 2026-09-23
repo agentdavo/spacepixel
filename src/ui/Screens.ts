@@ -18,7 +18,7 @@ export function titleScreen(root: HTMLElement): Promise<'launch' | 'map' | 'hang
     <h1>PROJECT<br/>VANGUARD</h1>
     <div class="episode">The Lantern Sings</div>
     <ul>${items.map((it, i) => `<li data-i="${i}" class="${i === 0 ? 'active' : ''}">${it.label}</li>`).join('')}</ul>
-    <div class="foot">↑↓ SELECT · ENTER CONFIRM · MERIDIAN CONCORD DEFENSE FORCE // 13TH INDEPENDENT SQUADRON</div>`;
+    <div class="foot">↑↓ SELECT · ENTER CONFIRM · TERRAN DIRECTORATE // 13TH INDEPENDENT SQUADRON "VANGUARD"</div>`;
   root.append(el);
   let sel = 0;
   const lis = [...el.querySelectorAll('li')];
