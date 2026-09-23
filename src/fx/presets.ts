@@ -92,8 +92,8 @@ export function explosion(fx: Particles, pos: Vector3, vel: Vector3, scale: numb
   d.dir.y = d.dir.y * 0.4 + (d.dir.y >= 0 ? 0.6 : -0.6);
   d.dir.normalize();
   d.size0 = s * 0.4;
-  d.size1 = s * 3.4;
-  d.lifeMin = d.lifeMax = 0.5 * ts;
+  d.size1 = s * 2.6;
+  d.lifeMin = d.lifeMax = 0.45 * ts;
   fx.emit(d);
   if (big) {
     // A second, flatter camera-facing ring for capital blasts.
@@ -160,8 +160,8 @@ export function debris(fx: Particles, pos: Vector3, vel: Vector3, scale: number,
 export function impact(fx: Particles, pos: Vector3, normal: Vector3, vel: Vector3, palette: ParticlePalette = PAL.WARM): void {
   begin(PK.FLASH, palette, pos, vel);
   d.count = 1;
-  d.size0 = d.size1 = 3.2;
-  d.lifeMin = d.lifeMax = 0.1;
+  d.size0 = d.size1 = 2.4;
+  d.lifeMin = d.lifeMax = 0.08;
   fx.emit(d);
 
   begin(PK.SPARK, palette, pos, vel);
@@ -219,13 +219,13 @@ export function shieldHit(
   d.count = 1;
   d.dir.copy(normal).normalize();
   d.size0 = d.size1 = radius;
-  d.lifeMin = d.lifeMax = 0.6;
+  d.lifeMin = d.lifeMax = 0.45;
   fx.emit(d);
 
   begin(PK.FLASH, palette, _v.copy(normal).multiplyScalar(0.3).add(pos), vel ?? null);
   d.count = 1;
-  d.size0 = d.size1 = radius * 0.32;
-  d.lifeMin = d.lifeMax = 0.12;
+  d.size0 = d.size1 = radius * 0.16;
+  d.lifeMin = d.lifeMax = 0.1;
   fx.emit(d);
 
   begin(PK.SPARK, palette, pos, vel ?? null);

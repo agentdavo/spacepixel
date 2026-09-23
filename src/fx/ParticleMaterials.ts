@@ -181,7 +181,7 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
     // Size envelopes per kind (stepped time → grows in hand-drawn increments).
     const rFire = mix(d.s0, d.s1, ease(tq, 3)).mul(float(1).sub(smoothstep(0.7, 1.0, tq).mul(0.55)));
     const rSmoke = mix(d.s0, d.s1, ease(tq, 2)).mul(float(1).sub(smoothstep(0.75, 1.0, tq).mul(0.4)));
-    const rPuff = mix(d.s0, d.s1, ease(tq, 2.2)).mul(float(1).sub(smoothstep(0.85, 1.0, tq).mul(0.3)));
+    const rPuff = mix(d.s0, d.s1, ease(tq, 3.5)).mul(float(1).sub(smoothstep(0.85, 1.0, tq).mul(0.3)));
     const r = select(kind.equal(PK.FIRE), rFire, select(kind.equal(PK.SMOKE), rSmoke, select(kind.equal(PK.PUFF), rPuff, d.s0))).toVar();
 
     const c = d.P.xyz.add(g.uAnchorOffset).toVar();
@@ -262,7 +262,7 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
   const cq = cos(quadAng);
   const sq = sin(quadAng);
   const nDeb = vec3(nq.x.mul(cq).sub(nq.y.mul(sq)), nq.x.mul(sq).add(nq.y.mul(cq)), nq.z);
-  const nView: Node = select(isDebris, nDeb, nSphere).toVar('fxN');
+  const nView: Node = select(isDebris, nDeb, nSphere);
   const nWorld = normalize(camWorld.mul(vec4(nView, 0)).xyz);
   const ndl = dot(nWorld, LightRig.keyDirection);
   const lit = ndl.greaterThan(0.2);
@@ -297,16 +297,16 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
     const smoke = select(tq.lessThan(0.12).and(nz.greaterThan(0.25).or(tq.lessThan(0.06))), smokeHot, smokeCel);
 
     // PUFF: white missile smoke with blue-violet shadow; white-hot while young.
-    const puffLit = c3('#fbf8f0').mul(LightRig.keyColor);
-    const puffMid = c3('#d3d8ea');
-    const puffDark = mix(c3('#98a0c6'), LightRig.shadowTint, 0.25);
+    const puffLit = c3('#ffffff').mul(LightRig.keyColor);
+    const puffMid = c3('#e2e4f0');
+    const puffDark = mix(c3('#b3b8d8'), LightRig.shadowTint, 0.15);
     const puffCel = select(lit, puffLit, select(mid, puffMid, puffDark));
     const puffHot = select(
-      age.lessThan(0.035),
+      age.lessThan(0.025),
       c3('#ffffff', 3),
-      select(age.lessThan(0.08), fireRamp(float(1), pal), fireRamp(float(2), pal).mul(0.8)),
+      select(age.lessThan(0.05), fireRamp(float(1), pal), fireRamp(float(2), pal).mul(0.9)),
     );
-    const puff = select(age.lessThan(0.14), puffHot, puffCel);
+    const puff = select(age.lessThan(0.085), puffHot, puffCel);
 
     // DEBRIS: dark hull metal, two facet tones, cooling hot edge.
     const debLit = c3('#8d92a8').mul(LightRig.keyColor);
@@ -319,7 +319,7 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
     const rim = select(rimOn.and(isFire.not()), LightRig.rimColor.mul(0.45), vec3(0));
     const surface = min(select(isSmoke, smoke, select(isPuff, puff, debrisCol)).add(rim), vec3(0.97));
     // Emissive parts (hot smoke, hot puffs, hot edges) may exceed 1 → bloom.
-    const hot: Node = select(isSmoke, tq.lessThan(0.12), select(isPuff, age.lessThan(0.14), heatEdge));
+    const hot: Node = select(isSmoke, tq.lessThan(0.12), select(isPuff, age.lessThan(0.085), heatEdge));
     const surfaceOut = select(hot, select(isSmoke, smoke, select(isPuff, puff, debrisCol)), surface);
     return select(isFire, fire, surfaceOut);
   })();
@@ -331,7 +331,10 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
   const clip = projMatrix.mul(vec4(pvS, 1.0));
   mat.depthNode = clip.z.div(clip.w);
   const inkW = select(isFire, float(0), float(1)).mul(smoothstep(2.5, 7.0, radiusPx));
-  const regionId = floor(seed.mul(1000)).add(select(isDebris.and(facet), float(0.5), float(0)));
+  // Smoke balls and debris facets get their own ids (each ball fully outlined,
+  // cotton-ball clusters); trail puffs share one id so a trail reads as one
+  // lumpy ribbon outlined by silhouette/crease lines rather than a bead chain.
+  const regionId = select(isPuff, float(777), floor(seed.mul(1000)).add(select(isDebris.and(facet), float(0.5), float(0))));
   mat.mrtNode = mrt({
     gbuf: vec4(packNormalToRGB(nView), pvS.z.negate().mul(DEPTH_SCALE)),
     ink: vec4(inkW, hashInkId(regionId), select(isFire, float(0), float(1)), 1.0),
@@ -441,7 +444,8 @@ function createGlow(g: ParticleGpu): MeshBasicNodeMaterial {
     const flash = flashCol.mul(select(fMask, fade, float(0)));
 
     // RING — thinning annulus with a slightly wobbly hand-drawn edge.
-    const wob = sin(a.mul(7).add(seed.mul(30))).mul(0.025).add(1);
+    // Outer radius 0.92 so the wobbly ring never touches the quad edge.
+    const wob = sin(a.mul(7).add(seed.mul(30))).mul(0.02).add(0.92);
     const thick = mix(0.2, 0.035, t);
     const inner = float(1).sub(thick);
     const rMask = dd.lessThan(wob).and(dd.greaterThan(inner.mul(wob)));

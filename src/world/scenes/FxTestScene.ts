@@ -104,7 +104,7 @@ export class FxTestScene implements GameScene {
   private readonly n = new Vector3();
   private readonly zero = new Vector3();
   private readonly lookAt = new Vector3();
-  private readonly launcher = new Vector3(250, -70, -110).add(ORIGIN);
+  private readonly launcher = new Vector3(210, -25, -60).add(ORIGIN);
   private readonly demo: Demo;
   private readonly speed: number;
   private readonly demoScale: number;
@@ -220,7 +220,7 @@ export class FxTestScene implements GameScene {
     // ── laser impacts & shield hits on the target ──
     const tr = this.target.radius || 20;
     if (t >= this.nextImpact) {
-      this.nextImpact = t + rr(0.12, 0.3);
+      this.nextImpact = t + rr(0.2, 0.45);
       this.n.set(rr(-1, 1), rr(-0.4, 1), rr(-1, -0.1)).normalize();
       this.v.copy(ORIGIN).addScaledVector(this.n, tr * 0.45);
       fx.impact(this.v, this.n, this.zero);
@@ -229,7 +229,7 @@ export class FxTestScene implements GameScene {
       this.nextShield = t + rr(0.3, 0.6);
       this.n.set(rr(-1, 1), rr(-0.5, 1), rr(-1, 0.2)).normalize();
       this.v.copy(ORIGIN).addScaledVector(this.n, tr * 1.25);
-      fx.shieldHit(this.v, this.n, tr * rr(0.35, 0.55), undefined, rnd() < 0.5 ? PAL.MAGENTA : PAL.PLASMA);
+      fx.shieldHit(this.v, this.n, tr * rr(0.25, 0.4), undefined, rnd() < 0.5 ? PAL.MAGENTA : PAL.PLASMA);
     }
 
     // ── staged explosions of every scale ──
@@ -240,7 +240,7 @@ export class FxTestScene implements GameScene {
           fx.explosion(this.v.set(500, 250, 1600).add(ORIGIN), this.zero, 260);
           break;
         case 1: // frigate section
-          fx.explosion(this.v.set(-110, 50, 90).add(ORIGIN), this.zero, 40);
+          fx.explosion(this.v.set(-150, 60, 240).add(ORIGIN), this.zero, 40);
           break;
         case 2: // fighter
           fx.explosion(this.v.set(80, -20, -60).add(ORIGIN), this.zero, 10);
@@ -307,6 +307,6 @@ export class FxTestScene implements GameScene {
   }
 
   cameraLabel(): string {
-    return `FX · ${SHOTS[this.shot].name} · ${this.fx.liveCount} live · ${this.fx.trails.activeCount} trails`;
+    return `FX · ${SHOTS[this.shot].name} · r${this.target.radius.toFixed(0)} · ${this.fx.liveCount} live · ${this.fx.trails.activeCount} trails`;
   }
 }

@@ -25,14 +25,14 @@ export interface TrailStyle {
 
 /** Macross "Itano circus" missile smoke: fat white puffs that linger and thicken. */
 export const TRAIL_MISSILE: TrailStyle = {
-  size0: 0.55,
-  size1: 3.4,
-  lifeMin: 2.4,
-  lifeMax: 3.6,
-  spacing: 1.5,
-  jitter: 0.35,
-  drift: 1.2,
-  glint: 1.6,
+  size0: 1.0,
+  size1: 5.5,
+  lifeMin: 2.6,
+  lifeMax: 3.8,
+  spacing: 2.0,
+  jitter: 0.5,
+  drift: 1.5,
+  glint: 2.2,
   palette: PAL.WARM,
   maxPerUpdate: 48,
 };

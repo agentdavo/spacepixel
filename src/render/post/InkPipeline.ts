@@ -32,6 +32,7 @@ import { inkEdgeWGSL } from './shaders/inkEdge.wgsl';
 import { makeInkEdgeTSL } from './shaders/inkEdge.tsl';
 import type { DebugView } from '@/core/Flags';
 import { postFx } from './PostFx';
+import { cos as tslCos, abs as tslAbs, cross as tslCross, step as tslStep } from 'three/tsl';
 
 export interface InkSettings {
   enabled: boolean;
@@ -108,6 +109,15 @@ export class InkPipeline {
   private readonly speed = uniform(0);
   private readonly jump = uniform(0);
   private readonly flash = uniform(0);
+  // Set-piece grade (postFx.fog/invert/hue/solarize/fade/radiation); identity at defaults.
+  private readonly fog = uniform(0);
+  private readonly fogColor = uniform(new Color());
+  private readonly fogRange = uniform(1.6);
+  private readonly invert = uniform(0);
+  private readonly hue = uniform(0);
+  private readonly solarize = uniform(0);
+  private readonly fade = uniform(0);
+  private readonly radiation = uniform(0);
 
   private view: DebugView = 'final';
   private pixelRatio = 1;
@@ -163,7 +173,10 @@ export class InkPipeline {
 
     // Bloom reads the pre-ink HDR buffer so only true emissives glow.
     const glow = bloom(color, this.settings.bloomStrength, this.settings.bloomRadius, this.settings.bloomThreshold);
-    const hdr = vec4(inked.add(glow.rgb), 1.0);
+    // Set-piece depth fog (dense nebula): zero at postFx.fog = 0.
+    const fogK = this.fog.mul(float(1).sub(exp(depthKm.div(max(this.fogRange, 0.001)).negate())));
+    const fogged = mix(inked, this.fogColor, fogK);
+    const hdr = vec4(fogged.add(glow.rgb.mul(float(1).sub(fogK.mul(0.6)))), 1.0);
 
     // ── display transform + film grade ────────────────────────────────
     const display = renderOutput(hdr);
@@ -186,7 +199,8 @@ export class InkPipeline {
       .mul(mix(0.78, 1.0, vignette))
       .add(grain.mul(0.025))
       .add(vec3(0.85, 0.95, 1.0).mul(speedLines));
-    const flashed = mix(graded, vec3(1.0, 0.98, 0.95), this.flash);
+    const setGraded = setPieceGrade(graded, centered, this.invert, this.hue, this.solarize, this.fade, this.radiation, this.grainSeed);
+    const flashed = mix(setGraded, vec3(1.0, 0.98, 0.95), this.flash);
     const final = fxaa(vec4(clamp(flashed, 0, 1), 1.0));
 
     // ── debug views ───────────────────────────────────────────────────
@@ -247,6 +261,14 @@ export class InkPipeline {
     this.speed.value = postFx.speed;
     this.jump.value = postFx.jump;
     this.flash.value = postFx.flash;
+    this.fog.value = postFx.fog;
+    this.fogColor.value.copy(postFx.fogColor);
+    this.fogRange.value = postFx.fogRange;
+    this.invert.value = postFx.invert;
+    this.hue.value = postFx.hue;
+    this.solarize.value = postFx.solarize;
+    this.fade.value = postFx.fade;
+    this.radiation.value = postFx.radiation;
     // Stepped clock → lines re-trace 12×/s like hand-inked animation.
     this.params2.value.z = Math.floor(time * this.settings.boilRate) % 97;
     this.grainSeed.value = (Math.floor(time * 24) % 64) * 0.013;
@@ -255,4 +277,28 @@ export class InkPipeline {
   render(): void {
     this.pipeline.render();
   }
+}
+
+/**
+ * Display-space set-piece grade (src/world/setpieces): hue rotation,
+ * solarisation, inversion, fade to black and a radiation warning (green-gold
+ * edge tint + white sensor-hit speckle). Every term is the identity when its
+ * amount is 0, so scenes that never touch these fields are unaffected.
+ */
+function setPieceGrade(c: Node, centered: Node, invert: Node, hue: Node, solarize: Node, fade: Node, radiation: Node, seed: Node): Node {
+  // Hue: Rodrigues rotation of the colour vector about the grey axis.
+  const k = vec3(0.57735, 0.57735, 0.57735);
+  const ch = tslCos(hue);
+  const sh = sin(hue);
+  const rot = c.mul(ch).add(tslCross(k, c).mul(sh)).add(k.mul(dot(k, c).mul(float(1).sub(ch))));
+  const hued = clamp(rot, 0, 1);
+  const sol = mix(hued, float(1).sub(tslAbs(hued.mul(2).sub(1))), solarize);
+  const inv = mix(sol, float(1).sub(sol), invert);
+  // Radiation: speckles on a coarse pixel lattice, re-seeded with the grain clock.
+  const cell = floor(screenUV.mul(vec2(960, 540)));
+  const h = fract(sin(dot(cell.add(seed.mul(97.0)), vec2(12.9898, 78.233))).mul(43758.5453));
+  const speck = tslStep(float(1).sub(radiation.mul(0.0035)), h).mul(radiation);
+  const edge = smoothstep(0.25, 0.75, length(centered.mul(vec2(1.25, 1.0))));
+  const rad = mix(inv, vec3(0.72, 0.8, 0.3), edge.mul(radiation).mul(0.28)).add(vec3(speck.mul(0.9)));
+  return mix(rad, vec3(0), fade);
 }
