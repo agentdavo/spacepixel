@@ -44,6 +44,33 @@ export interface DockContext {
   onLaunch(): void;
 }
 
+/**
+ * Extra dock tabs (shipyard, outfitting, contracts, concourse …) register here
+ * and appear after MARKET; digits 1–6 switch tabs. A tab owns its panel's DOM
+ * and gets first refusal on keys while active (return true = handled).
+ */
+export interface DockTabApi {
+  /** Line in the dock log (cls: '' | 'ok' | 'err'). */
+  say(text: string, cls?: string): void;
+  /** Redraw the header stats (shares, cargo, standing) after changing the ledger. */
+  refresh(): void;
+}
+export interface DockTab {
+  id: string;
+  label: string;
+  /** Hide the tab at stations that don't offer it. */
+  available?(ctx: DockContext): boolean;
+  mount(panel: HTMLElement, ctx: DockContext, api: DockTabApi): void;
+  onKey?(e: KeyboardEvent): boolean;
+  unmount?(): void;
+}
+const TABS: DockTab[] = [];
+export function registerDockTab(tab: DockTab): void {
+  const i = TABS.findIndex((t) => t.id === tab.id);
+  if (i >= 0) TABS[i] = tab;
+  else TABS.push(tab);
+}
+
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!);
 const sh = (n: number) => `${Math.round(n).toLocaleString('en-US')} sh`;
 
@@ -53,6 +80,9 @@ export class DockScreen {
   private sel = 0;
   private log: { text: string; cls: string }[] = [];
   private onKey = (e: KeyboardEvent) => this.key(e);
+  /** null = the built-in market tab. */
+  private tab: DockTab | null = null;
+  private tabs: DockTab[] = [];
 
   constructor(private root: HTMLElement) {}
 
@@ -81,6 +111,8 @@ export class DockScreen {
         </div>
         <div class="dock-stats"></div>
       </div>
+      <nav class="dock-tabs"></nav>
+      <div class="dock-panel" hidden></div>
       <div class="dock-body">
         <section class="dock-market"><h3>MARKET // ASK · BID IN SHARES</h3><table></table><div class="dock-blurb"></div></section>
         <section class="dock-services">
@@ -96,10 +128,44 @@ export class DockScreen {
     el.querySelector('.dock-launch')!.addEventListener('click', () => this.launch());
     el.addEventListener('pointerdown', (e) => e.stopPropagation());
     window.addEventListener('keydown', this.onKey);
+    this.tabs = TABS.filter((t) => t.available?.(ctx) ?? true);
+    this.tab = null;
+    this.renderTabs();
+    this.render();
+  }
+
+  private renderTabs(): void {
+    const nav = this.el?.querySelector('.dock-tabs');
+    if (!nav) return;
+    const all = [{ id: 'market', label: 'MARKET' }, ...this.tabs];
+    const cur = this.tab?.id ?? 'market';
+    nav.innerHTML = all.map((t, i) => `<button data-tab="${i}" class="${t.id === cur ? 'on' : ''}"><small>${i + 1}</small>${esc(t.label)}</button>`).join('');
+    nav.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => this.switchTab(Number(b.dataset.tab))));
+  }
+
+  /** 0 = market, 1.. = registered tabs. */
+  private switchTab(i: number): void {
+    const el = this.el;
+    const ctx = this.ctx;
+    if (!el || !ctx || i > this.tabs.length) return;
+    const next = i === 0 ? null : this.tabs[i - 1];
+    if (next === this.tab) return;
+    this.tab?.unmount?.();
+    this.tab = next;
+    const panel = el.querySelector('.dock-panel') as HTMLElement;
+    const body = el.querySelector('.dock-body') as HTMLElement;
+    panel.innerHTML = '';
+    panel.hidden = !next;
+    body.hidden = !!next;
+    if (next) next.mount(panel, ctx, { say: (t, c) => (this.say(t, c), this.render()), refresh: () => this.render() });
+    getAudio().ui('move');
+    this.renderTabs();
     this.render();
   }
 
   close(): void {
+    this.tab?.unmount?.();
+    this.tab = null;
     window.removeEventListener('keydown', this.onKey);
     this.el?.remove();
     this.el = null;
@@ -157,6 +223,19 @@ export class DockScreen {
 
   private key(e: KeyboardEvent): void {
     if (!this.ctx) return;
+    const digit = /^Digit([1-6])$/.exec(e.code);
+    if (digit) {
+      e.preventDefault();
+      return this.switchTab(Number(digit[1]) - 1);
+    }
+    if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+      e.preventDefault();
+      return this.launch();
+    }
+    if (this.tab) {
+      if (this.tab.onKey?.(e)) e.preventDefault();
+      return;
+    }
     const n = e.shiftKey ? 5 : 1;
     const cid = COMMODITIES[this.sel].id;
     switch (e.code) {

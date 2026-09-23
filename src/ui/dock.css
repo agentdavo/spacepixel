@@ -189,3 +189,14 @@
   .dock-head { grid-template-columns: 1fr; }
   .dock-stats { text-align: left; }
 }
+
+/* Tabs: MARKET + registered dock tabs (1–6). */
+.dock-tabs { display: flex; gap: 6px; margin: 6px 0 10px; }
+.dock-tabs button {
+  font: inherit; font-size: 12px; letter-spacing: 0.14em; color: #9fe8c8; background: rgba(8, 20, 24, 0.7);
+  border: 1px solid rgba(120, 255, 200, 0.25); padding: 5px 12px; cursor: pointer;
+}
+.dock-tabs button small { opacity: 0.55; margin-right: 6px; }
+.dock-tabs button.on { color: #061012; background: #7dffc8; border-color: #7dffc8; }
+.dock-panel { min-height: 0; overflow: auto; }
+.dock-body[hidden], .dock-panel[hidden] { display: none !important; }
