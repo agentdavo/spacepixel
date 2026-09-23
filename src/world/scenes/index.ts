@@ -11,6 +11,7 @@ export const SCENES: Record<string, () => Promise<GameScene>> = {
   fx: async () => new (await import('./FxTestScene')).FxTestScene(),
   comms: async () => new (await import('./CommsTestScene')).CommsTestScene(),
   setpieces: async () => new (await import('./SetPieceScene')).SetPieceScene(),
+  audio: async () => new (await import('./AudioTestScene')).AudioTestScene(),
 };
 
 export const DEFAULT_SCENE = 'flight';

@@ -9,6 +9,8 @@ export interface PilotProfile {
   callsign: string;
   livery: Partial<Livery>;
   liveryName: string;
+  /** Next campaign episode to play (1-based). */
+  episode: number;
 }
 
 const KEY = 'vanguard.profile.v1';
@@ -38,7 +40,7 @@ export const LIVERY_PRESETS: { name: string; livery: Partial<Livery> }[] = [
 ];
 
 export function loadProfile(): PilotProfile {
-  const base: PilotProfile = { callsign: 'VANGUARD 1', livery: {}, liveryName: LIVERY_PRESETS[0].name };
+  const base: PilotProfile = { callsign: 'VANGUARD 1', livery: {}, liveryName: LIVERY_PRESETS[0].name, episode: 1 };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) return { ...base, ...(JSON.parse(raw) as Partial<PilotProfile>) };

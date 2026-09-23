@@ -39,6 +39,8 @@ interface Shot {
   player?: (t: number, o: Vector3) => Vector3;
   /** Kestrel scale reference, relative to the anchor. */
   ref?: (t: number, o: Vector3) => Vector3;
+  /** Camera up (default +Y). */
+  up?: Vector3;
 }
 
 const key = LIGHT_PRESETS.meridian.keyDirection.clone().normalize();
@@ -86,6 +88,7 @@ const SHOTS: Record<SetPieceKind, Shot[]> = {
       eye: (t, o) => skim(60_000, t, o),
       look: (t, o) => skim(60_000, t, o).add(tmpA.copy(skimFwd).multiplyScalar(1000)).addScaledVector(skimUp, -150),
       ref: (t, o) => skim(60_000, t, o).addScaledVector(skimFwd, 70).addScaledVector(skimUp, -12).addScaledVector(skimSide, 18),
+      up: skimUp,
     },
     {
       name: 'CONTACT · 8 km',
@@ -93,12 +96,19 @@ const SHOTS: Record<SetPieceKind, Shot[]> = {
       eye: (t, o) => skim(8_000, t, o),
       look: (t, o) => skim(8_000, t, o).add(tmpA.copy(skimFwd).multiplyScalar(1000)).addScaledVector(skimUp, -420),
       ref: (t, o) => skim(8_000, t, o).addScaledVector(skimFwd, 60).addScaledVector(skimUp, -14).addScaledVector(skimSide, -12),
+      up: skimUp,
     },
   ],
   derelict: [
-    { name: 'DERELICT · WIDE', fov: 45, eye: (t, o) => o.set(2600 + t * 4, 700, 2300), look: (_t, o) => o.set(0, 0, 0) },
-    { name: 'DERELICT · BREACH', fov: 50, eye: (_t, o) => o.set(620, 180, 260), look: (_t, o) => o.set(0, 0, 60), ref: (_t, o) => o.set(560, 150, 230) },
-    { name: 'DERELICT · IN THE BELT', fov: 60, eye: (_t, o) => o.set(-900, 260, -1200), look: (_t, o) => o.set(0, 0, -200) },
+    { name: 'DERELICT · WIDE', fov: 40, eye: (t, o) => o.set(3_300 + t * 4, 700, 900), look: (_t, o) => o.set(0, -80, -100) },
+    {
+      name: 'DERELICT · BREACH',
+      fov: 50,
+      eye: (_t, o) => o.set(560, 260, 180),
+      look: (_t, o) => o.set(0, 0, -40),
+      ref: (_t, o) => o.set(330, 160, 90),
+    },
+    { name: 'DERELICT · IN THE BELT', fov: 60, eye: (_t, o) => o.set(-1_300, 360, -1_200), look: (_t, o) => o.set(0, 0, 0) },
   ],
   blackbox: [
     { name: 'BLACKBOX · CLOSE', fov: 40, eye: (_t, o) => o.set(9, 3, 12), look: (_t, o) => o.set(0, 0, 0), player: (_t, o) => o.set(0, 400, 0) },
@@ -112,12 +122,12 @@ const SHOTS: Record<SetPieceKind, Shot[]> = {
       fov: 60,
       eye: (_t, o) => o.set(15_200, 2_600, 6_500),
       look: (_t, o) => o.set(0, 0, 0),
-      ref: (_t, o) => o.set(15_140, 2_585, 6_450),
+      ref: (_t, o) => o.set(14_500, 2_350, 5_900),
     },
     { name: 'NEXUS · THRESHOLD', fov: 65, eye: (_t, o) => o.set(900, 400, 4_500), look: (_t, o) => o.set(0, 0, -20_000) },
   ],
   nebula: [
-    { name: 'NEBULA · OUTSIDE', fov: 55, eye: (_t, o) => o.set(20_000, 12_000, 105_000), look: (_t, o) => o.set(0, 0, 0) },
+    { name: 'NEBULA · OUTSIDE', fov: 55, eye: (_t, o) => o.set(18_000, 6_000, 78_000), look: (_t, o) => o.set(0, 4_000, 0), ref: (_t, o) => o.set(17_985, 5_994, 77_940) },
     { name: 'NEBULA · INSIDE', fov: 60, eye: (t, o) => o.set(4_000, 1_000, 9_000 - t * 120), look: (t, o) => o.set(3_000, 800, -9_000 - t * 120), ref: (t, o) => o.set(3_985, 994, 8_950 - t * 120) },
     { name: 'NEBULA · EDGE', fov: 55, eye: (_t, o) => o.set(0, 3_000, 43_000), look: (_t, o) => o.set(0, 0, 0) },
   ],
@@ -126,7 +136,7 @@ const SHOTS: Record<SetPieceKind, Shot[]> = {
     { name: 'BASTION · BROADSIDE', fov: 50, eye: (_t, o) => o.set(2_600, 300, -600), look: (_t, o) => o.set(0, 0, 0) },
   ],
   wreckage: [
-    { name: 'WRECKAGE · FIELD', fov: 55, eye: (t, o) => o.set(1_600 + t * 5, 250, 2_200), look: (_t, o) => o.set(0, 0, 0) },
+    { name: 'WRECKAGE · FIELD', fov: 55, eye: (t, o) => o.set(700 + t * 5, 120, 900), look: (_t, o) => o.set(0, 0, 0), ref: (_t, o) => o.set(560, 90, 700) },
     { name: 'WRECKAGE · INSIDE', fov: 60, eye: (_t, o) => o.set(300, 40, 500), look: (_t, o) => o.set(-500, -60, -400) },
   ],
   beacon: [
@@ -241,7 +251,8 @@ export class SetPieceScene implements GameScene {
 
     this.world.sync(this.camera);
     this.world.toRender(this.look, this.look);
-    this.camera.up.set(0, 1, 0);
+    if (shot.up) this.camera.up.copy(shot.up);
+    else this.camera.up.set(0, 1, 0);
     this.camera.lookAt(this.look);
     this.camera.updateMatrixWorld();
     this.backdrop.follow(this.camera);

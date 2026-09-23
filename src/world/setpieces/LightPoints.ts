@@ -104,7 +104,7 @@ export class LightPoints {
     geo.boundingSphere = new Sphere(new Vector3(), maxR);
 
     const minPx = float(opts.minPixels ?? 1.6);
-    const fadeFar = float(opts.fadeFar ?? 0);
+    const fadeFar = opts.fadeFar ?? 0;
     const glint = float(opts.glint ?? 0.6);
     const vUV: Node = varyingProperty('vec2', 'vLpUV');
     const vCol: Node = varyingProperty('vec3', 'vLpCol');
@@ -137,8 +137,9 @@ export class LightPoints {
         .add(flicker.mul(step(abs(m.sub(2)), 0.5)))
         .add(pulse.mul(step(abs(m.sub(3)), 0.5)));
       // Sub-pixel-size lights keep their energy: dimmer as they're clamped bigger.
-      const energy = p.w.div(r).clamp(0.25, 1);
-      const far = fadeFar.greaterThan(0).select(float(1).sub(smoothstep(fadeFar.mul(0.6), fadeFar, z)), float(1));
+      const energy = p.w.div(r).clamp(0.6, 1);
+      // (Branch in JS: WGSL rejects a constant smoothstep with equal edges.)
+      const far: Node = fadeFar > 0 ? float(1).sub(smoothstep(fadeFar * 0.6, fadeFar, z)) : float(1);
       vCol.assign(col.xyz.mul(b.mul(md.w).mul(energy).mul(far).mul(this.intensity)));
       vUV.assign(positionGeometry.xy);
       return cameraProjectionMatrix.mul(vec4(view.xy.add(positionGeometry.xy.mul(r)), view.z, 1));

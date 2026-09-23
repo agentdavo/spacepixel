@@ -16,6 +16,8 @@ export class DebugHud implements Updatable {
   private shotEl: HTMLDivElement;
   private view: DebugView = flags.view;
   private acc = 0;
+  /** Collapsed by default for players (one-line frame readout); F3 expands. */
+  private expanded = new URLSearchParams(location.search).has('dev');
   private graph = document.createElement('canvas');
   private graphCtx: CanvasRenderingContext2D;
 
@@ -37,6 +39,10 @@ export class DebugHud implements Updatable {
     if (flags.hud) root.append(this.el, this.shotEl);
 
     window.addEventListener('keydown', (e) => {
+      if (e.code === 'F3') {
+        e.preventDefault();
+        this.expanded = !this.expanded;
+      }
       const fn = /^F([1-6])$/.exec(e.code);
       if (fn) {
         e.preventDefault();
@@ -69,6 +75,11 @@ export class DebugHud implements Updatable {
     const { info, stats } = this.engine;
     const s = this.ink.settings;
     const p = this.engine.perf.summary();
+    if (!this.expanded) {
+      this.el.innerHTML = `<div class="sub">${stats.fps.toFixed(0)} FPS · CPU ${p.cpu.p95} · GPU ${p.gpu.p95} ms · [F3] dev</div>`;
+      this.shotEl.textContent = this.game.cameraLabel?.() ?? this.sceneName.toUpperCase();
+      return;
+    }
     const backend = info.isWebGPU
       ? `<b>WebGPU</b> <span class="sub">(native WGSL ink)</span>`
       : `<span class="warn">WebGL2 fallback</span> <span class="sub">(TSL ink twin)</span>`;

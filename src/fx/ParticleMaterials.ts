@@ -253,7 +253,11 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
 
   // Normals (view space). Blobs: fake sphere. Debris: two flat facets tumbling.
   const nz: Node = sqrt(max(float(1).sub(dd.mul(dd)), 0.0));
-  const nSphere = normalize(vec3(uv.x, uv.y, nz.add(0.02)));
+  // Trail puffs use a flattened sphere: neighbouring puffs then differ less in
+  // normal, so the ink pass draws the ribbon's outline and a few folds rather
+  // than a crease around every single puff.
+  const flat = select(isPuff, float(0.55), float(1));
+  const nSphere = normalize(vec3(uv.x.mul(flat), uv.y.mul(flat), nz.add(0.02)));
   const spin2 = fract(seed.mul(3.7)).sub(0.5).mul(5.0);
   const a1 = seed.mul(20).add(floor(age.mul(STEP_HZ)).div(STEP_HZ).mul(spin2));
   const nq1 = normalize(vec3(cos(a1).mul(0.75), sin(a1).mul(0.75), 0.66));
@@ -266,9 +270,12 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
   // expression (a .toVar() here would only be declared in one of those graphs).
   const nView: Node = select(isDebris, nDeb, nSphere);
   const nWorld = normalize(camWorld.mul(vec4(nView, 0)).xyz);
-  const ndl = dot(nWorld, LightRig.keyDirection);
-  const hi = ndl.greaterThan(0.72);
-  const lit = ndl.greaterThan(-0.12);
+  // Key light pulled toward the viewer: shadows become crescents on each
+  // ball's far side (the anime smoke look) instead of straight terminators.
+  const camBack = camWorld.element(2).xyz;
+  const ndl = dot(nWorld, normalize(LightRig.keyDirection.add(camBack.mul(select(isPuff, float(0.35), float(0.9))))));
+  const hi = ndl.greaterThan(0.8);
+  const lit = ndl.greaterThan(0.18);
   const rimOn: Node = float(1)
     .sub(nz)
     .greaterThan(0.72)
@@ -291,9 +298,9 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
     const fire = fireRamp(fireStep, pal);
 
     // SMOKE: three-tone cel ball, red-hot for its first couple of frames.
-    const smokeHi = byPal(pal, c3('#b3a3b5'), c3('#a3b0c8'), c3('#b69ab8'));
-    const smokeLit = byPal(pal, c3('#85768f'), c3('#74819f'), c3('#886c90'));
-    const smokeDark = byPal(pal, c3('#3b3050'), c3('#2f3656'), c3('#3d2448'));
+    const smokeHi = byPal(pal, c3('#8e7f96'), c3('#7f8ca8'), c3('#937596'));
+    const smokeLit = byPal(pal, c3('#5e5068'), c3('#4f5a78'), c3('#5f4466'));
+    const smokeDark = byPal(pal, c3('#2a2138'), c3('#20263e'), c3('#2c1832'));
     const smokeCel = select(hi, smokeHi, select(lit, smokeLit, smokeDark)).mul(select(lit, LightRig.keyColor, vec3(1)));
     const smokeHot = fireRamp(select(tq.lessThan(0.06), float(3), float(4)), pal);
     const smoke = select(tq.lessThan(0.12).and(nz.greaterThan(0.25).or(tq.lessThan(0.06))), smokeHot, smokeCel);

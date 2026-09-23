@@ -1146,8 +1146,10 @@ function signalFx(ctx: CanvasRenderingContext2D, w: number, h: number, t: number
   const k = Math.floor(t * 24);
   // Rolling bar (always a little; strong with static).
   const barY = (((t * 0.35) % 1.3) - 0.15) * h;
-  ctx.fillStyle = `rgba(255,255,255,${(0.035 + amount * 0.14).toFixed(3)})`;
+  ctx.fillStyle = '#ffffff';
+  ctx.globalAlpha = 0.035 + amount * 0.14;
   ctx.fillRect(0, barY, w, h * 0.1);
+  ctx.globalAlpha = 1;
   if (amount <= 0.02) return;
   // Snow.
   const n = Math.floor(amount * 260);
@@ -1159,9 +1161,11 @@ function signalFx(ctx: CanvasRenderingContext2D, w: number, h: number, t: number
   // Dark interference bands.
   for (let b = 0; b < 2; b++) {
     const y = ((hash01(Math.floor(t * 3) + b * 31, 11) + t * 0.2 * (b + 1)) % 1) * h;
-    ctx.fillStyle = `rgba(0,0,0,${(amount * 0.35).toFixed(3)})`;
+    ctx.fillStyle = '#000000';
+    ctx.globalAlpha = amount * 0.35;
     ctx.fillRect(0, y, w, h * 0.04 * (1 + b));
   }
+  ctx.globalAlpha = 1;
   // Signal dropout flash.
   if (hash01(k, 99) < amount * 0.06) {
     ctx.fillStyle = 'rgba(180,200,210,0.55)';
@@ -1174,6 +1178,15 @@ function signalFx(ctx: CanvasRenderingContext2D, w: number, h: number, t: number
  * coordinate space. Deterministic from `spec.seed` and `opts.time`.
  */
 export function drawPortrait(ctx: CanvasRenderingContext2D, spec: PortraitSpec, w: number, h: number, opts: PortraitOpts = {}): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, w, h);
+  ctx.clip();
+  drawPortraitInner(ctx, spec, w, h, opts);
+  ctx.restore();
+}
+
+function drawPortraitInner(ctx: CanvasRenderingContext2D, spec: PortraitSpec, w: number, h: number, opts: PortraitOpts): void {
   const t = opts.time ?? 0;
   const st = Math.max(0, Math.min(1, opts.static ?? 0));
   const tint = opts.tint ?? '#7dffb2';
@@ -1273,7 +1286,8 @@ function drawSystem(c: CanvasRenderingContext2D, w: number, h: number, t: number
   c.font = '6px "Share Tech Mono", monospace';
   c.textAlign = 'center';
   c.fillText('SYS // CORE', 0, 44);
-  c.fillText(((t * 7.3) % 1 < 0.5 ? '▮ ' : '  ') + 'LINK', 0, -41);
+  c.fillText('LINK', 0, -41);
+  if ((t * 1.5) % 1 < 0.5) c.fillRect(-12, -45, 3, 4.5);
   c.restore();
   // Scanlines.
   c.fillStyle = 'rgba(0,0,0,0.25)';

@@ -15,7 +15,11 @@ import { WeaponVisuals } from '../WeaponVisuals';
 import { StarSystemView, type GateInstance } from '../StarSystemView';
 import { Hyperspace } from '../Hyperspace';
 import { SpaceDust } from '../SpaceDust';
-import { generateUniverse } from '@/universe/generate';
+import { generateUniverse, specialSystem } from '@/universe/generate';
+import { CampaignSession, type FlightHostScene } from '@/game/CampaignSession';
+import { SYSTEM_FALLBACK } from '@/game/campaign/missions';
+import type { CampaignMission } from '@/game/campaign/types';
+import type { StarSystem } from '@/universe/Universe';
 import type { Universe } from '@/universe/Universe';
 import { FlightHud } from '@/ui/FlightHud';
 import { StarMap } from '@/ui/StarMap';
@@ -47,7 +51,7 @@ interface Bandit {
   center: Vector3;
 }
 
-export class FlightScene implements GameScene {
+export class FlightScene implements GameScene, FlightHostScene {
   readonly scene = new Scene();
   readonly camera = new PerspectiveCamera(60, 16 / 9, 0.3, 1_500_000);
   readonly world = new WorldSpace(this.scene);
@@ -76,6 +80,9 @@ export class FlightScene implements GameScene {
   private cathedral!: ShipEntity;
   private carrier!: ShipEntity;
   private mission: MissionRunner | null = null;
+  /** Active campaign episode (story missions), if any. */
+  campaign: CampaignSession | null = null;
+  private campaignDone: ((r: { outcome: 'success' | 'failure'; codex: string[] }) => void) | null = null;
   private tactical = false;
   private orderStatus = '';
   /** Current standing order for the wing (M13); the AI reads this. */
@@ -215,6 +222,7 @@ export class FlightScene implements GameScene {
     if (this.jumpPhase === 'none') {
       updateAI(this.fleet, dt, time);
       this.capitals.step(dt);
+      this.campaign?.preStep(dt);
     }
     this.fleet.step(dt);
     for (const b of this.bandits) {
@@ -238,6 +246,17 @@ export class FlightScene implements GameScene {
     // 4. Weapons + missiles sim.
     this.weapons.step(dt);
     this.missiles.step(dt);
+
+    // 4a. Campaign episode: runner, set pieces, chatter.
+    if (this.campaign) {
+      this.campaign.update(dt, time);
+      const since = this.campaign.sinceOutcome(time);
+      if (since > 5 && this.campaignDone) {
+        const done = this.campaignDone;
+        this.campaignDone = null;
+        done({ outcome: this.campaign.runner.outcome as 'success' | 'failure', codex: [...this.campaign.unlockedTitles] });
+      }
+    }
 
     // 4b. Mission bookkeeping (kills by faction of the victim).
     for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship) this.kills.set(e.ship.faction, (this.kills.get(e.ship.faction) ?? 0) + 1);
@@ -285,7 +304,74 @@ export class FlightScene implements GameScene {
     }
     this.hud.drawStatus(this.view.system.name, pf.cruise, this.jumpPhase !== 'none' ? `LANTERN TRANSIT → ${this.universe.systems.get(this.jumpTo)?.name ?? ''}` : '');
     if (this.mission) this.hud.drawObjectives(this.mission, time);
+    if (this.campaign) {
+      const m = this.campaign.mission;
+      this.hud.drawCampaign(`EP ${String(m.episode).padStart(2, '0')} · ${m.title}`, this.campaign.visibleObjectives(), this.campaign.runner.outcome, time);
+      for (const d of this.campaign.runner.dwells) this.hud.drawDwell(d.position, d.radius, d.progress, this.camera, this.world);
+    }
     this.starMap.draw(time);
+  }
+
+  // ── FlightHostScene ────────────────────────────────────────────────
+  currentSystemId(): string {
+    return this.systemId;
+  }
+  jumpCount(): number {
+    return this.jumps;
+  }
+  gatePosition(i: number): Vector3 | null {
+    return this.view.gates[i]?.center ?? null;
+  }
+
+  private systemFor(id: string): StarSystem {
+    return this.universe.systems.get(id) ?? specialSystem(id) ?? this.universe.systems.get(SYSTEM_FALLBACK[id] ?? '') ?? this.universe.systems.get('meridian')!;
+  }
+
+  /**
+   * Begin a story episode: move to its system (no jump effect), clear the
+   * free-flight cast, and hand the scene to a CampaignSession. Resolves when
+   * the episode succeeds or fails.
+   */
+  startCampaign(m: CampaignMission): Promise<{ outcome: 'success' | 'failure'; codex: string[] }> {
+    this.campaign?.dispose();
+    const sys = this.systemFor(m.system);
+    if (sys.id !== this.systemId) {
+      this.view.dispose();
+      this.systemId = sys.id;
+      this.view = new StarSystemView(sys, this.scene, this.world.root);
+      this.gateSide.clear();
+    }
+    // Clear the free-flight cast: missions bring their own squad and enemies.
+    const park = (s: ShipEntity) => {
+      s.alive = false;
+      s.model.root.visible = false;
+    };
+    for (const w of this.wingmen) park(w.ship);
+    for (const b of this.bandits) {
+      park(b.ship);
+      b.deadFor = -1e9;
+    }
+    park(this.cathedral);
+    park(this.carrier);
+    this.cathedral.hull = this.carrier.hull = 0; // keep placeCapitals from reviving them
+    // Player: 2.6 km short of the first Lantern (or at the origin of an off-map system).
+    const g = this.view.gates[0];
+    const pf = this.player.flight;
+    const fwd = g ? g.link.normal.clone() : new Vector3(0, 0, 1);
+    pf.position.copy(g ? g.center : new Vector3()).addScaledVector(fwd, -2600);
+    faceAlong(pf.orientation, fwd);
+    pf.velocity.copy(fwd).multiplyScalar(160);
+    pf.throttle = 0.7;
+    this.player.hull = this.player.hullMax;
+    this.player.shield = this.player.shieldMax;
+    this.player.alive = true;
+    this.player.model.root.visible = true;
+    this.chase.snap(pf);
+    this.lock.target = null;
+
+    this.campaign = new CampaignSession(m, this, document.getElementById('ui-root')!);
+    this.campaign.begin();
+    return new Promise((resolve) => (this.campaignDone = resolve));
   }
 
   startMission(def: MissionDef): void {
@@ -395,7 +481,23 @@ export class FlightScene implements GameScene {
       w.ship.flight.position.copy(_v.copy(w.slot).applyQuaternion(pf.orientation).add(pf.position));
       w.ship.flight.orientation.copy(pf.orientation);
     }
-    const hostile = this.view.system.threat > 0.35;
+    if (this.campaign) {
+      // The squad jumps with you; everyone else stays in the old system.
+      let k = 0;
+      for (const s of this.fleet.ships) {
+        if (s === this.player || !s.alive) continue;
+        if (s.team === this.player.team) {
+          k++;
+          s.flight.position.copy(pf.position).addScaledVector(out, -60 * k).add(_v.set((k % 2 ? 1 : -1) * 50 * k, 8 * k, 0));
+          s.flight.orientation.copy(pf.orientation);
+          s.flight.velocity.copy(pf.velocity);
+        } else {
+          s.alive = false;
+          s.model.root.visible = false;
+        }
+      }
+    }
+    const hostile = !this.campaign && this.view.system.threat > 0.35;
     this.bandits.forEach((b, i) => {
       b.center.copy(g.center).addScaledVector(out, 3500 + i * 400);
       if (hostile) this.respawn(b);

@@ -383,6 +383,57 @@ export class FlightHud {
     }
   }
 
+  /** Campaign objectives panel (hidden script cues already filtered out). */
+  drawCampaign(title: string, objectives: { text: string; state: string; optional: boolean }[], outcome: string, time: number): void {
+    const c = this.ctx;
+    const x = this.w - 360;
+    let y = 60;
+    c.fillStyle = 'rgba(0,10,6,0.55)';
+    c.fillRect(x - 12, y - 20, 350, 30 + objectives.length * 20);
+    c.fillStyle = '#ffffff';
+    c.fillText(title, x, y);
+    y += 22;
+    for (const o of objectives) {
+      if (o.state === 'locked') continue;
+      c.fillStyle = o.state === 'done' ? GREEN : o.state === 'failed' ? RED : (time * 1.5) % 1 < 0.75 ? AMBER : '#ffffff';
+      const box = o.state === 'done' ? '[■]' : o.state === 'failed' ? '[×]' : '[ ]';
+      c.fillText(`${box} ${o.text}${o.optional ? ' (opt)' : ''}`, x, y);
+      y += 20;
+    }
+    if (outcome === 'success' || outcome === 'failure') {
+      c.textAlign = 'center';
+      c.font = '800 44px "Oxanium", sans-serif';
+      c.fillStyle = outcome === 'success' ? '#ffffff' : RED;
+      c.fillText(outcome === 'success' ? 'EPISODE COMPLETE' : 'MISSION FAILED', this.w / 2, this.h * 0.42);
+      c.font = '13px "Share Tech Mono", monospace';
+      c.textAlign = 'left';
+    }
+  }
+
+  /** Beacon dwell zone: projected ring + progress arc. */
+  drawDwell(universe: Vector3, radius: number, progress: number, cam: PerspectiveCamera, world: WorldSpace): void {
+    const pt = this.project(universe, world, cam);
+    if (!pt) return;
+    const dist = world.toRender(universe, _p).length();
+    const fovScale = this.h / (2 * Math.tan(((cam.fov * Math.PI) / 180) / 2));
+    const r = Math.max(14, Math.min(this.h * 0.45, (radius * fovScale) / Math.max(dist, 1)));
+    const c = this.ctx;
+    c.strokeStyle = 'rgba(111,230,255,0.5)';
+    c.lineWidth = 1.5;
+    c.setLineDash([6, 6]);
+    c.beginPath();
+    c.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+    c.stroke();
+    c.setLineDash([]);
+    c.strokeStyle = progress >= 1 ? GREEN : '#6fe6ff';
+    c.lineWidth = 3;
+    c.beginPath();
+    c.arc(pt.x, pt.y, r + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+    c.stroke();
+    c.fillStyle = '#6fe6ff';
+    c.fillText(progress >= 1 ? 'HELD' : `HOLD ${(progress * 100).toFixed(0)}%`, pt.x - 22, pt.y + r + 22);
+  }
+
   private brackets(x: number, y: number, h: number, l: number): void {
     const c = this.ctx;
     c.beginPath();

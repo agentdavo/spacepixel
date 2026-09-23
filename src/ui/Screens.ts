@@ -1,4 +1,5 @@
 import type { MissionDef } from '@/game/Missions';
+import { loadProfile } from '@/game/Profile';
 
 /**
  * Milestone 19 — title card and mission briefing. Plain DOM, styled in
@@ -7,7 +8,7 @@ import type { MissionDef } from '@/game/Missions';
  */
 export function titleScreen(root: HTMLElement): Promise<'launch' | 'map' | 'hangar' | 'paint' | 'showcase'> {
   const items: { id: 'launch' | 'map' | 'hangar' | 'paint' | 'showcase'; label: string }[] = [
-    { id: 'launch', label: 'LAUNCH — EPISODE 01' },
+    { id: 'launch', label: `LAUNCH — EPISODE ${String(loadProfile().episode).padStart(2, '0')}` },
     { id: 'paint', label: 'PAINT SHOP' },
     { id: 'hangar', label: 'HANGAR / MODEL SHEETS' },
     { id: 'showcase', label: 'SHOWCASE' },

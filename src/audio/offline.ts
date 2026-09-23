@@ -1,0 +1,359 @@
+import { GameAudio, type AudioFrame, type AudioMissileEvent, type AudioShip, type AudioWeaponEvent, type Mood } from './index';
+
+/**
+ * Headless renders for scripts/audio-render.mjs. Each scenario runs the real
+ * GameAudio façade on an OfflineAudioContext, calling `update()` from
+ * suspend() callbacks every 1024 samples (~43 fps), exactly like the game's
+ * frame loop — so what gets measured is the shipping code path.
+ *
+ * Not imported by the game; loaded by the render script through Vite.
+ */
+export interface RenderStats {
+  name: string;
+  seconds: number;
+  sampleRate: number;
+  /** Peak |x| before 16-bit quantisation. */
+  peak: number;
+  /** Samples with |x| ≥ 0.999. */
+  clipped: number;
+  maxVoices: number;
+  /** 16-bit PCM WAV, base64. */
+  wav: string;
+}
+
+interface Ev {
+  kind: AudioWeaponEvent['kind'];
+  position: { x: number; y: number; z: number };
+  ship: AudioShip | null;
+  shooter: AudioShip | null;
+}
+interface MEv {
+  kind: AudioMissileEvent['kind'];
+  position: { x: number; y: number; z: number };
+  target: AudioShip | null;
+  shooter: AudioShip | null;
+}
+
+const PLAYER: AudioShip = { isPlayer: true, faction: 'concord', radius: 9 };
+const CANTOR: AudioShip = { isPlayer: false, faction: 'choir', radius: 8 };
+const RUST: AudioShip = { isPlayer: false, faction: 'rustwake', radius: 8 };
+const WING: AudioShip = { isPlayer: false, faction: 'concord', radius: 9 };
+const CATHEDRAL: AudioShip = { isPlayer: false, faction: 'choir', radius: 700 };
+
+/** Mutable frame the scenarios poke at; events are pushed per frame and cleared. */
+interface Sim {
+  t: number;
+  frame: AudioFrame & { player: AudioFrame['player'] & { velocity: { x: number; y: number; z: number } } };
+  w: Ev[];
+  m: MEv[];
+  audio: GameAudio;
+  /** Did something cross time `x` during this frame? */
+  at(x: number): boolean;
+  every(period: number, from?: number, to?: number): boolean;
+  fire(kind: Ev['kind'], x: number, y: number, z: number, shooter: AudioShip | null, ship?: AudioShip | null): void;
+  missile(kind: MEv['kind'], x: number, y: number, z: number, shooter: AudioShip | null, target?: AudioShip | null): void;
+}
+
+interface Scenario {
+  seconds: number;
+  setup?(s: Sim): void;
+  tick?(s: Sim): void;
+}
+
+const music = (mood: Mood, seconds: number, intensity: number, rampTo?: number): Scenario => ({
+  seconds,
+  setup: (s) => {
+    s.audio.autoMood = false;
+    s.audio.music.setMood(mood, 0.1);
+    s.frame.combatIntensity = intensity;
+  },
+  tick: (s) => {
+    if (rampTo !== undefined) s.frame.combatIntensity = intensity + (rampTo - intensity) * Math.min(1, s.t / seconds);
+  },
+});
+
+export const SCENARIOS: Record<string, Scenario> = {
+  'music-title': music('title', 48, 0.5),
+  'music-briefing': music('briefing', 20, 0.2),
+  'music-cruise': music('cruise', 24, 0.1),
+  'music-combat-low': music('combat', 14, 0.1),
+  'music-combat': music('combat', 16, 0.9),
+  'music-sublime': music('sublime', 30, 0.3),
+  'music-dread': music('dread', 24, 0.5),
+  'music-victory': music('victory', 10, 0),
+  'music-defeat': music('defeat', 10, 0),
+  'music-crossfade': {
+    seconds: 16,
+    setup: (s) => {
+      s.audio.autoMood = true;
+      s.audio.music.setMood('cruise', 0.1);
+      s.frame.combatIntensity = 0;
+    },
+    tick: (s) => {
+      if (s.at(4)) s.frame.combatIntensity = 0.85; // auto cruise → combat
+      if (s.at(12)) s.audio.stinger('victory');
+    },
+  },
+
+  'sfx-lasers': {
+    seconds: 5,
+    tick: (s) => {
+      // Player guns (12/s) for 1 s, Zenith fire from the right, Rustwake from the left, then far away.
+      if (s.t < 1 && s.every(1 / 12)) s.fire('fire', 0, 0, 0, PLAYER);
+      if (s.t > 1.3 && s.t < 2.3 && s.every(1 / 10)) s.fire('fire', 80, 0, -60, CANTOR);
+      if (s.t > 2.6 && s.t < 3.6 && s.every(1 / 10)) s.fire('fire', -120, 10, -40, RUST);
+      if (s.t > 3.9 && s.t < 4.6 && s.every(1 / 10)) s.fire('fire', 1500, 0, -2000, CANTOR);
+    },
+  },
+  // Hull hits hard right (0–1 s), hard left (1.5–2.5 s), dead ahead (3–4 s). Camera looks down −Z.
+  'sfx-pan': {
+    seconds: 4.5,
+    setup: (s) => {
+      s.frame.player.throttle = 0;
+      s.frame.player.alive = false;
+    },
+    tick: (s) => {
+      const t = s.t;
+      if (t < 1 && s.every(0.2)) s.fire('hit', 60, 0, 30, PLAYER, CANTOR);
+      if (t > 1.5 && t < 2.5 && s.every(0.2)) s.fire('hit', -60, 0, 30, PLAYER, CANTOR);
+      if (t > 3 && t < 4 && s.every(0.2)) s.fire('hit', 0, 0, -30, PLAYER, CANTOR);
+    },
+  },
+  'sfx-impacts': {
+    seconds: 5,
+    tick: (s) => {
+      if (s.at(0.1) || s.at(0.35) || s.at(0.6)) s.fire('shield', 60, 0, -80, PLAYER, CANTOR);
+      if (s.at(1.0) || s.at(1.25) || s.at(1.5)) s.fire('hit', -60, 0, -80, PLAYER, CANTOR);
+      if (s.at(2.0) || s.at(2.4)) s.fire('shield', 0, 0, 20, CANTOR, PLAYER);
+      if (s.at(2.9)) s.fire('hit', 0, 0, 20, CANTOR, PLAYER);
+      if (s.t > 3.4 && s.t < 4.6) s.fire('beam-hit', 200, 50, -400, CATHEDRAL, WING);
+    },
+  },
+  'sfx-explosions': {
+    seconds: 8,
+    tick: (s) => {
+      if (s.at(0.1)) s.fire('kill', 40, 0, -80, PLAYER, CANTOR);
+      if (s.at(1.2)) s.fire('kill', -300, 0, -600, WING, RUST);
+      if (s.at(2.2)) s.missile('detonate', 120, 0, -200, PLAYER, CANTOR);
+      if (s.at(3.0)) s.fire('kill', 900, 200, -2500, WING, CATHEDRAL);
+      if (s.at(6.5)) s.fire('kill', 0, 0, 25, CANTOR, PLAYER);
+    },
+  },
+  'sfx-missiles': {
+    seconds: 5,
+    tick: (s) => {
+      for (let k = 0; k < 12; k++) if (s.at(0.1 + k * 0.045)) s.missile('launch', 0, -1, 0, PLAYER, CANTOR);
+      for (let k = 0; k < 12; k++) if (s.at(2.2 + k * 0.03)) s.missile('detonate', 300 + k * 5, 0, -900, PLAYER, CANTOR);
+      if (s.at(3.4)) for (let k = 0; k < 6; k++) s.missile('launch', 400, 0, -300, CANTOR, PLAYER);
+    },
+  },
+  'sfx-engine': {
+    seconds: 9,
+    setup: (s) => {
+      s.frame.player.throttle = 0;
+    },
+    tick: (s) => {
+      const p = s.frame.player;
+      const t = s.t;
+      p.throttle = Math.min(1, t / 3);
+      p.boosting = t > 4 && t < 6.5;
+      const speed = p.boosting ? Math.min(460, 220 + (t - 4) * 150) : Math.min(220, t * 70);
+      p.velocity.z = speed;
+    },
+  },
+  'sfx-cruise': {
+    seconds: 7,
+    tick: (s) => {
+      const p = s.frame.player;
+      const t = s.t;
+      p.throttle = 0.7;
+      p.cruise = t < 0.5 ? 'off' : t < 1.9 ? 'spool' : t < 5 ? 'on' : 'off';
+      p.velocity.z = p.cruise === 'on' ? Math.min(3000, 160 + (t - 1.9) * 650) : t >= 5 ? Math.max(160, 3000 - (t - 5) * 3000) : 160;
+    },
+  },
+  'sfx-jump': {
+    seconds: 7,
+    setup: (s) => {
+      s.audio.music.setMood('cruise', 0.1);
+    },
+    tick: (s) => {
+      const t = s.t;
+      s.frame.jumpPhase = t < 0.5 ? 'none' : t < 1.4 ? 'spool' : t < 4.0 ? 'tunnel' : t < 4.9 ? 'exit' : 'none';
+      s.frame.player.velocity.z = 220;
+    },
+  },
+  'sfx-lock': {
+    seconds: 6,
+    tick: (s) => {
+      const p = s.frame.player;
+      const t = s.t;
+      p.lockProgress = t < 0.3 ? 0 : Math.min(1, (t - 0.3) / 1.1);
+      p.locked = t >= 1.4 && t < 3;
+      if (t >= 3) p.lockProgress = 0;
+      p.incomingMissile = t > 3.5 && t < 5.5;
+    },
+  },
+  'sfx-ui-radio': {
+    seconds: 5,
+    tick: (s) => {
+      const a = s.audio;
+      if (s.at(0.1) || s.at(0.3) || s.at(0.5)) a.ui('move');
+      if (s.at(0.8)) a.ui('confirm');
+      if (s.at(1.2)) a.ui('back');
+      if (s.at(1.6)) a.ui('error');
+      if (s.t > 2 && s.t < 2.6 && s.every(0.05)) a.ui('tick');
+      if (s.at(2.8)) a.ui('open');
+      if (s.at(3.2)) a.radio('open');
+      if (s.at(3.8)) a.radio('static');
+      if (s.at(4.4)) a.radio('close');
+    },
+  },
+  // Full mix: combat score under a dogfight, radio call, capital kill. Checks SFX sit on top.
+  'mix-combat': {
+    seconds: 12,
+    setup: (s) => {
+      s.audio.music.setMood('combat', 0.1);
+      s.frame.combatIntensity = 0.8;
+      s.frame.player.throttle = 0.8;
+      s.frame.player.velocity.z = 200;
+    },
+    tick: (s) => {
+      const t = s.t;
+      if (t > 2 && t < 3.5 && s.every(1 / 12)) s.fire('fire', 0, 0, 0, PLAYER);
+      if (t > 2.5 && t < 4 && s.every(0.1)) s.fire('fire', 150 * Math.sin(t), 20, -300, CANTOR);
+      if (s.at(3.2) || s.at(3.4)) s.fire('shield', 0, 0, -300, PLAYER, CANTOR);
+      if (s.at(3.6)) s.fire('kill', 0, 0, -300, PLAYER, CANTOR);
+      if (s.at(5)) s.audio.radio('open');
+      if (s.at(7)) s.audio.radio('close');
+      if (s.at(8)) s.fire('kill', 600, 100, -1800, WING, CATHEDRAL);
+      s.frame.player.lockProgress = t > 9 ? Math.min(1, (t - 9) / 1.1) : 0;
+      s.frame.player.locked = t > 10.1;
+    },
+  },
+  // Stress: 120 remote shots + 30 kills + 40 hits per frame for 3 s.
+  stress: {
+    seconds: 4,
+    setup: (s) => {
+      s.audio.music.setMood('combat', 0.1);
+      s.frame.combatIntensity = 1;
+    },
+    tick: (s) => {
+      if (s.t > 3) return;
+      for (let k = 0; k < 120; k++) s.fire('fire', (k % 11) * 40 - 200, 0, -100 - k * 3, k % 2 ? CANTOR : RUST);
+      for (let k = 0; k < 40; k++) s.fire(k % 2 ? 'hit' : 'shield', k * 10 - 200, 0, -150, PLAYER, CANTOR);
+      for (let k = 0; k < 30; k++) s.fire('kill', k * 30 - 450, 0, -200 - k * 20, PLAYER, k % 5 ? CANTOR : CATHEDRAL);
+      for (let k = 0; k < 12; k++) s.missile('detonate', k * 20, 0, -300, PLAYER, CANTOR);
+    },
+  },
+};
+
+export async function renderScenario(name: string, sampleRate = 44100): Promise<RenderStats> {
+  const sc = SCENARIOS[name];
+  if (!sc) throw new Error(`unknown scenario ${name}`);
+  const seconds = sc.seconds;
+  const length = Math.ceil(seconds * sampleRate);
+  const ctx = new OfflineAudioContext({ numberOfChannels: 2, length, sampleRate });
+  const audio = new GameAudio({ context: ctx });
+  audio.autoMood = false;
+  const zero = { x: 0, y: 0, z: 0 };
+  const sim: Sim = {
+    t: 0,
+    audio,
+    w: [],
+    m: [],
+    frame: {
+      dt: 1024 / sampleRate,
+      eye: { x: 0, y: 0, z: 30 },
+      camera: { x: 0, y: 0, z: 0, w: 1 },
+      player: { position: zero, velocity: { x: 0, y: 0, z: 150 }, throttle: 0.6, boosting: false, cruise: 'off', lockProgress: 0, locked: false, incomingMissile: false },
+      weaponEvents: [],
+      missileEvents: [],
+      jumpPhase: 'none',
+      combatIntensity: 0,
+    },
+    at(x) {
+      return x >= this.t && x < this.t + this.frame.dt;
+    },
+    every(period, from = 0, to = Infinity) {
+      if (this.t < from || this.t > to) return false;
+      const a = Math.floor((this.t - from) / period);
+      const b = Math.floor((this.t + this.frame.dt - from) / period);
+      return b > a || this.t === from;
+    },
+    fire(kind, x, y, z, shooter, ship = null) {
+      this.w.push({ kind, position: { x, y, z }, ship, shooter });
+    },
+    missile(kind, x, y, z, shooter, target = null) {
+      this.m.push({ kind, position: { x, y, z }, target, shooter });
+    },
+  };
+  sim.frame.weaponEvents = sim.w;
+  sim.frame.missileEvents = sim.m;
+  sc.setup?.(sim);
+  let maxVoices = 0;
+  const step = (): void => {
+    sim.w.length = 0;
+    sim.m.length = 0;
+    sc.tick?.(sim);
+    audio.update(sim.frame);
+    maxVoices = Math.max(maxVoices, audio.engine.activeVoices());
+  };
+  step();
+  const frameLen = 1024;
+  for (let k = 1; k * frameLen < length; k++) {
+    const when = (k * frameLen) / sampleRate;
+    ctx.suspend(when).then(() => {
+      sim.t = when;
+      step();
+      ctx.resume();
+    });
+  }
+  const buf = await ctx.startRendering();
+  audio.music.dispose();
+  const L = buf.getChannelData(0);
+  const R = buf.getChannelData(1);
+  let peak = 0;
+  let clipped = 0;
+  for (let i = 0; i < L.length; i++) {
+    const a = Math.abs(L[i]);
+    const b = Math.abs(R[i]);
+    if (a > peak) peak = a;
+    if (b > peak) peak = b;
+    if (a >= 0.999) clipped++;
+    if (b >= 0.999) clipped++;
+  }
+  return { name, seconds, sampleRate, peak, clipped, maxVoices, wav: wavBase64(L, R, sampleRate) };
+}
+
+function wavBase64(L: Float32Array, R: Float32Array, sr: number): string {
+  const n = L.length;
+  const buf = new ArrayBuffer(44 + n * 4);
+  const v = new DataView(buf);
+  const str = (o: number, s: string) => {
+    for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i));
+  };
+  str(0, 'RIFF');
+  v.setUint32(4, 36 + n * 4, true);
+  str(8, 'WAVE');
+  str(12, 'fmt ');
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 2, true);
+  v.setUint32(24, sr, true);
+  v.setUint32(28, sr * 4, true);
+  v.setUint16(32, 4, true);
+  v.setUint16(34, 16, true);
+  str(36, 'data');
+  v.setUint32(40, n * 4, true);
+  let o = 44;
+  for (let i = 0; i < n; i++) {
+    v.setInt16(o, Math.max(-1, Math.min(1, L[i])) * 32767, true);
+    v.setInt16(o + 2, Math.max(-1, Math.min(1, R[i])) * 32767, true);
+    o += 4;
+  }
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode(...bytes.subarray(i, i + CH));
+  return btoa(bin);
+}

@@ -122,14 +122,14 @@ export function explosion(fx: Particles, pos: Vector3, vel: Vector3, scale: numb
 
   // 5. Late smoke billow: dark, ink-outlined balls that swallow the dying fire.
   begin(PK.SMOKE, palette, pos, vel);
-  d.count = Math.round(Math.min(10 + s * 0.05, 22));
-  d.jitter = s * 0.55;
+  d.count = Math.round(Math.min(14 + s * 0.06, 28));
+  d.jitter = s * 0.6;
   d.radial = true;
   d.speedMin = (s * 0.35) / ts;
   d.speedMax = (s * 0.9) / ts;
   d.drag = 1.1 / ts;
-  d.size0 = s * 0.38;
-  d.size1 = s * 0.85;
+  d.size0 = s * 0.3;
+  d.size1 = s * 0.68;
   d.sizeJitter = 0.3;
   d.lifeMin = 1.7 * ts;
   d.lifeMax = 2.7 * ts;

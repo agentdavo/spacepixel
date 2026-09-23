@@ -233,7 +233,7 @@ export class Monolith implements SetPiece {
     const lat: Node = acos(Nl.y.clamp(-1, 1));
     const wave: Node = pow(sin(this.uTime.mul(0.9).sub(lat.mul(9.0))).mul(0.5).add(0.5), 6.0);
     const node: Node = pow(g0.mul(g1), 0.5);
-    const gain: Node = float(0.2).add(this.uBreath.mul(wave.mul(2.6).add(0.25)));
+    const gain: Node = float(0.17).add(this.uBreath.mul(wave.mul(2.6).add(0.25)));
     col.addAssign(vec3(tint).mul(lattice.mul(gain)).mul(mix(0.55, 1.0, lit)));
     col.addAssign(vec3(0.9, 0.85, 1.0).mul(node.mul(this.uBreath).mul(wave).mul(1.6)));
 
@@ -281,7 +281,8 @@ export class Monolith implements SetPiece {
       const razorI: Node = float(0.1)
         .add(smoothstep(-0.1, 0.9, facing).mul(3.5))
         .add(pow(max(facing, 0.0), 24.0).mul(14.0))
-        .add(smoothstep(0.3, 0.95, rimFacing).mul(0.9));
+        .add(smoothstep(0.3, 0.95, rimFacing).mul(0.4));
+      const rimTint: Node = LightRig.rimColor.mul(smoothstep(0.2, 0.95, rimFacing).mul(razor).mul(1.4));
       // Where the hidden star grazes the limb: a hard anime flare point.
       const flare: Node = pow(max(facing, 0.0), 60.0).mul(exp(x.mul(-9.0))).mul(1.6);
       // Corona: a stepped (cel) soft glow + a tight inner sheath.
@@ -300,12 +301,13 @@ export class Monolith implements SetPiece {
       const lensed: Node = this.stars(src, 170, 0.62, 0.2, 1.8).add(this.stars(src, 60, 0.88, 0.12, 3.0));
       const lensMask: Node = float(1).sub(smoothstep(1.0, 1.65, p)).mul(front);
       const ringD: Node = abs(theta.sub(thetaE)).div(max(fwidth(theta), 1e-7));
-      const einstein: Node = exp(ringD.mul(-0.7)).mul(0.35).add(exp(abs(p.sub(1.22)).mul(-40.0)).mul(0.05));
+      const einstein: Node = exp(ringD.mul(-0.7)).mul(0.18).add(exp(abs(p.sub(1.22)).mul(-40.0)).mul(0.05));
 
       const glow: Node = vec3(tint)
         .mul(coronaStep.mul(lightSide))
         .add(vec3(0.92, 0.88, 1.0).mul(razor.mul(razorI).add(flare)))
         .add(vec3(0.75, 0.7, 1.0).mul(einstein))
+        .add(rimTint)
         .mul(front);
       const starCol: Node = vec3(0.85, 0.9, 1.0).mul(lensed).mul(lensMask);
       // Premultiplied: the lens darkens the real sky behind it (alpha) and adds the re-mapped stars + glow.

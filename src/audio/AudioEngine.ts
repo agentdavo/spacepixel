@@ -58,7 +58,7 @@ export class VoiceSlot {
   }
 }
 
-const DEFAULT_VOLUME: Record<BusName, number> = { master: 0.9, music: 0.5, sfx: 0.9, voice: 1 };
+const DEFAULT_VOLUME: Record<BusName, number> = { master: 0.9, music: 0.3, sfx: 1, voice: 1 };
 const STEAL_FADE = 0.012;
 
 export class AudioEngine {

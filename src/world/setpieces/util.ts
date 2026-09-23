@@ -1,4 +1,23 @@
 import { BufferAttribute, BufferGeometry, Material, Mesh, Object3D, Plane, Vector3 } from 'three';
+import { CelMaterial, type CelOptions } from '@/render/materials/CelMaterial';
+import { attribute, float, floor, mix, mx_noise_float, positionLocal, smoothstep, vec3 } from 'three/tsl';
+import type { ShaderNode as Node } from '@/render/tsl';
+
+/**
+ * Vertex paint aged by object-space noise, posterised like a background
+ * painter's grime pass: two flat steps of soot/tarnish plus long streaks
+ * running along the hull (z), so a pristine blueprint reads as ancient.
+ */
+export function weatheredPaint(amount: number, scale: number): Node {
+  const base: Node = attribute('color', 'vec3');
+  const p: Node = positionLocal.mul(scale);
+  const blotch: Node = mx_noise_float(p.mul(vec3(1.0, 1.0, 0.35)));
+  const streak: Node = mx_noise_float(p.mul(vec3(6.0, 6.0, 0.25)).add(3.1));
+  const grime: Node = floor(smoothstep(-0.1, 0.45, blotch).mul(2.0).add(smoothstep(0.25, 0.4, streak).mul(0.8))).div(2.0).clamp(0, 1);
+  const tarnish: Node = vec3(0.34, 0.33, 0.3);
+  const aged: Node = mix(base, base.mul(tarnish), float(amount).mul(0.35));
+  return mix(aged, aged.mul(0.42), grime.mul(amount));
+}
 
 /** Seeded PRNG (mulberry32). */
 export function mulberry(seed: number): () => number {
@@ -94,4 +113,17 @@ export function disposeTree(root: Object3D, owned: Material[] = []): void {
     if (m.geometry) m.geometry.dispose();
   });
   for (const m of owned) m.dispose();
+}
+
+/**
+ * Give a built ship its own cel material (the ShipBuilder shares one per
+ * faction). Lets colossal set pieces take less aerial haze so they keep their
+ * cel bands at tens of kilometres, without touching other ships.
+ */
+export function ownHullMaterial(meshes: Mesh[], opts: CelOptions & { weather?: number; weatherScale?: number }): CelMaterial {
+  const w = opts.weather ?? 0;
+  const paintNode = w > 0 ? weatheredPaint(w, opts.weatherScale ?? 0.01) : undefined;
+  const m = new CelMaterial({ vertexPaint: true, paintNode, ...opts });
+  for (const mesh of meshes) mesh.material = m;
+  return m;
 }

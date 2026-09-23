@@ -30,7 +30,7 @@ export const TRAIL_MISSILE: TrailStyle = {
   lifeMin: 2.6,
   lifeMax: 3.8,
   spacing: 2.0,
-  jitter: 0.5,
+  jitter: 0.75,
   drift: 1.5,
   glint: 2.2,
   palette: PAL.WARM,
@@ -162,7 +162,7 @@ export class Trails {
         d.lifeMax = st.lifeMax;
         d.size0 = st.size0;
         d.size1 = st.size1;
-        d.sizeJitter = 0.3;
+        d.sizeJitter = 0.45;
         d.jitter = st.jitter;
         d.ageA = (1 - fa) * dt;
         d.ageB = (1 - fb) * dt;

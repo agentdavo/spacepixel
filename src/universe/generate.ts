@@ -245,3 +245,43 @@ function makePlanet(rnd: () => number, name: string): PlanetPreset {
       : undefined,
   };
 }
+
+/**
+ * Off-map locations the campaign visits (no lanes on the sector map):
+ * the Dead Zone nebula, the Monolith's dark, and the Nexus. Each gets a
+ * hand-tuned sky and light, no planets, and one Lantern home so gate
+ * placements still resolve.
+ */
+export function specialSystem(id: string): StarSystem | null {
+  const skies: Record<string, { name: string; hue: number; light: number; star: string; blurb: string }> = {
+    deadzone: { name: 'The Dead Zone', hue: 0.48, light: 0.35, star: '#b8c4c0', blurb: 'Uncharted. Instruments are guesses here.' },
+    monolith: { name: 'The Anchor', hue: 0.7, light: 0.08, star: '#e8ecff', blurb: 'Silence the size of a moon.' },
+    nexus: { name: 'The Nexus', hue: 0.78, light: 0.25, star: '#e6d8ff', blurb: 'The road, still lit.' },
+  };
+  const k = skies[id];
+  if (!k) return null;
+  const rnd = mulberry32([...id].reduce((h, c) => h * 31 + c.charCodeAt(0), 7) >>> 0);
+  const backdrop = makeBackdrop(rnd, k.hue, k.name);
+  if (id === 'monolith') {
+    // Nearly empty sky: the thing itself is the only event.
+    backdrop.nebula = backdrop.nebula.map((s) => ({ ...s, color: s.at < 0.9 ? '#020208' : s.color }));
+  }
+  const starColor = new Color(k.star);
+  const light = makeLight(rnd, starColor, k.hue, k.name);
+  light.keyIntensity = 0.6 + k.light;
+  const dir = new Vector3(0, 0, 1);
+  return {
+    id,
+    name: k.name,
+    faction: 'unknown',
+    map: { x: -1, y: -1 },
+    starColor,
+    starClass: '—',
+    light,
+    backdrop,
+    planets: [],
+    gates: [{ to: 'meridian', position: dir.clone().multiplyScalar(22_000), normal: dir }],
+    threat: id === 'deadzone' ? 0.6 : 0.3,
+    blurb: k.blurb,
+  };
+}

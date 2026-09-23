@@ -5,14 +5,14 @@
 /* ── radio comms panel ──────────────────────────────────────────────── */
 .comms {
   --cc: #7dffb2;
-  --port: 112px;
+  --port: 124px;
   position: absolute;
   left: 20px;
   bottom: 150px;
   z-index: 12;
   display: grid;
   grid-template-columns: var(--port) minmax(0, 1fr);
-  width: min(470px, calc(100vw - 40px));
+  width: min(490px, calc(100vw - 40px));
   pointer-events: none;
   font-family: var(--font-mono);
   opacity: 0;
@@ -122,7 +122,7 @@
 .comms.flash .comms-main { animation: comms-flash 0.22s steps(2); }
 .comms.is-static .comms-text { color: #ffe0ef; animation: comms-jitter 0.25s steps(2) infinite; }
 .comms.is-static .comms-callsign { background: repeating-linear-gradient(90deg, var(--cc) 0 6px, color-mix(in srgb, var(--cc) 40%, #000) 6px 8px); }
-.comms.is-static .comms-main { border-style: dashed; }
+.comms.is-static .comms-main { border-style: dashed dashed dashed none; }
 .comms.is-priority .comms-port { animation: comms-alert 0.4s steps(2) 4; }
 .comms.is-oracle .comms-text { font-style: italic; letter-spacing: 0.04em; }
 @keyframes comms-flash { 0% { background: color-mix(in srgb, var(--cc) 30%, rgba(3, 9, 12, 0.9)); } }
@@ -298,7 +298,8 @@
 .codex-foot { margin-top: 10px; font-size: 11px; letter-spacing: 0.2em; color: rgba(125, 255, 178, 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 760px) {
   .codex { padding: 12px 12px 10px; }
-  .codex-head { gap: 10px; }
+  .codex-head { gap: 6px 10px; flex-wrap: wrap; }
+  .codex-count { order: 3; width: 100%; margin-left: 0; }
   .codex-brand b { font-size: 15px; letter-spacing: 0.16em; }
   .cx-sub, .cx-stripe { display: none; }
   .codex-count { font-size: 10px; }
@@ -390,9 +391,9 @@
 }
 @keyframes ec-band { to { transform: rotate(-12deg) scaleX(1); } }
 .ec-stripes {
-  top: 8vh;
-  right: -4vw;
-  width: 46vw;
+  top: 47vh;
+  right: -6vw;
+  width: 42vw;
   height: 14px;
   background: repeating-linear-gradient(90deg, var(--orange) 0 36px, transparent 36px 44px, var(--ivory) 44px 52px, transparent 52px 60px);
   transform: rotate(-12deg);

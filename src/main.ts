@@ -7,7 +7,12 @@ import { SCENES, DEFAULT_SCENE } from '@/world/scenes';
 import type { GameScene } from '@/world/GameScene';
 import { DebugHud } from '@/ui/DebugHud';
 import { titleScreen, briefingScreen } from '@/ui/Screens';
-import { FIRST_LIGHT } from '@/game/Missions';
+import { FIRST_LIGHT, type MissionDef } from '@/game/Missions';
+import { MISSIONS } from '@/game/campaign/missions';
+import type { CampaignMission } from '@/game/campaign/types';
+import { showEyecatch, showDebrief } from '@/ui/Eyecatch';
+import { loadProfile, saveProfile } from '@/game/Profile';
+import type { FlightScene } from '@/world/scenes/FlightScene';
 import { DynamicResolution } from '@/core/DynamicResolution';
 
 declare global {
@@ -81,18 +86,40 @@ async function boot(): Promise<void> {
   };
   console.info(`[vanguard] ${info.backendName} backend · ${info.adapterDescription}`);
 
+  const q = new URLSearchParams(location.search);
   if (direct) {
-    if (new URLSearchParams(location.search).get('mission') === '1') first.startMission?.(FIRST_LIGHT);
+    if (q.get('mission') === '1') first.startMission?.(FIRST_LIGHT);
+    // ?scene=flight&episode=N: drop straight into a campaign episode (dev / captures).
+    const ep = Number(q.get('episode'));
+    if (ep >= 1 && ep <= MISSIONS.length && 'startCampaign' in first) void (first as FlightScene).startCampaign(MISSIONS[ep - 1]);
     return;
+  }
+
+  /** The campaign loop: eyecatch → briefing → episode → debrief → next. */
+  async function runCampaign(): Promise<void> {
+    const profile = loadProfile();
+    let flight: FlightScene | null = null;
+    for (;;) {
+      const m: CampaignMission | undefined = MISSIONS[Math.min(profile.episode, MISSIONS.length) - 1];
+      if (!m) return;
+      await showEyecatch(uiRoot, { chapter: m.chapter, episode: m.episode, title: m.title, tagline: m.tagline });
+      await briefingScreen(uiRoot, briefingOf(m));
+      if (!flight) flight = (await load(DEFAULT_SCENE)) as FlightScene;
+      const result = await flight.startCampaign(m);
+      const next = await showDebrief(uiRoot, { title: m.title, debrief: result.outcome === 'success' ? m.debrief : 'The Keeping teaches: what fails can be flown again.', codexUnlocked: result.codex, outcome: result.outcome, episode: m.episode });
+      if (result.outcome === 'success' && next === 'continue') {
+        profile.episode = Math.min(MISSIONS.length + 1, m.episode + 1);
+        saveProfile(profile);
+        if (profile.episode > MISSIONS.length) return;
+      }
+    }
   }
 
   // Front end: title card over the live showcase → briefing → flight.
   for (;;) {
     const choice = await titleScreen(uiRoot);
     if (choice === 'launch') {
-      await briefingScreen(uiRoot, FIRST_LIGHT);
-      const game = await load(DEFAULT_SCENE);
-      game.startMission?.(FIRST_LIGHT);
+      await runCampaign();
       return;
     }
     if (choice === 'hangar' || choice === 'paint') {
@@ -104,3 +131,15 @@ async function boot(): Promise<void> {
 }
 
 boot().catch(fail);
+
+/** Adapt a campaign episode to the briefing screen's shape. */
+function briefingOf(m: CampaignMission): MissionDef {
+  return {
+    id: m.id,
+    episode: `EPISODE ${String(m.episode).padStart(2, '0')}`,
+    title: m.title,
+    system: m.system,
+    briefing: m.briefing,
+    objectives: m.objectives.filter((o) => !o.hidden).map((o) => ({ id: o.id, text: o.text, optional: o.optional, done: () => false })),
+  };
+}

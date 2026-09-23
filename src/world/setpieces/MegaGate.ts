@@ -16,7 +16,6 @@ import {
   Fn,
   abs,
   atan,
-  exp,
   float,
   fract,
   length,
@@ -39,7 +38,8 @@ import type { SetPiece, SetPieceFrame, SetPieceParams } from './types';
 import { num, str } from './types';
 import { LightPoints, LIGHT_PULSE, LIGHT_STEADY, LIGHT_STROBE, type LightSpec } from './LightPoints';
 import { useBlendedMRT } from '../BlendedMRT';
-import { smooth } from './util';
+import { ownHullMaterial, smooth } from './util';
+import type { CelMaterial } from '@/render/materials/CelMaterial';
 
 /** Authoring units: the outer ring has radius 100; the blueprint is scaled to `radius` metres. */
 const U = 100;
@@ -112,6 +112,29 @@ function nexusBlueprint(): Blueprint {
       shape: { kind: 'loft', stations: PETAL_STATIONS.map((s) => ({ z: s.z, w: s.w * 0.22, h: s.h * 1.5, y: (s.y ?? 0) + 0.3, c: s.c })) },
       repeat: { count: PETALS, rot: [0, 0, 360 / PETALS] },
     },
+    // A second, shorter crown leaning away (behind the ring), offset half a petal.
+    ...Array.from({ length: PETALS }, (_, i): Part => ({
+      name: 'petal-back',
+      paint: 'secondary',
+      ...radialPart(360 / PETALS / 2 + (360 / PETALS) * i, PETAL_BASE - 1, -2.5, -90 - 28),
+      scale: [0.7, 0.8, 0.62],
+      shape: { kind: 'loft', stations: PETAL_STATIONS.map((st) => ({ ...st, y: -(st.y ?? 0) })) },
+    })),
+    // Cross-ribs on every front petal: scale cues every few hundred metres.
+    ...Array.from({ length: PETALS * 3 }, (_, j): Part => {
+      const i = Math.floor(j / 3);
+      const st = PETAL_STATIONS[(j % 3) + 1];
+      const m = radialMatrix((360 / PETALS) * i, PETAL_BASE, 1.5, -90 + PETAL_CONE).multiply(new Matrix4().makeTranslation(0, (st.y ?? 0) - st.h / 2 - 0.2, st.z - 4));
+      const e = new Euler().setFromRotationMatrix(m, 'XYZ');
+      const pp = new Vector3().setFromMatrixPosition(m);
+      return {
+        name: 'petal-rib',
+        paint: 'metal',
+        pos: [pp.x, pp.y, pp.z],
+        rot: [MathUtils.radToDeg(e.x), MathUtils.radToDeg(e.y), MathUtils.radToDeg(e.z)],
+        shape: { kind: 'box', w: st.w * 0.95, h: 0.6, d: 1.4, c: 0.2 },
+      };
+    }),
     // Spokes carry the aperture ring (in the z = 0 plane; the spinning rings sit fore and aft).
     { name: 'spoke', paint: 'secondary', pos: [0, 79, 0], shape: { kind: 'box', w: 3.4, h: 34, d: 4.6, c: 0.9 }, repeat: { count: 8, rot: [0, 0, 45] } },
     ring(61, 3.2, 13, 'secondary', { name: 'aperture' }),
@@ -138,11 +161,11 @@ function nexusBlueprint(): Blueprint {
       { id: 'ringC', pivot: [0, 0, RING_C_Z], axis: [0, 0, 1], range: [0, 360], mirror: false },
     ],
     livery: {
-      primary: '#2c2540',
-      secondary: '#17131f',
-      accent: '#8e6bd8',
-      dark: '#0c0a12',
-      metal: '#5e577a',
+      primary: '#4a4262',
+      secondary: '#2a2438',
+      accent: '#a883f0',
+      dark: '#15121c',
+      metal: '#8a84a6',
       glass: '#8b5cff',
       glow: '#9a6bff',
       plumeCore: '#f2e8ff',
@@ -181,7 +204,7 @@ function stripGeometry(): BufferGeometry {
         const f = k / SUB;
         const z = MathUtils.lerp(A.z, B.z, f);
         const y = MathUtils.lerp((A.y ?? 0) - A.h / 2, (B.y ?? 0) - B.h / 2, f) - 0.15;
-        const w = Math.max(0.35, MathUtils.lerp(A.w, B.w, f) * 0.09);
+        const w = Math.max(0.45, MathUtils.lerp(A.w, B.w, f) * 0.14);
         const u = z / PETAL_STATIONS[PETAL_STATIONS.length - 1].z;
         const a = v.set(-w, y, z).applyMatrix4(m).clone();
         const b = v.set(w, y, z).applyMatrix4(m).clone();
@@ -252,6 +275,7 @@ export class MegaGate implements SetPiece {
   private readonly reach: number;
   private readonly startAwake: boolean;
   private readonly owned: MeshBasicNodeMaterial[] = [];
+  private readonly hullMat: CelMaterial;
 
   constructor(
     readonly tag: string,
@@ -269,6 +293,8 @@ export class MegaGate implements SetPiece {
     this.group.rotation.set(MathUtils.degToRad(num(params, 'pitch', 0)), MathUtils.degToRad(num(params, 'yaw', 0)), 0, 'YXZ');
 
     this.model = buildShip({ ...nexusBlueprint(), scale: k });
+    // Own hull material: little aerial haze so the crown keeps its cel bands at 60 km.
+    this.hullMat = ownHullMaterial(this.model.meshes, { ramp: 'dramatic', rimWidth: 0.58, haze: 0.3, inkId: 7400, inkWeight: 0.9 });
     this.model.setArticulation('ringB', this.angleB);
     this.model.setArticulation('ringC', this.angleC);
     this.group.add(this.model.root);
@@ -352,8 +378,8 @@ export class MegaGate implements SetPiece {
       const core: Node = float(1).sub(smoothstep(0.0, 0.35, d));
       const uvC = vec3(0.42, 0.16, 1.35);
       const hot = vec3(0.95, 0.85, 1.4);
-      const base: Node = mix(0.05, 0.3, w);
-      const lit: Node = pulse.mul(mix(0.25, 3.2, w));
+      const base: Node = mix(0.25, 1.6, w);
+      const lit: Node = pulse.mul(mix(0.8, 9.0, w));
       return uvC.mul(rims.mul(base.add(lit))).add(hot.mul(core.mul(lit).mul(0.35)));
     })();
   }
@@ -368,7 +394,8 @@ export class MegaGate implements SetPiece {
     const out = Fn(() => {
       const q: Node = (uv() as Node).mul(2.0).sub(1.0);
       const r: Node = length(q);
-      const ang: Node = atan(q.y, q.x);
+      // (+1e-6: atan2(0, 0) is NaN in WGSL and would blacken the frame through bloom.)
+      const ang: Node = atan(q.y, q.x.add(1e-6));
       const w: Node = this.uAwake;
       const t: Node = this.uTime;
       // Posterised logarithmic swirl, drawn inward.
@@ -376,15 +403,13 @@ export class MegaGate implements SetPiece {
       const band: Node = smoothstep(0.46, 0.5, sw).mul(float(1).sub(smoothstep(0.8, 0.84, sw)));
       const rim: Node = smoothstep(0.62, 0.99, r);
       const rimHot: Node = smoothstep(0.93, 0.995, r);
-      const eye: Node = exp(abs(r.sub(0.13)).mul(-90.0));
       // Forms from the rim inward as the gate wakes.
       const formed: Node = smoothstep(r.sub(0.08), r, w.mul(1.25).sub(0.12)).max(rim.mul(0.35));
       const uvC = vec3(0.34, 0.1, 1.1);
       const col: Node = uvC
         .mul(rim.mul(mix(0.08, 0.9, w)))
         .add(vec3(0.9, 0.7, 1.6).mul(rimHot.mul(mix(0.12, 1.8, w))))
-        .add(uvC.mul(band.mul(smoothstep(0.12, 0.9, r)).mul(mix(0.03, 0.45, w))))
-        .add(vec3(0.8, 0.6, 1.4).mul(eye.mul(w).mul(1.2)));
+        .add(uvC.mul(band.mul(smoothstep(0.12, 0.9, r)).mul(mix(0.03, 0.45, w))));
       const inner: Node = pow(float(1).sub(r), 0.5);
       const a: Node = formed.mul(mix(0.18, 0.97, w)).mul(mix(1.0, inner.mul(0.3).add(0.7), 0.5)).clamp(0, 1);
       return vec4(col.mul(formed.max(rim.mul(0.5))), a);
@@ -435,6 +460,7 @@ export class MegaGate implements SetPiece {
     this.group.removeFromParent();
     this.group.traverse((o) => (o as Mesh).geometry?.dispose());
     for (const m of this.owned) m.dispose();
+    this.hullMat.dispose();
   }
 }
 

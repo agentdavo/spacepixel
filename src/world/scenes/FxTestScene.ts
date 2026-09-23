@@ -70,7 +70,7 @@ const SHOTS: CamShot[] = [
     name: 'CAPITAL BLAST',
     fov: 34,
     eye: (t, o) => o.set(-200 + Math.sin(t * 0.1) * 40, 120, -400),
-    look: new Vector3(500, 250, 1600),
+    look: new Vector3(-100, 300, 2200),
   },
 ];
 
@@ -237,7 +237,7 @@ export class FxTestScene implements GameScene {
       const k = this.blastIndex++ % 6;
       switch (k) {
         case 0: // capital section, far
-          fx.explosion(this.v.set(500, 250, 1600).add(ORIGIN), this.zero, 260);
+          fx.explosion(this.v.set(-100, 300, 2200).add(ORIGIN), this.zero, 260);
           break;
         case 1: // frigate section
           fx.explosion(this.v.set(-150, 60, 240).add(ORIGIN), this.zero, 40);

@@ -60,6 +60,20 @@ function corrupt(n: number, seed: number): string {
   return out;
 }
 
+/** Scroll `parent` just enough to show `child` (never scrolls the page). */
+function reveal(parent: HTMLElement, child: HTMLElement | null, axis: 'x' | 'y'): void {
+  if (!child) return;
+  if (axis === 'y') {
+    const top = child.offsetTop - parent.offsetTop;
+    if (top < parent.scrollTop) parent.scrollTop = top;
+    else if (top + child.offsetHeight > parent.scrollTop + parent.clientHeight) parent.scrollTop = top + child.offsetHeight - parent.clientHeight;
+  } else {
+    const left = child.offsetLeft - parent.offsetLeft;
+    if (left < parent.scrollLeft) parent.scrollLeft = left - 8;
+    else if (left + child.offsetWidth > parent.scrollLeft + parent.clientWidth) parent.scrollLeft = left + child.offsetWidth - parent.clientWidth + 8;
+  }
+}
+
 export interface CodexOptions {
   /** Key code the codex binds itself to toggle (e.g. 'KeyL'). Omit to let the owner call toggle(). */
   key?: string;
@@ -217,6 +231,7 @@ export class Codex {
     this.cat = ((i % n) + n) % n;
     this.sel = 0;
     this.render();
+    reveal(this.tabsEl, this.tabsEl.querySelector('button.active'), 'x');
   }
 
   private setSel(i: number): void {
@@ -224,7 +239,7 @@ export class Codex {
     if (!list.length) return;
     this.sel = Math.max(0, Math.min(list.length - 1, i));
     this.render();
-    this.listEl.querySelector('li.active')?.scrollIntoView({ block: 'nearest' });
+    reveal(this.listEl, this.listEl.querySelector('li.active'), 'y');
   }
 
   private readonly onKey = (e: KeyboardEvent): void => {

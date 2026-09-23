@@ -50,6 +50,8 @@ export interface ShipEntity {
   sinceHit: number;
   /** Smoothed wing-sweep 0..1 (variable geometry). */
   sweep: number;
+  /** Story characters: damage can't take hull below 15% (the script decides). */
+  plotArmour: boolean;
 }
 
 export function emptyControls(): ControlState {
@@ -122,6 +124,7 @@ export class Fleet {
       brain: null,
       sinceHit: 99,
       sweep: 0.3,
+      plotArmour: false,
       ...opts,
     };
     this.ships.push(e);
@@ -168,6 +171,7 @@ export class Fleet {
     const absorbed = Math.min(s.shield, amount);
     s.shield -= absorbed;
     s.hull -= amount - absorbed;
+    if (s.plotArmour) s.hull = Math.max(s.hull, s.hullMax * 0.15);
     if (s.hull <= 0) {
       s.alive = false;
       s.model.root.visible = false;

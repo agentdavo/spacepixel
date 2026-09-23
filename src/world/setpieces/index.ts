@@ -3,9 +3,16 @@ import type { SetPieceSpec } from '@/game/campaign/types';
 import type { SetPiece } from './types';
 import { Monolith } from './Monolith';
 import { MegaGate } from './MegaGate';
+import { Derelict } from './Derelict';
+import { BlackBox } from './BlackBox';
+import { Beacon } from './Beacon';
+import { Wreckage } from './Wreckage';
+import { Nebula } from './Nebula';
+import { Bastion } from './Bastion';
+import { Pilgrimage } from './Pilgrimage';
 
 export type { SetPiece, SetPieceFrame, SetPieceParams } from './types';
-export { Monolith, MegaGate };
+export { Monolith, MegaGate, Derelict, BlackBox, Beacon, Wreckage, Nebula, Bastion, Pilgrimage };
 
 /**
  * Build a narrative set piece from mission data. `anchor` is the universe
@@ -21,7 +28,23 @@ export function createSetPiece(spec: SetPieceSpec, anchor: Vector3): SetPiece {
       return new Monolith(spec.tag, anchor, p);
     case 'megagate':
       return new MegaGate(spec.tag, anchor, p);
-    default:
-      throw new Error(`createSetPiece: kind "${spec.kind}" not implemented`);
+    case 'derelict':
+      return new Derelict(spec.tag, anchor, p);
+    case 'blackbox':
+      return new BlackBox(spec.tag, anchor, p);
+    case 'beacon':
+      return new Beacon(spec.tag, anchor, p);
+    case 'wreckage':
+      return new Wreckage(spec.tag, anchor, p);
+    case 'nebula':
+      return new Nebula(spec.tag, anchor, p);
+    case 'bastion':
+      return new Bastion(spec.tag, anchor, p);
+    case 'pilgrimage':
+      return new Pilgrimage(spec.tag, anchor, p);
+    default: {
+      const k: never = spec.kind;
+      throw new Error(`createSetPiece: unknown kind "${String(k)}"`);
+    }
   }
 }
