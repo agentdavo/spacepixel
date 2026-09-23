@@ -1,5 +1,5 @@
 import { Quaternion, Vector3 } from 'three';
-import type { ShipEntity } from '../Fleet';
+import { hostile, type ShipEntity } from '../Fleet';
 import { matchVelocity, type SteerGains } from './Pilot';
 import { brainOf, isCapital, setManeuver, type Brain, type FormationKind, type Order } from './state';
 
@@ -199,7 +199,7 @@ export function issueOrder(wing: readonly ShipEntity[], order: Order, leader: Sh
         setManeuver(b, 'form');
         break;
       case 'attackMyTarget':
-        s.target = leader.target && leader.target.alive && leader.target.faction !== s.faction ? leader.target : null;
+        s.target = leader.target && leader.target.alive && hostile(leader.target, s) ? leader.target : null;
         break;
       case 'breakAndAttack': {
         // Fan out from the formation: each ship peels away along its slot side.
@@ -231,7 +231,7 @@ export function findChaser(leader: ShipEntity, ships: readonly ShipEntity[], ran
   let bestScore = Infinity;
   for (let i = 0; i < ships.length; i++) {
     const o = ships[i];
-    if (!o.alive || o.faction === leader.faction || isCapital(o)) continue;
+    if (!o.alive || !hostile(o, leader) || isCapital(o)) continue;
     _rel.subVectors(lf.position, o.flight.position); // o → leader
     const d = _rel.length();
     if (d > range || d < 1e-3) continue;

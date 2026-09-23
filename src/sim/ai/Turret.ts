@@ -1,6 +1,5 @@
 import { Vector3 } from 'three';
-import type { ShipEntity } from '../Fleet';
-import type { FactionId } from '@/assets/Blueprint';
+import { hostile, type ShipEntity, type Team } from '../Fleet';
 import { GUN, leadPoint } from './Pilot';
 import { isCapital } from './state';
 
@@ -88,7 +87,7 @@ const _try = createTurretSolution();
  */
 export function turretSelectTarget(
   m: TurretMount,
-  faction: FactionId,
+  team: Team,
   ships: readonly ShipEntity[],
   current: ShipEntity | null,
   out: TurretSolution,
@@ -98,7 +97,7 @@ export function turretSelectTarget(
   _best.target = null;
   for (let i = 0; i < ships.length; i++) {
     const s = ships[i];
-    if (!s.alive || s.faction === faction) continue;
+    if (!s.alive || !hostile(s, { team })) continue;
     if (!allowCapitals && isCapital(s)) continue;
     if (!turretAim(m, s, _try)) continue;
     // Closing speed toward the mount (positive = inbound).

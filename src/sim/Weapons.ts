@@ -1,5 +1,5 @@
 import { Vector3 } from 'three';
-import type { Fleet, ShipEntity } from './Fleet';
+import type { Fleet, ShipEntity, Team } from './Fleet';
 import type { FactionId } from '@/assets/Blueprint';
 
 /**
@@ -39,6 +39,7 @@ export interface Beam {
   maxLife: number;
   dps: number;
   faction: FactionId;
+  team: Team;
   /** Where the beam currently terminates (hit point or full length). */
   end: Vector3;
   /** Track this ship (sweeping lance) instead of firing along the owner's nose. */
@@ -71,7 +72,8 @@ export class Weapons {
   readonly vz = new Float32Array(BOLT_CAPACITY);
   readonly life = new Float32Array(BOLT_CAPACITY);
   readonly damage = new Float32Array(BOLT_CAPACITY);
-  readonly faction = new Uint8Array(BOLT_CAPACITY); // index into FACTION_INDEX
+  readonly faction = new Uint8Array(BOLT_CAPACITY); // index into FACTION_INDEX (colour)
+  readonly team = new Uint8Array(BOLT_CAPACITY); // index into TEAM_INDEX (who it can hit)
   readonly owner = new Int32Array(BOLT_CAPACITY);
   private head = 0;
 
@@ -141,16 +143,17 @@ export class Weapons {
     this.life[i] = life;
     this.damage[i] = damage;
     this.faction[i] = FACTION_INDEX[owner.faction];
+    this.team[i] = TEAM_INDEX[owner.team];
     this.owner[i] = owner.id;
   }
 
   fireBeam(owner: ShipEntity, socket: string | null, length: number, width: number, duration: number, dps: number): Beam {
     let b = this.beams.find((x) => !x.active);
     if (!b) {
-      b = { active: false, owner, socket, origin: new Vector3(), dir: new Vector3(), length, width, life: 0, maxLife: duration, dps, faction: owner.faction, end: new Vector3(), aimTarget: null };
+      b = { active: false, owner, socket, origin: new Vector3(), dir: new Vector3(), length, width, life: 0, maxLife: duration, dps, faction: owner.faction, team: owner.team, end: new Vector3(), aimTarget: null };
       this.beams.push(b);
     }
-    Object.assign(b, { active: true, owner, socket, length, width, life: duration, maxLife: duration, dps, faction: owner.faction, aimTarget: null });
+    Object.assign(b, { active: true, owner, socket, length, width, life: duration, maxLife: duration, dps, faction: owner.faction, team: owner.team, aimTarget: null });
     return b;
   }
 
@@ -166,11 +169,12 @@ export class Weapons {
       this.life[i] -= dt;
       _a.set(this.px[i], this.py[i], this.pz[i]);
       _d.set(this.vx[i] * dt, this.vy[i] * dt, this.vz[i] * dt);
-      const f = this.faction[i];
+      const tm = this.team[i];
       let hitT = 2;
       let hitShip: ShipEntity | null = null;
       for (const s of ships) {
-        if (!s.alive || FACTION_INDEX[s.faction] === f || s.id === this.owner[i]) continue;
+        // Bolts hit anyone not on the shooter's team (neutrals included — shooting them provokes them).
+        if (!s.alive || TEAM_INDEX[s.team] === tm || s.id === this.owner[i]) continue;
         const t = segmentSphere(_a, _d, s.flight.position, s.radius);
         if (t < hitT) {
           hitT = t;
@@ -183,6 +187,7 @@ export class Weapons {
         _f.set(this.vx[i], this.vy[i], this.vz[i]);
         const shielded = hitShip.shield > 0;
         const shooter = ships.find((x) => x.id === this.owner[i]) ?? null;
+        if (shooter) provoke(hitShip, shooter);
         const killed = this.fleet.damage(hitShip, this.damage[i]);
         this.emit(shielded ? 'shield' : 'hit', _b, _c, _f, hitShip, shooter);
         if (killed) this.emit('kill', hitShip.flight.position, _c, hitShip.flight.velocity, hitShip, shooter);
@@ -214,7 +219,7 @@ export class Weapons {
       let hitT = 1;
       let hitShip: ShipEntity | null = null;
       for (const s of ships) {
-        if (!s.alive || s.faction === b.faction) continue;
+        if (!s.alive || s.team === b.team) continue;
         const t = segmentSphere(b.origin, _d, s.flight.position, s.radius + b.width * 0.5);
         if (t < hitT) {
           hitT = t;
@@ -233,6 +238,13 @@ export class Weapons {
 }
 
 export const FACTION_INDEX: Record<FactionId, number> = { concord: 0, choir: 1, rustwake: 2 };
+export const TEAM_INDEX: Record<Team, number> = { concord: 0, choir: 1, rustwake: 2, renegade: 3, neutral: 4 };
+
+/** A neutral that gets shot turns on its attacker's side. */
+export function provoke(victim: ShipEntity, attacker: ShipEntity): void {
+  if (victim.team !== 'neutral' || attacker.team === 'neutral') return;
+  victim.team = victim.faction !== attacker.team ? victim.faction : 'renegade';
+}
 
 /**
  * Earliest t in [0,1] where segment p + t·d enters the sphere, or 2 if none.

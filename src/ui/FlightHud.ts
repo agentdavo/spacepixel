@@ -1,7 +1,7 @@
 import { Vector3, type PerspectiveCamera } from 'three';
 import type { FlightModel } from '@/sim/FlightModel';
 import type { WorldSpace } from '@/core/WorldSpace';
-import type { Fleet, ShipEntity } from '@/sim/Fleet';
+import { hostile as isHostile, type Fleet, type ShipEntity } from '@/sim/Fleet';
 import type { LockState } from '@/sim/Missiles';
 import { LASER } from '@/sim/Weapons';
 import type { MissionRunner } from '@/game/Missions';
@@ -99,7 +99,7 @@ export class FlightHud {
     const fovScale = this.h / (2 * Math.tan(((cam.fov * Math.PI) / 180) / 2));
     for (const s of fleet.ships) {
       if (!s.alive || s === player) continue;
-      const hostile = s.faction !== player.faction;
+      const hostile = isHostile(s, player);
       const isTarget = s === lock.target;
       const pt = this.project(s.flight.position, world, cam);
       if (!pt) continue;
@@ -333,7 +333,7 @@ export class FlightHud {
       const p = this.project(sp, world, cam);
       const g = this.project(_r.set(sp.x, y0, sp.z), world, cam);
       if (!p || !g) continue;
-      const hostile = s.faction !== player.faction;
+      const hostile = isHostile(s, player);
       const col = s === player ? '#ffffff' : hostile ? PINK : GREEN;
       c.strokeStyle = col;
       c.fillStyle = col;

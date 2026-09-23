@@ -13,10 +13,23 @@ import { FlightModel, KESTREL_SPEC, type FlightSpec } from './FlightModel';
  * Plain data + arrays; no component system. Systems (AI, weapons, damage)
  * are functions that walk `fleet.ships`.
  */
+/**
+ * Who a ship fights for. Usually its faction; missions can override it
+ * (renegade Directorate ships, allied Zenith defectors, neutral escorts that
+ * only turn when shot). `faction` stays the livery / kill-count identity.
+ */
+export type Team = FactionId | 'renegade' | 'neutral';
+
+/** The one hostility rule, used by AI, weapons, turrets and the HUD. */
+export function hostile(a: { team: Team }, b: { team: Team }): boolean {
+  return a.team !== b.team && a.team !== 'neutral' && b.team !== 'neutral';
+}
+
 export interface ShipEntity {
   id: number;
   name: string;
   faction: FactionId;
+  team: Team;
   flight: FlightModel;
   model: ShipModel;
   /** Written each frame by player input or an AI brain, read by flight + weapons. */
@@ -94,6 +107,7 @@ export class Fleet {
       id: this.nextId++,
       name: `${model.blueprint.name}-${this.nextId}`,
       faction,
+      team: faction,
       flight,
       model,
       controls: emptyControls(),
@@ -140,11 +154,11 @@ export class Fleet {
   }
 
   enemiesOf(s: ShipEntity): ShipEntity[] {
-    return this.ships.filter((o) => o.alive && o.faction !== s.faction);
+    return this.ships.filter((o) => o.alive && hostile(o, s));
   }
 
   alliesOf(s: ShipEntity): ShipEntity[] {
-    return this.ships.filter((o) => o.alive && o.faction === s.faction && o !== s);
+    return this.ships.filter((o) => o.alive && o.team === s.team && o !== s);
   }
 
   /** Apply damage; shields absorb first. Returns true if this killed the ship. */

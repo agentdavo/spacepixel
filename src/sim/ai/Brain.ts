@@ -1,5 +1,5 @@
 import { Vector3 } from 'three';
-import type { ShipEntity } from '../Fleet';
+import { hostile, type ShipEntity } from '../Fleet';
 import { GUN, inFiringSolution, leadPoint, noseAngleTo, setSpeed, steerToward } from './Pilot';
 import { avoidance, type Obstacle } from './Avoid';
 import { findChaser, flyFormation } from './Squadron';
@@ -79,7 +79,7 @@ export function pickTarget(s: ShipEntity, b: Brain, ships: readonly ShipEntity[]
   let bestScore = Infinity;
   for (let i = 0; i < ships.length; i++) {
     const o = ships[i];
-    if (!o.alive || o.faction === s.faction || isCapital(o)) continue;
+    if (!o.alive || !hostile(o, s) || isCapital(o)) continue;
     _tmp.subVectors(o.flight.position, f.position);
     const d = Math.max(1, _tmp.length());
     let score = d * (1.6 - 0.6 * (_fwd.dot(_tmp) / d));
@@ -89,7 +89,7 @@ export function pickTarget(s: ShipEntity, b: Brain, ships: readonly ShipEntity[]
     let piling = 0;
     for (let j = 0; j < ships.length; j++) {
       const a = ships[j];
-      if (a !== s && a.alive && a.faction === s.faction && a.target === o) piling++;
+      if (a !== s && a.alive && a.team === s.team && a.target === o) piling++;
     }
     score *= 1 + 0.3 * piling;
     if (score < bestScore) {
@@ -108,7 +108,7 @@ export function findThreat(s: ShipEntity, ships: readonly ShipEntity[], range = 
   let bestD = range;
   for (let i = 0; i < ships.length; i++) {
     const o = ships[i];
-    if (!o.alive || o.faction === s.faction || isCapital(o)) continue;
+    if (!o.alive || !hostile(o, s) || isCapital(o)) continue;
     _tmp.subVectors(f.position, o.flight.position); // o → me
     const d = _tmp.length();
     if (d >= bestD || d < 1e-3) continue;
@@ -160,7 +160,7 @@ export function think(s: ShipEntity, b: Brain, ships: readonly ShipEntity[]): vo
       break;
     case 'attackMyTarget': {
       const lt = leader ? leader.target : null;
-      s.target = lt && lt.alive && lt.faction !== s.faction ? lt : leader ? null : pickTarget(s, b, ships);
+      s.target = lt && lt.alive && hostile(lt, s) ? lt : leader ? null : pickTarget(s, b, ships);
       break;
     }
     case 'coverMe':
@@ -266,7 +266,7 @@ function friendlyInLine(s: ShipEntity, dist: number, ships: readonly ShipEntity[
   f.forward(_fwd);
   for (let i = 0; i < ships.length; i++) {
     const a = ships[i];
-    if (a === s || !a.alive || a.faction !== s.faction) continue;
+    if (a === s || !a.alive || a.team !== s.team) continue;
     _tmp.subVectors(a.flight.position, f.position);
     const along = _tmp.dot(_fwd);
     if (along <= 0 || along > dist + 30) continue;

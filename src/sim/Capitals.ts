@@ -1,5 +1,5 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
-import type { Fleet, ShipEntity } from './Fleet';
+import { hostile, type Fleet, type ShipEntity } from './Fleet';
 import type { Weapons, Beam } from './Weapons';
 import { createTurretSolution, turretAim, turretSelectTarget, TURRET_DEFAULTS, type TurretMount, type TurretSolution } from './ai/Turret';
 import { issueOrder } from './ai';
@@ -128,7 +128,7 @@ export class Capitals {
         m.forward.copy(g.localFwd).applyQuaternion(f.orientation);
         m.velocity.copy(f.velocity);
         const cur = g.sol.target && g.sol.target.alive ? g.sol.target : null;
-        const ok = cur && turretAim(m, cur, g.sol) ? true : turretSelectTarget(m, s.faction, this.fleet.ships, cur, g.sol);
+        const ok = cur && turretAim(m, cur, g.sol) ? true : turretSelectTarget(m, s.team, this.fleet.ships, cur, g.sol);
         if (!ok) {
           g.cooldown = 0.5;
           continue;
@@ -156,7 +156,7 @@ export class Capitals {
         let best: ShipEntity | null = null;
         let bd = LANCE_RANGE;
         for (const o of this.fleet.ships) {
-          if (!o.alive || o.faction === s.faction) continue;
+          if (!o.alive || !hostile(o, s)) continue;
           const d = o.flight.position.distanceTo(_v);
           if (d < bd) {
             bd = d;
@@ -182,7 +182,7 @@ export class Capitals {
           h.cooldown = 6 + Math.random() * 4;
           _v.copy(h.local).applyQuaternion(f.orientation).add(f.position);
           _w.copy(h.localFwd).applyQuaternion(f.orientation);
-          const fighter = this.fleet.spawn(c.launchBlueprint, s.faction, _v, _w, { name: `${s.name} flight` });
+          const fighter = this.fleet.spawn(c.launchBlueprint, s.faction, _v, _w, { name: `${s.name} flight`, team: s.team });
           fighter.flight.velocity.copy(f.velocity).addScaledVector(_w, 180);
           issueOrder([fighter], 'engageAtWill', fighter);
           c.launched.push(fighter);
