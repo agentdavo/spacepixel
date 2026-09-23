@@ -268,7 +268,10 @@ export class FlightScene implements GameScene {
     postFx.speed = Math.min(1, pf.speed / pf.spec.boostSpeed);
     this.hyperspace.update(dt, this.jumpPhase === 'tunnel' ? Math.min(1, this.jumpT * 3, (TUNNEL - this.jumpT) * 3) : 0, 60, this.camera.quaternion);
     this.hud.update(pf, this.camera, this.world, time);
-    if (this.tactical) this.hud.drawTactical(this.player, this.fleet, this.camera, this.world, this.orderStatus);
+    if (this.tactical) {
+      const markers = this.view.gates.map((g) => ({ label: `LANTERN → ${this.universe.systems.get(g.link.to)!.name.toUpperCase()}`, pos: g.center, radius: g.gate.radius }));
+      this.hud.drawTactical(this.player, this.fleet, this.camera, this.world, this.orderStatus, markers);
+    }
     else if (this.jumpPhase === 'none') {
       this.hud.drawTargets(this.player, this.fleet, this.lock, this.camera, this.world, time);
       const nav = this.navGate();

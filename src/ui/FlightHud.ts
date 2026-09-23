@@ -265,7 +265,14 @@ export class FlightHud {
    * range rings, every ship as a symbol with an altitude stalk to the grid
    * and a 3 s velocity vector. Friendly = circle, hostile = diamond.
    */
-  drawTactical(player: ShipEntity, fleet: Fleet, cam: PerspectiveCamera, world: WorldSpace, status: string): void {
+  drawTactical(
+    player: ShipEntity,
+    fleet: Fleet,
+    cam: PerspectiveCamera,
+    world: WorldSpace,
+    status: string,
+    markers: { label: string; pos: Vector3; radius: number }[] = [],
+  ): void {
     const c = this.ctx;
     const pp = player.flight.position;
     const y0 = pp.y;
@@ -302,7 +309,24 @@ export class FlightHud {
       }
       c.stroke();
     }
-    // Ships.
+    // Lanterns and other landmarks: projected rings with labels.
+    c.strokeStyle = '#6fe6ff';
+    c.fillStyle = '#6fe6ff';
+    for (const m of markers) {
+      c.beginPath();
+      for (let a = 0; a <= 32; a++) {
+        const t = (a / 32) * Math.PI * 2;
+        const p = this.project(_r.set(m.pos.x + Math.cos(t) * m.radius, m.pos.y, m.pos.z + Math.sin(t) * m.radius), world, cam);
+        if (!p) continue;
+        if (a === 0) c.moveTo(p.x, p.y);
+        else c.lineTo(p.x, p.y);
+      }
+      c.stroke();
+      const p = this.project(m.pos, world, cam);
+      if (p) c.fillText(m.label, p.x + 8, p.y + 4);
+    }
+    // Ships (labels staggered so tight formations stay readable).
+    let labelRow = 0;
     for (const s of fleet.ships) {
       if (!s.alive) continue;
       const sp = s.flight.position;
@@ -349,7 +373,7 @@ export class FlightHud {
         c.arc(p.x, p.y, 6, 0, Math.PI * 2);
       }
       c.stroke();
-      c.fillText(`${s.name.toUpperCase()}  ${(sp.y - y0 >= 0 ? '+' : '') + Math.round(sp.y - y0)}m`, p.x + 10, p.y - 8);
+      c.fillText(`${s.name.toUpperCase()}  ${(sp.y - y0 >= 0 ? '+' : '') + Math.round(sp.y - y0)}m`, p.x + 10, p.y - 8 - (labelRow++ % 3) * 13);
     }
     c.fillStyle = '#6fe6ff';
     c.fillText('TACTICAL // TIME ×0.25 · 1 FORM UP · 2 ATTACK MY TARGET · 3 ENGAGE AT WILL · 4 COVER ME · WHEEL ZOOM', 24, 60);
