@@ -54,6 +54,7 @@ export class HangarScene implements GameScene {
   private readonly radars: ShipModel[] = [];
   private readonly sheetIds: string[];
   private readonly sheetFixed: string | null;
+  private readonly sheetCache = new Map<string, ShipModel>();
   private sheetShip = '';
   private sheetRadius = 10;
   shot = 0;
@@ -96,7 +97,7 @@ export class HangarScene implements GameScene {
     if (cv) this.radars.push(cv);
     const bb = this.add('bb-indomitable', 'capital', V(90, -83, 30));
     if (bb) this.radars.push(bb);
-    this.add('choir-cathedral', 'capital', V(2227, 262, -175));
+    this.add('choir-cathedral', 'capital', V(1620, 280, -615));
     const scaleLg = this.add('ffc-lantern-guard', 'capital', V(-902, 162, 1178));
     if (scaleLg) this.radars.push(scaleLg);
     for (const p of this.placed) if (p.lineup === 'capital') p.ship.root.rotation.y = deg(32);
@@ -205,8 +206,12 @@ export class HangarScene implements GameScene {
     this.sheetShip = id;
     const g = this.groups.get('sheet')!;
     g.clear();
-    const ship = buildShip(BLUEPRINTS[id]);
-    ship.setThrottle(0.6);
+    let ship = this.sheetCache.get(id);
+    if (!ship) {
+      ship = buildShip(BLUEPRINTS[id]);
+      ship.setThrottle(0.6);
+      this.sheetCache.set(id, ship);
+    }
     // Normalise every design to the same on-screen size (and fighter-scale
     // depth, so kilometre hulls don't vanish into the aerial haze).
     const R = 20;

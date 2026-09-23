@@ -100,6 +100,70 @@ export const CANTOR: Blueprint = {
       pos: [0, 0, -7.0],
       shape: { kind: 'torus', radius: 0.95, tube: 0.12, segments: 6, tubeSegments: 4 },
     },
+    // Refinements: crystal canards, gun tines, spine ridge, glowing seam, radial drive fins.
+    {
+      name: 'canard-crystal',
+      paint: 'glass',
+      emissive: 0.5,
+      mirror: true,
+      pos: [0.4, 0.05, 4.4],
+      rot: [0, 0, -18],
+      shape: { kind: 'wing', root: 1.3, tip: 0.3, span: 1.2, sweep: -0.5, thickness: 0.12, bevel: 1 },
+    },
+    {
+      name: 'tine',
+      paint: 'metal',
+      mirror: true,
+      shape: {
+        kind: 'loft',
+        stations: [
+          { z: 1.5, w: 0.3, h: 0.34, x: 0.5, y: -0.38, c: 0.12 },
+          { z: 5.8, w: 0.22, h: 0.22, x: 0.42, y: -0.4, c: 0.09 },
+          { z: 6.9, w: 0.03, h: 0.03, x: 0.36, y: -0.42 },
+        ],
+      },
+    },
+    {
+      name: 'spine-ridge',
+      paint: 'secondary',
+      shape: {
+        kind: 'loft',
+        stations: [
+          { z: -5.6, w: 0.3, h: 0.3, y: 0.52, c: 0.12 },
+          { z: -1.2, w: 0.45, h: 0.45, y: 0.82, c: 0.18 },
+          { z: 2.2, w: 0.25, h: 0.25, y: 0.62, c: 0.1 },
+        ],
+      },
+    },
+    {
+      name: 'seam',
+      paint: 'glass',
+      emissive: 0.9,
+      shape: {
+        kind: 'loft',
+        stations: [
+          { z: -3.3, w: 1.58, h: 1.36, y: 0.1, c: 0.66 },
+          { z: -3.1, w: 1.6, h: 1.38, y: 0.1, c: 0.67 },
+        ],
+      },
+    },
+    {
+      name: 'blade-vane',
+      paint: 'primary',
+      mirror: true,
+      pos: [3.2, -0.72, -1.6],
+      rot: [0, 0, -14],
+      shape: { kind: 'box', w: 0.08, h: 0.45, d: 2.4, c: 0.03 },
+    },
+    {
+      name: 'drive-fin',
+      paint: 'glass',
+      emissive: 0.45,
+      pos: [0, 0.62, -5.6],
+      rot: [0, 0, 90],
+      repeat: { count: 3, rot: [0, 0, 120] },
+      shape: { kind: 'wing', root: 1.6, tip: 0.4, span: 0.9, sweep: 1.1, thickness: 0.1, bevel: 1 },
+    },
   ],
   engines: [{ pos: [0, 0, -7.2], radius: 0.55, plume: 5.5 }],
   hardpoints: [{ id: 'lance', pos: [0, -0.2, 7.0], kind: 'beam' }],

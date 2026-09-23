@@ -56,6 +56,7 @@ export class CampaignRunner {
   private tagged: TaggedShip[] = [];
   private pieces: SetPieceHandle[] = [];
   private pendingSpawns: SpawnSpec[];
+  private pendingPieces: SetPieceSpec[];
   private fired = new Set<string>();
   private kills = new Map<FactionId, number>();
   private lastJumps = 0;
@@ -67,6 +68,7 @@ export class CampaignRunner {
   ) {
     this.state = mission.objectives.map((o, i) => (i === 0 || (o.optional && !o.hidden) ? 'active' : 'locked'));
     this.pendingSpawns = [...mission.spawns];
+    this.pendingPieces = [...mission.setpieces];
     const self = this;
     this.ctx = {
       get time() {
@@ -103,13 +105,10 @@ export class CampaignRunner {
     };
   }
 
-  /** Build set pieces + immediate spawns; unlock start codex; fire 'start' chatter. */
+  /** Immediate spawns, then set pieces (which may be placed relative to them); start codex + chatter. */
   begin(): void {
-    for (const sp of this.mission.setpieces) {
-      const pos = this.resolve(sp.place);
-      if (pos) this.pieces.push(this.host.spawnSetPiece(sp, pos));
-    }
     this.releaseSpawns();
+    this.releasePieces();
     for (const id of this.mission.codexOnStart ?? []) this.host.unlockCodex(id);
     this.trigger((t) => t.on === 'start');
   }
@@ -131,6 +130,7 @@ export class CampaignRunner {
     if (this.outcome !== 'running') return;
     this.time += dt;
     this.releaseSpawns();
+    if (this.pendingPieces.length) this.releasePieces();
 
     // Chatter triggers that depend on continuous state.
     this.trigger((t) => {
@@ -189,6 +189,17 @@ export class CampaignRunner {
       if (this.fired.has(beat.id) || !pred(beat.trigger)) continue;
       this.fired.add(beat.id);
       this.host.playChatter(beat);
+    }
+  }
+
+  /** Set pieces whose anchor can't resolve yet (e.g. a tag spawned later) retry every frame. */
+  private releasePieces(): void {
+    for (let k = this.pendingPieces.length - 1; k >= 0; k--) {
+      const sp = this.pendingPieces[k];
+      const pos = this.resolve(sp.place);
+      if (!pos) continue;
+      this.pendingPieces.splice(k, 1);
+      this.pieces.push(this.host.spawnSetPiece(sp, pos));
     }
   }
 
