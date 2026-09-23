@@ -29,6 +29,10 @@ import { StarMap } from '@/ui/StarMap';
 import { postFx } from '@/render/post/PostFx';
 import { MissionRunner, type MissionContext, type MissionDef } from '@/game/Missions';
 import { updateAI, issueOrder, setFormation, setAutopilot, brainOf } from '@/sim/ai';
+import { DockingController, berth, type Dockable } from '../Docking';
+import { DockScreen, DockCinema } from '@/ui/DockScreen';
+import { loadLedger, saveLedger } from '@/game/Profile';
+import { MISSILE_MAX, cargoUsed, dockingClearance, reputationForKill, type EconFaction, type TradeLedger } from '@/game/economy';
 
 /**
  * Milestones 4–6 + 10–11: one ship flying well, then shooting.
@@ -123,6 +127,18 @@ export class FlightScene implements GameScene, FlightHostScene {
   private playerSubject: Subject;
   private missileSubject: Subject = { position: new Vector3(), velocity: new Vector3(), radius: 1.5 };
   private killSubject: Subject = { position: new Vector3(), velocity: new Vector3(), radius: 10 };
+  /** Docking & trade: stations, friendly carriers, orbital ports (G). */
+  readonly docking: DockingController;
+  private dockScreen: DockScreen;
+  private cinema: DockCinema;
+  /** Shares, cargo, standing, missile rails — persisted by Profile.ts. */
+  ledger: TradeLedger = loadLedger();
+  /**
+   * Hook for the campaign (or anything else) when the player berths:
+   * receives the station id (`meridian-orbital-0`, `carrier:Hesperus Dawn`).
+   * The active CampaignRunner also gets `onDocked(id)` (sets flags).
+   */
+  onDocked: ((stationId: string) => void) | null = null;
 
   constructor() {
     this.systemId = this.universe.start;
@@ -211,6 +227,16 @@ export class FlightScene implements GameScene, FlightHostScene {
     window.addEventListener('keydown', (e) => e.code === 'KeyN' && this.audio.toggleMute());
     this.starMap = new StarMap(document.getElementById('ui-root')!, this.universe, () => this.systemId);
     this.placeCapitals();
+    this.docking = new DockingController(() => this.view, this.fleet, this.player);
+    this.dockScreen = new DockScreen(document.getElementById('ui-root')!);
+    this.cinema = new DockCinema(document.getElementById('ui-root')!);
+    this.docking.onDocked = (d) => this.berthed(d);
+    window.addEventListener('pagehide', () => saveLedger(this.ledger));
+    this.docking.onLaunched = () => {
+      this.cinema.hide();
+      this.director.cut('chase', null, Infinity);
+      this.chase.snap(this.player.flight);
+    };
     // ?jump=1: start mid-spool at the first gate (captures of the transition).
     const q = new URLSearchParams(location.search);
     if (q.get('jump') === '1') this.beginJump(gate0.link.to);
@@ -219,6 +245,9 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.starMap.destination = q.get('map');
       this.starMap.toggle();
     }
+    // ?dock=approach|auto|docked|launch [&station=<id|index>] [&cargo=demo]: docking captures.
+    if (q.get('dock')) this.dockFlag(q.get('dock')!, q.get('station') ?? '', q.get('cargo') === 'demo');
+    if (q.get('dockui') === '0') this.dockScreen.close();
     window.__VANGUARD__ = { ...window.__VANGUARD__, ready: false, frame: () => 0, backend: '', hooks: { ...window.__VANGUARD__?.hooks, scene: this } };
   }
 
@@ -247,8 +276,15 @@ export class FlightScene implements GameScene, FlightHostScene {
   update({ dt: realDt, time }: FrameContext): void {
     const c = this.player.controls;
     const pf = this.player.flight;
-    // Tactical view runs the battle at quarter speed so orders can be given.
-    const dt = this.tactical ? realDt * 0.25 : realDt;
+    // Docking sequences own the ship: no guns, no drive, no target cycling.
+    if (this.docking.busy) {
+      c.fire = c.missile = c.cruise = c.nextTarget = c.afterburner = false;
+      this.tactical = false;
+    }
+    // Tactical view runs the battle at quarter speed so orders can be given;
+    // berthed, the world holds still (dt = 0) behind the dock screen.
+    const dt = this.docking.frozen ? 0 : this.tactical ? realDt * 0.25 : realDt;
+    this.ledger.clock += dt;
 
     // 0. Supercruise: cruise speed scales with distance to the nearest mass
     //    (planet, Lantern, great set piece) and locks to 1× near hostiles.
@@ -263,10 +299,12 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.campaign?.preStep(dt);
     }
     this.fleet.step(dt);
+    this.docking.update(this.docking.busy ? realDt : dt);
     for (const b of this.bandits) {
       if (b.ship.alive || b.deadFor < 0) continue;
       b.deadFor += dt;
-      if (b.deadFor > 6) this.respawn(b);
+      // Station space is patrolled: reinforcements don't jump you on the approach.
+      if (b.deadFor > 6 && !this.nearStation(20_000)) this.respawn(b);
     }
 
     // 2b. Lanterns: crossing a gate plane inside the ring starts a jump.
@@ -276,7 +314,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     // 3. Targeting + missile salvos.
     if (c.nextTarget || !this.lock.target?.alive) this.cycleTarget();
     Missiles.updateLock(this.lock, this.player, dt);
-    if (c.missile && this.lock.locked && this.lock.target) {
+    if (c.missile && this.lock.locked && this.lock.target && this.takeMissile()) {
       this.missiles.salvo(this.player, this.lock.target);
       if (this.cinematic) this.pendingMissileCam = true;
     }
@@ -301,6 +339,8 @@ export class FlightScene implements GameScene, FlightHostScene {
 
     // 4b. Mission bookkeeping (kills by faction of the victim).
     for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship) this.kills.set(e.ship.faction, (this.kills.get(e.ship.faction) ?? 0) + 1);
+    // Free-roam: shooting a faction's ships costs standing with its stations.
+    if (!this.campaign) for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship && e.shooter === this.player) this.ledger = reputationForKill(this.ledger, e.ship.faction as EconFaction);
     if (this.mission) {
       this.missionTime += dt;
       const mc = this.missionCtx;
@@ -320,6 +360,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     const tgtSubject: Subject | null = tgt ? { position: tgt.flight.position, velocity: tgt.flight.velocity, radius: tgt.radius } : null;
     this.director.update(pf, tgtSubject, realDt);
     this.world.eye.copy(this.director.eye);
+    this.docking.camera(this.world.eye, this.camera, realDt);
     this.world.sync(this.camera);
 
     this.view.backdrop.follow(this.camera);
@@ -342,6 +383,13 @@ export class FlightScene implements GameScene, FlightHostScene {
     postFx.speed = Math.min(1, pf.speed / pf.spec.boostSpeed);
     this.hyperspace.update(dt, this.jumpPhase === 'tunnel' ? Math.min(1, this.jumpT * 3, (TUNNEL - this.jumpT) * 3) : 0, 60, this.camera.quaternion);
     this.hud.navNoise = Math.max(postFx.navNoise, this.campaign?.mission.modifiers?.navDegraded ? 0.55 : 0);
+    if (this.docking.busy) {
+      // Cutaway: the frame belongs to the cinematography.
+      this.hud.clear();
+      this.updateCinema();
+      this.starMap.draw(time);
+      return;
+    }
     this.hud.update(pf, this.camera, this.world, time);
     if (this.tactical) {
       const markers = this.view.gates.map((g) => ({ label: `LANTERN → ${this.universe.systems.get(g.link.to)!.name.toUpperCase()}`, pos: g.center, radius: g.gate.radius }));
@@ -349,10 +397,11 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
     else if (this.jumpPhase === 'none') {
       this.hud.drawTargets(this.player, this.fleet, this.lock, this.camera, this.world, time);
-      const nav = this.navGate();
+      const nav = this.docking.phase === 'cleared' ? undefined : this.navGate();
       if (nav) this.hud.drawNav(this.universe.systems.get(nav.link.to)!.name, nav.center, pf.position, this.camera, this.world, time);
     }
     this.hud.drawStatus(this.view.system.name, pf.cruise, this.jumpPhase !== 'none' ? `LANTERN TRANSIT → ${this.universe.systems.get(this.jumpTo)?.name ?? ''}` : '');
+    if (this.jumpPhase === 'none' && !this.tactical) this.drawDockHud(time);
     if (this.mission) this.hud.drawObjectives(this.mission, time);
     if (this.campaign) {
       const m = this.campaign.mission;
@@ -367,6 +416,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     let d = Infinity;
     for (const m of this.view.masses) d = Math.min(d, p.distanceTo(m.position) - m.radius);
     for (const g of this.view.gates) d = Math.min(d, p.distanceTo(g.center));
+    for (const st of this.view.stations) d = Math.min(d, p.distanceTo(st.center) - st.radius);
     for (const m of this.campaign?.masses() ?? []) d = Math.min(d, p.distanceTo(m.position) - m.radius);
     for (const s of this.fleet.ships) {
       if (s.alive && s !== this.player && s.team !== this.player.team && s.team !== 'neutral' && s.flight.position.distanceTo(p) < 10_000) return 1;
@@ -438,6 +488,9 @@ export class FlightScene implements GameScene, FlightHostScene {
    */
   startCampaign(m: CampaignMission): Promise<{ outcome: 'success' | 'failure'; codex: string[] }> {
     this.campaign?.dispose();
+    this.docking.reset();
+    this.dockScreen.close();
+    this.cinema.hide();
     const sys = this.systemFor(m.system);
     if (sys.id !== this.systemId) {
       this.view.dispose();
@@ -680,6 +733,180 @@ export class FlightScene implements GameScene, FlightHostScene {
     b.deadFor = 0;
   }
 
+  // ── Docking & trade ────────────────────────────────────────────────
+
+  private requestDock(): void {
+    this.docking.request((d) => dockingClearance(this.ledger, d.faction));
+  }
+
+  /** True if any station in this system is within `r` metres of the player. */
+  private nearStation(r: number): boolean {
+    const p = this.player.flight.position;
+    return this.view.stations.some((st) => st.center.distanceTo(p) < r);
+  }
+
+  /** Free-roam missiles come off the rails (restock when docked); story episodes are fleet-supplied. */
+  private takeMissile(): boolean {
+    if (this.campaign) return true;
+    if (this.ledger.missiles <= 0) {
+      this.docking.say('RAILS EMPTY — REARM AT A STATION OR CARRIER', '#ff5f7a', 3);
+      return false;
+    }
+    this.ledger.missiles--;
+    return true;
+  }
+
+  /** Every station in the Reach, for the ticker's price tips. */
+  private allMarkets() {
+    return [...this.universe.systems.values()].flatMap((s) => s.stations);
+  }
+
+  /** Berthed: save, notify hooks, open the dock screen. */
+  private berthed(d: Dockable): void {
+    this.ledger.lastDock = d.id;
+    saveLedger(this.ledger);
+    this.cinema.hide();
+    this.onDocked?.(d.id);
+    this.campaign?.runner.onDocked(d.id);
+    this.lock.target = null;
+    this.dockScreen.open({
+      station: d,
+      systemName: this.view.system.name,
+      berth: berth(d),
+      markets: this.allMarkets(),
+      ledger: () => this.ledger,
+      setLedger: (l) => {
+        this.ledger = l;
+        saveLedger(l);
+      },
+      hull: () => this.player.hull / this.player.hullMax,
+      setHull: (h) => (this.player.hull = h * this.player.hullMax),
+      onLaunch: () => {
+        saveLedger(this.ledger);
+        this.docking.launch();
+      },
+    });
+    this.audio.music.setMood('briefing', 2);
+  }
+
+  /** Letterbox, caption and iris for the docking / launch cutaways. */
+  private updateCinema(): void {
+    const d = this.docking.target;
+    if (!d) return;
+    const ph = this.docking.phase;
+    if (ph === 'auto') {
+      this.cinema.show('DOCKING SEQUENCE // AUTO-GUIDANCE', d.name.toUpperCase(), `BERTH ${berth(d)} · ${d.kind === 'orbital' ? 'PLANETARY LANDING CORRIDOR' : d.kind === 'carrier' ? 'HANGAR DECK' : 'APPROACH CORRIDOR'} · SEALS STANDING BY`);
+      this.cinema.timecode(this.docking.t);
+      // Iris closes over the last beat as she slides into the dark.
+      this.cinema.setIris(this.docking.t > 6.1 ? 1 - (this.docking.t - 6.1) / 0.9 : 1);
+    } else if (ph === 'launch') {
+      this.cinema.show('LAUNCH // CATAPULT HOT', d.name.toUpperCase(), 'GOOD HUNTING, VANGUARD');
+      this.cinema.timecode(this.docking.t);
+      this.cinema.setIris(Math.min(1, this.docking.t / 0.6));
+    } else this.cinema.hide();
+  }
+
+  /** Station markers, the approach corridor, the dock prompt and the loadout line. */
+  private drawDockHud(time: number): void {
+    const pf = this.player.flight;
+    const dk = this.docking;
+    const list = dk.dockables();
+    const hot = dk.target?.name ?? dk.nearest?.name ?? null;
+    this.hud.drawStations(
+      list.filter((d) => d.station || d === dk.nearest || d === dk.target).map((d) => ({ name: d.name, pos: d.station ? d.center : d.bay, faction: d.faction, kind: d.kind === 'orbital' ? 'orbital port' : d.kind })),
+      pf.position,
+      hot,
+      this.camera,
+      this.world,
+    );
+    if (dk.phase === 'cleared' && dk.target) {
+      const d = dk.target;
+      _to.subVectors(pf.velocity, d.velocity);
+      this.hud.drawDockCorridor(d.bay, d.axis, d.up, pf.position, _to, d.name, this.camera, this.world, time);
+    }
+    if (dk.message) this.hud.drawDockMessage(dk.message, dk.messageColor);
+    else if (dk.phase === 'free' && dk.nearest) this.hud.drawDockMessage(`[G] REQUEST DOCKING · ${dk.nearest.name.toUpperCase()} · ${(dk.nearest.bay.distanceTo(pf.position) / 1000).toFixed(1)} km`, '#6fe6ff');
+    if (!this.campaign) this.hud.drawLoadout(this.ledger.missiles, MISSILE_MAX, this.ledger.credits, cargoUsed(this.ledger), this.ledger.capacity);
+  }
+
+  /** Jump straight to a system (no transit effect) — captures and dev flags. */
+  private warpTo(id: string): void {
+    if (id === this.systemId || !this.universe.systems.has(id)) return;
+    this.view.dispose();
+    this.systemId = id;
+    this.view = new StarSystemView(this.universe.systems.get(id)!, this.scene, this.world.root);
+    this.paintPlanes();
+    this.gateSide.clear();
+    this.placeCapitals();
+  }
+
+  /**
+   * ?dock=approach — on the corridor 2.4 km out, cleared, flying in.
+   * ?dock=auto — at 900 m, guidance engaged (cutaway).
+   * ?dock=docked — berthed, dock screen open. ?dock=launch — launching.
+   * &station=<station id | index in the current system> (default: nearest to
+   * the start). &cargo=demo fills the hold and purse for a livelier screen.
+   */
+  private dockFlag(mode: string, sel: string, demoCargo: boolean): void {
+    setAutopilot(this.player, false);
+    input.override = null;
+    this.cinematic = false;
+    const owner = [...this.universe.systems.values()].find((s) => s.stations.some((st) => st.id === sel));
+    if (owner) this.warpTo(owner.id);
+    // A quiet approach: the free-flight bandits and the Cathedral stand down.
+    for (const b of this.bandits) {
+      b.ship.alive = false;
+      b.ship.model.root.visible = false;
+      b.deadFor = -1e9;
+    }
+    this.cathedral.alive = false;
+    this.cathedral.model.root.visible = false;
+    this.cathedral.hull = 0;
+    this.lock.target = null;
+    const list = this.docking.dockables();
+    const p0 = this.player.flight.position;
+    const d =
+      list.find((x) => x.id === sel) ??
+      (sel && /^\d+$/.test(sel) ? list[Number(sel)] : undefined) ??
+      [...list].filter((x) => x.station).sort((a, b) => a.bay.distanceTo(p0) - b.bay.distanceTo(p0))[0];
+    if (!d) return;
+    if (demoCargo) this.ledger = { ...this.ledger, credits: 18_450, cargo: { ebon: 4, relics: 3, rations: 2, medical: 1 }, missiles: 3, rep: { concord: 34, choir: -22, rustwake: 12 } };
+    const pf = this.player.flight;
+    const place = (out: number, lat: number) => {
+      const right = _v.crossVectors(d.up, d.axis);
+      pf.position.copy(d.bay).addScaledVector(d.axis, out).addScaledVector(right, lat).addScaledVector(d.up, Math.abs(lat) * 0.35);
+      // Nose a little off the bay so the chase camera sees the station past the ship.
+      _to.copy(d.bay).addScaledVector(right, lat * 2.2).addScaledVector(d.up, -Math.abs(lat) * 0.5).sub(pf.position).normalize();
+      faceAlong(pf.orientation, _to);
+      pf.velocity.copy(_to).multiplyScalar(110);
+      pf.throttle = 0.5;
+      // Wingmen hold off the corridor.
+      this.wingmen.forEach((w, i) => {
+        w.ship.flight.position.copy(pf.position).addScaledVector(d.axis, 260 + i * 90).add(_v.set(i ? 120 : -120, 40, 0));
+        w.ship.flight.orientation.copy(pf.orientation);
+        w.ship.flight.velocity.copy(pf.velocity);
+      });
+      this.chase.snap(pf);
+    };
+    if (mode === 'approach') {
+      place(1900, -130);
+      this.docking.clear(d);
+    } else if (mode === 'auto') {
+      place(900, 40);
+      this.docking.clear(d);
+      this.docking.skipTo = Number(new URLSearchParams(location.search).get('dockt') ?? 0) || 0;
+    } else if (mode === 'docked' || mode === 'launch') {
+      place(900, 0);
+      this.player.hull = this.player.hullMax * 0.62;
+      this.docking.berth(d);
+      if (mode === 'launch') {
+        this.dockScreen.close();
+        this.docking.launch();
+        this.docking.t = Number(new URLSearchParams(location.search).get('dockt') ?? 0) || 0;
+      }
+    }
+  }
+
   resize(w: number, h: number): void {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
@@ -695,6 +922,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   private onKey(code: string): void {
     const t = this.lock.target;
     const target: Subject | null = t ? { position: t.flight.position, velocity: t.flight.velocity, radius: t.radius } : null;
+    if (code === 'KeyG') return this.requestDock();
+    if (this.docking.busy && code !== 'KeyM') return; // the dock screen / cutaway owns the keys
     if (code === 'KeyV') {
       const order = ['chase', 'lock', 'orbit', 'flyby'] as const;
       const next = order[(order.indexOf(this.director.kind as (typeof order)[number]) + 1) % order.length];

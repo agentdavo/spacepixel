@@ -6,6 +6,7 @@ import { LanternGate } from './LanternGate';
 import { LightRig } from '@/render/LightRig';
 import { AsteroidField } from './AsteroidField';
 import { HazeClouds } from './HazeClouds';
+import { StationView } from './Station';
 
 /**
  * Builds a StarSystem's data into renderable objects: sky + light rig
@@ -34,6 +35,8 @@ export class StarSystemView {
   readonly masses: { position: Vector3; radius: number }[] = [];
   /** Belt beside the first Lantern: parallax, cover and scale reference. */
   readonly field: AsteroidField;
+  /** Dockable stations (docking & trade). */
+  readonly stations: StationView[] = [];
 
   constructor(
     readonly system: StarSystem,
@@ -88,11 +91,18 @@ export class StarSystemView {
     const haze = new HazeClouds({ seed, centres: puffs, size: [500, 1500], opacity: dense ? 0.32 : 0.2, colors: ['#6a4f9a', '#2f7f9a'] });
     this.field.group.add(haze.group);
     this.group.add(this.field.group);
+    for (const site of system.stations) {
+      const pl = site.planet !== undefined ? system.planets[site.planet] : undefined;
+      const st = new StationView(site, SYSTEM_OFFSET, pl && { center: pl.position.clone().add(SYSTEM_OFFSET), radius: pl.preset.radius });
+      this.stations.push(st);
+      this.group.add(st.group);
+    }
     worldRoot.add(this.group);
   }
 
   update(time: number): void {
     this.field.update(time);
+    for (const st of this.stations) st.update(time);
   }
 
   gateTo(id: string): GateInstance | undefined {
@@ -100,6 +110,7 @@ export class StarSystemView {
   }
 
   dispose(): void {
+    for (const st of this.stations) st.dispose();
     this.group.removeFromParent();
     this.scene.remove(this.backdrop.group);
     this.group.traverse((o) => {

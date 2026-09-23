@@ -448,6 +448,187 @@ export class FlightHud {
     c.fillText(progress >= 1 ? 'HELD' : `HOLD ${(progress * 100).toFixed(0)}%`, pt.x - 22, pt.y + r + 22);
   }
 
+  /** Blank the canvas (docking cutaways own the screen). */
+  clear(): void {
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.ctx.clearRect(0, 0, this.w, this.h);
+  }
+
+  /**
+   * Station / carrier nav markers (docking & trade): a small square per
+   * dockable with name, kind and range; the highlighted one (nearest inside
+   * 5 km, or the berth you're cleared for) is drawn bold.
+   */
+  drawStations(
+    list: { name: string; pos: Vector3; faction: string; kind: string }[],
+    from: Vector3,
+    highlight: string | null,
+    cam: PerspectiveCamera,
+    world: WorldSpace,
+  ): void {
+    const c = this.ctx;
+    for (const st of list) {
+      if (this.glitch()) continue;
+      const pt = this.project(st.pos, world, cam);
+      if (!pt || pt.x < 0 || pt.x > this.w || pt.y < 0 || pt.y > this.h) continue;
+      const hot = st.name === highlight;
+      const col = st.faction === 'choir' ? PINK : st.faction === 'rustwake' ? AMBER : '#6fe6ff';
+      const dist = st.pos.distanceTo(from);
+      const range = dist > 10_000 ? `${(dist / 1000).toFixed(0)} km` : `${(dist / 1000).toFixed(1)} km`;
+      c.strokeStyle = col;
+      c.fillStyle = col;
+      c.globalAlpha = hot ? 1 : 0.75;
+      c.lineWidth = hot ? 2 : 1.2;
+      const r = hot ? 9 : 6;
+      c.strokeRect(pt.x - r, pt.y - r, r * 2, r * 2);
+      c.beginPath();
+      c.moveTo(pt.x - r - 4, pt.y);
+      c.lineTo(pt.x - r, pt.y);
+      c.moveTo(pt.x + r, pt.y);
+      c.lineTo(pt.x + r + 4, pt.y);
+      c.stroke();
+      c.fillText(`${st.name.toUpperCase()}  ${range}`, pt.x + r + 8, pt.y - 2);
+      c.globalAlpha = 0.7;
+      c.fillText(st.kind.toUpperCase(), pt.x + r + 8, pt.y + 12);
+      c.globalAlpha = 1;
+    }
+  }
+
+  /**
+   * ILS-style approach corridor out of a docking bay: a string of boxes every
+   * 350 m to 3.5 km (tighter near the mouth), a dashed centreline, a flight
+   * director diamond 600 m ahead of you on the centreline, and deviation /
+   * range / closure readouts. Boxes you're inside light cyan, others amber.
+   */
+  drawDockCorridor(bay: Vector3, axis: Vector3, up: Vector3, pos: Vector3, relVel: Vector3, name: string, cam: PerspectiveCamera, world: WorldSpace, time: number): void {
+    const c = this.ctx;
+    const right = _r.crossVectors(up, axis).normalize();
+    const rel = _d.subVectors(pos, bay);
+    const lz = rel.dot(axis);
+    const lx = rel.dot(right);
+    const ly = rel.dot(up);
+    const corner = _vt;
+    const pts: { x: number; y: number }[] = [];
+    c.lineWidth = 1.5;
+    for (let k = 10; k >= 1; k--) {
+      const d = k * 350;
+      const half = 40 + d * 0.05;
+      const inside = Math.abs(lx) < half && Math.abs(ly) < half * 0.7;
+      // Only the gates still ahead of you (and never more than ~2 km of them).
+      if (d > lz - 150 || d < lz - 2200) continue;
+      pts.length = 0;
+      for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        corner.copy(bay).addScaledVector(axis, d).addScaledVector(right, sx * half).addScaledVector(up, sy * half * 0.7);
+        const p = this.project(corner, world, cam);
+        if (p) pts.push(p);
+      }
+      if (pts.length < 4) continue;
+      c.strokeStyle = inside ? '#6fe6ff' : AMBER;
+      c.fillStyle = c.strokeStyle;
+      c.globalAlpha = 0.95 - Math.max(0, lz - d - 1200) / 2000;
+      c.beginPath();
+      pts.forEach((p, i) => (i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)));
+      c.closePath();
+      c.stroke();
+      // Corner ticks: the OVA "gate" look.
+      for (const p of pts) c.fillRect(p.x - 2, p.y - 2, 4, 4);
+    }
+    c.globalAlpha = 0.6;
+    c.setLineDash([6, 8]);
+    c.lineDashOffset = -time * 40;
+    c.strokeStyle = '#6fe6ff';
+    const a = this.project(bay, world, cam);
+    const b = this.project(corner.copy(bay).addScaledVector(axis, Math.max(600, Math.min(4000, lz + 800))), world, cam);
+    if (a && b) {
+      c.beginPath();
+      c.moveTo(a.x, a.y);
+      c.lineTo(b.x, b.y);
+      c.stroke();
+    }
+    c.setLineDash([]);
+    c.globalAlpha = 1;
+    // Flight director: where to point the nose.
+    const fd = this.project(corner.copy(bay).addScaledVector(axis, Math.max(0, lz - 600)), world, cam);
+    if (fd) {
+      const r = 10 + Math.sin(time * 6) * 2;
+      c.strokeStyle = '#ffffff';
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(fd.x, fd.y - r);
+      c.lineTo(fd.x + r, fd.y);
+      c.lineTo(fd.x, fd.y + r);
+      c.lineTo(fd.x - r, fd.y);
+      c.closePath();
+      c.stroke();
+    }
+    if (a) {
+      c.strokeStyle = GREEN;
+      c.lineWidth = 2;
+      c.strokeRect(a.x - 12, a.y - 8, 24, 16);
+    }
+    // Deviation needles (localizer / glideslope) and readouts, lower centre.
+    const cx = this.w / 2;
+    const cy = this.h - 150;
+    const half = 40 + Math.max(0, lz) * 0.05;
+    const nx = Math.max(-1, Math.min(1, lx / (half * 2)));
+    const ny = Math.max(-1, Math.min(1, ly / (half * 1.4)));
+    c.fillStyle = 'rgba(0,10,6,0.5)';
+    c.fillRect(cx - 60, cy - 40, 120, 80);
+    c.strokeStyle = 'rgba(111,230,255,0.6)';
+    c.lineWidth = 1;
+    c.strokeRect(cx - 60, cy - 40, 120, 80);
+    c.beginPath();
+    c.moveTo(cx, cy - 40);
+    c.lineTo(cx, cy + 40);
+    c.moveTo(cx - 60, cy);
+    c.lineTo(cx + 60, cy);
+    c.stroke();
+    c.strokeStyle = Math.abs(nx) < 0.5 && Math.abs(ny) < 0.5 ? GREEN : AMBER;
+    c.lineWidth = 3;
+    c.beginPath();
+    c.moveTo(cx - nx * 58, cy - 38);
+    c.lineTo(cx - nx * 58, cy + 38);
+    c.moveTo(cx - 58, cy + ny * 38);
+    c.lineTo(cx + 58, cy + ny * 38);
+    c.stroke();
+    const range = Math.hypot(lx, ly, lz);
+    const closure = -relVel.dot(axis);
+    c.textAlign = 'center';
+    c.fillStyle = '#6fe6ff';
+    c.fillText(`APPROACH ${name.toUpperCase()}`, cx, cy - 52);
+    c.fillStyle = '#ffffff';
+    c.fillText(`RNG ${(range / 1000).toFixed(2)} km · CLS ${closure.toFixed(0)} m/s · LAT ${Math.abs(lx).toFixed(0)} m ${lx >= 0 ? 'R' : 'L'} · VRT ${Math.abs(ly).toFixed(0)} m ${ly >= 0 ? 'HI' : 'LO'}`, cx, cy + 58);
+    c.fillStyle = range < 1400 ? GREEN : 'rgba(125,255,178,0.75)';
+    c.fillText(lz < 60 ? 'BEHIND THE BAY — CIRCLE OUT TO THE CORRIDOR' : range < 1000 ? 'GUIDANCE ENGAGING' : 'AUTO-DOCK AT 1.0 km · [G] CANCEL', cx, cy + 76);
+    c.textAlign = 'left';
+  }
+
+  /** One-line docking prompt / controller message, lower centre. */
+  drawDockMessage(text: string, color: string): void {
+    if (!text) return;
+    const c = this.ctx;
+    c.textAlign = 'center';
+    c.font = '15px "Share Tech Mono", monospace';
+    const w = c.measureText(text).width + 28;
+    c.fillStyle = 'rgba(0,10,6,0.6)';
+    c.fillRect(this.w / 2 - w / 2, this.h * 0.7 - 18, w, 26);
+    c.fillStyle = color;
+    c.fillText(text, this.w / 2, this.h * 0.7);
+    c.font = '13px "Share Tech Mono", monospace';
+    c.textAlign = 'left';
+  }
+
+  /** Missile rails + trade summary, under the flight block. */
+  drawLoadout(missiles: number, max: number, credits: number, cargo: number, capacity: number): void {
+    const c = this.ctx;
+    const x0 = 24;
+    const y = this.h - 18;
+    c.fillStyle = missiles > 0 ? GREEN : RED;
+    c.fillText(`MSL ${'■'.repeat(Math.max(0, missiles))}${'□'.repeat(Math.max(0, max - missiles))}`, x0, y);
+    c.fillStyle = 'rgba(125,255,178,0.75)';
+    c.fillText(`${credits.toLocaleString('en-US')} sh · HOLD ${cargo}/${capacity}`, x0 + 150, y);
+  }
+
   private brackets(x: number, y: number, h: number, l: number): void {
     const c = this.ctx;
     c.beginPath();
