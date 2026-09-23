@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Quaternion, Scene, Vector3 } from 'three';
+import { Matrix4, PerspectiveCamera, Quaternion, Scene, Vector3 } from 'three';
 import type { FrameContext } from '@/core/Engine';
 import type { GameScene } from '../GameScene';
 import { WorldSpace } from '@/core/WorldSpace';
@@ -6,6 +6,7 @@ import { input, type ControlState } from '@/core/Input';
 import { flags } from '@/core/Flags';
 import { FlightModel, KESTREL_SPEC } from '@/sim/FlightModel';
 import { ChaseCamera } from '@/sim/ChaseCamera';
+import { CameraDirector, type Subject } from '@/sim/CameraDirector';
 import { assets } from '@/assets/AssetLibrary';
 import type { ShipModel } from '@/assets/ShipBuilder';
 import { Backdrop, BACKDROPS } from '../Backdrop';
@@ -31,6 +32,14 @@ export class FlightScene implements GameScene {
   readonly world = new WorldSpace(this.scene);
   readonly flight = new FlightModel(KESTREL_SPEC);
   readonly chase = new ChaseCamera(this.camera);
+  readonly director = new CameraDirector(this.camera, this.chase);
+  /** Placeholder bandits on scripted paths (M14 replaces with AI). */
+  readonly bandits: { model: ShipModel; subject: Subject; center: Vector3; a: number; b: number; r: number; ph: number }[] = [];
+  private targetIndex = 0;
+  private cinematic = flags.demo;
+  private wasBoosting = false;
+  private lastCut = -10;
+  private playerSubject: Subject;
   readonly ship: ShipModel;
   readonly wingmen: { model: ShipModel; slot: Vector3; pos: Vector3; quat: Quaternion }[] = [];
   private backdrop = new Backdrop(BACKDROPS.meridian);
@@ -65,6 +74,21 @@ export class FlightScene implements GameScene {
       this.wingmen.push({ model, slot, pos: new Vector3(), quat: new Quaternion() });
     }
 
+    // Bandits circling the gate.
+    for (let i = 0; i < 3; i++) {
+      const model = assets.ship('choir-cantor');
+      this.world.root.add(model.root);
+      this.bandits.push({
+        model,
+        subject: { position: new Vector3(), velocity: new Vector3(), radius: 8 },
+        center: ORIGIN.clone().add(new Vector3(0, 60, 2600)),
+        a: 0.11 + i * 0.023,
+        b: 0.07 + i * 0.019,
+        r: 700 + i * 260,
+        ph: i * 2.1,
+      });
+    }
+
     // Start on approach to the gate.
     this.flight.position.copy(ORIGIN);
     this.flight.velocity.set(0, 0, 150);
@@ -72,7 +96,14 @@ export class FlightScene implements GameScene {
     for (const w of this.wingmen) w.pos.copy(w.slot).add(ORIGIN);
     this.chase.snap(this.flight);
 
+    this.playerSubject = { position: this.flight.position, velocity: this.flight.velocity, radius: 9 };
     if (flags.demo) input.override = demoPilot;
+    window.addEventListener('keydown', (e) => this.onKey(e.code));
+    // ?cam=1 padlock on target · ?cam=2 orbit target · ?cam=3 missile-style track of a bandit
+    const t0 = this.bandits[0].subject;
+    if (flags.cam === 1) this.director.setBase('lock', t0);
+    if (flags.cam === 2) this.director.cut('orbit', t0, Infinity);
+    if (flags.cam === 3) this.director.cut('track', t0, Infinity);
     this.hud = new FlightHud(document.getElementById('ui-root')!);
   }
 
@@ -97,9 +128,29 @@ export class FlightScene implements GameScene {
       w.model.setThrottle(this.flight.boosting ? 1.4 : 0.3 + this.flight.throttle * 0.8);
     }
 
-    // 4. Camera (the only thing allowed to lag), then rebase the world on it.
-    this.chase.update(this.flight, dt);
-    this.world.eye.copy(this.chase.eye);
+    // 4. Bandits on scripted Lissajous paths.
+    for (const b of this.bandits) {
+      const t = time + b.ph;
+      const p = b.subject.position;
+      const prev = _v.copy(p);
+      p.set(Math.sin(t * b.a * 6.28) * b.r, Math.sin(t * b.b * 6.28) * b.r * 0.35, Math.cos(t * b.a * 6.28) * b.r).add(b.center);
+      if (dt > 0) b.subject.velocity.subVectors(p, prev).divideScalar(dt);
+      b.model.root.position.copy(p);
+      if (b.subject.velocity.lengthSq() > 1) faceAlong(b.model.root.quaternion, b.subject.velocity);
+      b.model.setThrottle(1.1);
+    }
+    const target = this.bandits[this.targetIndex % this.bandits.length].subject;
+
+    // 5. Cinematic auto-cutaways (opt-in, K): burner lights → flyby cut.
+    if (this.cinematic && this.flight.boosting && !this.wasBoosting && time - this.lastCut > 6) {
+      this.director.cut('flyby', this.playerSubject, 3.0, this.flight);
+      this.lastCut = time;
+    }
+    this.wasBoosting = this.flight.boosting;
+
+    // 6. Camera (the only thing allowed to lag), then rebase the world on it.
+    this.director.update(this.flight, target, dt);
+    this.world.eye.copy(this.director.eye);
     this.world.sync(this.camera);
     this.backdrop.follow(this.camera);
 
@@ -115,11 +166,45 @@ export class FlightScene implements GameScene {
   }
 
   cameraLabel(): string {
-    return `FLIGHT TEST · ${this.flight.flightAssist ? 'FA ON' : 'FA OFF'}`;
+    return `${this.director.label()} · ${this.flight.flightAssist ? 'FA ON' : 'FA OFF'}${this.cinematic ? ' · CINEMATIC' : ''}`;
+  }
+
+  /** V: cycle camera · T: next target · K: cinematic auto-cutaways. */
+  private onKey(code: string): void {
+    const target = this.bandits[this.targetIndex % this.bandits.length].subject;
+    if (code === 'KeyV') {
+      const order = ['chase', 'lock', 'orbit', 'flyby'] as const;
+      const next = order[(order.indexOf(this.director.kind as (typeof order)[number]) + 1) % order.length];
+      if (next === 'chase' || next === 'lock') this.director.setBase(next, target);
+      if (next === 'lock') this.director.cut('lock', target, Infinity);
+      if (next === 'chase') this.director.cut('chase', null, Infinity);
+      if (next === 'orbit') this.director.cut('orbit', target, 4);
+      if (next === 'flyby') this.director.cut('flyby', this.playerSubject, 3, this.flight);
+    } else if (code === 'KeyT') {
+      this.targetIndex++;
+    } else if (code === 'KeyK') {
+      this.cinematic = !this.cinematic;
+    }
+  }
+
+  cycleCamera(): void {
+    this.onKey('KeyV');
   }
 }
 
 const _v = new Vector3();
+const _m = new Matrix4();
+const _o = new Vector3();
+const UP = new Vector3(0, 1, 0);
+
+/**
+ * Orient a +Z-forward object along a direction. (Object3D.lookAt works in
+ * render space, which is eye-relative under the floating origin — never feed
+ * it universe positions.)
+ */
+function faceAlong(q: Quaternion, dir: Vector3): void {
+  q.setFromRotationMatrix(_m.lookAt(dir, _o.set(0, 0, 0), UP));
+}
 
 /** Scripted pilot for demos and deterministic captures. */
 function demoPilot(s: ControlState, t: number): void {

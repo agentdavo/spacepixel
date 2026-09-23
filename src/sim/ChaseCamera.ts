@@ -163,6 +163,11 @@ export class ChaseCamera {
     }
   }
 
+  /** Current (smoothed) chase FOV in degrees. */
+  get fovValue(): number {
+    return this.fov;
+  }
+
   /** 0..1 afterburner visual intensity (drives post FX). */
   get boostAmount(): number {
     return this.boostPunch;

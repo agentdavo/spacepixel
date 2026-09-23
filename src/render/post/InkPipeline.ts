@@ -140,7 +140,7 @@ export class InkPipeline {
     );
     // Afterburner focal distortion: radial chromatic split of the lit frame.
     const caDir = screenUV.sub(0.5);
-    const caAmt = this.boost.mul(0.006).add(this.speed.mul(0.0015));
+    const caAmt = this.boost.mul(0.0035).add(this.speed.mul(0.001));
     const litR = color.sample(screenUV.add(caDir.mul(caAmt))).r;
     const litB = color.sample(screenUV.sub(caDir.mul(caAmt))).b;
     const caColor = vec3(litR, color.g, litB);
@@ -164,8 +164,11 @@ export class InkPipeline {
     const radius = length(centered.mul(vec2(1.7, 1.0)));
     const along = fract(radius.mul(1.5).sub(time.mul(3.0)).add(lineHash));
     const dash = smoothstep(0.0, 0.25, along).mul(float(1).sub(smoothstep(0.55, 0.9, along)));
-    const streak = smoothstep(0.82, 0.9, lineHash).mul(smoothstep(0.3, 0.8, radius)).mul(dash);
-    const speedLines = streak.mul(this.boost).mul(0.9);
+    // Thin tapered line inside each lit sector (not a solid wedge).
+    const across = fract(ang.mul(38.0)).sub(0.5).abs().mul(2.0);
+    const thin = float(1).sub(smoothstep(0.08, 0.22, across.div(radius.mul(1.4).add(0.2))));
+    const streak = smoothstep(0.8, 0.88, lineHash).mul(smoothstep(0.32, 0.85, radius)).mul(dash).mul(thin);
+    const speedLines = streak.mul(this.boost).mul(0.75);
     const graded = display.rgb
       .mul(mix(0.78, 1.0, vignette))
       .add(grain.mul(0.025))
