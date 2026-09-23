@@ -1,4 +1,18 @@
 import type { Blueprint } from '../Blueprint';
+import { wingPoint, wingSlice, type WingSpec } from './kit';
+
+/** Kestrel main-wing planform (full span, authored at ~38° leading-edge sweep). */
+const KESTREL_WING: WingSpec = {
+  pos: [1.5, -0.05, 1.2],
+  rot: [0, 0, -3],
+  root: 6.0,
+  tip: 1.7,
+  span: 5.4,
+  sweep: 4.2,
+  thickness: 0.34,
+  tipThickness: 0.16,
+};
+const WING_FOLD = 3.3;
 
 /**
  * VF-27 KESTREL — MCDF variable-geometry interceptor.
@@ -84,31 +98,48 @@ export const KESTREL: Blueprint = {
       pos: [1.36, -0.2, 1.42],
       shape: { kind: 'box', w: 0.7, h: 0.8, d: 0.1, c: 0.15 },
     },
-    // Main swing wings.
+    // Fixed wing glove: the swing wing's root pivots inside it.
     {
-      name: 'wing',
+      name: 'glove',
       paint: 'primary',
       mirror: true,
-      pos: [1.5, -0.05, 1.2],
+      pos: [1.25, -0.02, 3.4],
       rot: [0, 0, -3],
-      shape: { kind: 'wing', root: 6.0, tip: 1.7, span: 5.4, sweep: 4.2, thickness: 0.34, tipThickness: 0.16 },
+      shape: { kind: 'wing', root: 7.9, tip: 4.4, span: 1.25, sweep: 2.9, thickness: 0.56, tipThickness: 0.46 },
     },
-    // Cobalt wing stripe (overlay slab near the tip).
     {
-      name: 'wing-stripe',
+      name: 'glove-edge',
       paint: 'secondary',
       mirror: true,
-      pos: [4.4, 0.02, -1.6],
+      pos: [1.3, 0.0, 3.3],
       rot: [0, 0, -3],
-      shape: { kind: 'wing', root: 2.7, tip: 2.1, span: 1.0, sweep: 0.75, thickness: 0.26, tipThickness: 0.2 },
+      shape: { kind: 'wing', root: 1.0, tip: 0.6, span: 1.15, sweep: 2.6, thickness: 0.6, tipThickness: 0.5 },
     },
+    // Swing wing, inner panel (sweeps about the glove pivot).
+    { name: 'wing', paint: 'primary', mirror: true, articulation: 'wing', ...wingSlice(KESTREL_WING, 0, WING_FOLD) },
+    // Outer panel folds up for carrier stowage.
+    { name: 'wing-outer', paint: 'primary', mirror: true, articulation: 'wingFold', ...wingSlice(KESTREL_WING, WING_FOLD, 5.4) },
+    { name: 'fold-hinge', paint: 'dark', mirror: true, articulation: 'wingFold', ...wingSlice(KESTREL_WING, WING_FOLD, WING_FOLD + 0.12, 0.05) },
+    // Cobalt wing stripe (overlay slab near the tip).
+    { name: 'wing-stripe', paint: 'secondary', mirror: true, articulation: 'wingFold', ...wingSlice(KESTREL_WING, 3.9, 4.6, 0.05) },
+    { name: 'flap', paint: 'secondary', mirror: true, articulation: 'wing', ...wingSlice(KESTREL_WING, 1.4, WING_FOLD - 0.1, 0.04, 0.74, 1) },
     // Wingtip missile rails.
     {
       name: 'tip-rail',
       paint: 'accent',
       mirror: true,
+      articulation: 'wingFold',
       pos: [6.85, -0.34, -3.6],
       shape: { kind: 'cylinder', rFront: 0.08, rBack: 0.19, length: 2.8, segments: 8 },
+    },
+    {
+      name: 'nav-light',
+      paint: 'glow',
+      mirror: true,
+      articulation: 'wingFold',
+      pos: [6.92, -0.12, -3.0],
+      shape: { kind: 'box', w: 0.14, h: 0.1, d: 0.3 },
+      emissive: 1.5,
     },
     // Canards.
     {
@@ -160,12 +191,27 @@ export const KESTREL: Blueprint = {
       pos: [0.78, -0.05, -8.2],
       shape: { kind: 'cylinder', rFront: 0.68, rBack: 0.78, length: 0.9, segments: 12, open: true },
     },
-    // Nav lights.
-    { name: 'nav-light', paint: 'glow', pos: [7.0, -0.05, -3.0], shape: { kind: 'box', w: 0.14, h: 0.1, d: 0.3 }, emissive: 1.5 },
+    // Dorsal airbrake + panel details.
+    {
+      name: 'airbrake',
+      paint: 'primary',
+      pos: [0, 1.02, -3.4],
+      rot: [-4, 0, 0],
+      shape: { kind: 'box', w: 1.1, h: 0.1, d: 1.6, c: 0.04 },
+    },
+    { name: 'vent', paint: 'dark', mirror: true, pos: [0.62, 0.86, -5.4], shape: { kind: 'box', w: 0.3, h: 0.08, d: 0.9, c: 0.03 } },
+    { name: 'gun-port', paint: 'dark', mirror: true, pos: [0.62, -0.28, 5.0], rot: [0, 0, -30], shape: { kind: 'box', w: 0.14, h: 0.12, d: 0.9 } },
+    { name: 'chin-sensor', paint: 'glass', pos: [0, -0.55, 3.6], shape: { kind: 'dome', radius: 0.2, segments: 8, scale: [1, 0.7, 1.4] } },
   ],
   engines: [{ pos: [0.78, -0.05, -8.55], radius: 0.6, plume: 6.5, mirror: true }],
+  articulations: [
+    // Leading-edge sweep: 20° (spread) → 70° (swept); authored at ~38°.
+    { id: 'wing', pivot: [2.05, -0.1, -0.4], axis: [0, 1, 0], range: [-18, 32], channel: 'sweep' },
+    // Stowage fold: the outer panel folds up along a streamwise hinge.
+    { id: 'wingFold', parent: 'wing', pivot: [...wingPoint(KESTREL_WING, WING_FOLD, 0.5, 0.1)], axis: [0, 0, 1], range: [0, 105], channel: 'fold' },
+  ],
   hardpoints: [
     { id: 'gun', pos: [0.6, -0.4, 5.6], kind: 'gun', mirror: true },
-    { id: 'rail', pos: [6.85, -0.34, -2.2], kind: 'missile', mirror: true },
+    { id: 'rail', pos: [6.85, -0.34, -2.2], kind: 'missile', mirror: true, articulation: 'wingFold' },
   ],
 };

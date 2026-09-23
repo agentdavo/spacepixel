@@ -161,7 +161,9 @@ export function steerToward(
 export function setSpeed(c: ControlState, f: FlightModel, speed: number, allowBoost = true): void {
   const s = f.spec;
   c.throttleDelta = 0;
-  const boost = allowBoost && speed > s.maxSpeed * 1.03 && !f.boostLocked && (f.boosting || f.boostGauge > 0.25);
+  // Burn only while still short of the goal (FA would chase boostSpeed and overshoot).
+  const boost =
+    allowBoost && speed > s.maxSpeed * 1.03 && f.speed < speed - 2 && !f.boostLocked && (f.boosting || f.boostGauge > 0.25);
   c.afterburner = boost;
   c.throttleSet = boost ? 1 : clamp(speed / s.maxSpeed, 0, 1);
 }
@@ -201,6 +203,11 @@ export function flyToPoint(
  * Match a world velocity (formation keeping, escorting). With flight assist
  * the ship flies where it points, so: nose along the velocity, throttle to
  * its magnitude. Returns the off-bore angle.
+ *
+ * `maxSlip` (m/s) caps how far the commanded velocity may lead the actual
+ * one. FA thrusters only turn the velocity at ~lateralAccel, so pointing the
+ * nose further ahead than that just makes the ship crab sideways and
+ * overshoot; capping the lead keeps nose and flight path together.
  */
 export function matchVelocity(
   c: ControlState,
@@ -211,15 +218,27 @@ export function matchVelocity(
   dt: number,
   g: SteerGains = DEFAULT_GAINS,
   allowBoost = true,
+  maxSlip = Infinity,
 ): number {
-  const sp = vel.length();
-  if (sp < 1) {
+  const spDes = vel.length();
+  if (spDes < 1) {
     setSpeed(c, f, 0, false);
     return 0;
   }
-  _v.copy(vel).divideScalar(sp);
+  // Velocity turn rate is ~lateralAccel / speed: when the flight path is far
+  // off where it needs to go, bleed speed to tighten the turn (like a pilot).
+  const sp0 = f.speed;
+  const cosT = sp0 > 1 ? f.velocity.dot(vel) / (sp0 * spDes) : 1;
+  const theta = Math.acos(clamp(cosT, -1, 1));
+  const speed = theta > 0.35 ? spDes * Math.max(0.5, Math.cos(theta - 0.35)) : spDes;
+  if (maxSlip < Infinity) {
+    _w.subVectors(vel, f.velocity);
+    const l = _w.length();
+    if (l > maxSlip) vel = _r.copy(f.velocity).addScaledVector(_w, maxSlip / l);
+  }
+  _v.copy(vel).normalize();
   const a = steerToward(c, f, _v, up, ps, dt, g);
-  setSpeed(c, f, sp, allowBoost);
+  setSpeed(c, f, speed, allowBoost);
   return a;
 }
 

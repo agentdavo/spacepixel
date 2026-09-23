@@ -67,7 +67,7 @@ const _e = new Vector3();
 const _s = new Vector3();
 const _ab = new Vector3();
 const ZERO = new Vector3();
-const SAMPLES = [0, 0.4, 0.9, 1.5, 2.2, 3.0, 4.0, 5.0];
+const SAMPLES = [0, 0.4, 0.9, 1.5, 2.2, 3.0, 4.0, 5.0, 6.0, 7.0];
 
 /** Closest point on segment ab to p. */
 export function closestOnSegment(a: Vector3, b: Vector3, p: Vector3, out: Vector3): Vector3 {
@@ -145,7 +145,8 @@ function capsuleThreat(me: ShipEntity, a: Vector3, b: Vector3, radius: number, v
   _u.subVectors(f.velocity, vel);
   const speed = _u.length();
   const Rm = radius + me.radius + 60 + speed * 0.25;
-  const H = Math.min(5, Math.max(2, (Rm * 0.5 + 350) / Math.max(speed, 1)));
+  // Look ahead far enough to turn away: turn radius ~ v² / a_lat, plus margin.
+  const H = Math.min(7, Math.max(2, ((speed * speed) / 120 + 350) / Math.max(speed, 1)));
   for (let i = 0; i < SAMPLES.length; i++) {
     const t = SAMPLES[i];
     if (t > H) break;

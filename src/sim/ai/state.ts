@@ -58,8 +58,15 @@ export interface Brain {
   formation: FormationKind;
   slotIndex: number;
   spacing: number;
-  /** Slot offset in the leader's body frame (right = −X, up = +Y, fwd = +Z). */
+  /** Slot offset in the formation frame (left = +X, up = +Y, fwd = +Z, like a ship body). */
   slot: Vector3;
+  /**
+   * Formation frame "up": the leader's up vector, low-passed. Slots hang off
+   * the leader's heading plus this, so a leader's quick aileron roll doesn't
+   * fling wingmen round a corkscrew — they bank with sustained turns only.
+   */
+  formUp: Vector3;
+  formUpInit: boolean;
 
   // ── maneuver ───────────────────────────────────────────────────────
   maneuver: Maneuver;
@@ -106,6 +113,8 @@ export function createBrain(seed: number, p: Personality = PERSONALITIES.veteran
     slotIndex: 0,
     spacing: 40,
     slot: new Vector3(),
+    formUp: new Vector3(0, 1, 0),
+    formUpInit: false,
     maneuver: 'patrol',
     maneuverT: 0,
     maneuverMax: Infinity,

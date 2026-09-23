@@ -6,6 +6,8 @@ export const SCENES: Record<string, () => Promise<GameScene>> = {
   showcase: async () => new (await import('../ShowcaseScene')).ShowcaseScene(),
   spatial: async () => new (await import('./SpatialTestScene')).SpatialTestScene(),
   hangar: async () => new (await import('./HangarScene')).HangarScene(),
+  dogfight: async () => new (await import('./DogfightScene')).DogfightScene(),
+  fx: async () => new (await import('./FxTestScene')).FxTestScene(),
 };
 
 export const DEFAULT_SCENE = 'flight';

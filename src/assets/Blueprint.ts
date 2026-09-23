@@ -38,7 +38,61 @@ export type Shape =
   | { kind: 'cylinder'; rFront: number; rBack: number; length: number; segments?: number; open?: boolean }
   | { kind: 'dome'; radius: number; scale?: Vec3; segments?: number; hemisphere?: boolean }
   | { kind: 'box'; w: number; h: number; d: number; c?: number }
-  | { kind: 'torus'; radius: number; tube: number; segments?: number; tubeSegments?: number };
+  | { kind: 'torus'; radius: number; tube: number; segments?: number; tubeSegments?: number }
+  /** Surface of revolution around Z: `profile` is a list of [radius, z] points, back to front. */
+  | { kind: 'lathe'; profile: [number, number][]; segments?: number; phase?: number }
+  /**
+   * Chamfered arch in the XY plane (a rib / hoop / flying arch). Swept from
+   * `start` through `arc` degrees counter-clockwise from +X (default 0 → 180,
+   * an arch over +Y). `thickness` is radial, `depth` runs along Z.
+   */
+  | { kind: 'rib'; radius: number; thickness: number; depth: number; arc?: number; start?: number; segments?: number; c?: number }
+  /**
+   * Composite gun turret sitting on y = 0, barrels pointing +Z. Base ring and
+   * chamfered housing use the part's paint, barrels use `Part.trim`.
+   */
+  | {
+      kind: 'turret';
+      radius: number;
+      height: number;
+      barrels?: number;
+      barrelLength: number;
+      barrelRadius?: number;
+      /** Housing size [w, h, d]; defaults from radius. */
+      housing?: Vec3;
+    }
+  /**
+   * Seeded scatter of small plated boxes over a `w` × `d` patch of the XZ
+   * plane (normal +Y) — machinery, vents, conduits. About a fifth of them are
+   * painted with `Part.trim` (if set).
+   */
+  | { kind: 'greeble'; w: number; d: number; count: number; seed?: number; size?: [number, number]; height?: [number, number] };
+
+/**
+ * A named hinge. Parts that reference it are merged into their own child mesh
+ * pivoting about `pivot` (ship coordinates, unscaled, in the pose the parts
+ * were authored in). Mirrored parts automatically get a mirrored twin joint
+ * called `${id}.L` that moves symmetrically.
+ */
+export interface Articulation {
+  id: string;
+  pivot: Vec3;
+  /** Hinge axis in ship coordinates (normalised at build time). */
+  axis: Vec3;
+  /** Parent joint id — joints nest (e.g. a wing fold inside a swing wing). */
+  parent?: string;
+  /** Angle limits in degrees, relative to the authored pose. Channels map 0..1 across this. */
+  range?: [number, number];
+  /** Initial angle in degrees (default 0 = authored pose). */
+  rest?: number;
+  /** Control channel that drives this joint, e.g. 'sweep', 'fold', 'bay', 'radar'. */
+  channel?: string;
+  /**
+   * Set false for centreline joints: mirrored parts then ride on this joint
+   * itself instead of on a mirrored `.L` twin.
+   */
+  mirror?: boolean;
+}
 
 export interface Part {
   name?: string;
@@ -57,6 +111,21 @@ export interface Part {
   group?: number;
   emissive?: number;
   gloss?: number;
+  /** Secondary paint for composite shapes (turret barrels, greeble caps). */
+  trim?: Paint;
+  /** Resolve the paint slot against another faction's livery (salvaged parts). */
+  livery?: FactionId;
+  /** Explicit colour, overriding the paint slot's colour (surface preset still follows `paint`). */
+  color?: string;
+  /** Hinge this part moves with: a joint id from `Blueprint.articulations`, or an inline definition. */
+  articulation?: string | Articulation;
+  /**
+   * Linear/radial array. Copy i is transformed by translate(step·i) ·
+   * rotateXYZ(rot·i) applied on top of the part's own transform.
+   */
+  repeat?: { count: number; step?: Vec3; rot?: Vec3 };
+  /** Emit a hardpoint socket at this part's origin (one per repeat/mirror copy). */
+  socket?: { id: string; kind: Hardpoint['kind'] };
 }
 
 export interface EngineMount {
@@ -72,6 +141,10 @@ export interface Hardpoint {
   pos: Vec3;
   kind: 'gun' | 'missile' | 'turret' | 'beam' | 'hangar';
   mirror?: boolean;
+  /** Parent the socket to a joint so it moves with it (mirrored copy uses `${id}.L`). */
+  articulation?: string;
+  /** Socket orientation, Euler XYZ degrees (default: facing +Z). */
+  rot?: Vec3;
 }
 
 export type ShipClass =
@@ -95,6 +168,10 @@ export interface Blueprint {
   parts: Part[];
   engines: EngineMount[];
   hardpoints?: Hardpoint[];
+  /** Hinged part groups (variable-geometry wings, bay doors, radar dishes). */
+  articulations?: Articulation[];
+  /** Per-design livery tweaks layered over the faction livery (build-time overrides still win). */
+  livery?: Partial<Livery>;
   /** Flavour text for the database / briefing screens. */
   notes?: string;
 }

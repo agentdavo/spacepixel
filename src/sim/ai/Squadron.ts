@@ -1,6 +1,6 @@
-import { Vector3 } from 'three';
+import { Quaternion, Vector3 } from 'three';
 import type { ShipEntity } from '../Fleet';
-import { matchVelocity } from './Pilot';
+import { matchVelocity, type SteerGains } from './Pilot';
 import { brainOf, isCapital, setManeuver, type Brain, type FormationKind, type Order } from './state';
 
 /**
@@ -14,8 +14,8 @@ import { brainOf, isCapital, setManeuver, type Brain, type FormationKind, type O
  */
 
 /**
- * Slot for wingman `i` (0-based, leader excluded) in the leader's body frame,
- * spacing in metres. Body frame: right = −X, up = +Y, forward = +Z.
+ * Slot for wingman `i` (0-based, leader excluded) in the formation frame,
+ * spacing in metres. Axes like a ship body: right = −X, up = +Y, forward = +Z.
  */
 export function formationSlot(kind: FormationKind, i: number, spacing: number, out: Vector3): Vector3 {
   // Build in (right, up, fwd) then convert to body (−right, up, fwd).
@@ -58,10 +58,57 @@ const _err = new Vector3();
 const _des = new Vector3();
 const _fwd = new Vector3();
 const _up = new Vector3();
+const _ff = new Vector3();
+const _fu = new Vector3();
+const _left = new Vector3();
+const _prevUp = new Vector3();
+const _rq = new Quaternion();
+const _gains: SteerGains = { kp: 5, kd: 0.35, bank: 1, authority: 1 };
 
-/** World position of a brain's slot on its leader. */
-export function slotWorld(b: Brain, leader: ShipEntity, out: Vector3): Vector3 {
-  return out.copy(b.slot).applyQuaternion(leader.flight.orientation).add(leader.flight.position);
+/**
+ * Roll the brain's formation frame toward the leader's up: low-passed and
+ * rate-limited so the slot never swings faster than ~30 m/s (an outer slot
+ * 150 m out follows a leader's aileron roll slowly; a close one briskly).
+ */
+function trackFormationUp(b: Brain, leader: ShipEntity, dt: number): void {
+  const lf = leader.flight;
+  lf.up(_up);
+  if (!b.formUpInit) {
+    b.formUp.copy(_up);
+    b.formUpInit = true;
+    return;
+  }
+  if (dt <= 0) return;
+  lf.forward(_ff);
+  // Signed angle about the leader's forward axis from formUp to its up.
+  _fu.copy(b.formUp).addScaledVector(_ff, -b.formUp.dot(_ff));
+  if (_fu.lengthSq() < 1e-6) {
+    b.formUp.copy(_up);
+    return;
+  }
+  _fu.normalize();
+  const ang = Math.atan2(_left.crossVectors(_fu, _up).dot(_ff), _fu.dot(_up));
+  const maxRate = Math.min(0.6, Math.max(0.12, 30 / Math.max(1, b.slot.length())));
+  let step = ang * (1 - Math.exp(-dt / 0.8));
+  const lim = maxRate * dt;
+  step = step > lim ? lim : step < -lim ? -lim : step;
+  b.formUp.copy(_fu).applyQuaternion(_rq.setFromAxisAngle(_ff, step));
+}
+
+/**
+ * World position of a brain's slot: leader position + slot offset in the
+ * formation frame (leader heading, roll-smoothed up). Optionally writes the
+ * frame's up vector to `upOut`.
+ */
+export function slotWorld(b: Brain, leader: ShipEntity, out: Vector3, upOut?: Vector3): Vector3 {
+  const lf = leader.flight;
+  lf.forward(_ff);
+  _fu.copy(b.formUpInit ? b.formUp : lf.up(_fu)).addScaledVector(_ff, -_fu.dot(_ff));
+  if (_fu.lengthSq() < 1e-6) lf.up(_fu);
+  _fu.normalize();
+  _left.crossVectors(_fu, _ff); // up × fwd = body +X (left)
+  if (upOut) upOut.copy(_fu);
+  return out.copy(lf.position).addScaledVector(_left, b.slot.x).addScaledVector(_fu, b.slot.y).addScaledVector(_ff, b.slot.z);
 }
 
 /**
@@ -71,25 +118,33 @@ export function slotWorld(b: Brain, leader: ShipEntity, out: Vector3): Vector3 {
 export function flyFormation(s: ShipEntity, b: Brain, leader: ShipEntity, dt: number, escape: Vector3 | null, urgency: number): number {
   const lf = leader.flight;
   const f = s.flight;
-  slotWorld(b, leader, _slot);
+  _prevUp.copy(b.formUpInit ? b.formUp : _prevUp.set(0, 0, 0));
+  trackFormationUp(b, leader, dt);
+  const frameUp = _up;
+  slotWorld(b, leader, _slot, frameUp);
 
-  // Slot velocity = leader velocity + ω × r (the slot swings when the leader turns).
+  // Slot velocity = leader velocity + ω × r, where ω is the leader's turn
+  // rate minus its roll (the formation frame doesn't roll with it).
   _omega.set(-lf.bodyRates.x, lf.bodyRates.y, lf.bodyRates.z).applyQuaternion(lf.orientation);
+  lf.forward(_fwd);
+  _omega.addScaledVector(_fwd, -_omega.dot(_fwd));
+  // …plus the formation frame's own (smoothed) roll.
+  if (dt > 0 && _prevUp.lengthSq() > 0.5) _omega.addScaledVector(_fwd, _prevUp.cross(b.formUp).dot(_fwd) / dt);
   _err.subVectors(_slot, lf.position);
   _vSlot.crossVectors(_omega, _err).add(lf.velocity);
 
   _err.subVectors(_slot, f.position);
   const d = _err.length();
   // Closing speed toward the slot: linear near it, braking-limited further out.
-  const corr = Math.min(0.9 * d, Math.sqrt(2 * 22 * d), 160);
+  const corr = Math.min(0.6 * d, Math.sqrt(2 * 25 * d), 160);
   _des.copy(_vSlot);
   if (d > 1e-3) _des.addScaledVector(_err, corr / d);
+  // Feed forward the leader's throttle / burner changes (felt forward accel).
+  _des.addScaledVector(_fwd, lf.bodyAccel.z * 0.5);
 
   // Never turn around to reach a slot we overshot — slow down and let it come back.
-  lf.forward(_fwd);
-  const leadSpeed = lf.speed;
   const along = _des.dot(_fwd);
-  const minAlong = Math.max(35, leadSpeed * 0.45);
+  const minAlong = Math.max(35, lf.speed * 0.45);
   if (along < minAlong) _des.addScaledVector(_fwd, minAlong - along);
 
   if (escape && urgency > 0) {
@@ -97,9 +152,13 @@ export function flyFormation(s: ShipEntity, b: Brain, leader: ShipEntity, dt: nu
     _des.normalize().lerp(escape, Math.min(1, urgency * 1.6)).normalize().multiplyScalar(sp);
   }
 
-  // Close in: match the leader's roll so the formation banks as one.
-  const up = d < 150 ? lf.up(_up) : null;
-  matchVelocity(s.controls, f, _des, up, b.pilot, dt, b.gains, d > 60);
+  // Close in: small corrections with stick only (no roll-to-turn), wings level
+  // with the formation frame so the flight banks as one.
+  _gains.kp = b.gains.kp;
+  _gains.kd = b.gains.kd;
+  _gains.authority = b.gains.authority;
+  _gains.bank = d < 120 ? 0 : b.gains.bank;
+  matchVelocity(s.controls, f, _des, d < 150 ? frameUp : null, b.pilot, dt, _gains, true, 30);
   return d;
 }
 
@@ -110,6 +169,7 @@ export function setFormation(wing: readonly ShipEntity[], kind: FormationKind, s
     b.formation = kind;
     b.spacing = spacing;
     b.slotIndex = i;
+    b.formUpInit = false;
     formationSlot(kind, i, spacing, b.slot);
   }
 }
@@ -130,6 +190,7 @@ export function issueOrder(wing: readonly ShipEntity[], order: Order, leader: Sh
     b.leader = leader;
     b.slotIndex = i;
     formationSlot(b.formation, i, b.spacing, b.slot);
+    b.formUpInit = false;
     b.nextThink = 0;
     switch (order) {
       case 'formUp':
@@ -142,7 +203,7 @@ export function issueOrder(wing: readonly ShipEntity[], order: Order, leader: Sh
         break;
       case 'breakAndAttack': {
         // Fan out from the formation: each ship peels away along its slot side.
-        _err.copy(b.slot).applyQuaternion(leader.flight.orientation);
+        _err.subVectors(slotWorld(b, leader, _slot), leader.flight.position);
         if (_err.lengthSq() < 1) _err.copy(_up);
         _err.normalize();
         b.refDir.copy(_fwd).addScaledVector(_err, 0.9).addScaledVector(_up, i % 2 === 0 ? 0.35 : -0.35).normalize();

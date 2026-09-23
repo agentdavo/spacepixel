@@ -2,12 +2,13 @@ import {
   BufferGeometry,
   CylinderGeometry,
   Float32BufferAttribute,
+  MathUtils,
   Matrix4,
   SphereGeometry,
   TorusGeometry,
   Vector3,
 } from 'three';
-import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Shape, Station } from './Blueprint';
 
 /**
@@ -147,6 +148,184 @@ export function box(w: number, h: number, d: number, c = 0): BufferGeometry {
   ]);
 }
 
+/** Surface of revolution around +Z. `profile` = [radius, z] points; closed profiles give solid shells. */
+export function lathe(profile: [number, number][], segments = 12, phase = 0, crease = 40): BufferGeometry {
+  const tb = new TriBuilder();
+  const rings = profile.map(([r, z]) => {
+    const ring: Vector3[] = [];
+    for (let i = 0; i < segments; i++) {
+      const a = phase + (i / segments) * Math.PI * 2;
+      ring.push(new Vector3(Math.cos(a) * r, Math.sin(a) * r, z));
+    }
+    return ring;
+  });
+  for (let r = 0; r < rings.length - 1; r++) {
+    const A = rings[r];
+    const B = rings[r + 1];
+    for (let i = 0; i < segments; i++) {
+      const j = (i + 1) % segments;
+      tb.tri(A[i], A[j], B[j], [i / segments, r], [j / segments, r], [j / segments, r + 1]);
+      tb.tri(A[i], B[j], B[i], [i / segments, r], [j / segments, r + 1], [i / segments, r + 1]);
+    }
+  }
+  return creased(tb.build(), crease);
+}
+
+/** Chamfered arch in the XY plane, swept CCW from `start` through `arc` degrees. */
+export function rib(radius: number, thickness: number, depth: number, arc = 180, start = 0, segments = 12, c = 0): BufferGeometry {
+  // Section coords: x → Z (depth), y → radial offset. (ẑ × r̂ = tangent, so loft winding holds.)
+  const sec = sectionPoints({ z: 0, w: depth, h: thickness, c });
+  const n = sec.length;
+  const rings: Vector3[][] = [];
+  for (let k = 0; k <= segments; k++) {
+    const a = MathUtils.degToRad(start + (arc * k) / segments);
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    rings.push(sec.map(([px, py]) => new Vector3(ca * (radius + py), sa * (radius + py), px)));
+  }
+  const tb = new TriBuilder();
+  for (let r = 0; r < segments; r++) {
+    const A = rings[r];
+    const B = rings[r + 1];
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      tb.tri(A[i], A[j], B[j], [i / n, r], [j / n, r], [j / n, r + 1]);
+      tb.tri(A[i], B[j], B[i], [i / n, r], [j / n, r + 1], [i / n, r + 1]);
+    }
+  }
+  if (arc < 360) {
+    const fan = (ring: Vector3[], reverse: boolean) => {
+      const ctr = ring.reduce((acc, p) => acc.add(p), new Vector3()).divideScalar(ring.length);
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        if (reverse) tb.tri(ctr, ring[j], ring[i], [0.5, 0.5], [0, 0], [1, 0]);
+        else tb.tri(ctr, ring[i], ring[j], [0.5, 0.5], [0, 0], [1, 0]);
+      }
+    };
+    fan(rings[0], true);
+    fan(rings[segments], false);
+  }
+  return tb.build();
+}
+
+/** A tiny deterministic PRNG (mulberry32) so greebles are stable between builds. */
+export function rng(seed: number): () => number {
+  let a = (seed * 2654435761) >>> 0 || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function merge(list: BufferGeometry[]): BufferGeometry | undefined {
+  const clean = list.map((g) => {
+    const out = g.index ? g.toNonIndexed() : g;
+    for (const name of Object.keys(out.attributes)) {
+      if (!['position', 'normal', 'uv'].includes(name)) out.deleteAttribute(name);
+    }
+    return out;
+  });
+  if (!clean.length) return undefined;
+  return mergeGeometries(clean, false) ?? undefined;
+}
+
+/** Composite gun turret on y = 0 facing +Z. Returns hull + barrels (trim). */
+export function turret(
+  radius: number,
+  height: number,
+  barrels = 2,
+  barrelLength = radius * 2.2,
+  barrelRadius = radius * 0.11,
+  housing?: [number, number, number],
+): ShapeParts {
+  const baseH = height * 0.35;
+  const base = lathe(
+    [
+      [0, 0],
+      [radius, 0],
+      [radius * 0.94, baseH],
+      [0, baseH],
+    ],
+    8,
+    Math.PI / 8,
+    20,
+  );
+  base.applyMatrix4(new Matrix4().makeRotationX(-Math.PI / 2)); // Z-axis lathe → stand on Y.
+  const [hw, hh, hd] = housing ?? [radius * 1.5, height - baseH, radius * 1.7];
+  const c = Math.min(hw, hh) * 0.28;
+  const house = loft([
+    { z: -hd / 2, w: hw, h: hh, c },
+    { z: hd * 0.2, w: hw, h: hh, c },
+    { z: hd / 2, w: hw * 0.82, h: hh * 0.62, y: -hh * 0.12, c: c * 0.7 },
+  ]);
+  house.translate(0, baseH + hh / 2, -hd * 0.08);
+  const trims: BufferGeometry[] = [];
+  const spacing = Math.min(hw * 0.8 / Math.max(barrels - 1, 1), barrelRadius * 3.2);
+  const by = baseH + hh * 0.42;
+  for (let i = 0; i < barrels; i++) {
+    const x = (i - (barrels - 1) / 2) * spacing;
+    const b = cylinder(barrelRadius * 0.85, barrelRadius, barrelLength, 8);
+    b.translate(x, by, hd * 0.35 + barrelLength / 2);
+    const muzzle = cylinder(barrelRadius * 1.25, barrelRadius * 1.25, barrelLength * 0.12, 8);
+    muzzle.translate(x, by, hd * 0.35 + barrelLength * 0.94);
+    trims.push(b, muzzle);
+  }
+  return { main: merge([base, house])!, trim: merge(trims) };
+}
+
+/** Seeded scatter of boxes over a w × d patch (XZ plane, standing on y = 0). */
+export function greeble(
+  w: number,
+  d: number,
+  count: number,
+  seed = 1,
+  size: [number, number] = [0.1, 0.4],
+  height: [number, number] = [0.03, 0.12],
+): ShapeParts {
+  const r = rng(seed);
+  const main: BufferGeometry[] = [];
+  const trim: BufferGeometry[] = [];
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+  for (let i = 0; i < count; i++) {
+    let bw = lerp(size[0], size[1], r());
+    let bd = lerp(size[0], size[1], r());
+    const shape = r();
+    if (shape < 0.2) bd *= 3; // long conduit
+    else if (shape < 0.3) bw *= 2.5; // wide block
+    bw = Math.min(bw, w);
+    bd = Math.min(bd, d);
+    const bh = lerp(height[0], height[1], r());
+    // Snap to a coarse grid so the scatter reads as machinery, not noise.
+    const grid = size[0] * 0.5;
+    const x = Math.round(lerp(-w / 2 + bw / 2, w / 2 - bw / 2, r()) / grid) * grid;
+    const z = Math.round(lerp(-d / 2 + bd / 2, d / 2 - bd / 2, r()) / grid) * grid;
+    const g = box(bw, bh, bd, Math.min(bw, bh) * 0.15);
+    g.translate(x, bh / 2, z);
+    (r() < 0.22 ? trim : main).push(g);
+  }
+  return { main: merge(main) ?? box(0.001, 0.001, 0.001), trim: merge(trim) };
+}
+
+/** A shape can produce a secondary "trim" geometry painted with `Part.trim`. */
+export interface ShapeParts {
+  main: BufferGeometry;
+  trim?: BufferGeometry;
+}
+
+export function buildShapeParts(shape: Shape): ShapeParts {
+  switch (shape.kind) {
+    case 'turret':
+      return turret(shape.radius, shape.height, shape.barrels, shape.barrelLength, shape.barrelRadius, shape.housing);
+    case 'greeble':
+      return greeble(shape.w, shape.d, shape.count, shape.seed, shape.size, shape.height);
+    default:
+      return { main: buildShape(shape) };
+  }
+}
+
 export function buildShape(shape: Shape): BufferGeometry {
   switch (shape.kind) {
     case 'loft':
@@ -164,6 +343,15 @@ export function buildShape(shape: Shape): BufferGeometry {
       return box(shape.w, shape.h, shape.d, shape.c);
     case 'torus':
       return torus(shape.radius, shape.tube, shape.segments, shape.tubeSegments);
+    case 'lathe':
+      return lathe(shape.profile, shape.segments, shape.phase);
+    case 'rib':
+      return rib(shape.radius, shape.thickness, shape.depth, shape.arc, shape.start, shape.segments, shape.c);
+    case 'turret':
+    case 'greeble': {
+      const p = buildShapeParts(shape);
+      return p.trim ? merge([p.main, p.trim])! : p.main;
+    }
   }
 }
 
