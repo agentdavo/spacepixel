@@ -184,7 +184,7 @@ export class InkPipeline {
     const vignette = float(1).sub(smoothstep(0.35, 0.95, length(centered.mul(vec3(1.25, 1.0, 0).xy))));
     const grain = fract(sin(dot(screenUV.add(this.grainSeed), vec3(12.9898, 78.233, 0).xy)).mul(43758.5453)).sub(0.5);
     // Anime speed lines: radial streaks on the frame edges while boosting.
-    const ang = atan(centered.y, centered.x.mul(1.7));
+    const ang = atan(centered.y, centered.x.mul(1.7).add(1e-5)); // never atan(0,0) = NaN (spreads via FXAA)
     const sector = floor(ang.mul(38.0).add(floor(time.mul(24.0)).mul(7.31)));
     const lineHash = fract(sin(sector.mul(91.17)).mul(43758.5453));
     const radius = length(centered.mul(vec2(1.7, 1.0)));

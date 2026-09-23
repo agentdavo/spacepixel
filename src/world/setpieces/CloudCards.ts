@@ -197,7 +197,7 @@ export class CloudCards {
       const L: Node = LightRig.keyDirection;
       const lx: Node = dot(L, (cameraWorldMatrix as Node).element(0).xyz);
       const ly: Node = dot(L, (cameraWorldMatrix as Node).element(1).xyz);
-      vLight.assign(vec2(lx.mul(c).add(ly.mul(sn)), ly.mul(c).sub(lx.mul(sn))).mul(0.09));
+      vLight.assign(vec2(lx.mul(c).add(ly.mul(sn)), ly.mul(c).sub(lx.mul(sn))).mul(0.055));
       vFlash.assign(this.flash.mul(exp(length(centre.sub(this.flashPos)).div(this.flashRadius).negate())));
       return centre.add(right.mul(rx.mul(p.w))).add(up.mul(ry.mul(p.w)));
     })();
@@ -216,8 +216,8 @@ export class CloudCards {
       const base: Node = mix(colA, colB, vLook.y.mul(vLook.y));
       const col: Node = mix(vec3(shade), vec3(base), lit.mul(0.75).add(0.25)).mul(mix(1.0, 0.82, core)).toVar();
       // Silver lining along the lit edge of the silhouette; cores glow from within.
-      const edgeBand: Node = step(dens, cut.add(0.06)).mul(lit);
-      col.assign(mix(col, vec3(lining), edgeBand.mul(0.85)));
+      const edgeBand: Node = step(dens, cut.add(0.035)).mul(lit);
+      col.assign(mix(col, vec3(lining), edgeBand.mul(0.5)));
       col.addAssign(vec3(glow).mul(step(0.78, dens)));
       return col.add(vec3(0.85, 0.75, 1.0).mul(vFlash.mul(step(0.25, dens)).mul(1.4)));
     })();

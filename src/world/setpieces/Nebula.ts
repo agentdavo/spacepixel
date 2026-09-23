@@ -7,6 +7,7 @@ import type { SetPieceKind } from '@/game/campaign/types';
 import type { SetPiece, SetPieceFrame, SetPieceParams } from './types';
 import { bool, num, str } from './types';
 import { CloudCards } from './CloudCards';
+import { LightPoints, LIGHT_PULSE, type LightSpec } from './LightPoints';
 import { fxMix } from './fxMix';
 import { useBlendedMRT } from '../BlendedMRT';
 import { mulberry, seedOf, smooth } from './util';
@@ -43,6 +44,7 @@ export class Nebula implements SetPiece {
   private entered = false;
   private exited = false;
   private readonly outer: CloudCards;
+  private readonly gas: LightPoints;
   private readonly near: CloudCards;
   private readonly bolts: Mesh;
   private readonly boltPos: Float32Array;
@@ -82,11 +84,11 @@ export class Nebula implements SetPiece {
     const flatten = num(params, 'flatten', 0.55);
     const seed = seedOf(tag);
     const rand = mulberry(seed);
-    const colors: [string, string] = [str(params, 'colorA', '#8a4fb8'), str(params, 'colorB', '#3b7fa6')];
-    const shade = str(params, 'shade', '#2a1840');
+    const colors: [string, string] = [str(params, 'colorA', '#7a3aa8'), str(params, 'colorB', '#2f6f96')];
+    const shade = str(params, 'shade', '#1d1030');
 
     // ── the volume: big cards filling a squashed ellipsoid ────────────
-    const N = 280;
+    const N = 200;
     const puffs = new Float32Array(N * 4);
     // Anisotropic mass with a few towering columns (the anime "cumulus wall").
     const cols = [0, 1, 2, 3].map(() => new Vector3((rand() - 0.5) * R, 0, (rand() - 0.5) * R));
@@ -101,12 +103,31 @@ export class Nebula implements SetPiece {
         d.multiplyScalar(R * 0.95 * Math.pow(rand(), 0.6)).multiply(this.b.set(1.25, 1, 0.95));
       }
       const core = 1 - Math.min(1, d.length() / R);
-      const size = R * (0.09 + 0.2 * rand()) * (0.75 + 0.6 * core);
+      const size = R * (0.13 + 0.26 * rand()) * (0.75 + 0.6 * core);
       puffs.set([d.x, d.y, d.z, size], i * 4);
     }
     this.outer = new CloudCards({ seed: seed % 1000, puffs, colors, shade, near: [0.3, 1.1], lining: str(params, 'lining', '#e0c8ff'), glow: str(params, 'glow', '#3a1450') });
     this.outer.flashRadius.value = R * 0.25;
     this.group.add(this.outer.mesh);
+
+    // Gas: huge soft additive glows lit from within, so the mass reads as a nebula, not a rock pile.
+    const glows: LightSpec[] = [];
+    for (let i = 0; i < 9; i++) {
+      glows.push({
+        pos: new Vector3((rand() - 0.5) * R * 1.4, (rand() - 0.4) * R * 0.7, (rand() - 0.5) * R * 1.2),
+        color: i % 3 === 0 ? str(params, 'colorB', '#3b7fa6') : str(params, 'gasColor', '#b04fd8'),
+        size: R * (0.55 + rand() * 0.5),
+        mode: LIGHT_PULSE,
+        rate: 0.03 + rand() * 0.03,
+        phase: rand(),
+        gain: 0.16,
+      });
+    }
+    this.gas = new LightPoints(glows, { minPixels: 0, glint: 0, soft: true });
+    this.gas.mesh.renderOrder = 4;
+    // Gas veils over the cards too (additive, no depth test) — the mass glows from within.
+    (this.gas.mesh.material as MeshBasicNodeMaterial).depthTest = false;
+    this.group.add(this.gas.mesh);
 
     // ── the drifting layer around the camera (inside only) ────────────
     const M = 70;
@@ -246,6 +267,8 @@ export class Nebula implements SetPiece {
       this.near.erode.value = 1 - this.inside;
     }
 
+    this.gas.update(t);
+    this.gas.intensity.value = 1 - 0.85 * this.inside;
     // Lightning: deterministic strike schedule (seekable), 3 bolt slots.
     let flashNear = 0;
     if (this.lightning) {
@@ -307,6 +330,7 @@ export class Nebula implements SetPiece {
   dispose(): void {
     fxMix.release(this);
     this.outer.dispose();
+    this.gas.dispose();
     this.near.dispose();
     this.bolts.geometry.dispose();
     this.boltMat.dispose();

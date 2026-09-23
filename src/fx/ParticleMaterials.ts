@@ -186,6 +186,9 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
 
     const c = d.P.xyz.add(g.uAnchorOffset).toVar();
     const dist = max(length(c), 1e-3);
+    // Opaque blobs shrink away as the camera flies through them — a chase
+    // camera crossing a smoke trail must never be filled edge to edge.
+    r.assign(r.mul(smoothstep(3.0, 22.0, dist)));
     const right = camWorld.element(0).xyz;
     const up = camWorld.element(1).xyz;
     const pix = dist.mul(2).div(projMatrix.element(1).y.mul(screenSize.y));

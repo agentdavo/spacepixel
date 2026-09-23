@@ -12,6 +12,7 @@ import { Missiles, type LockState } from '@/sim/Missiles';
 import { Capitals } from '@/sim/Capitals';
 import { loadProfile } from '@/game/Profile';
 import { WeaponVisuals } from '../WeaponVisuals';
+import { CombatFx } from '../CombatFx';
 import { StarSystemView, type GateInstance } from '../StarSystemView';
 import { Hyperspace } from '../Hyperspace';
 import { SpaceDust } from '../SpaceDust';
@@ -66,6 +67,9 @@ export class FlightScene implements GameScene, FlightHostScene {
   private wingmen: { ship: ShipEntity; slot: Vector3 }[] = [];
   private bandits: Bandit[] = [];
   private visuals: WeaponVisuals;
+  private combatFx: CombatFx;
+  /** ?fx=0 disables particle FX (A/B checks). */
+  private fxOn = new URLSearchParams(location.search).get('fx') !== '0';
   private hud: FlightHud;
   readonly universe: Universe = generateUniverse(1994);
   private systemId: string;
@@ -154,6 +158,8 @@ export class FlightScene implements GameScene, FlightHostScene {
 
     this.visuals = new WeaponVisuals(this.weapons, this.missiles);
     this.scene.add(this.visuals.group);
+    this.combatFx = new CombatFx(this.weapons, this.missiles);
+    this.scene.add(this.combatFx.fx.object);
 
     this.chase.snap(this.player.flight);
     this.playerSubject = { position: this.player.flight.position, velocity: this.player.flight.velocity, radius: 9 };
@@ -264,6 +270,9 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.weapons.step(dt);
     this.missiles.step(dt);
 
+    // 4.5 Particles from this frame's events (emits are universe-space).
+    if (this.fxOn) this.combatFx.consume(dt);
+
     // 4a. Campaign episode: runner, set pieces, chatter.
     if (this.campaign) {
       this.campaign.update(dt, time);
@@ -308,6 +317,7 @@ export class FlightScene implements GameScene, FlightHostScene {
 
     // 7. Visuals + HUD in render space.
     this.visuals.update(this.world, dt);
+    this.combatFx.update(dt, this.world.eye);
     const cruiseK = pf.cruise === 'on' ? 0.55 : pf.cruise === 'spool' ? (pf.cruiseT / pf.spec.cruiseSpool) * 0.4 : 0;
     postFx.boost = Math.max(this.chase.boostAmount, cruiseK);
     postFx.speed = Math.min(1, pf.speed / pf.spec.boostSpeed);

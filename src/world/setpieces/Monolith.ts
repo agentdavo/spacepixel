@@ -13,6 +13,7 @@ import {
   cameraPosition,
   cameraViewMatrix,
   cos,
+  cross,
   dot,
   exp,
   float,
@@ -219,7 +220,7 @@ export class Monolith implements SetPiece {
     const hi: Node = smoothstep(0.55, 0.58, ndl);
     const shadow = vec3(0.004, 0.0028, 0.009);
     const mid = vec3(0.028, 0.019, 0.058);
-    const top = vec3(0.05, 0.036, 0.1);
+    const top = vec3(0.036, 0.025, 0.074);
     const col: Node = mix(mix(shadow, mid, lit), top, hi).toVar();
 
     // The lattice: four octaves of an impossibly precise grid.
@@ -303,8 +304,24 @@ export class Monolith implements SetPiece {
       const ringD: Node = abs(theta.sub(thetaE)).div(max(fwidth(theta), 1e-7));
       const einstein: Node = exp(ringD.mul(-0.7)).mul(0.18).add(exp(abs(p.sub(1.22)).mul(-40.0)).mul(0.05));
 
+      // Eclipse rays: cel spokes of the hidden star fanning off the lit limb (reads at any range).
+      const e1: Node = normalize(cross(cHat, vec3(0.0, 1.0, 0.0)).add(vec3(1e-6, 0, 0)));
+      const e2: Node = cross(cHat, e1);
+      const ang: Node = atan(dot(qHat, e2), dot(qHat, e1).add(1e-6)).div(Math.PI * 2).add(0.5);
+      const sector: Node = floor(ang.mul(72.0));
+      const hr: Node = fract(sin(sector.mul(127.1).add(3.7)).mul(43758.5453));
+      const hs: Node = fract(sin(sector.mul(269.5).add(1.3)).mul(43758.5453));
+      const across: Node = abs(fract(ang.mul(72.0)).sub(0.5)).mul(2.0);
+      const rayLen: Node = hr.mul(1.1).add(0.25);
+      const ray: Node = step(0.42, hs)
+        .mul(float(1).sub(smoothstep(0.25, 0.6, across.div(max(float(1).sub(x.div(rayLen)), 0.05)))))
+        .mul(float(1).sub(smoothstep(rayLen.mul(0.4), rayLen, x)))
+        .mul(smoothstep(-0.15, 0.85, facing));
+      const rays: Node = floor(ray.mul(3.0)).div(3.0).mul(0.16);
+
       const glow: Node = vec3(tint)
         .mul(coronaStep.mul(lightSide))
+        .add(vec3(0.85, 0.8, 1.0).mul(rays))
         .add(vec3(0.92, 0.88, 1.0).mul(razor.mul(razorI).add(flare)))
         .add(vec3(0.75, 0.7, 1.0).mul(einstein))
         .add(rimTint)

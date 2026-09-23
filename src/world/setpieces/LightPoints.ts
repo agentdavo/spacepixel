@@ -1,13 +1,4 @@
-import {
-  AdditiveBlending,
-  Color,
-  Float32BufferAttribute,
-  InstancedBufferAttribute,
-  InstancedBufferGeometry,
-  Mesh,
-  Sphere,
-  Vector3,
-} from 'three';
+import { AdditiveBlending, Color, Float32BufferAttribute, InstancedBufferAttribute, InstancedBufferGeometry, Mesh, Sphere, Vector3 } from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import {
   Fn,
@@ -64,6 +55,8 @@ export interface LightPointOptions {
   fadeFar?: number;
   /** Cross-glint arms strength (anime sparkle). */
   glint?: number;
+  /** Soft, coreless glow (gas / aura) instead of a hot point light. */
+  soft?: boolean;
 }
 
 /**
@@ -128,7 +121,10 @@ export class LightPoints {
       const t: Node = this.time.mul(md.y).add(col.w);
       const strobe = step(fract(t), md.z);
       const hsh = fract(sin(floor(t.mul(3.0)).mul(91.345).add(col.w.mul(311.7))).mul(43758.55));
-      const flicker = step(0.55, hsh).mul(0.8).add(0.12).mul(sin(t.mul(17.0)).mul(0.15).add(0.85));
+      const flicker = step(0.55, hsh)
+        .mul(0.8)
+        .add(0.12)
+        .mul(sin(t.mul(17.0)).mul(0.15).add(0.85));
       const pulse = sin(t.mul(6.2832)).mul(0.5).add(0.5);
       const m = md.x;
       const b = float(1)
@@ -145,21 +141,31 @@ export class LightPoints {
       return cameraProjectionMatrix.mul(vec4(view.xy.add(positionGeometry.xy.mul(r)), view.z, 1));
     })();
 
-    mat.colorNode = Fn(() => {
-      const q: Node = vUV;
-      const d = length(q);
-      const core = exp(d.mul(d).mul(-18.0)).mul(2.5);
-      const halo = exp(d.mul(-4.5)).mul(0.5);
-      const ax = abs(q.x);
-      const ay = abs(q.y);
-      const arms = exp(ax.mul(-30.0))
-        .mul(float(1).sub(ay).clamp(0, 1))
-        .add(exp(ay.mul(-30.0)).mul(float(1).sub(ax).clamp(0, 1)))
-        .mul(glint);
-      const shape = core.add(halo).add(arms).mul(float(1).sub(smoothstep(0.85, 1.0, d)));
-      // Hot white core inside the coloured sheath.
-      return vec3(vCol).mul(shape).add(vec3(core.mul(0.35)).mul(length(vCol).min(2)));
-    })();
+    mat.colorNode = opts.soft
+      ? Fn(() => {
+          const d = length(vUV as Node);
+          return vec3(vCol).mul(exp(d.mul(d).mul(-3.5)).mul(float(1).sub(smoothstep(0.6, 1.0, d))));
+        })()
+      : Fn(() => {
+          const q: Node = vUV;
+          const d = length(q);
+          const core = exp(d.mul(d).mul(-18.0)).mul(2.5);
+          const halo = exp(d.mul(-4.5)).mul(0.5);
+          const ax = abs(q.x);
+          const ay = abs(q.y);
+          const arms = exp(ax.mul(-30.0))
+            .mul(float(1).sub(ay).clamp(0, 1))
+            .add(exp(ay.mul(-30.0)).mul(float(1).sub(ax).clamp(0, 1)))
+            .mul(glint);
+          const shape = core
+            .add(halo)
+            .add(arms)
+            .mul(float(1).sub(smoothstep(0.85, 1.0, d)));
+          // Hot white core inside the coloured sheath.
+          return vec3(vCol)
+            .mul(shape)
+            .add(vec3(core.mul(0.35)).mul(length(vCol).min(2)));
+        })();
     mat.mrtNode = noInkMRT();
 
     this.mesh = new Mesh(geo, mat);
