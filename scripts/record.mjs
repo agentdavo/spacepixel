@@ -36,6 +36,7 @@ const browser = await chromium.launch({
 try {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
+  page.on('console', (m) => m.type() === 'error' && console.log(`[console.error] ${m.text().slice(0, 300)}`));
   const url = `http://127.0.0.1:${port}/?shot=1&record=${fps}&scene=${scene}&loop=0&t=${from}${extra ? '&' + extra : ''}`;
   await page.goto(url, { waitUntil: 'commit' });
   await page.waitForFunction(() => window.__VANGUARD__?.error || window.__VANGUARD__?.hooks?.step, null, { timeout: 300_000, polling: 250 });
