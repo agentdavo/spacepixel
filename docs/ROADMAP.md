@@ -63,9 +63,9 @@ opens the Reach up around them and gets the game in front of players.
 
 | # | Milestone | Pass/fail | Status |
 |---|---|---|---|
-| 1 | **Prologue** — 60 s scripted cold open: the gates, the Shattering, the Lanterns, two powers, the Signal (`?scene=prologue`) | plays at budget, skippable, first launch only | 🔧 |
-| 2 | Cinema sequencer — timeline of shots, captions, cues (shared by prologue, cutscenes, trailer) | a shot list is data only | 🔧 |
-| 3 | Attract mode / trailer — title idles into the prologue and flybys | runs unattended 10 min | |
+| 1 | **Prologue** — 60 s scripted cold open: the gates, the Shattering, the Lanterns, two powers, the Signal (`?scene=prologue`) | plays at budget, skippable, first launch only (`npm run flow-check`) | ✅ |
+| 2 | Cinema sequencer — timeline of shots, captions, cues (shared by prologue, cutscenes, trailer) | a shot list is data only (`src/cinema`) | ✅ |
+| 3 | Attract mode / trailer — title idles into the prologue and flybys | runs unattended 10 min | 🔧 idle title → prologue reel |
 | 4 | Photo mode + clip capture (headless webm/GIF from recorded input) | 1080p clip from a replay | |
 | 5 | **Stations** — refineries, salvage yards, bastions, free ports, 1–3 per system | seeded, on star map | 🔧 |
 | 6 | **Docking** — request within 5 km, ILS corridor, auto-dock under 1 km, launch | hostiles within 10 km block it | 🔧 |
