@@ -33,6 +33,7 @@ import { LightRig, LIGHT_PRESETS } from '@/render/LightRig';
 import { noInkMRT } from '@/render/materials/InkChannels';
 import { useBlendedMRT } from '../BlendedMRT';
 import { postFx } from '@/render/post/PostFx';
+import { applyShipyardFlight, requestedShip } from './shipyardFlight';
 
 /**
  * Milestones 13–14 demo: `?scene=dogfight`.
@@ -103,15 +104,17 @@ export class DogfightScene implements GameScene {
     cathedral.flight.throttle = 0;
     cathedral.flight.velocity.set(0, 0, 0);
 
-    // Player + wingmen.
-    this.player = this.fleet.spawn('vf27-kestrel', 'concord', ORIGIN.clone(), FWD, { isPlayer: true });
+    // Player + wingmen. `?ship=<id>` flies any catalogued hull (handling + camera scale with size).
+    this.player = this.fleet.spawn(requestedShip(), 'concord', ORIGIN.clone(), FWD, { isPlayer: true });
     setPersonality(this.player, PERSONALITIES.ace);
-    for (const p of [new Vector3(40, 0, -32), new Vector3(-40, 4, -32)]) {
+    applyShipyardFlight(this.player, this.chase, this.camera);
+    const spread = Math.max(40, this.player.model.length * 0.9);
+    for (const p of [new Vector3(spread, 0, -spread * 0.8), new Vector3(-spread, 4, -spread * 0.8)]) {
       const s = this.fleet.spawn('vf27-kestrel', 'concord', ORIGIN.clone().add(p), FWD);
       setPersonality(s, PERSONALITIES.veteran);
       this.wing.push(s);
     }
-    setFormation(this.wing, 'fingerFour', 40);
+    setFormation(this.wing, 'fingerFour', spread);
     issueOrder(this.wing, 'formUp', this.player);
 
     // Bandit flight, inbound.

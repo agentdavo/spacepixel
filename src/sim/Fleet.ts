@@ -4,6 +4,7 @@ import type { FactionId, Livery } from '@/assets/Blueprint';
 import type { ShipModel } from '@/assets/ShipBuilder';
 import { assets } from '@/assets/AssetLibrary';
 import { FlightModel, KESTREL_SPEC, type FlightSpec } from './FlightModel';
+import { shipyardFlightSpec } from '@/game/shipyard/flight';
 
 /**
  * Every ship in a battle — player, wingmen, bandits — is a ShipEntity driven
@@ -98,7 +99,7 @@ export class Fleet {
   spawn(blueprintId: string, faction: FactionId, position: Vector3, facing: Vector3, opts: Partial<ShipEntity> = {}, livery?: Partial<Livery>): ShipEntity {
     const model = assets.ship(blueprintId, livery);
     this.root.add(model.root);
-    const flight = new FlightModel(SPECS[blueprintId] ?? (model.radius > 200 ? CAPITAL_SPEC : KESTREL_SPEC));
+    const flight = new FlightModel(SPECS[blueprintId] ?? shipyardFlightSpec(blueprintId, KESTREL_SPEC) ?? (model.radius > 200 ? CAPITAL_SPEC : KESTREL_SPEC));
     flight.position.copy(position);
     flight.orientation.setFromRotationMatrix(_m.lookAt(facing, _o.set(0, 0, 0), _up));
     flight.velocity.copy(facing).normalize().multiplyScalar(flight.spec.maxSpeed * 0.6);

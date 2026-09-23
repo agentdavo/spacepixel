@@ -89,6 +89,24 @@ time, so any frame can be seeked and screenshotted.
 
 ![Prologue](docs/screenshots/prologue-2-shattering.jpg)
 
+**Shipyard.** 28 hull designs. The Vanguard progression line runs T1 Kestrel
+(17 m) → T2 Super Kestrel → T3 Gauntlet heavy fighter → T4 Bulwark gunship
+(56 m) → T5 Resolute corvette (177 m, crew 20) → T6 Valiant light frigate
+(380 m, flown from the bridge). Alternates come from other yards: the Hegemony
+Seraph at high standing, and the Rustwake Knuckleduster and Scrapjack. Also:
+Rustwake Gaff harpoon raiders, Bulldog gunboats and the Mother Lode
+hauler-carrier; civil traffic (Swallow courier, Tallow mining barge, Longhaul
+freighter, Umbra Ebon tanker, Meridian Star liner); and line warships (DDG-40
+Arbiter, Hegemony Canticle). Prices, tiers, crew, hardpoint layouts and stat
+hints are data in `src/game/shipyard/catalog.ts`. Handling and camera
+distance scale with hull size (`src/game/shipyard/flight.ts`). To view them:
+`?scene=hangar&cam=6..10` (scale charts with captions),
+`?scene=hangar&ship=<id>` (four-view model sheet), and
+`?scene=dogfight&ship=<id>` (fly it; `&bridge=1|0` forces the bridge camera
+on or off).
+
+![Shipyard](docs/screenshots/ships-progression.jpg)
+
 ## How it's built
 
 **Rendering.** A scene pass writes an MRT G-buffer (HDR cel colour; view
@@ -128,7 +146,7 @@ follow the fight and the story.
 src/
   core/      engine loop, input, perf, floating origin, flags
   render/    renderer, light rig, cel/glow materials, ink pipeline + WGSL
-  assets/    blueprint format, hull kit, ship builder, 11 designs
+  assets/    blueprint format, hull kit, ship builder, 28 designs
   sim/       flight, fleet, weapons, missiles, capitals, cameras, ai/
   fx/        WebGPU compute particles, trails
   world/     sky, planets, gates, dust, asteroids, set pieces, scenes
