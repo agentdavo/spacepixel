@@ -54,6 +54,36 @@ Systems: data contract `src/game/campaign/types.ts`, runtime
 `src/game/CampaignRunner.ts` (tested: `npm test`), radio chatter with
 procedural anime portraits, codex, eyecatches, narrative set pieces.
 
+## Batch 3 — presentation, the frontier, the shared Reach
+
+The campaign's chapters I–IV are the first four game chapters. Batch 3
+opens the Reach up around them and gets the game in front of players.
+
+| # | Milestone | Pass/fail | Status |
+|---|---|---|---|
+| 1 | **Prologue** — 60 s scripted cold open: the gates, the Shattering, the Lanterns, two powers, the Signal (`?scene=prologue`) | plays at budget, skippable, first launch only | 🔧 |
+| 2 | Cinema sequencer — timeline of shots, captions, cues (shared by prologue, cutscenes, trailer) | a shot list is data only | 🔧 |
+| 3 | Attract mode / trailer — title idles into the prologue and flybys | runs unattended 10 min | |
+| 4 | Photo mode + clip capture (headless webm/GIF from recorded input) | 1080p clip from a replay | |
+| 5 | **Stations** — refineries, salvage yards, bastions, free ports, 1–3 per system | seeded, on star map | 🔧 |
+| 6 | **Docking** — request within 5 km, ILS corridor, auto-dock under 1 km, launch | hostiles within 10 km block it | 🔧 |
+| 7 | **Trade** — commodities, supply/demand per station, cargo, credits | pure, unit-tested economy | 🔧 |
+| 8 | Repair, rearm, reputation per faction | persists in profile | 🔧 |
+| 9 | Planetary ports — orbital elevators / descent corridor to the surface port | seamless approach, no load screen | |
+| 10 | Contracts board — courier, escort, bounty jobs generated from station state | uses the campaign runner | |
+| 11 | Free-roam between episodes — the Reach stays open, episodes start from a station | save/resume anywhere docked | |
+| 12 | Ship upgrades & hangar — guns, missiles, shields, engines; livery shop | visible on the model | |
+| 13 | **MP-0 determinism** — fixed 60 Hz step, seeded RNG, sim/render split | bit-identical 10 min replay | |
+| 14 | Replays + kill-cam from recorded input | replay matches live | |
+| 15 | Headless shard (Node) + bot clients | 200 ships < 8 ms tick | |
+| 16 | Two-browser flight: prediction, interpolation, lag-compensated hits | < 2 m error at 150 ms RTT | |
+| 17 | Lantern jump = shard handoff | < 3 s inside the tunnel | |
+| 18 | Persistent economy + faction front on the star map | server-authoritative | |
+| 19 | Co-op campaign (up to 4) | episodes playable with 2 | |
+| 20 | Public playtest build + landing page | 100 concurrent | |
+
+Design for 13–20: [docs/MULTIPLAYER.md](MULTIPLAYER.md).
+
 ## Known issues
 
 - WebGL2 fallback lines are softer than the WGSL path.

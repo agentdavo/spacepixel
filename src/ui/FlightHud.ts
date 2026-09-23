@@ -472,7 +472,7 @@ export class FlightHud {
     const x0 = 24;
     let y = this.h - 118;
     c.fillStyle = GREEN;
-    c.fillText(`SPD ${f.speed.toFixed(0).padStart(4, ' ')} m/s`, x0, y);
+    c.fillText(f.speed < 1000 ? `SPD ${f.speed.toFixed(0).padStart(4, ' ')} m/s` : `SPD ${(f.speed / 1000).toFixed(f.speed < 10_000 ? 2 : 1).padStart(4, ' ')} km/s`, x0, y);
     y += 20;
     this.bar(x0, y, 'THR', f.throttle, GREEN);
     y += 20;

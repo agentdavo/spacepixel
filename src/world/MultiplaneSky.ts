@@ -74,11 +74,13 @@ export class MultiplaneSky {
   private readonly colB: Node = uniform(new Color('#2f7f9a'));
   private readonly haze: Node = uniform(new Color('#1b1446'));
   private readonly master: Node = uniform(1);
+  private readonly farD: Node;
 
   constructor(opts: Partial<MultiplaneOptions> = {}) {
     this.opts = { ...MULTIPLANE_DEFAULT, ...opts };
     const o = this.opts;
     this.count = o.layers * o.cardsPerLayer;
+    this.farD = uniform(o.layers * KM);
     let s = (o.seed * 48271 + 7) | 0;
     const rand = () => {
       s = (Math.imul(s, 1664525) + 1013904223) | 0;
@@ -140,11 +142,16 @@ export class MultiplaneSky {
 
     mat.colorNode = Fn(() => {
       const density = dot(texture(puffTex, vUV), vMask).mul(vLook.z);
-      const stepped: Node = floor(smoothstep(0.05, 0.75, density).mul(3.0)).div(3.0);
-      // Aerial perspective across the strata: far layers sink into the sky colour.
-      const far = smoothstep(1000, 16000, vLook.w);
-      const tint = mix(mix(this.colA, this.colB, vLook.y), this.haze, far.mul(0.6));
-      return vec4(vec3(tint).mul(stepped.mul(0.35).add(0.75)), stepped.mul(opacity).mul(vFade));
+      const level: Node = floor(smoothstep(0.05, 0.75, density).mul(3.0)); // 0..3 painted steps
+      // Multiplane grading: near strata are dark silhouettes with a backlit
+      // rim (the outermost step), far strata pale and sunk into the sky.
+      const near: Node = float(1).sub(smoothstep(1000, this.farD, vLook.w));
+      const lit = mix(this.colA, this.colB, vLook.y);
+      const body = mix(mix(lit, this.haze, 0.5), this.haze.mul(0.3), near);
+      const rim = lit.mul(mix(1.0, 1.6, near));
+      const col = select(level.lessThan(1.5), rim, body);
+      const alpha = level.greaterThan(0.5).select(mix(0.55, 1.0, level.div(3)), float(0));
+      return vec4(vec3(col), alpha.mul(opacity).mul(near.mul(2.5).add(1)).mul(vFade));
     })();
     mat.mrtNode = noInkMRT();
 
