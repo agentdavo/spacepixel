@@ -18,6 +18,7 @@ import { SpaceDust } from '../SpaceDust';
 import { generateUniverse, specialSystem } from '@/universe/generate';
 import { CampaignSession, type FlightHostScene } from '@/game/CampaignSession';
 import { SYSTEM_FALLBACK } from '@/game/campaign/missions';
+import { getAudio, combatIntensity, type AudioFrame } from '@/audio';
 import type { CampaignMission } from '@/game/campaign/types';
 import type { StarSystem } from '@/universe/Universe';
 import type { Universe } from '@/universe/Universe';
@@ -83,6 +84,9 @@ export class FlightScene implements GameScene, FlightHostScene {
   /** Active campaign episode (story missions), if any. */
   campaign: CampaignSession | null = null;
   private campaignDone: ((r: { outcome: 'success' | 'failure'; codex: string[] }) => void) | null = null;
+  private audio = getAudio();
+  private audioFrame!: AudioFrame;
+  private lastOutcome = 'running';
   private tactical = false;
   private orderStatus = '';
   /** Current standing order for the wing (M13); the AI reads this. */
@@ -175,6 +179,19 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.director.cut('tactical', null, Infinity);
     }
     this.hud = new FlightHud(document.getElementById('ui-root')!);
+    const pf0 = this.player.flight;
+    this.audioFrame = {
+      dt: 0,
+      eye: this.world.eye,
+      camera: this.camera.quaternion,
+      player: { position: pf0.position, velocity: pf0.velocity, throttle: 0, boosting: false, cruise: 'off', lockProgress: 0, locked: false, incomingMissile: false, alive: true },
+      weaponEvents: this.weapons.events,
+      missileEvents: this.missiles.events,
+      jumpPhase: 'none',
+      combatIntensity: 0,
+    };
+    this.audio.music.setMood('cruise', 3);
+    window.addEventListener('keydown', (e) => e.code === 'KeyN' && this.audio.toggleMute());
     this.starMap = new StarMap(document.getElementById('ui-root')!, this.universe, () => this.systemId);
     this.placeCapitals();
     // ?jump=1: start mid-spool at the first gate (captures of the transition).
@@ -286,6 +303,9 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.dust.update(this.world.eye, pf.velocity, dt);
     this.dust.object.visible = this.jumpPhase !== 'tunnel';
 
+    // 6b. Audio: one frame of facts, read by the audio façade.
+    this.updateAudio(realDt);
+
     // 7. Visuals + HUD in render space.
     this.visuals.update(this.world, dt);
     const cruiseK = pf.cruise === 'on' ? 0.55 : pf.cruise === 'spool' ? (pf.cruiseT / pf.spec.cruiseSpool) * 0.4 : 0;
@@ -310,6 +330,41 @@ export class FlightScene implements GameScene, FlightHostScene {
       for (const d of this.campaign.runner.dwells) this.hud.drawDwell(d.position, d.radius, d.progress, this.camera, this.world);
     }
     this.starMap.draw(time);
+  }
+
+  private updateAudio(dt: number): void {
+    const pf = this.player.flight;
+    const a = this.audioFrame;
+    a.dt = dt;
+    const p = a.player;
+    p.throttle = pf.throttle;
+    p.boosting = pf.boosting;
+    p.cruise = pf.cruise;
+    p.lockProgress = this.lock.progress;
+    p.locked = this.lock.locked;
+    p.alive = this.player.alive;
+    a.jumpPhase = this.jumpPhase;
+    let incoming = false;
+    const m = this.missiles;
+    for (let i = 0; i < m.alive.length && !incoming; i++) incoming = !!m.alive[i] && m.target[i] === this.player;
+    p.incomingMissile = incoming;
+    let nearest = Infinity;
+    let near = 0;
+    for (const s of this.fleet.ships) {
+      if (!s.alive || s.team === this.player.team || s.team === 'neutral') continue;
+      const d = s.flight.position.distanceTo(pf.position);
+      nearest = Math.min(nearest, d);
+      if (d < 3000) near++;
+    }
+    a.combatIntensity = combatIntensity(nearest, near, this.player.sinceHit);
+    this.audio.update(a);
+    // Episode outcome stingers.
+    const outcome = this.campaign?.runner.outcome ?? 'running';
+    if (outcome !== this.lastOutcome) {
+      if (outcome === 'success') this.audio.music.setMood('victory', 0);
+      else if (outcome === 'failure') this.audio.music.setMood('defeat', 0);
+      this.lastOutcome = outcome;
+    }
   }
 
   // ── FlightHostScene ────────────────────────────────────────────────
@@ -369,6 +424,10 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.chase.snap(pf);
     this.lock.target = null;
 
+    this.lastOutcome = 'running';
+    const amb = m.modifiers?.ambience;
+    this.audio.autoMood = amb !== 'sublime' && amb !== 'dread';
+    this.audio.music.setMood(amb === 'sublime' ? 'sublime' : amb === 'dread' ? 'dread' : amb === 'battle' ? 'combat' : 'cruise', 3);
     this.campaign = new CampaignSession(m, this, document.getElementById('ui-root')!);
     this.campaign.begin();
     return new Promise((resolve) => (this.campaignDone = resolve));
@@ -414,6 +473,7 @@ export class FlightScene implements GameScene, FlightHostScene {
   }
 
   private beginJump(to: string): void {
+    this.audio.stinger('jump');
     this.jumpPhase = 'spool';
     this.jumpT = 0;
     this.jumpTo = to;

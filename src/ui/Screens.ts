@@ -1,5 +1,6 @@
 import type { MissionDef } from '@/game/Missions';
 import { loadProfile } from '@/game/Profile';
+import { getAudio } from '@/audio';
 
 /**
  * Milestone 19 — title card and mission briefing. Plain DOM, styled in
@@ -24,7 +25,10 @@ export function titleScreen(root: HTMLElement): Promise<'launch' | 'map' | 'hang
   root.append(el);
   let sel = 0;
   const lis = [...el.querySelectorAll('li')];
-  const paint = () => lis.forEach((li, i) => li.classList.toggle('active', i === sel));
+  const paint = () => {
+    lis.forEach((li, i) => li.classList.toggle('active', i === sel));
+    getAudio().ui('move');
+  };
   return new Promise((resolve) => {
     const done = (i: number) => {
       window.removeEventListener('keydown', onKey);

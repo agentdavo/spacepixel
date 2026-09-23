@@ -13,6 +13,7 @@ import type { CampaignMission } from '@/game/campaign/types';
 import { showEyecatch, showDebrief } from '@/ui/Eyecatch';
 import { loadProfile, saveProfile } from '@/game/Profile';
 import type { FlightScene } from '@/world/scenes/FlightScene';
+import { getAudio } from '@/audio';
 import { DynamicResolution } from '@/core/DynamicResolution';
 
 declare global {
@@ -103,6 +104,7 @@ async function boot(): Promise<void> {
       const m: CampaignMission | undefined = MISSIONS[Math.min(profile.episode, MISSIONS.length) - 1];
       if (!m) return;
       await showEyecatch(uiRoot, { chapter: m.chapter, episode: m.episode, title: m.title, tagline: m.tagline });
+      getAudio().music.setMood('briefing', 2);
       await briefingScreen(uiRoot, briefingOf(m));
       if (!flight) flight = (await load(DEFAULT_SCENE)) as FlightScene;
       const result = await flight.startCampaign(m);
@@ -117,7 +119,9 @@ async function boot(): Promise<void> {
 
   // Front end: title card over the live showcase → briefing → flight.
   for (;;) {
+    getAudio().music.setMood('title');
     const choice = await titleScreen(uiRoot);
+    getAudio().ui('confirm');
     if (choice === 'launch') {
       await runCampaign();
       return;
