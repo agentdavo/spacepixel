@@ -35,6 +35,8 @@ export interface ShipEntity {
   brain: unknown;
   /** Seconds since last damage (shield regen delay, hit flashes). */
   sinceHit: number;
+  /** Smoothed wing-sweep 0..1 (variable geometry). */
+  sweep: number;
 }
 
 export function emptyControls(): ControlState {
@@ -105,16 +107,29 @@ export class Fleet {
       isPlayer: false,
       brain: null,
       sinceHit: 99,
+      sweep: 0.3,
       ...opts,
     };
     this.ships.push(e);
     return e;
   }
 
+  private clock = 0;
+
   /** Step flight for all living ships and copy sim state to visuals. */
   step(dt: number): void {
+    this.clock += dt;
     for (const s of this.ships) {
       if (!s.alive) continue;
+      // Variable geometry follows the flight: wings sweep back with speed
+      // (fully swept in cruise), radars turn. No-ops on ships without joints.
+      if (s.model.articulations.size) {
+        const f = s.flight;
+        const sweep = f.cruise === 'on' ? 1 : Math.min(1, Math.max(0, (f.speed - 140) / 320));
+        s.sweep += (sweep - s.sweep) * (1 - Math.exp(-2.5 * dt));
+        s.model.setWingSweep(s.sweep);
+        s.model.setChannel('radar', (this.clock * 0.15) % 1);
+      }
       s.flight.step(s.controls, dt);
       s.sinceHit += dt;
       if (s.sinceHit > 3 && s.shield < s.shieldMax) s.shield = Math.min(s.shieldMax, s.shield + s.shieldMax * 0.15 * dt);
