@@ -9,7 +9,8 @@
  * Mouse: virtual joystick — cursor offset from screen centre is a rate
  * command (with deadzone). Keyboard: W/S throttle, A/D yaw, arrows pitch/yaw,
  * Q/E roll, Shift afterburner, X kill throttle, Z flight-assist toggle,
- * Space/LMB guns, F/RMB missile salvo, T next target, J cruise drive.
+ * Space/LMB guns, F/RMB missile salvo, T next target, J cruise drive,
+ * R next gun, Y next missile type, B next target subsystem.
  * Gamepad: left stick pitch/yaw, right stick X roll, triggers throttle,
  * A/south = afterburner.
  */
@@ -28,6 +29,10 @@ export interface ControlState {
   nextTarget?: boolean;
   /** Toggle cruise drive (edge-triggered). */
   cruise?: boolean;
+  /** Next gun / missile type / target subsystem (edge-triggered: R · Y · B). */
+  cycleGun?: boolean;
+  cycleMissile?: boolean;
+  cycleSub?: boolean;
 }
 
 const DEADZONE = 0.06;
@@ -61,6 +66,9 @@ export class Input {
   private missileEdge = false;
   private targetEdge = false;
   private cruiseEdge = false;
+  private gunEdge = false;
+  private missileTypeEdge = false;
+  private subEdge = false;
 
   constructor(private target: HTMLElement | Window = window) {
     const t = this.target as Window;
@@ -71,6 +79,9 @@ export class Input {
       if (e.code === 'KeyF') this.missileEdge = true;
       if (e.code === 'KeyT') this.targetEdge = true;
       if (e.code === 'KeyJ') this.cruiseEdge = true;
+      if (e.code === 'KeyR') this.gunEdge = true;
+      if (e.code === 'KeyY') this.missileTypeEdge = true;
+      if (e.code === 'KeyB') this.subEdge = true;
       if (e.code === 'Tab') e.preventDefault();
       this.mark(e.timeStamp);
     });
@@ -124,7 +135,11 @@ export class Input {
     s.missile = this.missileEdge;
     s.nextTarget = this.targetEdge;
     s.cruise = this.cruiseEdge;
+    s.cycleGun = this.gunEdge;
+    s.cycleMissile = this.missileTypeEdge;
+    s.cycleSub = this.subEdge;
     this.faEdge = this.missileEdge = this.targetEdge = this.cruiseEdge = false;
+    this.gunEdge = this.missileTypeEdge = this.subEdge = false;
 
     // Mouse virtual joystick (adds to keyboard, clamped).
     if (this.mouseActive) {

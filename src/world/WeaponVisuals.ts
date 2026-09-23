@@ -8,9 +8,11 @@ import {
   InstancedMesh,
   Matrix4,
   Mesh,
+  OctahedronGeometry,
   Quaternion,
   Sprite,
   Vector3,
+  type BufferGeometry,
 } from 'three';
 import { MeshBasicNodeMaterial, SpriteNodeMaterial } from 'three/webgpu';
 import {
@@ -29,6 +31,10 @@ import {
   normalize,
   normalLocal,
   positionLocal,
+  mix,
+  sin,
+  step,
+  time,
 } from 'three/tsl';
 import { GlowMaterial } from '@/render/materials/GlowMaterial';
 import { noInkMRT } from '@/render/materials/InkChannels';
@@ -37,7 +43,8 @@ import type { WorldSpace } from '@/core/WorldSpace';
 import { BOLT_CAPACITY, type Weapons } from '@/sim/Weapons';
 import { MISSILE_CAPACITY, type Missiles } from '@/sim/Missiles';
 import { FACTIONS } from '@/assets/Factions';
-import type { FactionId } from '@/assets/Blueprint';
+import { GUN_LIST, type BoltStyle } from '@/sim/Loadouts';
+import type { ShipEntity } from '@/sim/Fleet';
 
 /**
  * Renders the weapons sim: laser bolts (one instanced draw per faction
@@ -48,12 +55,13 @@ import type { FactionId } from '@/assets/Blueprint';
  * Look: 90s anime lasers are long, fat, white-cored streaks with a saturated
  * sheath; impacts are sharp four-point star flashes; shields show a brief
  * hexagon-lattice bubble lit around the hit point.
+ *
+ * Each gun family has its own bolt (Loadouts.ts GunSpec style/colour/size):
+ * Directorate lasers are long cyan streaks, autocannon short fat amber
+ * slugs, the Choir hymn a long magenta crystal shard, Rustwake scattershot
+ * orange pellets. Capital shields are ellipsoid shells lit per facing; a
+ * facing that fails flares and rings, and one that comes back shimmers.
  */
-const BOLT_COLORS: Record<FactionId, string> = {
-  concord: '#4fd8ff',
-  choir: '#ff3fb4',
-  rustwake: '#ffb13f',
-};
 
 const FLASH_POOL = 96;
 const SHIELD_POOL = 24;
@@ -78,9 +86,18 @@ interface ShieldFx {
   mesh: Mesh;
   hitDir: ShaderNode;
   alpha: ShaderNode;
+  /** Spot width: lower edge of smoothstep(dot(n, hitDir)); −1.6 = whole shell. */
+  spot: ShaderNode;
+  /** 0 hit ripple · 1 collapse flare · 2 regen shimmer. */
+  mode: ShaderNode;
+  tint: ShaderNode;
   life: number;
-  ship: { flight: { position: Vector3 }; radius: number } | null;
+  maxLife: number;
+  ship: ShipEntity | null;
 }
+
+/** Shell-local axis of each capital facing (fore, aft, port, starboard — see Damage.FACING). */
+const FACING_DIR = [new Vector3(0, 0, 1), new Vector3(0, 0, -1), new Vector3(1, 0, 0), new Vector3(-1, 0, 0)];
 
 interface BeamFx {
   core: Mesh;
@@ -89,13 +106,15 @@ interface BeamFx {
 
 export class WeaponVisuals {
   readonly group = new Group();
-  private bolts: InstancedMesh[] = [];
+  /** One instanced mesh per gun (index = GUN_LIST index; null for beam guns). */
+  private bolts: (InstancedMesh | null)[] = [];
   private flashes: Flash[] = [];
   private flashHead = 0;
   private shields: ShieldFx[] = [];
   private shieldHead = 0;
   private beams: BeamFx[] = [];
   private missileMesh: InstancedMesh;
+  private counts = new Int32Array(GUN_LIST.length);
 
   constructor(
     private weapons: Weapons,
@@ -103,12 +122,22 @@ export class WeaponVisuals {
   ) {
     this.group.name = 'weapon-visuals';
 
-    // ── bolts ────────────────────────────────────────────────────────
-    const boltGeo = new CylinderGeometry(0.22, 0.22, 1, 6, 1, false);
-    boltGeo.rotateX(Math.PI / 2); // along Z, centred
-    for (const f of ['concord', 'choir', 'rustwake'] as FactionId[]) {
-      const mat = new GlowMaterial({ color: BOLT_COLORS[f], core: '#ffffff', intensity: 7, flicker: 0 });
-      const mesh = new InstancedMesh(boltGeo, mat, BOLT_CAPACITY);
+    // ── bolts: one instanced draw per gun family ─────────────────────
+    const geos: Record<BoltStyle, BufferGeometry> = {
+      streak: new CylinderGeometry(0.22, 0.22, 1, 6, 1, false).rotateX(Math.PI / 2),
+      // Slug: a blunt tracer with a tapered tail.
+      slug: new CylinderGeometry(0.3, 0.12, 1, 6, 1, false).rotateX(-Math.PI / 2),
+      // Shard: a long crystal diamond.
+      shard: new OctahedronGeometry(0.5, 0).scale(0.55, 0.55, 1),
+      pellet: new IcosahedronGeometry(0.5, 0),
+    };
+    for (const g of GUN_LIST) {
+      if (g.beam) {
+        this.bolts.push(null);
+        continue;
+      }
+      const mat = new GlowMaterial({ color: g.color, core: g.core, intensity: g.style === 'streak' ? 7 : g.style === 'shard' ? 6 : 8, flicker: g.style === 'shard' ? 0.25 : 0 });
+      const mesh = new InstancedMesh(geos[g.style], mat, BOLT_CAPACITY);
       mesh.instanceMatrix.setUsage(DynamicDrawUsage);
       mesh.frustumCulled = false;
       mesh.count = 0;
@@ -146,6 +175,9 @@ export class WeaponVisuals {
     for (let i = 0; i < SHIELD_POOL; i++) {
       const hitDir: ShaderNode = uniform(new Vector3(0, 0, 1));
       const alpha: ShaderNode = uniform(0);
+      const spot: ShaderNode = uniform(0.35);
+      const mode: ShaderNode = uniform(0);
+      const tint: ShaderNode = uniform(new Color(0.35, 0.85, 1.0));
       const mat = new MeshBasicNodeMaterial();
       mat.transparent = true;
       mat.depthWrite = false;
@@ -153,17 +185,25 @@ export class WeaponVisuals {
       mat.colorNode = Fn(() => {
         const n = normalize(normalLocal);
         const toHit = dot(n, hitDir);
-        const spot = smoothstep(0.35, 0.95, toHit);
-        // Hex-ish lattice from three rotated stripe sets on the sphere.
+        const patch = smoothstep(spot, spot.add(0.6), toHit);
+        // Hex-ish lattice from three rotated stripe sets on the sphere (cel-hard edges).
         const p = positionLocal.mul(9.0);
         const l1 = abs(fract(p.x.add(p.y.mul(0.577))).sub(0.5));
         const l2 = abs(fract(p.x.sub(p.y.mul(0.577))).sub(0.5));
         const l3 = abs(fract(p.y.mul(1.155).add(p.z.mul(0.3))).sub(0.5));
-        const lattice = smoothstep(0.42, 0.49, max(l1, max(l2, l3)));
-        const ringPos = float(1).sub(alpha.oneMinus().mul(1.2)); // sweeps outward from the hit as alpha fades
-        const ring = float(1).sub(smoothstep(0.0, 0.1, abs(toHit.sub(ringPos)))).mul(0.8);
-        const glow = spot.mul(lattice.mul(0.9).add(0.25)).add(ring);
-        return vec3(0.35, 0.85, 1.0).mul(glow).mul(alpha).mul(2.2);
+        const lattice = smoothstep(0.42, 0.46, max(l1, max(l2, l3)));
+        // Hit: ripple ring sweeping outward from the impact as alpha fades.
+        const ringPos = float(1).sub(alpha.oneMinus().mul(1.2));
+        const ring = float(1).sub(smoothstep(0.0, 0.08, abs(toHit.sub(ringPos)))).mul(0.9);
+        const hit = patch.mul(lattice.mul(0.9).add(0.2)).add(ring.mul(smoothstep(-0.2, 0.3, toHit)));
+        // Collapse: the whole patch flares white-hot then breaks up into lattice shards.
+        const shards = lattice.mul(step(0.35, fract(p.x.mul(0.37).add(p.z.mul(0.51)).add(alpha.mul(1.7)))));
+        const collapse = patch.mul(mix(shards.mul(1.4), float(1.6), smoothstep(0.7, 0.95, alpha))).add(ring.mul(1.5));
+        // Regen: a scanning band climbs the shell, drawing the lattice back in.
+        const band = float(1).sub(smoothstep(0.0, 0.14, abs(toHit.sub(float(1).sub(alpha.mul(2.2)))))).mul(patch.add(0.15));
+        const regen = band.mul(lattice.mul(1.1).add(0.15)).add(patch.mul(lattice).mul(0.25).mul(sin(time.mul(40.0)).mul(0.5).add(0.5)));
+        const glow = mode.lessThan(0.5).select(hit, mode.lessThan(1.5).select(collapse, regen));
+        return vec3(tint).mul(glow).mul(alpha).mul(2.2);
       })();
       mat.mrtNode = noInkMRT();
       const mesh = new Mesh(shieldGeo, mat);
@@ -171,7 +211,7 @@ export class WeaponVisuals {
       mesh.renderOrder = 22;
       mesh.frustumCulled = false;
       this.group.add(mesh);
-      this.shields.push({ mesh, hitDir, alpha, life: 0, ship: null });
+      this.shields.push({ mesh, hitDir, alpha, spot, mode, tint, life: 0, maxLife: 0.45, ship: null });
     }
 
     // ── missile bodies: small hot glows (smoke trails come from the FX engine) ──
@@ -208,14 +248,48 @@ export class WeaponVisuals {
     f.sprite.visible = true;
   }
 
-  private shield(ship: ShieldFx['ship'], hitNormal: Vector3): void {
+  /**
+   * Light a ship's shield. `mode` 0 = hit ripple at `hitPos`, 1 = a facing
+   * collapsing, 2 = a facing regenerating. For capitals the shell is an
+   * ellipsoid fitted to the hull and `facing` picks the patch that lights.
+   */
+  private shield(ship: ShipEntity | null, hitPos: Vector3 | null, mode: 0 | 1 | 2, facing: number): void {
     if (!ship) return;
-    const s = this.shields[this.shieldHead];
-    this.shieldHead = (this.shieldHead + 1) % SHIELD_POOL;
+    const cap = ship.combat.dmg.capital;
+    // A capital under fire would churn the pool with ripples: one live ripple per ship.
+    let s = mode === 0 && cap ? this.shields.find((x) => x.life > 0 && x.ship === ship && (x.mode.value as number) === 0) : undefined;
+    if (!s) {
+      s = this.shields[this.shieldHead];
+      this.shieldHead = (this.shieldHead + 1) % SHIELD_POOL;
+    }
     s.ship = ship;
-    s.life = 0.45;
-    (s.hitDir.value as Vector3).copy(hitNormal).normalize();
+    s.maxLife = s.life = mode === 0 ? 0.45 : mode === 1 ? 0.7 : 1.1;
+    s.mode.value = mode;
+    const dir = s.hitDir.value as Vector3;
+    if (mode === 0 && hitPos) {
+      // Direction to the hit in shell-local unit-sphere space.
+      this.shellLocal(ship, hitPos, dir);
+      s.spot.value = cap ? 0.8 : 0.35;
+    } else if (cap && facing >= 0) {
+      dir.copy(FACING_DIR[facing]);
+      s.spot.value = 0.15;
+    } else {
+      dir.set(0, 1, 0);
+      s.spot.value = -1.6; // whole bubble
+    }
+    (s.tint.value as Color).set(ship.faction === 'choir' ? '#ff6fd0' : ship.faction === 'rustwake' ? '#ffc070' : '#5fd8ff');
     s.mesh.visible = true;
+  }
+
+  private shellLocal(ship: ShipEntity, universe: Vector3, out: Vector3): Vector3 {
+    const st = ship.combat.dmg;
+    _q.copy(ship.flight.orientation).invert();
+    out.subVectors(universe, ship.flight.position).applyQuaternion(_q);
+    if (st.capital) {
+      const sh = ship.combat.shell;
+      out.set((out.x - st.cx) / sh.x, (out.y - st.cy) / sh.y, (out.z - st.cz) / sh.z);
+    }
+    return out.normalize();
   }
 
   /** Consume this frame's weapon events and draw everything relative to the eye. */
@@ -232,8 +306,18 @@ export class WeaponVisuals {
           this.flash(e.position, 9, 0.2);
           break;
         case 'shield':
-          this.flash(e.position, 6, 0.15);
-          if (e.ship) this.shield(e.ship, e.normal);
+          this.flash(e.position, e.ship?.combat.dmg.capital ? 22 : 6, 0.15);
+          if (e.ship) this.shield(e.ship, e.position, 0, e.facing);
+          break;
+        case 'shield-down':
+          this.flash(e.position, e.ship?.combat.dmg.capital ? 90 : 18, 0.25);
+          if (e.ship) this.shield(e.ship, e.position, 1, e.facing);
+          break;
+        case 'shield-up':
+          if (e.ship) this.shield(e.ship, null, 2, e.facing);
+          break;
+        case 'subsystem':
+          this.flash(e.position, (e.sub?.radius ?? 20) * 3, 0.35);
           break;
         case 'beam-hit':
           if (Math.random() < 0.3) this.flash(e.position, 14, 0.12);
@@ -244,25 +328,32 @@ export class WeaponVisuals {
       }
     }
 
-    // Bolts → instance matrices (render space). Streak length ∝ speed.
-    const counts = [0, 0, 0];
+    // Bolts → instance matrices (render space), per gun family.
+    const counts = this.counts;
+    counts.fill(0);
     for (let i = 0; i < BOLT_CAPACITY; i++) {
       if (w.life[i] <= 0) continue;
-      const fi = w.faction[i];
-      const mesh = this.bolts[fi];
+      const gi = w.gun[i];
+      const mesh = this.bolts[gi];
+      if (!mesh) continue;
+      const g = GUN_LIST[gi];
       _d.set(w.vx[i], w.vy[i], w.vz[i]);
       const speed = _d.length();
       _d.divideScalar(speed || 1);
-      const len = Math.min(48, speed * 0.028);
-      // Centre the streak half a length behind the head.
+      // Lasers stretch with speed; slugs, shards and pellets keep their shape.
+      const len = g.style === 'streak' ? Math.min(g.length, speed * 0.028) : g.length;
+      // Centre the bolt half a length behind the head.
       _p.set(w.px[i] - eye.x, w.py[i] - eye.y, w.pz[i] - eye.z).addScaledVector(_d, -len * 0.5);
       _q.setFromUnitVectors(_z, _d);
-      _s.set(1.6, 1.6, len);
-      mesh.setMatrixAt(counts[fi]++, _m.compose(_p, _q, _s));
+      const wd = g.style === 'streak' ? g.width : g.width * 1.4;
+      _s.set(wd, wd, len);
+      mesh.setMatrixAt(counts[gi]++, _m.compose(_p, _q, _s));
     }
-    for (let f = 0; f < 3; f++) {
-      this.bolts[f].count = counts[f];
-      this.bolts[f].instanceMatrix.needsUpdate = counts[f] > 0;
+    for (let f = 0; f < this.bolts.length; f++) {
+      const mesh = this.bolts[f];
+      if (!mesh) continue;
+      mesh.count = counts[f];
+      mesh.instanceMatrix.needsUpdate = counts[f] > 0;
     }
 
     const m = this.missiles;
@@ -278,7 +369,8 @@ export class WeaponVisuals {
       _d.divideScalar(sp);
       _p.subVectors(m.pos[i], eye);
       _q.setFromUnitVectors(_z, _d);
-      _s.set(1, 1, 2.2 + Math.min(10, sp * 0.008));
+      const body = m.spec[i].body;
+      _s.set(body.width, body.width, (2.2 + Math.min(10, sp * 0.008)) * body.length);
       this.missileMesh.setMatrixAt(mc++, _m.compose(_p, _q, _s));
     }
     this.missileMesh.count = mc;
@@ -299,13 +391,24 @@ export class WeaponVisuals {
     for (const s of this.shields) {
       if (s.life <= 0) continue;
       s.life -= dt;
-      if (s.life <= 0 || !s.ship) {
+      if (s.life <= 0 || !s.ship || !s.ship.alive) {
         s.mesh.visible = false;
+        s.life = 0;
         continue;
       }
-      s.alpha.value = s.life / 0.45;
-      s.mesh.position.subVectors(s.ship.flight.position, eye);
-      s.mesh.scale.setScalar(s.ship.radius * 1.35);
+      s.alpha.value = s.life / s.maxLife;
+      const ship = s.ship;
+      const st = ship.combat.dmg;
+      if (st.capital) {
+        // Ellipsoid shell around the hull centre, riding the ship's orientation.
+        s.mesh.position.set(st.cx, st.cy, st.cz).applyQuaternion(ship.flight.orientation).add(ship.flight.position).sub(eye);
+        s.mesh.quaternion.copy(ship.flight.orientation);
+        s.mesh.scale.copy(ship.combat.shell);
+      } else {
+        s.mesh.position.subVectors(ship.flight.position, eye);
+        s.mesh.quaternion.copy(ship.flight.orientation);
+        s.mesh.scale.setScalar(ship.radius * 1.35);
+      }
     }
 
     let bi = 0;
@@ -326,7 +429,7 @@ export class WeaponVisuals {
         mesh.quaternion.copy(_q);
         mesh.scale.set(b.width * wmul * pulse * fade, b.width * wmul * pulse * fade, len);
       }
-      ((fx.glow.material as GlowMaterial).glowColor.value as Color).set(FACTIONS[b.faction].livery.glow);
+      ((fx.glow.material as GlowMaterial).glowColor.value as Color).set(b.gun ? b.gun.color : FACTIONS[b.faction].livery.glow);
     }
     for (; bi < BEAM_POOL; bi++) this.beams[bi].core.visible = this.beams[bi].glow.visible = false;
 

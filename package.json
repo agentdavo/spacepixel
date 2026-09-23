@@ -13,6 +13,7 @@
     "perf": "node scripts/perf.mjs",
     "test": "node --experimental-transform-types --no-warnings --test 'tests/*.test.ts'",
     "ai-sim": "node scripts/ai-sim.mjs",
+    "balance": "node scripts/balance.mjs",
     "flow-check": "node scripts/flow-check.mjs"
   },
   "dependencies": {

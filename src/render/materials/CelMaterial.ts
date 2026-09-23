@@ -1,4 +1,4 @@
-import { Color, DoubleSide, FrontSide } from 'three';
+import { Color, DoubleSide, FrontSide, Vector3, Vector4 } from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { ShaderNode as Node } from '@/render/tsl';
 import {
@@ -21,6 +21,15 @@ import {
   smoothstep,
   saturate,
   normalize,
+  positionLocal,
+  screenCoordinate,
+  length,
+  fract,
+  step,
+  sin,
+  time,
+  mx_noise_float,
+  If,
 } from 'three/tsl';
 import { LightRig } from '../LightRig';
 import { getRamp, type RampName } from './ToonRamp';
@@ -50,7 +59,44 @@ export interface CelOptions {
   haze?: number;
   /** Custom per-fragment region id node (overrides inkId / surface.x). */
   regionNode?: Node;
+  /**
+   * Battle damage (ships): per-object scorch marks read from
+   * `mesh.userData.dmg` (see `DamageMarks`) — darkened cel patches with
+   * screentone hatching round the edges, and glowing burning craters.
+   */
+  damage?: boolean;
 }
+
+/** Number of damage marks a mesh can show at once. */
+export const DAMAGE_MARKS = 12;
+
+/**
+ * Per-mesh damage data (set on `mesh.userData.dmg`; meshes of one ship share
+ * it). Marks are in ship-root-local metres: xyz centre, w radius (0 = unused).
+ * `levels` packs one level per mark (0..1 scorch; ≥ 2 burning crater).
+ * `mesh.userData.dmgOffset` is the mesh's rest offset from the ship root.
+ */
+export interface DamageMarks {
+  marks: Vector4[];
+  levels: Vector4[];
+  /** Noise frequency (1/m) for blotchy edges and crack patterns. */
+  noiseScale: number;
+  /** Any mark set (skips the shader work when false). */
+  any: boolean;
+}
+
+export function createDamageMarks(noiseScale: number): DamageMarks {
+  return {
+    marks: Array.from({ length: DAMAGE_MARKS }, () => new Vector4()),
+    levels: Array.from({ length: DAMAGE_MARKS / 4 }, () => new Vector4()),
+    noiseScale,
+    any: false,
+  };
+}
+
+const ZERO4 = new Vector4();
+const ZERO3 = new Vector3();
+type ObjFrame = { object?: { userData: { dmg?: DamageMarks; dmgOffset?: Vector3 } } | null };
 
 /**
  * Stylised cel material (Milestone 2).
@@ -99,6 +145,21 @@ export class CelMaterial extends MeshBasicNodeMaterial {
     const emissiveAmt: Node = surface ? surface.y : float(0);
     const glossAmt: Node = surface ? surface.z.mul(this.gloss) : this.gloss;
 
+    // Battle damage: per-object uniforms, so one shared material shows each ship's own scars.
+    const dmg = opts.damage
+      ? {
+          marks: Array.from({ length: DAMAGE_MARKS }, (_, i) =>
+            uniform(new Vector4()).onObjectUpdate((f: ObjFrame) => f.object?.userData.dmg?.marks[i] ?? ZERO4),
+          ) as Node[],
+          levels: Array.from({ length: DAMAGE_MARKS / 4 }, (_, i) =>
+            uniform(new Vector4()).onObjectUpdate((f: ObjFrame) => f.object?.userData.dmg?.levels[i] ?? ZERO4),
+          ) as Node[],
+          offset: uniform(new Vector3()).onObjectUpdate((f: ObjFrame) => f.object?.userData.dmgOffset ?? ZERO3) as Node,
+          scale: uniform(0.5).onObjectUpdate((f: ObjFrame) => f.object?.userData.dmg?.noiseScale ?? 0.5) as Node,
+          on: uniform(0).onObjectUpdate((f: ObjFrame) => (f.object?.userData.dmg?.any ? 1 : 0)) as Node,
+        }
+      : null;
+
     this.colorNode = Fn(() => {
       const N = normalize(normalWorld);
       const V = normalize(cameraPosition.sub(positionWorld));
@@ -128,8 +189,46 @@ export class CelMaterial extends MeshBasicNodeMaterial {
       const rim = smoothstep(this.rimWidth, this.rimWidth.add(0.04), fres).mul(rimMask);
       col.addAssign(LightRig.rimColor.mul(rim));
 
+      // Battle damage (OVA style): scorched cel patches with hard edges, a
+      // band of screentone hatching round them, burning craters that glow.
+      const burn = float(0).toVar();
+      const crack = float(0).toVar();
+      if (dmg) {
+        If(dmg.on.greaterThan(0.5), () => {
+          const p = positionLocal.add(dmg.offset);
+          const n = mx_noise_float(p.mul(dmg.scale));
+          const scorchV = float(0).toVar();
+          for (let i = 0; i < DAMAGE_MARKS; i++) {
+            const m = dmg.marks[i];
+            const lv = dmg.levels[i >> 2];
+            const lev: Node = [lv.x, lv.y, lv.z, lv.w][i & 3];
+            const d = length(p.sub(m.xyz)).div(max(m.w, 0.001));
+            const f = saturate(float(1).sub(d).mul(1.6).add(n.mul(0.45))).mul(step(0.001, m.w));
+            scorchV.assign(max(scorchV, f.mul(min(lev, 1.0))));
+            burn.assign(max(burn, f.mul(step(1.5, lev))));
+          }
+          const scorch = smoothstep(0.42, 0.46, scorchV);
+          const band = smoothstep(0.16, 0.2, scorchV).mul(float(1).sub(scorch));
+          const sc = screenCoordinate;
+          const hatch = step(0.55, fract(sc.x.add(sc.y).mul(1 / 6)));
+          col.mulAssign(float(1).sub(band.mul(hatch).mul(0.5)));
+          const soot = col.mul(0.2).add(vec3(0.035, 0.025, 0.04));
+          // Deep scorch: a second, darker cel step toward the middle.
+          const deep = smoothstep(0.78, 0.82, scorchV);
+          col.assign(mix(col, soot, scorch));
+          col.assign(mix(col, soot.mul(0.45), deep));
+          // Craters: molten cracks where the noise ridges, flickering.
+          const ridge = float(1).sub(n.abs().mul(3.2));
+          crack.assign(smoothstep(0.35, 0.5, burn).mul(smoothstep(0.2, 0.45, ridge.add(burn.mul(0.35)))));
+        });
+      }
+
       // Keep painted surfaces below the bloom threshold: only emissives should glow.
       col.assign(min(col, vec3(0.97)));
+      if (dmg) {
+        const flick = sin(time.mul(23.0).add(positionLocal.x.mul(0.07))).mul(0.25).add(0.85);
+        col.addAssign(vec3(1.0, 0.42, 0.1).mul(crack).mul(flick).mul(2.6));
+      }
 
       // Emissive (vertex-driven for ship lights / glass, uniform for whole-material glow).
       col.addAssign(vec3(paint).mul(emissiveAmt).mul(this.emissiveStrength));

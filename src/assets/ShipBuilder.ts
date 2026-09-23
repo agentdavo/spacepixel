@@ -145,6 +145,7 @@ function hullMaterial(bp: Blueprint): CelMaterial {
       ramp: bp.ramp ?? 'classic',
       inkId: bp.faction === 'concord' ? 0 : bp.faction === 'choir' ? 1000 : 2000,
       rimWidth: 0.6,
+      damage: true,
     });
     materialCache.set(key, m);
   }

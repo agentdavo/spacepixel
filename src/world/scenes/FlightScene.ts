@@ -25,6 +25,7 @@ import type { CampaignMission } from '@/game/campaign/types';
 import type { StarSystem } from '@/universe/Universe';
 import type { Universe } from '@/universe/Universe';
 import { FlightHud } from '@/ui/FlightHud';
+import { CombatHud } from '@/ui/CombatHud';
 import { StarMap } from '@/ui/StarMap';
 import { postFx } from '@/render/post/PostFx';
 import { MissionRunner, type MissionContext, type MissionDef } from '@/game/Missions';
@@ -72,6 +73,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   /** ?fx=0 disables particle FX (A/B checks). */
   private fxOn = new URLSearchParams(location.search).get('fx') !== '0';
   private hud: FlightHud;
+  /** Weapons, target shield facings / subsystems, sub-target bracket (src/ui/CombatHud.ts). */
+  private combatHud: CombatHud;
   readonly universe: Universe = generateUniverse(1994);
   private systemId: string;
   private view: StarSystemView;
@@ -196,6 +199,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.director.cut('tactical', null, Infinity);
     }
     this.hud = new FlightHud(document.getElementById('ui-root')!);
+    this.combatHud = new CombatHud(document.getElementById('ui-root')!);
     const pf0 = this.player.flight;
     this.audioFrame = {
       dt: 0,
@@ -352,6 +356,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       const nav = this.navGate();
       if (nav) this.hud.drawNav(this.universe.systems.get(nav.link.to)!.name, nav.center, pf.position, this.camera, this.world, time);
     }
+    this.combatHud.draw(this.player, this.lock.target, this.camera, this.world, time, !this.tactical && this.jumpPhase === 'none');
     this.hud.drawStatus(this.view.system.name, pf.cruise, this.jumpPhase !== 'none' ? `LANTERN TRANSIT → ${this.universe.systems.get(this.jumpTo)?.name ?? ''}` : '');
     if (this.mission) this.hud.drawObjectives(this.mission, time);
     if (this.campaign) {
@@ -696,6 +701,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.hud.resize(w, h);
+    this.combatHud.resize(w, h);
   }
 
   cameraLabel(): string {

@@ -21,6 +21,8 @@ export interface TrailStyle {
   palette: ParticlePalette;
   /** Upper bound on puffs per update (very fast movers get sparser, never costlier). */
   maxPerUpdate: number;
+  /** Puff kind (default PK.PUFF, white missile smoke; PK.SMOKE for dark damage smoke). */
+  kind?: number;
 }
 
 /** Macross "Itano circus" missile smoke: fat white puffs that linger and thicken. */
@@ -49,6 +51,36 @@ export const TRAIL_ENGINE: TrailStyle = {
   glint: 0,
   palette: PAL.WARM,
   maxPerUpdate: 24,
+};
+
+/** Battle damage: thin grey smoke from a hurt fighter. */
+export const TRAIL_DAMAGE_LIGHT: TrailStyle = {
+  size0: 0.5,
+  size1: 2.6,
+  lifeMin: 0.9,
+  lifeMax: 1.5,
+  spacing: 3.2,
+  jitter: 0.35,
+  drift: 1.2,
+  glint: 0,
+  palette: PAL.WARM,
+  maxPerUpdate: 16,
+  kind: PK.PUFF,
+};
+
+/** Battle damage: the OVA death-rattle — fat black smoke, hot at the root. */
+export const TRAIL_DAMAGE_HEAVY: TrailStyle = {
+  size0: 0.9,
+  size1: 4.2,
+  lifeMin: 1.6,
+  lifeMax: 2.6,
+  spacing: 2.4,
+  jitter: 0.6,
+  drift: 2.0,
+  glint: 0,
+  palette: PAL.WARM,
+  maxPerUpdate: 24,
+  kind: PK.SMOKE,
 };
 
 export type TrailHandle = number;
@@ -149,7 +181,7 @@ export class Trails {
         this.p0.set(L[o] + dx * fa, L[o + 1] + dy * fa, L[o + 2] + dz * fa);
         this.p1.set(L[o] + dx * fb, L[o + 1] + dy * fb, L[o + 2] + dz * fb);
         resetSpawn(d);
-        d.kind = PK.PUFF;
+        d.kind = (st.kind ?? PK.PUFF) as typeof d.kind;
         d.palette = st.palette;
         d.count = n;
         d.pos.copy(this.p0);
