@@ -30,6 +30,8 @@ export class StarSystemView {
   readonly group = new Group();
   readonly backdrop: Backdrop;
   readonly gates: GateInstance[] = [];
+  /** Massive bodies (planets) for supercruise: centre + radius, universe space. */
+  readonly masses: { position: Vector3; radius: number }[] = [];
   /** Belt beside the first Lantern: parallax, cover and scale reference. */
   readonly field: AsteroidField;
 
@@ -47,6 +49,7 @@ export class StarSystemView {
       const planet = new Planet(p.preset);
       planet.group.position.copy(p.position).add(SYSTEM_OFFSET);
       planet.group.rotation.set(...p.tilt);
+      this.masses.push({ position: planet.group.position, radius: p.preset.radius });
       this.group.add(planet.group);
     }
 

@@ -239,6 +239,10 @@ export class FlightScene implements GameScene, FlightHostScene {
     // Tactical view runs the battle at quarter speed so orders can be given.
     const dt = this.tactical ? realDt * 0.25 : realDt;
 
+    // 0. Supercruise: cruise speed scales with distance to the nearest mass
+    //    (planet, Lantern, great set piece) and locks to 1× near hostiles.
+    pf.cruiseScale = this.supercruiseScale();
+
     // 1. AI writes controls for every non-player ship (and the player on
     //    autopilot), then one flight step for everyone — same physics.
     this.player.target = this.lock.target; // "attack my target" reads this
@@ -322,6 +326,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     postFx.boost = Math.max(this.chase.boostAmount, cruiseK);
     postFx.speed = Math.min(1, pf.speed / pf.spec.boostSpeed);
     this.hyperspace.update(dt, this.jumpPhase === 'tunnel' ? Math.min(1, this.jumpT * 3, (TUNNEL - this.jumpT) * 3) : 0, 60, this.camera.quaternion);
+    this.hud.navNoise = Math.max(postFx.navNoise, this.campaign?.mission.modifiers?.navDegraded ? 0.55 : 0);
     this.hud.update(pf, this.camera, this.world, time);
     if (this.tactical) {
       const markers = this.view.gates.map((g) => ({ label: `LANTERN → ${this.universe.systems.get(g.link.to)!.name.toUpperCase()}`, pos: g.center, radius: g.gate.radius }));
@@ -340,6 +345,18 @@ export class FlightScene implements GameScene, FlightHostScene {
       for (const d of this.campaign.runner.dwells) this.hud.drawDwell(d.position, d.radius, d.progress, this.camera, this.world);
     }
     this.starMap.draw(time);
+  }
+
+  private supercruiseScale(): number {
+    const p = this.player.flight.position;
+    let d = Infinity;
+    for (const m of this.view.masses) d = Math.min(d, p.distanceTo(m.position) - m.radius);
+    for (const g of this.view.gates) d = Math.min(d, p.distanceTo(g.center));
+    for (const m of this.campaign?.masses() ?? []) d = Math.min(d, p.distanceTo(m.position) - m.radius);
+    for (const s of this.fleet.ships) {
+      if (s.alive && s !== this.player && s.team !== this.player.team && s.team !== 'neutral' && s.flight.position.distanceTo(p) < 10_000) return 1;
+    }
+    return Math.min(150, Math.max(1, d / 15_000));
   }
 
   private updateAudio(dt: number): void {

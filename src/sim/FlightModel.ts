@@ -79,6 +79,12 @@ export class FlightModel {
   /** Cruise drive: off → spooling → engaged. Firing or burner drops out. */
   cruise: 'off' | 'spool' | 'on' = 'off';
   cruiseT = 0;
+  /**
+   * Supercruise multiplier on cruise speed/acceleration, set by the scene
+   * from the distance to the nearest massive body (Elite-style): crossing
+   * 400 km of empty space takes seconds, and you slow naturally on approach.
+   */
+  cruiseScale = 1;
   /** Felt acceleration in body frame (m/s²), for camera shake / HUD g-meter. */
   readonly bodyAccel = new Vector3();
 
@@ -144,14 +150,14 @@ export class FlightModel {
     this.forward(_fwd);
     const accelBefore = _dv.copy(this.velocity);
     if (this.flightAssist || cruising) {
-      const target = cruising ? s.cruiseSpeed : this.boosting ? s.boostSpeed : this.throttle * s.maxSpeed;
+      const target = cruising ? s.cruiseSpeed * this.cruiseScale : this.boosting ? s.boostSpeed : this.throttle * s.maxSpeed;
       _desired.copy(_fwd).multiplyScalar(target).sub(this.velocity); // velocity error, world
       // Split into body axes and clamp each by thruster authority.
       _invQ.copy(this.orientation).invert();
       _local.copy(_desired).applyQuaternion(_invQ);
-      const fwdCap = (cruising ? s.cruiseAccel : this.boosting ? s.boostAccel : s.mainAccel) * dt;
+      const fwdCap = (cruising ? s.cruiseAccel * this.cruiseScale : this.boosting ? s.boostAccel : s.mainAccel) * dt;
       // Dropping out of cruise bleeds speed hard (retro-burn), not over minutes.
-      const latCap = (this.speed > s.boostSpeed * 1.05 ? s.cruiseAccel : s.lateralAccel) * dt;
+      const latCap = (this.speed > s.boostSpeed * 1.05 ? s.cruiseAccel * Math.max(1, this.cruiseScale) : s.lateralAccel) * dt;
       _local.x = clampAbs(_local.x, latCap);
       _local.y = clampAbs(_local.y, latCap);
       _local.z = _local.z > 0 ? Math.min(_local.z, fwdCap) : Math.max(_local.z, -latCap);

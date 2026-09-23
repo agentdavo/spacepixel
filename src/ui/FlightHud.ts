@@ -27,6 +27,13 @@ export class FlightHud {
   private w = 1;
   private h = 1;
   private dpr = 1;
+  /** 0..1 instrument failure (Dead Zone): marks drop out, jitter, and lie. */
+  navNoise = 0;
+
+  /** True if a nav/target mark should be skipped this frame. */
+  private glitch(): boolean {
+    return this.navNoise > 0 && Math.random() < this.navNoise * 0.85;
+  }
 
   constructor(root: HTMLElement) {
     this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
@@ -46,7 +53,8 @@ export class FlightHud {
   private project(universe: Vector3, world: WorldSpace, cam: PerspectiveCamera): { x: number; y: number } | null {
     world.toRender(universe, _p).project(cam);
     if (_p.z > 1 || _p.z < -1) return null;
-    return { x: (_p.x * 0.5 + 0.5) * this.w, y: (-_p.y * 0.5 + 0.5) * this.h };
+    const j = this.navNoise * 40;
+    return { x: (_p.x * 0.5 + 0.5) * this.w + (Math.random() - 0.5) * j, y: (-_p.y * 0.5 + 0.5) * this.h + (Math.random() - 0.5) * j };
   }
 
   update(f: FlightModel, cam: PerspectiveCamera, world: WorldSpace, time: number): void {
@@ -99,6 +107,7 @@ export class FlightHud {
     const fovScale = this.h / (2 * Math.tan(((cam.fov * Math.PI) / 180) / 2));
     for (const s of fleet.ships) {
       if (!s.alive || s === player) continue;
+      if (this.glitch()) continue;
       const hostile = isHostile(s, player);
       const isTarget = s === lock.target;
       const pt = this.project(s.flight.position, world, cam);
@@ -183,6 +192,7 @@ export class FlightHud {
   /** Nav marker for the next Lantern on the route: diamond, name, range, ETA. */
   drawNav(name: string, universe: Vector3, from: Vector3, cam: PerspectiveCamera, world: WorldSpace, time: number): void {
     const c = this.ctx;
+    if (this.glitch()) return;
     const dist = universe.distanceTo(from);
     const label = `LANTERN → ${name.toUpperCase()}  ${dist > 10_000 ? (dist / 1000).toFixed(0) : (dist / 1000).toFixed(1)} km`;
     const pt = this.project(universe, world, cam);
@@ -219,6 +229,10 @@ export class FlightHud {
     c.textAlign = 'center';
     c.fillStyle = GREEN;
     c.fillText(`${system.toUpperCase()}${cruise === 'on' ? '  ·  CRUISE' : cruise === 'spool' ? '  ·  CRUISE SPOOLING' : ''}`, this.w / 2, 28);
+    if (this.navNoise > 0.2 && Math.random() < 0.7) {
+      c.fillStyle = RED;
+      c.fillText('NAV: NO FIX · RADAR: NO RETURN · FLY BY EYE', this.w / 2, 48);
+    }
     if (banner) {
       c.fillStyle = '#ffffff';
       c.font = '700 20px "Oxanium", sans-serif';

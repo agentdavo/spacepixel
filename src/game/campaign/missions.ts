@@ -1490,7 +1490,7 @@ const EP15: CampaignMission = {
     spawn(CANTOR, 'choir', 4, ahead(4000, 2000, 30000), 'wave3', 'Cantor', 'hostile', { whenFlag: 'salt-returns', delay: 4 }),
   ],
   setpieces: [
-    piece('megagate', 'nexus', ahead(0, 0, 24000), { radius: 100000, state: 'unlit', rimArchive: true, label: 'The Nexus' }),
+    piece('megagate', 'nexus', ahead(0, 0, 24000), { radius: 20000, state: 'unlit', rimArchive: true, label: 'The Nexus' }),
     piece('derelict', 'patience', ahead(0, -600, -1500), { name: 'The Long Patience', class: 'Clavis', state: 'lit' }),
   ],
   chatter: [
@@ -1501,7 +1501,7 @@ const EP15: CampaignMission = {
       say('jackpot', 'Very sensible people, the rest.'),
     ]),
     beat('whole', near('nexus', 15000), [
-      say('system', 'OBJECT. LANTERN. DIAMETER: 200 KILOMETRES. STATUS: WHOLE.'),
+      say('system', 'OBJECT. LANTERN. DIAMETER: 40 KILOMETRES. STATUS: WHOLE.'),
       say('sparrow', 'It\'s whole. It\'s the only whole thing I\'ve ever seen.'),
     ], 2),
     beat('rim', at(55), [
@@ -1583,7 +1583,7 @@ const EP16: CampaignMission = {
   ],
   spawns: [],
   setpieces: [
-    piece('megagate', 'nexus', ahead(0, 0, -30000), { radius: 100000, state: 'opening' }),
+    piece('megagate', 'nexus', ahead(0, 0, -30000), { radius: 20000, state: 'opening' }),
     piece('pilgrimage', 'corridor', ahead(0, 0, 2000), { length: 60000, stages: 5, palette: 'white-teal-magenta', duration: 280 }),
   ],
   chatter: [

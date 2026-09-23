@@ -208,6 +208,11 @@ export class CampaignSession {
     if (this.runner.outcome !== 'running' && this.outcomeAt < 0) this.outcomeAt = time;
   }
 
+  /** Large set pieces that should slow supercruise (Monolith, Nexus, derelicts). */
+  masses(): { position: Vector3; radius: number }[] {
+    return this.pieces.filter((p) => p.kind === 'monolith' || p.kind === 'megagate' || p.kind === 'derelict' || p.kind === 'bastion');
+  }
+
   /** Seconds since the mission resolved (−1 while running). */
   sinceOutcome(time: number): number {
     return this.outcomeAt < 0 ? -1 : time - this.outcomeAt;

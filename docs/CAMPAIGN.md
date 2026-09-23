@@ -349,7 +349,7 @@ machine knows a little more than the people flying it.
 
 - **Logline:** A ghost ship, four Kestrels and a handful of clans against the
   Zenith's armada at the only whole gate in the galaxy.
-- **Gameplay:** Reach the Nexus (21 km run toward a 200 km ring); break the
+- **Gameplay:** Reach the Nexus (21 km run toward a 40 km ring); break the
   Psalter wave; kill the three Vesper spire-tenders (without them the Cathedrals
   cannot sing the seal). At nine kills Salt returns with the free clans; at
   eleven, Jackpot dies (`destroy:jackpot`). Cathedrals turn back; return to the
