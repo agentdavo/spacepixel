@@ -9,7 +9,7 @@
  * Mouse: virtual joystick — cursor offset from screen centre is a rate
  * command (with deadzone). Keyboard: W/S throttle, A/D yaw, arrows pitch/yaw,
  * Q/E roll, Shift afterburner, X kill throttle, Z flight-assist toggle,
- * Space/LMB guns, F/RMB missile salvo, T next target.
+ * Space/LMB guns, F/RMB missile salvo, T next target, J cruise drive.
  * Gamepad: left stick pitch/yaw, right stick X roll, triggers throttle,
  * A/south = afterburner.
  */
@@ -26,6 +26,8 @@ export interface ControlState {
   missile?: boolean;
   /** Cycle target (edge-triggered). */
   nextTarget?: boolean;
+  /** Toggle cruise drive (edge-triggered). */
+  cruise?: boolean;
 }
 
 const DEADZONE = 0.06;
@@ -58,6 +60,7 @@ export class Input {
   private faEdge = false;
   private missileEdge = false;
   private targetEdge = false;
+  private cruiseEdge = false;
 
   constructor(private target: HTMLElement | Window = window) {
     const t = this.target as Window;
@@ -67,6 +70,7 @@ export class Input {
       if (e.code === 'KeyZ') this.faEdge = true;
       if (e.code === 'KeyF') this.missileEdge = true;
       if (e.code === 'KeyT') this.targetEdge = true;
+      if (e.code === 'KeyJ') this.cruiseEdge = true;
       if (e.code === 'Tab') e.preventDefault();
       this.mark(e.timeStamp);
     });
@@ -119,7 +123,8 @@ export class Input {
     s.flightAssistToggle = this.faEdge;
     s.missile = this.missileEdge;
     s.nextTarget = this.targetEdge;
-    this.faEdge = this.missileEdge = this.targetEdge = false;
+    s.cruise = this.cruiseEdge;
+    this.faEdge = this.missileEdge = this.targetEdge = this.cruiseEdge = false;
 
     // Mouse virtual joystick (adds to keyboard, clamped).
     if (this.mouseActive) {

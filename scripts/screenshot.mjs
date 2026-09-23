@@ -69,7 +69,7 @@ try {
     const err = await page.evaluate(() => window.__VANGUARD__?.error);
     const backend = await page.evaluate(() => window.__VANGUARD__?.backend);
     const file = `${outDir}/${name}.${jpg ? 'jpg' : 'png'}`;
-    await page.screenshot(jpg ? { path: file, type: 'jpeg', quality: 90 } : { path: file });
+    await page.screenshot(jpg ? { path: file, type: 'jpeg', quality: 90, timeout: 300_000 } : { path: file, timeout: 300_000 });
     console.log(`✓ ${file}  (${backend}, ${((Date.now() - t0) / 1000).toFixed(1)}s)`);
     const interesting = logs.filter((l) => !l.includes('[vite]') && !l.includes('Download the'));
     if (err || interesting.some((l) => /error|warn/i.test(l))) {

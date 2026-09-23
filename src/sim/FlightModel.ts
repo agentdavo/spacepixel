@@ -34,6 +34,9 @@ export interface FlightSpec {
   boostDrain: number; // gauge / s
   boostRegen: number; // gauge / s
   boostRelight: number; // gauge level to re-enable after lockout
+  cruiseSpeed: number; // m/s — cruise drive for crossing a system
+  cruiseAccel: number;
+  cruiseSpool: number; // s before the drive engages
 }
 
 export const KESTREL_SPEC: FlightSpec = {
@@ -49,6 +52,9 @@ export const KESTREL_SPEC: FlightSpec = {
   boostDrain: 0.22,
   boostRegen: 0.1,
   boostRelight: 0.3,
+  cruiseSpeed: 3000,
+  cruiseAccel: 650,
+  cruiseSpool: 1.4,
 };
 
 const _fwd = new Vector3();
@@ -70,6 +76,9 @@ export class FlightModel {
   boosting = false;
   boostGauge = 1; // 0..1
   boostLocked = false;
+  /** Cruise drive: off → spooling → engaged. Firing or burner drops out. */
+  cruise: 'off' | 'spool' | 'on' = 'off';
+  cruiseT = 0;
   /** Felt acceleration in body frame (m/s²), for camera shake / HUD g-meter. */
   readonly bodyAccel = new Vector3();
 
@@ -96,6 +105,15 @@ export class FlightModel {
     if (c.throttleSet !== null) this.throttle = c.throttleSet;
     this.throttle = Math.min(1, Math.max(0, this.throttle + c.throttleDelta * 0.6 * dt));
 
+    // Cruise drive.
+    if (c.cruise) {
+      this.cruise = this.cruise === 'off' ? 'spool' : 'off';
+      this.cruiseT = 0;
+    }
+    if (this.cruise !== 'off' && (c.fire || c.afterburner || c.missile)) this.cruise = 'off';
+    if (this.cruise === 'spool' && (this.cruiseT += dt) >= s.cruiseSpool) this.cruise = 'on';
+    const cruising = this.cruise === 'on';
+
     const wantBoost = c.afterburner && !this.boostLocked;
     this.boosting = wantBoost && this.boostGauge > 0;
     if (this.boosting) {
@@ -108,8 +126,9 @@ export class FlightModel {
 
     // ── rotation ─────────────────────────────────────────────────────
     const k = 1 - Math.exp(-s.rateResponse * dt);
-    this.bodyRates.x += (c.pitch * s.pitchRate - this.bodyRates.x) * k;
-    this.bodyRates.y += (-c.yaw * s.yawRate - this.bodyRates.y) * k;
+    const turn = cruising ? 0.4 : 1; // big drive, lazy turns
+    this.bodyRates.x += (c.pitch * s.pitchRate * turn - this.bodyRates.x) * k;
+    this.bodyRates.y += (-c.yaw * s.yawRate * turn - this.bodyRates.y) * k;
     this.bodyRates.z += (c.roll * s.rollRate - this.bodyRates.z) * k;
     // Ship faces +Z: pitch-up is rotation about -X, roll-right about +Z.
     const wx = -this.bodyRates.x * dt;
@@ -124,14 +143,15 @@ export class FlightModel {
     // ── translation ──────────────────────────────────────────────────
     this.forward(_fwd);
     const accelBefore = _dv.copy(this.velocity);
-    if (this.flightAssist) {
-      const target = this.boosting ? s.boostSpeed : this.throttle * s.maxSpeed;
+    if (this.flightAssist || cruising) {
+      const target = cruising ? s.cruiseSpeed : this.boosting ? s.boostSpeed : this.throttle * s.maxSpeed;
       _desired.copy(_fwd).multiplyScalar(target).sub(this.velocity); // velocity error, world
       // Split into body axes and clamp each by thruster authority.
       _invQ.copy(this.orientation).invert();
       _local.copy(_desired).applyQuaternion(_invQ);
-      const fwdCap = (this.boosting ? s.boostAccel : s.mainAccel) * dt;
-      const latCap = s.lateralAccel * dt;
+      const fwdCap = (cruising ? s.cruiseAccel : this.boosting ? s.boostAccel : s.mainAccel) * dt;
+      // Dropping out of cruise bleeds speed hard (retro-burn), not over minutes.
+      const latCap = (this.speed > s.boostSpeed * 1.05 ? s.cruiseAccel : s.lateralAccel) * dt;
       _local.x = clampAbs(_local.x, latCap);
       _local.y = clampAbs(_local.y, latCap);
       _local.z = _local.z > 0 ? Math.min(_local.z, fwdCap) : Math.max(_local.z, -latCap);

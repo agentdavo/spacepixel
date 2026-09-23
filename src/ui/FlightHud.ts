@@ -179,6 +179,54 @@ export class FlightHud {
     }
   }
 
+  /** Nav marker for the next Lantern on the route: diamond, name, range, ETA. */
+  drawNav(name: string, universe: Vector3, from: Vector3, cam: PerspectiveCamera, world: WorldSpace, time: number): void {
+    const c = this.ctx;
+    const dist = universe.distanceTo(from);
+    const label = `LANTERN → ${name.toUpperCase()}  ${dist > 10_000 ? (dist / 1000).toFixed(0) : (dist / 1000).toFixed(1)} km`;
+    const pt = this.project(universe, world, cam);
+    const cyan = '#6fe6ff';
+    c.strokeStyle = cyan;
+    c.fillStyle = cyan;
+    c.lineWidth = 1.5;
+    if (pt && pt.x > 0 && pt.x < this.w && pt.y > 0 && pt.y < this.h) {
+      const r = 11 + Math.sin(time * 5) * 2;
+      c.beginPath();
+      c.moveTo(pt.x, pt.y - r);
+      c.lineTo(pt.x + r, pt.y);
+      c.lineTo(pt.x, pt.y + r);
+      c.lineTo(pt.x - r, pt.y);
+      c.closePath();
+      c.stroke();
+      c.fillText(label, pt.x + 18, pt.y + 4);
+    } else {
+      world.toRender(universe, _p).applyMatrix4(cam.matrixWorldInverse);
+      const ang = Math.atan2(-_p.y, _p.x);
+      const rr = Math.min(this.w, this.h) / 2 - 70;
+      const x = this.w / 2 + Math.cos(ang) * rr;
+      const y = this.h / 2 + Math.sin(ang) * rr;
+      c.beginPath();
+      c.arc(x, y, 6, 0, Math.PI * 2);
+      c.stroke();
+      c.fillText(label, x - 60, y + 22);
+    }
+  }
+
+  /** Top-centre status strip: system, drive state, transit banner. */
+  drawStatus(system: string, cruise: 'off' | 'spool' | 'on', banner: string): void {
+    const c = this.ctx;
+    c.textAlign = 'center';
+    c.fillStyle = GREEN;
+    c.fillText(`${system.toUpperCase()}${cruise === 'on' ? '  ·  CRUISE' : cruise === 'spool' ? '  ·  CRUISE SPOOLING' : ''}`, this.w / 2, 28);
+    if (banner) {
+      c.fillStyle = '#ffffff';
+      c.font = '700 20px "Oxanium", sans-serif';
+      c.fillText(banner, this.w / 2, this.h * 0.2);
+      c.font = '13px "Share Tech Mono", monospace';
+    }
+    c.textAlign = 'left';
+  }
+
   private brackets(x: number, y: number, h: number, l: number): void {
     const c = this.ctx;
     c.beginPath();

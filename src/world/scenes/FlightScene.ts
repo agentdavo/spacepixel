@@ -10,12 +10,13 @@ import { Fleet, faceAlong, type ShipEntity } from '@/sim/Fleet';
 import { Weapons } from '@/sim/Weapons';
 import { Missiles, type LockState } from '@/sim/Missiles';
 import { assets } from '@/assets/AssetLibrary';
-import { Backdrop, BACKDROPS } from '../Backdrop';
-import { Planet, PLANETS } from '../Planet';
-import { LanternGate } from '../LanternGate';
 import { WeaponVisuals } from '../WeaponVisuals';
-import { LightRig, LIGHT_PRESETS } from '@/render/LightRig';
+import { StarSystemView, type GateInstance } from '../StarSystemView';
+import { Hyperspace } from '../Hyperspace';
+import { generateUniverse } from '@/universe/generate';
+import type { Universe } from '@/universe/Universe';
 import { FlightHud } from '@/ui/FlightHud';
+import { StarMap } from '@/ui/StarMap';
 import { postFx } from '@/render/post/PostFx';
 
 /**
@@ -30,8 +31,10 @@ import { postFx } from '@/render/post/PostFx';
  *   input (engine) → fleet flight → placeholders → targeting → weapons →
  *   missiles → cutaways → camera director → rebase → visuals → HUD
  */
-const ORIGIN = new Vector3(2_400_000, 150_000, -1_100_000); // deliberately huge
-const GATE = ORIGIN.clone().add(new Vector3(0, 60, 2600));
+type JumpPhase = 'none' | 'spool' | 'tunnel' | 'exit';
+const SPOOL = 0.9;
+const TUNNEL = 2.6;
+const EXIT = 0.9;
 
 interface Bandit {
   ship: ShipEntity;
@@ -40,6 +43,7 @@ interface Bandit {
   r: number;
   ph: number;
   deadFor: number;
+  center: Vector3;
 }
 
 export class FlightScene implements GameScene {
@@ -56,8 +60,17 @@ export class FlightScene implements GameScene {
   private wingmen: { ship: ShipEntity; slot: Vector3 }[] = [];
   private bandits: Bandit[] = [];
   private visuals: WeaponVisuals;
-  private backdrop = new Backdrop(BACKDROPS.meridian);
   private hud: FlightHud;
+  readonly universe: Universe = generateUniverse(1994);
+  private systemId: string;
+  private view: StarSystemView;
+  private starMap: StarMap;
+  private hyperspace = new Hyperspace();
+  private jumpPhase: JumpPhase = 'none';
+  private jumpT = 0;
+  private jumpTo = '';
+  private gateSide = new Map<GateInstance, number>();
+  private cathedral = assets.ship('choir-cathedral');
   private cinematic = flags.demo;
   private wasBoosting = false;
   private lastCut = -10;
@@ -67,29 +80,20 @@ export class FlightScene implements GameScene {
   private killSubject: Subject = { position: new Vector3(), velocity: new Vector3(), radius: 10 };
 
   constructor() {
-    LightRig.apply(LIGHT_PRESETS.meridian);
-    this.scene.add(this.backdrop.group);
+    this.systemId = this.universe.start;
+    this.view = new StarSystemView(this.universe.systems.get(this.systemId)!, this.scene, this.world.root);
+    this.scene.add(this.hyperspace.mesh);
+    this.world.root.add(this.cathedral.root);
+    this.cathedral.setThrottle(0.5);
 
-    const planet = new Planet(PLANETS.castellan);
-    planet.group.position.copy(ORIGIN).add(new Vector3(150_000, -70_000, 290_000));
-    planet.group.rotation.set(0.1, 0.4, 0.28);
-    this.world.root.add(planet.group);
-
-    const gate = new LanternGate(420);
-    gate.group.position.copy(GATE);
-    gate.group.rotation.y = 0.15;
-    this.world.root.add(gate.group);
-
-    const cathedral = assets.ship('choir-cathedral');
-    cathedral.root.position.copy(ORIGIN).add(new Vector3(-5200, 1400, 11000));
-    cathedral.root.rotation.set(0.05, 2.2, 0.08);
-    cathedral.setThrottle(0.5);
-    this.world.root.add(cathedral.root);
-
-    const fwd = new Vector3(0, 0, 1);
+    // Start 2.6 km short of the first Lantern, flying at it.
+    const gate0 = this.view.gates[0];
+    const fwd = gate0.link.normal.clone();
+    const ORIGIN = gate0.center.clone().addScaledVector(fwd, -2600).add(new Vector3(0, -60, 0));
+    const GATE = gate0.center;
     this.player = this.fleet.spawn('vf27-kestrel', 'concord', ORIGIN, fwd, { isPlayer: true, name: 'Vanguard 1' });
     this.player.controls = input.state; // the player's controls ARE the input
-    this.player.flight.velocity.set(0, 0, 150);
+    this.player.flight.velocity.copy(fwd).multiplyScalar(150);
     this.player.flight.throttle = 0.7;
 
     [new Vector3(-22, -4, -26), new Vector3(24, 3, -34)].forEach((slot, i) => {
@@ -98,7 +102,7 @@ export class FlightScene implements GameScene {
     });
     for (let i = 0; i < 3; i++) {
       const ship = this.fleet.spawn('choir-cantor', 'choir', GATE, fwd, { name: `Cantor ${i + 1}` });
-      this.bandits.push({ ship, a: 0.11 + i * 0.023, b: 0.07 + i * 0.019, r: 700 + i * 260, ph: i * 2.1, deadFor: 0 });
+      this.bandits.push({ ship, a: 0.11 + i * 0.023, b: 0.07 + i * 0.019, r: 700 + i * 260, ph: i * 2.1, deadFor: 0, center: GATE.clone() });
     }
     this.lock.target = this.bandits[0].ship;
 
@@ -116,6 +120,28 @@ export class FlightScene implements GameScene {
     if (flags.cam === 2) this.director.cut('orbit', s0, Infinity);
     if (flags.cam === 3) this.director.cut('track', s0, Infinity);
     this.hud = new FlightHud(document.getElementById('ui-root')!);
+    this.starMap = new StarMap(document.getElementById('ui-root')!, this.universe, () => this.systemId);
+    this.placeCapitals();
+    // ?jump=1: start mid-spool at the first gate (captures of the transition).
+    const q = new URLSearchParams(location.search);
+    if (q.get('jump') === '1') this.beginJump(gate0.link.to);
+    // ?map=tessaly: open the star map with a route plotted (captures).
+    if (q.get('map')) {
+      this.starMap.destination = q.get('map');
+      this.starMap.toggle();
+    }
+    window.__VANGUARD__ = { ...window.__VANGUARD__, ready: false, frame: () => 0, backend: '', hooks: { ...window.__VANGUARD__?.hooks, scene: this } };
+  }
+
+  /** Choir space gets a Cathedral parked off a gate; elsewhere it's hidden. */
+  private placeCapitals(): void {
+    const sys = this.view.system;
+    const show = sys.faction === 'choir' || sys.id === 'meridian';
+    this.cathedral.root.visible = show;
+    if (!show) return;
+    const g = this.view.gates[this.view.gates.length - 1];
+    this.cathedral.root.position.copy(g.center).add(new Vector3(-5200, 1400, 9000));
+    this.cathedral.root.rotation.set(0.05, 2.2, 0.08);
   }
 
   update({ dt, time }: FrameContext): void {
@@ -147,13 +173,17 @@ export class FlightScene implements GameScene {
       const t = time + b.ph;
       const f = s.flight;
       _v.copy(f.position);
-      f.position.set(Math.sin(t * b.a * 6.28) * b.r, Math.sin(t * b.b * 6.28) * b.r * 0.35, Math.cos(t * b.a * 6.28) * b.r).add(GATE);
+      f.position.set(Math.sin(t * b.a * 6.28) * b.r, Math.sin(t * b.b * 6.28) * b.r * 0.35, Math.cos(t * b.a * 6.28) * b.r).add(b.center);
       if (dt > 0) f.velocity.subVectors(f.position, _v).divideScalar(dt);
       if (f.velocity.lengthSq() > 1) faceAlong(f.orientation, f.velocity);
       s.model.root.position.copy(f.position);
       s.model.root.quaternion.copy(f.orientation);
       s.model.setThrottle(1.1);
     }
+
+    // 2b. Lanterns: crossing a gate plane inside the ring starts a jump.
+    if (this.jumpPhase === 'none') this.checkGates();
+    this.updateJump(dt);
 
     // 3. Targeting + missile salvos.
     if (c.nextTarget || !this.lock.target?.alive) this.cycleTarget();
@@ -177,14 +207,135 @@ export class FlightScene implements GameScene {
     this.director.update(pf, tgtSubject, dt);
     this.world.eye.copy(this.director.eye);
     this.world.sync(this.camera);
-    this.backdrop.follow(this.camera);
+
+    this.view.backdrop.follow(this.camera);
 
     // 7. Visuals + HUD in render space.
     this.visuals.update(this.world, dt);
-    postFx.boost = this.chase.boostAmount;
+    const cruiseK = pf.cruise === 'on' ? 0.55 : pf.cruise === 'spool' ? (pf.cruiseT / pf.spec.cruiseSpool) * 0.4 : 0;
+    postFx.boost = Math.max(this.chase.boostAmount, cruiseK);
     postFx.speed = Math.min(1, pf.speed / pf.spec.boostSpeed);
+    this.hyperspace.update(dt, this.jumpPhase === 'tunnel' ? Math.min(1, this.jumpT * 3, (TUNNEL - this.jumpT) * 3) : 0, 60, this.camera.quaternion);
     this.hud.update(pf, this.camera, this.world, time);
-    this.hud.drawTargets(this.player, this.fleet, this.lock, this.camera, this.world, time);
+    if (this.jumpPhase === 'none') {
+      this.hud.drawTargets(this.player, this.fleet, this.lock, this.camera, this.world, time);
+      const nav = this.navGate();
+      if (nav) this.hud.drawNav(this.universe.systems.get(nav.link.to)!.name, nav.center, pf.position, this.camera, this.world, time);
+    }
+    this.hud.drawStatus(this.view.system.name, pf.cruise, this.jumpPhase !== 'none' ? `LANTERN TRANSIT → ${this.universe.systems.get(this.jumpTo)?.name ?? ''}` : '');
+    this.starMap.draw(time);
+  }
+
+  /** Next gate on the plotted route, else the nearest Lantern. */
+  private navGate(): GateInstance | undefined {
+    const r = this.starMap.route();
+    if (r.length > 1) return this.view.gateTo(r[1]);
+    const p = this.player.flight.position;
+    let best: GateInstance | undefined;
+    let bd = Infinity;
+    for (const g of this.view.gates) {
+      const d = g.center.distanceToSquared(p);
+      if (d < bd) {
+        bd = d;
+        best = g;
+      }
+    }
+    return best;
+  }
+
+  private checkGates(): void {
+    const p = this.player.flight.position;
+    for (const g of this.view.gates) {
+      _v.subVectors(p, g.center);
+      const s = _v.dot(g.link.normal);
+      const prev = this.gateSide.get(g) ?? s;
+      this.gateSide.set(g, s);
+      const lateral = _v.addScaledVector(g.link.normal, -s).length();
+      if (prev < 0 && s >= 0 && lateral < g.gate.radius * 0.9) {
+        this.beginJump(g.link.to);
+        return;
+      }
+    }
+  }
+
+  private beginJump(to: string): void {
+    this.jumpPhase = 'spool';
+    this.jumpT = 0;
+    this.jumpTo = to;
+    this.player.flight.cruise = 'off';
+  }
+
+  /** Spool (stretch + white-out) → Lattice tunnel (new system loads) → exit flash. */
+  private updateJump(dt: number): void {
+    if (this.jumpPhase === 'none') {
+      postFx.jump = 0;
+      postFx.flash = Math.max(0, postFx.flash - dt * 2);
+      return;
+    }
+    this.jumpT += dt;
+    const t = this.jumpT;
+    if (this.jumpPhase === 'spool') {
+      postFx.jump = t / SPOOL;
+      postFx.flash = Math.max(0, (t - SPOOL * 0.6) / (SPOOL * 0.4));
+      if (t >= SPOOL) {
+        this.jumpPhase = 'tunnel';
+        this.jumpT = 0;
+        this.setWorldVisible(false);
+      }
+    } else if (this.jumpPhase === 'tunnel') {
+      postFx.jump = 0.6;
+      postFx.flash = Math.max(0, 1 - t * 4) + Math.max(0, (t - (TUNNEL - 0.25)) * 4);
+      if (t >= TUNNEL * 0.5 && this.view.system.id !== this.jumpTo) this.arrive();
+      if (t >= TUNNEL) {
+        this.jumpPhase = 'exit';
+        this.jumpT = 0;
+        this.setWorldVisible(true);
+      }
+    } else {
+      postFx.jump = Math.max(0, 1 - t / EXIT) * 0.7;
+      postFx.flash = Math.max(0, 1 - t / (EXIT * 0.6));
+      if (t >= EXIT) this.jumpPhase = 'none';
+    }
+  }
+
+  private setWorldVisible(v: boolean): void {
+    this.view.group.visible = v;
+    this.view.backdrop.group.visible = v;
+    for (const s of this.fleet.ships) if (!s.isPlayer) s.model.root.visible = v && s.alive;
+    if (v) this.placeCapitals();
+    else this.cathedral.root.visible = false;
+  }
+
+  /** Swap star systems under cover of the tunnel; place the flight at the arrival Lantern. */
+  private arrive(): void {
+    const from = this.systemId;
+    this.view.dispose();
+    this.systemId = this.jumpTo;
+    this.view = new StarSystemView(this.universe.systems.get(this.systemId)!, this.scene, this.world.root);
+    this.view.group.visible = false;
+    this.view.backdrop.group.visible = false;
+    this.gateSide.clear();
+    const g = this.view.gateTo(from) ?? this.view.gates[0];
+    const out = g.link.normal.clone().negate(); // exit away from the lane we came down
+    const pf = this.player.flight;
+    const speed = Math.max(220, pf.speed);
+    pf.position.copy(g.center).addScaledVector(out, 40);
+    faceAlong(pf.orientation, out);
+    pf.velocity.copy(out).multiplyScalar(speed);
+    for (const w of this.wingmen) {
+      w.ship.flight.position.copy(_v.copy(w.slot).applyQuaternion(pf.orientation).add(pf.position));
+      w.ship.flight.orientation.copy(pf.orientation);
+    }
+    const hostile = this.view.system.threat > 0.35;
+    this.bandits.forEach((b, i) => {
+      b.center.copy(g.center).addScaledVector(out, 3500 + i * 400);
+      b.ship.alive = hostile;
+      b.ship.hull = b.ship.hullMax;
+      b.ship.shield = b.ship.shieldMax;
+      b.deadFor = hostile ? 0 : -1e9;
+    });
+    if (this.starMap.destination === this.systemId) this.starMap.destination = null;
+    this.chase.snap(pf);
   }
 
   private cutaways(time: number): void {
@@ -262,6 +413,8 @@ export class FlightScene implements GameScene {
       else this.director.cut('flyby', this.playerSubject, 3, this.player.flight);
     } else if (code === 'KeyK') {
       this.cinematic = !this.cinematic;
+    } else if (code === 'KeyM') {
+      this.starMap.toggle();
     }
   }
 

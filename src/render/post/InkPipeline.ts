@@ -19,6 +19,7 @@ import {
   renderOutput,
   select,
   log2,
+  max,
   atan,
   floor,
   vec2,
@@ -105,6 +106,8 @@ export class InkPipeline {
   private readonly grainSeed = uniform(0);
   private readonly boost = uniform(0);
   private readonly speed = uniform(0);
+  private readonly jump = uniform(0);
+  private readonly flash = uniform(0);
 
   private view: DebugView = 'final';
   private pixelRatio = 1;
@@ -140,10 +143,18 @@ export class InkPipeline {
     );
     // Afterburner focal distortion: radial chromatic split of the lit frame.
     const caDir = screenUV.sub(0.5);
-    const caAmt = this.boost.mul(0.0035).add(this.speed.mul(0.001));
+    const caAmt = this.boost.mul(0.0035).add(this.speed.mul(0.001)).add(this.jump.mul(0.03));
     const litR = color.sample(screenUV.add(caDir.mul(caAmt))).r;
     const litB = color.sample(screenUV.sub(caDir.mul(caAmt))).b;
-    const caColor = vec3(litR, color.g, litB);
+    // Hyperspace radial zoom blur (a few taps toward the centre, only while jumping).
+    const zoom = this.jump.mul(0.09);
+    const blur = color
+      .sample(screenUV.sub(caDir.mul(zoom.mul(0.25))))
+      .rgb.add(color.sample(screenUV.sub(caDir.mul(zoom.mul(0.5)))).rgb)
+      .add(color.sample(screenUV.sub(caDir.mul(zoom.mul(0.75)))).rgb)
+      .add(color.sample(screenUV.sub(caDir.mul(zoom))).rgb)
+      .mul(0.25);
+    const caColor = mix(vec3(litR, color.g, litB), blur, this.jump.mul(0.7));
     const lit = mix(caColor, this.hazeColor, haze);
     const lineColor = mix(this.inkColor, this.hazeColor, haze.mul(0.85));
     const inked = mix(lit, lineColor, edges.x.mul(this.inkOn));
@@ -168,12 +179,13 @@ export class InkPipeline {
     const across = fract(ang.mul(38.0)).sub(0.5).abs().mul(2.0);
     const thin = float(1).sub(smoothstep(0.08, 0.22, across.div(radius.mul(1.4).add(0.2))));
     const streak = smoothstep(0.8, 0.88, lineHash).mul(smoothstep(0.32, 0.85, radius)).mul(dash).mul(thin);
-    const speedLines = streak.mul(this.boost).mul(0.75);
+    const speedLines = streak.mul(max(this.boost, this.jump)).mul(0.75);
     const graded = display.rgb
       .mul(mix(0.78, 1.0, vignette))
       .add(grain.mul(0.025))
       .add(vec3(0.85, 0.95, 1.0).mul(speedLines));
-    const final = fxaa(vec4(clamp(graded, 0, 1), 1.0));
+    const flashed = mix(graded, vec3(1.0, 0.98, 0.95), this.flash);
+    const final = fxaa(vec4(clamp(flashed, 0, 1), 1.0));
 
     // ── debug views ───────────────────────────────────────────────────
     const showDepth = log2(depthKm.mul(1000).add(1)).div(20);
@@ -218,6 +230,8 @@ export class InkPipeline {
   update(time: number): void {
     this.boost.value = postFx.boost;
     this.speed.value = postFx.speed;
+    this.jump.value = postFx.jump;
+    this.flash.value = postFx.flash;
     // Stepped clock → lines re-trace 12×/s like hand-inked animation.
     this.params2.value.z = Math.floor(time * this.settings.boilRate) % 97;
     this.grainSeed.value = (Math.floor(time * 24) % 64) * 0.013;
