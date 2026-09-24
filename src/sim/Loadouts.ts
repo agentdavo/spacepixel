@@ -159,7 +159,7 @@ export const GUNS: Record<GunId, GunSpec> = {
   // ── outfitting guns (M / L slots, turrets) ──
   cannon: { id: 'cannon', name: 'GU-17 CANNON', type: 'kinetic', rate: 5, speed: 1400, life: 1.3, damage: 13, pellets: 1, spread: 0.003, style: 'slug', color: '#ffc23f', core: '#fff2cc', width: 1.9, length: 13, sfx: 'cannon', timbre: 'concord' },
   heavylaser: { id: 'heavylaser', name: 'HEAVY PULSE LASER', type: 'laser', rate: 4.5, speed: 1750, life: 1.3, damage: 15, pellets: 1, spread: 0, style: 'streak', color: '#6fe0ff', core: '#ffffff', width: 2.6, length: 64, sfx: 'laser', timbre: 'concord' },
-  railgun: { id: 'railgun', name: 'HEAVY RAILGUN', type: 'kinetic', rate: 0.9, speed: 3400, life: 1.1, damage: 70, pellets: 1, spread: 0, style: 'slug', color: '#bfe8ff', core: '#ffffff', width: 2.4, length: 80, sfx: 'cannon', timbre: 'concord' },
+  railgun: { id: 'railgun', name: 'HEAVY RAILGUN', type: 'kinetic', rate: 0.9, speed: 3400, life: 1.1, damage: 52, pellets: 1, spread: 0, style: 'slug', color: '#bfe8ff', core: '#ffffff', width: 2.4, length: 80, sfx: 'cannon', timbre: 'concord' },
   massdriver: { id: 'massdriver', name: 'MASS DRIVER', type: 'kinetic', rate: 0.35, speed: 2400, life: 1.6, damage: 100, pellets: 1, spread: 0, style: 'slug', color: '#ffe08a', core: '#ffffff', width: 4.2, length: 34, sfx: 'cannon', timbre: 'rustwake' },
   flakcannon: { id: 'flakcannon', name: 'FLAK CANNON', type: 'kinetic', rate: 2, speed: 1150, life: 1.5, damage: 5, pellets: 6, spread: 0.022, style: 'pellet', color: '#ffb05a', core: '#fff0d0', width: 1.5, length: 5, sfx: 'cannon', timbre: 'rustwake' },
   greatlance: {

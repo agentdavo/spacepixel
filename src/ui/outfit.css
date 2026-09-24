@@ -42,7 +42,8 @@
   clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 26px, 100% 100%, 26px 100%, 0 calc(100% - 26px));
   box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
 }
-.sy-card { grid-template-rows: auto minmax(120px, 1fr) auto auto auto; gap: 8px; }
+.sy-card { grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 8px; }
+.sy-mid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px; min-height: 0; }
 .sy-card.concord { --fcol: #6fe6ff; }
 .sy-card.choir { --fcol: #ff5fb4; }
 .sy-card.rustwake { --fcol: #ffc46b; }
@@ -60,7 +61,7 @@
   transform-origin: left bottom;
 }
 .sy-stripe { width: 180px; height: 6px; margin-bottom: 6px; background: repeating-linear-gradient(90deg, #ff7a1c 0 24px, transparent 24px 30px, var(--fcol) 30px 54px, transparent 54px 60px); }
-.sy-sheet { position: relative; min-height: 0; border: 1px solid rgba(125, 255, 178, 0.25); background: radial-gradient(ellipse at 50% 60%, rgba(40, 80, 70, 0.35), rgba(2, 6, 6, 0.9) 70%); }
+.sy-sheet { position: relative; min-height: 150px; border: 1px solid rgba(125, 255, 178, 0.25); background: radial-gradient(ellipse at 50% 60%, rgba(40, 80, 70, 0.35), rgba(2, 6, 6, 0.9) 70%); }
 .sy-sheet canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .sy-sheet i { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.2) 0 1px, transparent 1px 3px); pointer-events: none; }
 .sy-sheet .stamp {
@@ -68,8 +69,8 @@
   letter-spacing: 0.22em; border: 2px solid currentColor; transform: rotate(-6deg); color: #7dffb2;
 }
 .sy-sheet .stamp.lock { color: #ff5f7a; }
-.sy-blurb { color: #e8f5ee; font-size: 12px; line-height: 1.45; }
-.sy-cmp { display: grid; grid-template-columns: auto auto auto minmax(60px, 1fr); gap: 2px 10px; font-size: 11px; align-items: center; }
+.sy-blurb { color: #e8f5ee; font-size: 12px; line-height: 1.4; }
+.sy-cmp { display: grid; grid-template-columns: auto auto auto minmax(30px, 1fr); gap: 1px 8px; font-size: 11px; align-items: center; align-content: start; overflow: hidden; }
 .sy-cmp .k { color: rgba(255, 179, 71, 0.85); letter-spacing: 0.16em; font-size: 10px; }
 .sy-cmp .a { color: rgba(125, 255, 178, 0.6); text-align: right; }
 .sy-cmp .b { color: #fff; text-align: right; }
@@ -118,7 +119,7 @@
 .of-row.item .it { grid-column: 1; }
 .of-row.item .price { color: #fff; font-family: var(--font-display); font-weight: 700; }
 .of-row.item .pw { color: rgba(125, 255, 178, 0.7); font-size: 11px; min-width: 52px; text-align: right; }
-.of-row.item .sub { grid-column: 1 / 4; font-size: 10px; letter-spacing: 0.12em; color: rgba(125, 255, 178, 0.55); }
+.of-row.item .sub { grid-column: 1 / 4; font-size: 10px; letter-spacing: 0.12em; color: rgba(125, 255, 178, 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .of-row.item.fitted { box-shadow: inset -3px 0 0 #7dffb2; }
 .of-row.item.locked .it, .of-row.item.locked .price { color: rgba(255, 255, 255, 0.4); }
 .of-card { grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 8px; height: 100%; box-sizing: border-box; }

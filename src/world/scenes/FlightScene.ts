@@ -619,7 +619,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     park(this.cathedral);
     park(this.carrier);
     this.cathedral.hull = this.carrier.hull = 0; // keep placeCapitals from reviving them
-    this.outfit.settle(); // episodes fly a fighter: a big active hull stays in the hangar
+    this.outfit.settle(true); // episodes fly a fighter: a big active hull stays in the hangar
     // Player: 2.6 km short of the first Lantern (or at the origin of an off-map system).
     const g = this.view.gates[0];
     const pf = this.player.flight;
@@ -896,6 +896,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       },
       hull: () => this.player.hull / this.player.hullMax,
       setHull: (h) => (this.player.hull = h * this.player.hullMax),
+      hullSize: () => Math.sqrt(Math.max(1, this.player.hullMax / 110)),
       onLaunch: () => {
         saveLedger(this.ledger);
         this.docking.launch();
@@ -1162,7 +1163,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     issueOrder(this.wingmen.map((w) => w.ship), 'formUp', this.player);
     this.audio.autoMood = true;
     this.audio.music.setMood('cruise', 3);
-    this.outfit.settle(); // back into the active hull
+    this.outfit.settle(false); // back into the active hull
     if (!this.berthAt(stationId)) this.berthAt(this.contracts.homeStation());
     this.contracts.priority = priority;
     return new Promise((resolve) => {

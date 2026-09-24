@@ -114,10 +114,15 @@ export function slotsFor(e: CatalogEntry): Slot[] {
   return out;
 }
 
-/** Can `it` go in `slot`? (Weapons: same kind, size ≤ slot; utility: same kind and class.) */
+/**
+ * Can `it` go in `slot`? Guns and turrets: the slot's size exactly (a corvette
+ * hardpoint doesn't take a fighter gun). Racks: that size or smaller.
+ * Utility: same kind and class.
+ */
 export function fits(it: Item, slot: Slot): boolean {
   if (it.kind !== slot.kind) return false;
-  if (it.kind === 'gun' || it.kind === 'missile' || it.kind === 'turret') return SIZE_RANK[it.size] <= SIZE_RANK[slot.size ?? 'S'];
+  if (it.kind === 'gun' || it.kind === 'turret') return it.size === (slot.size ?? 'S');
+  if (it.kind === 'missile') return SIZE_RANK[it.size] <= SIZE_RANK[slot.size ?? 'S'];
   if (it.kind === 'shield' || it.kind === 'armour' || it.kind === 'engine' || it.kind === 'reactor') return it.cls === slot.cls;
   return true;
 }
@@ -146,7 +151,7 @@ function stockGun(slot: Slot, y: Yard): string {
   const f = slot.family ?? 'kinetic';
   if (f === 'mass-driver') return 'g-driver';
   if (f === 'beam') return s === 'S' ? 'g-hymn' : s === 'M' ? 'g-lance' : 'g-glance';
-  if (y === 'rustwake' && s !== 'L') return f === 'laser' ? 'g-laser' : 'g-scatter';
+  if (y === 'rustwake' && s !== 'L') return s === 'M' ? 'g-scrap' : f === 'laser' ? 'g-laser' : 'g-scatter';
   if (f === 'laser') return s === 'S' ? 'g-laser' : s === 'M' ? 'g-hlaser' : 'g-rail';
   return s === 'S' ? 'g-auto' : s === 'M' ? 'g-cannon' : f === 'grapple' ? 'g-driver' : 'g-rail';
 }
@@ -169,6 +174,7 @@ function stockTurret(slot: Slot, y: Yard): string {
   const s = slot.size ?? 'S';
   const f = slot.family ?? 'kinetic';
   if (f === 'beam') return s === 'S' ? 't-hymn' : s === 'M' ? 't-lance' : 't-glance';
+  if (f === 'flak' && s !== 'S') return y === 'choir' ? 't-battery' : 't-flakbat';
   if (f === 'flak' || (f === 'kinetic' && s === 'S')) return y === 'rustwake' ? 't-scrapflak' : y === 'choir' ? 't-hymn' : 't-pd';
   if (y === 'choir') return s === 'L' ? 't-glance' : 't-battery';
   if (f === 'laser') return s === 'S' ? 't-twin' : s === 'M' ? 't-hlaser' : 't-rail';

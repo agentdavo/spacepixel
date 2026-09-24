@@ -9,8 +9,8 @@ import { GUNS, MISSILES, type GunId, type GunSpec, type MissileId } from '../../
  * Slots (see fit.ts): guns S/M/L, missile racks S/M/L, turret mounts S/M/L,
  * and utility slots with a class 1–5 — shield generator, armour, drive,
  * reactor — plus free bays (cargo, point defence, capacitors) and hangar
- * bays. Weapons fit any slot of their size or bigger; utility items fit a
- * slot of exactly their class.
+ * bays. Guns and turrets fit a slot of their size, racks their size or
+ * bigger; utility items fit a slot of exactly their class.
  *
  * Every item comes in Mk I–IV from a named manufacturer. Utility items are
  * *relative*: a Mk I of the hull's own yard is what the hull's base numbers
@@ -221,7 +221,7 @@ const GUN_DEFS: GunDef[] = [
   { key: 'g-auto', name: 'GU-11 AUTOCANNON PAIR', size: 'S', guns: ['autocannon'], maker: 'anchorage', price: 900, power: 2, blurb: 'Kinetic: bounces off shields, chews hull. Switch to it when the bubble drops.' },
   { key: 'g-chord', name: 'TINE CHORD', size: 'S', guns: ['hymn', 'lance'], maker: 'hesper', price: 1400, power: 4, blurb: 'Hymn pulse and a short beam-lance, as the Cantors fly them. Strips shields fast; weak on plate.' },
   { key: 'g-hymn', name: 'HYMN PULSE EMITTERS', size: 'S', guns: ['hymn'], maker: 'hesper', price: 1100, power: 3, blurb: 'Harmonic pulse: shields shatter, hull shrugs.' },
-  { key: 'g-scrap', name: 'SCRAP PAIR', size: 'S', guns: ['scatter', 'laser'], maker: 'tey', price: 800, power: 2.5, blurb: 'A scattergun and a salvaged laser on a welded yoke. Point blank or nothing.' },
+  { key: 'g-scrap', name: 'SCRAP PAIR', size: 'M', guns: ['scatter', 'laser'], maker: 'tey', price: 1600, power: 3.5, blurb: 'A scattergun and a salvaged laser on a welded yoke. Point blank or nothing. R swaps.' },
   { key: 'g-scatter', name: 'SCATTERGUN', size: 'S', guns: ['scatter'], maker: 'tey', price: 700, power: 2, blurb: 'Eight pellets a shot. Get close.' },
   { key: 'g-cannon', name: 'GU-17 CANNON POD', size: 'M', guns: ['cannon'], maker: 'anchorage', price: 2600, power: 4.5, blurb: 'Heavy kinetic slugs from a conformal pod. The gunship pilot\'s hammer.' },
   { key: 'g-hlaser', name: 'HEAVY PULSE LASER', size: 'M', guns: ['heavylaser'], maker: 'anchorage', price: 2800, power: 5, blurb: 'A frigate secondary cut down to a hardpoint. Slow, bright, hits hard.' },
@@ -382,7 +382,7 @@ function buildItems(): Item[] {
   const bays: { key: string; name: string; role: BayItem['role']; maker: MakerId; price: number; power: number; blurb: string }[] = [
     { key: 'b-cargo', name: 'CARGO BAY EXTENSION', role: 'cargo', maker: 'castellan', price: 1500, power: 0, blurb: 'Racks and a pressure skin: more hold.' },
     { key: 'b-hold', name: 'SCRAP HOLD', role: 'cargo', maker: 'tey', price: 1100, power: 0, blurb: 'A cargo box welded where something else used to be.' },
-    { key: 'b-pd', name: 'POINT-DEFENCE CLUSTER', role: 'pd', maker: 'aegis', price: 4000, power: 2, blurb: 'Automatic gatlings that shoot inbound missiles and torpedoes.' },
+    { key: 'b-pd', name: 'POINT-DEFENCE CLUSTER', role: 'pd', maker: 'aegis', price: 4000, power: 2, blurb: 'Automatic flak that shoots down inbound torpedoes before they reach the plating.' },
     { key: 'b-pdscrap', name: 'CHAFF-AND-GUN RIG', role: 'pd', maker: 'tey', price: 2800, power: 1.6, blurb: 'Rustwake point defence: loud, mostly effective.' },
     { key: 'b-cap', name: 'SHIELD CAPACITOR', role: 'capacitor', maker: 'aegis', price: 3000, power: 1.5, blurb: 'Banks charge between hits: faster shield recovery.' },
     { key: 'b-choircap', name: 'CHORAL CAPACITOR', role: 'capacitor', maker: 'hesper', price: 3800, power: 1.8, blurb: 'A resonant bank. The shield comes back singing.' },

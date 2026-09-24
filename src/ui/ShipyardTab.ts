@@ -50,8 +50,10 @@ class ShipyardTab {
     this.api = api;
     this.note = null;
     this.collect();
-    // Start on the first hull for sale (the thing you came to look at).
-    const i = this.rows.findIndex((r) => r.kind === 'sale');
+    // Start on the next hull up the ladder (the thing you came to look at).
+    const tier = entryOf(activeShip(outfitter()!.hangar)).tier;
+    const up = this.rows.findIndex((r) => r.kind === 'sale' && r.e.tier > tier && !r.lock);
+    const i = up >= 0 ? up : this.rows.findIndex((r) => r.kind === 'sale');
     this.sel = i >= 0 ? i : 0;
     this.render();
   }
@@ -264,9 +266,11 @@ class ShipyardTab {
     const fac = e.faction;
     return `<div class="sy-card ${fac}">
       <div><div class="sy-stripe"></div><span class="sy-kicker">${row.kind === 'owned' ? 'YOUR HANGAR' : 'MODEL SHEET'} // TIER ${ROMAN[e.tier]} ${esc(e.role.toUpperCase())} · ${esc(e.manufacturer.toUpperCase())}</span><h2>${esc(e.designation)} ${esc(e.name.toUpperCase())}</h2></div>
-      <div class="sy-sheet"><canvas></canvas><i></i>${stamp}</div>
+      <div class="sy-mid">
+        <div class="sy-sheet"><canvas></canvas><i></i>${stamp}</div>
+        <div class="sy-cmp"><span class="k"></span><span class="a">YOURS</span><span class="b">THIS</span><span></span>${cmp}</div>
+      </div>
       <div class="sy-blurb">${esc(e.blurb)}</div>
-      <div class="sy-cmp"><span class="k"></span><span class="a">YOURS</span><span class="b">THIS</span><span></span>${cmp}</div>
       <div class="sy-deal">${deal}<div class="sy-actions">${actions}</div></div>
     </div>`;
   }

@@ -40,6 +40,8 @@ export class Outfitter {
   /** Hull + fit the player entity was built from. */
   private flying: { uid: string; hull: string; fit: Fit } | null = null;
   private livery: Partial<Livery> = {};
+  /** A story episode is running (set by settle(true / false)). */
+  private episode = false;
 
   constructor() {
     // ?own=<hull id>: own (and fly) that hull with its stock fit — captures, balance checks.
@@ -72,7 +74,7 @@ export class Outfitter {
   /** The hull the pilot flies now: the active one, or a fleet Kestrel during story episodes if the active hull is too big. */
   private seat(): { uid: string; hull: string; fit: Fit; condition: number } {
     const a = this.active();
-    if (!this.host?.inEpisode() || entryOf(a).length <= EPISODE_MAX_LENGTH) return a;
+    if (!(this.episode || this.host?.inEpisode()) || entryOf(a).length <= EPISODE_MAX_LENGTH) return a;
     const own = this.hangar.ships.find((s) => entryOf(s).length <= EPISODE_MAX_LENGTH);
     if (own) return own;
     const k = CATALOG_BY_ID['vf27-kestrel'];
@@ -142,7 +144,8 @@ export class Outfitter {
    * changed, rebuild (swap) when the active hull changed. Call after any
    * shop operation, and when an episode starts or ends.
    */
-  settle(): void {
+  settle(episode?: boolean): void {
+    if (episode !== undefined) this.episode = episode;
     const h = this.host;
     if (!h) return;
     const want = this.seat();

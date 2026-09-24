@@ -1,8 +1,8 @@
 /**
  * Contracts board (batch 3 · milestone 10) — pure data + functions.
  *
- * No DOM, no three, no clocks, and only type imports, so the whole module
- * runs under `node --test` (tests/contracts.test.ts). Every board is a pure
+ * No DOM, no three, no clocks — type imports plus the pure ship catalogue —
+ * so the whole module runs under `node --test` (tests/contracts.test.ts). Every board is a pure
  * function of (station, board epoch, standing bucket, ship tier): the same
  * inputs always post the same jobs, and a contract's id encodes all four.
  *
@@ -26,6 +26,7 @@
  * contract is plain JSON and survives the save file.
  */
 import type { Character } from '../campaign/types';
+import { CATALOG_BY_ID } from '../shipyard/catalog.ts';
 import type { CommodityId, EconFaction, StationKind, TradeLedger } from '../economy';
 
 export type ContractKind = 'courier' | 'haul' | 'escort' | 'bounty' | 'patrol' | 'salvage' | 'recon' | 'sortie' | 'priority';
@@ -200,7 +201,11 @@ export const SHIP_TIER: Record<string, Tier> = {
   'choir-vesper': 3,
 };
 export function shipTier(blueprintId: string): Tier {
-  return SHIP_TIER[blueprintId] ?? 1;
+  const t = SHIP_TIER[blueprintId];
+  if (t) return t;
+  // Shipyard hulls: catalogue tier T1–2 → I, T3–4 → II, T5–6 → III.
+  const e = CATALOG_BY_ID[blueprintId];
+  return e ? (e.tier >= 5 ? 3 : e.tier >= 3 ? 2 : 1) : 1;
 }
 
 // ── Reward bands ─────────────────────────────────────────────────────────

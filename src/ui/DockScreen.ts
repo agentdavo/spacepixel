@@ -43,6 +43,8 @@ export interface DockContext {
   /** Player hull, 0..1. */
   hull(): number;
   setHull(h: number): void;
+  /** Repair-cost multiplier for the airframe size (shipyard hulls; default 1). */
+  hullSize?(): number;
   onLaunch(): void;
   /** Extra opening lines for the dock log (contract settlements, …). */
   notices?: { text: string; cls?: string }[];
@@ -211,7 +213,7 @@ export class DockScreen {
 
   private repair(): void {
     const ctx = this.ctx!;
-    const r = repair(ctx.ledger(), ctx.station, ctx.hull());
+    const r = repair(ctx.ledger(), ctx.station, ctx.hull(), ctx.hullSize?.() ?? 1);
     if (r.cost > 0) {
       ctx.setLedger(r.ledger);
       ctx.setHull(r.hull);
@@ -321,7 +323,7 @@ export class DockScreen {
     el.querySelector('.dock-blurb')!.textContent = `${c.name.toUpperCase()} — ${c.blurb}`;
 
     const hull = ctx.hull();
-    const rc = repairCost(st, l, hull);
+    const rc = repairCost(st, l, hull, ctx.hullSize?.() ?? 1);
     el.querySelector('.dock-svc.hull')!.innerHTML = `
       <div class="row"><h3>HULL · AIRFRAME 0413</h3><span>${Math.round(hull * 100)}%</span></div>
       <div class="meter"><i style="width:${Math.round(hull * 100)}%"></i></div>

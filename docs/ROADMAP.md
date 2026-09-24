@@ -109,7 +109,7 @@ buy the next hull, take on bigger adversaries.
 | 3 | Directional shields, collapse/regen visuals | facings on HUD | 🔧 |
 | 4 | Progression line T1→T6: Kestrel → heavy fighter → gunship → corvette → frigate | each tier flyable | 🔧 |
 | 5 | Rustwake line, civilian freighters/tankers/liners, mid-tier warships | in hangar | 🔧 |
-| 6 | Shipyard + outfitting (hardpoints, shields, armour, engines, reactor) | fit changes stats & model | queued |
+| 6 | Shipyard + outfitting (hardpoints, shields, armour, engines, reactor) | fit changes stats & model | ✅ `src/game/outfitting`, SHIPYARD / OUTFITTING dock tabs, turrets fire, `npm run balance` *outfit* |
 | 7 | Contracts board: courier, haul, escort, bounty, patrol, salvage, recon, sorties | seeded, tested | 🔧 |
 | 8 | Free-roam career loop between episodes | story resumes on demand | 🔧 |
 | 9 | Living Reach: ringed giants, moons, city lights, traffic lanes, patrols, pirates | perf budget holds | 🔧 |
