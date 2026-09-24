@@ -34,6 +34,7 @@ import { updateAI, issueOrder, setFormation, setAutopilot, brainOf } from '@/sim
 import { DockingController, berth, type Dockable } from '../Docking';
 import { stageReach } from '../ReachStage';
 import { Traffic, type TrafficEvent } from '../Traffic';
+import { hudLabels } from '@/ui/HudLabels';
 import { ReachHud } from '@/ui/ReachHud';
 import { ambushReward } from '@/universe/traffic';
 import { BLUEPRINTS } from '@/assets/blueprints';
@@ -480,6 +481,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       // Cutaway (docking, or the salvage tow after a free-flight death): the frame belongs to the cinematography.
       this.hud.clear();
       this.combatHud.clear();
+      hudLabels.discard();
       this.updateCinema();
       this.starMap.draw(time);
       return;
@@ -506,6 +508,8 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.hud.drawCampaign(`EP ${String(m.episode).padStart(2, '0')} · ${m.title}`, this.campaign.visibleObjectives(), this.campaign.runner.outcome, time);
       for (const d of this.campaign.runner.dwells) this.hud.drawDwell(d.position, d.radius, d.progress, this.camera, this.world);
     }
+    // World-space labels from every layer, decluttered in one pass (src/ui/HudLabels.ts).
+    hudLabels.flush(this.hud.context, window.innerWidth, window.innerHeight, time);
     this.starMap.draw(time);
   }
 

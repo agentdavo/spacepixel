@@ -6,6 +6,7 @@ import type { LockState } from '@/sim/Missiles';
 import { leadSpeedOf } from '@/sim/Combat';
 import type { MissionRunner } from '@/game/Missions';
 import { HUD, centerBand, corridorY, fitText, freeSpan, objectivesX, placeIn, promptY } from './hudLayout';
+import { LABEL_PRIORITY, hudLabels } from './HudLabels';
 
 /**
  * Minimal flight HUD on one 2D canvas (M19 turns this into the full CRT HUD).
@@ -21,6 +22,7 @@ const _d = new Vector3();
 const _r = new Vector3();
 const _vt = new Vector3();
 const PINK = '#ff5fb4';
+const F13 = '13px "Share Tech Mono", monospace';
 
 export class FlightHud {
   private canvas = document.createElement('canvas');
@@ -83,6 +85,8 @@ export class FlightHud {
         c.lineTo(aim.x + dx * 30, aim.y + dy * 30);
       }
       c.stroke();
+      // World-space labels never cover the gun cross.
+      hudLabels.reticle(aim.x, aim.y, 36);
     }
 
     // Velocity vector: where the ship is actually going.
@@ -100,6 +104,7 @@ export class FlightHud {
         c.moveTo(vv.x, vv.y - 6);
         c.lineTo(vv.x, vv.y - 12);
         c.stroke();
+        hudLabels.obstacle(vv.x - 14, vv.y - 12, 28, 20);
       }
     }
 
@@ -123,11 +128,22 @@ export class FlightHud {
       c.strokeStyle = hostile ? (isTarget ? PINK : 'rgba(255,95,180,0.7)') : 'rgba(125,255,178,0.6)';
       c.lineWidth = isTarget ? 2 : 1.2;
       this.brackets(pt.x, pt.y, half, half * 0.35);
+      // Brackets are obstacles for every label; the target's own label is pinned (always shown, placed first).
+      if (!isTarget) hudLabels.obstacle(pt.x - half, pt.y - half, half * 2, half * 2);
       if (isTarget) {
-        c.fillStyle = PINK;
-        c.fillText(`${s.name.toUpperCase()}  ${(dist / 1000).toFixed(2)} km`, pt.x + half + 8, pt.y - half + 10);
-        this.miniBar(pt.x + half + 8, pt.y - half + 16, s.shield / s.shieldMax, '#6fe6ff');
-        this.miniBar(pt.x + half + 8, pt.y - half + 22, s.hull / s.hullMax, AMBER);
+        hudLabels.add({
+          id: 'target',
+          x: pt.x,
+          y: pt.y,
+          r: half + 2,
+          lines: [{ text: `${s.name.toUpperCase()}  ${(dist / 1000).toFixed(2)} km`, color: PINK, font: F13 }],
+          bars: [
+            { value: s.shield / s.shieldMax, color: '#6fe6ff' },
+            { value: s.hull / s.hullMax, color: AMBER },
+          ],
+          priority: LABEL_PRIORITY.target,
+          pinned: true,
+        });
         // Lock-on: a diamond collapsing onto the target, then a hard red box.
         if (lock.locked) {
           if ((time * 4) % 1 < 0.7) {
@@ -215,7 +231,7 @@ export class FlightHud {
       c.lineTo(pt.x - r, pt.y);
       c.closePath();
       c.stroke();
-      c.fillText(label, pt.x + 18, pt.y + 4);
+      hudLabels.add({ id: 'nav', x: pt.x, y: pt.y, r: 13, lines: [{ text: label, color: cyan, font: F13 }], priority: LABEL_PRIORITY.nav });
     } else {
       world.toRender(universe, _p).applyMatrix4(cam.matrixWorldInverse);
       const ang = Math.atan2(-_p.y, _p.x);
@@ -498,10 +514,18 @@ export class FlightHud {
       c.moveTo(pt.x + r, pt.y);
       c.lineTo(pt.x + r + 4, pt.y);
       c.stroke();
-      c.fillText(`${st.name.toUpperCase()}  ${range}`, pt.x + r + 8, pt.y - 2);
-      c.globalAlpha = 0.7;
-      c.fillText(st.kind.toUpperCase(), pt.x + r + 8, pt.y + 12);
       c.globalAlpha = 1;
+      hudLabels.add({
+        id: `st:${st.name}`,
+        x: pt.x,
+        y: pt.y,
+        r: r + 4,
+        lines: [
+          { text: `${st.name.toUpperCase()}  ${range}`, color: col, font: F13, alpha: hot ? 1 : 0.75 },
+          { text: st.kind.toUpperCase(), color: col, font: F13, alpha: 0.7 },
+        ],
+        priority: hot ? LABEL_PRIORITY.dockTarget : LABEL_PRIORITY.station,
+      });
     }
   }
 
@@ -661,18 +685,11 @@ export class FlightHud {
     c.stroke();
   }
 
-  private miniBar(x: number, y: number, v: number, color: string): void {
-    const c = this.ctx;
-    c.fillStyle = 'rgba(0,0,0,0.5)';
-    c.fillRect(x, y, 70, 4);
-    c.fillStyle = color;
-    c.fillRect(x, y, 70 * Math.max(0, Math.min(1, v)), 4);
-  }
-
   private drawFlightBlock(f: FlightModel, time: number): void {
     const c = this.ctx;
     const x0 = 24;
     let y = this.h - 118;
+    hudLabels.obstacle(x0 - 8, y - 16, 340, this.h - y + 16);
     c.fillStyle = GREEN;
     c.fillText(f.speed < 1000 ? `SPD ${f.speed.toFixed(0).padStart(4, ' ')} m/s` : `SPD ${(f.speed / 1000).toFixed(f.speed < 10_000 ? 2 : 1).padStart(4, ' ')} km/s`, x0, y);
     y += 20;

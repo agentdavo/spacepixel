@@ -4,6 +4,7 @@ import type { ShipEntity } from '@/sim/Fleet';
 import { gunOf, missileOf, selectedSubsystem, subsystemPosition } from '@/sim/Combat';
 import { FACING_NAMES, ZONE_NAMES } from '@/sim/Damage';
 import { HUD, claimRect, targetBottom, weaponsRect } from './hudLayout';
+import { hudLabels } from './HudLabels';
 
 /**
  * Combat readouts on their own canvas (layered over FlightHud):
@@ -97,6 +98,7 @@ export class CombatHud {
     const cs = p.combat;
     c.fillStyle = 'rgba(0,10,6,0.45)';
     c.fillRect(r.x, r.y, r.w, r.h);
+    hudLabels.obstacle(r.x, r.y - HUD.weaponsLine, r.w, r.h + HUD.weaponsLine);
     const tu = this.turrets;
     const hg = this.hangar;
     if (tu || hg) {
@@ -196,6 +198,7 @@ export class CombatHud {
     const rows = Math.max(0, Math.min(subs.length, 14, Math.floor((targetBottom(this.h) - top - 112) / 15)));
     c.fillStyle = 'rgba(0,10,6,0.45)';
     c.fillRect(x - 12, y - 18, 262, 112 + rows * 15);
+    hudLabels.obstacle(x - 12, y - 18, 262, 112 + rows * 15);
     const dist = t.flight.position.distanceTo(player.flight.position);
     c.fillStyle = PINK;
     c.fillText(`${t.name.toUpperCase()}`, x, y);

@@ -6,6 +6,7 @@ import type { Ambush, Traffic, TrafficShip } from '@/world/Traffic';
 import { KIND_LABEL } from '@/universe/bodies';
 import { TRAFFIC_ROLES } from '@/universe/traffic';
 import { HUD, centerBand, claim, claimRect, fitText, hailBottom } from './hudLayout';
+import { LABEL_PRIORITY, hudLabels } from './HudLabels';
 
 /**
  * The living-Reach overlay (its own canvas above the flight HUD):
@@ -117,15 +118,16 @@ export class ReachHud {
       const col = b.landmark ? AMBER : moon ? 'rgba(216,208,255,0.75)' : BODY;
       c.strokeStyle = col;
       c.fillStyle = col;
+      // Label anchor: the ring marker, or the end of the limb tick on a big disc.
       let lx = pt.x;
       let ly = pt.y;
+      let lr = 4;
       if (rpx < 26) {
         const r = Math.max(moon ? 4 : 6, rpx + 4);
         c.beginPath();
         c.arc(pt.x, pt.y, r, 0, Math.PI * 2);
         c.stroke();
-        lx = pt.x + r + 6;
-        ly = pt.y + 4;
+        lr = r + 1;
       } else {
         // Limb tick at upper-right of the disc.
         const a = -Math.PI / 4;
@@ -137,15 +139,22 @@ export class ReachHud {
         c.lineTo(ex + 14, ey - 14);
         c.lineTo(ex + 30, ey - 14);
         c.stroke();
-        lx = ex + 34;
-        ly = ey - 10;
+        lx = ex + 30;
+        ly = ey - 14;
       }
       if (!labelled.has(b)) continue;
       const range = alt > 10_000 ? `${(alt / 1000).toFixed(0)} km` : `${(alt / 1000).toFixed(1)} km`;
-      c.fillText(`${b.name.toUpperCase()}  ${range}`, lx, ly);
-      c.globalAlpha = 0.65;
-      c.fillText(`${(b.landmark ?? KIND_LABEL[b.kind]).toUpperCase()}${moon ? ` · MOON OF ${b.parent!.name.toUpperCase()}` : ''}`, lx, ly + 13);
-      c.globalAlpha = 1;
+      hudLabels.add({
+        id: `body:${b.name}`,
+        x: lx,
+        y: ly,
+        r: lr,
+        lines: [
+          { text: `${b.name.toUpperCase()}  ${range}`, color: col },
+          { text: `${(b.landmark ?? KIND_LABEL[b.kind]).toUpperCase()}${moon ? ` · MOON OF ${b.parent!.name.toUpperCase()}` : ''}`, color: col, alpha: 0.65 },
+        ],
+        priority: b.landmark ? LABEL_PRIORITY.planet + 5 : moon ? LABEL_PRIORITY.moon : LABEL_PRIORITY.planet,
+      });
     }
     // Survey line for the nearest body (lower centre, above the dock prompt).
     if (nearest && nearAlt < 60_000) {
@@ -171,14 +180,9 @@ export class ReachHud {
       const pt = this.project(t.ship.flight.position, world, cam);
       if (pt.behind || pt.x < 0 || pt.x > this.w || pt.y < 0 || pt.y > this.h) continue;
       const half = Math.max(9, (t.ship.radius * fovScale) / Math.max(d, 1));
-      c.fillStyle = t.role === 'patrol' ? FLAG_COL[t.flag] : 'rgba(125,255,178,0.8)';
-      c.globalAlpha = t.ambush ? 1 : 0.75;
-      c.fillText(`${TRAFFIC_ROLES[t.role].prefix} ${t.manifest.name.toUpperCase()}`, pt.x + half + 6, pt.y + half + 2);
-      if (t.ambush && (time * 3) % 1 < 0.6) {
-        c.fillStyle = RED;
-        c.fillText('MAYDAY', pt.x + half + 6, pt.y + half + 15);
-      }
-      c.globalAlpha = 1;
+      const lines = [{ text: `${TRAFFIC_ROLES[t.role].prefix} ${t.manifest.name.toUpperCase()}`, color: t.role === 'patrol' ? FLAG_COL[t.flag] : 'rgba(125,255,178,0.8)', alpha: t.ambush ? 1 : 0.75 }];
+      if (t.ambush) lines.push({ text: 'MAYDAY', color: RED, alpha: (time * 3) % 1 < 0.6 ? 1 : 0 });
+      hudLabels.add({ id: `tr:${t.ship.id}`, x: pt.x, y: pt.y, r: half, lines, priority: t.ambush ? LABEL_PRIORITY.distress : LABEL_PRIORITY.traffic });
     }
 
     // ── distress calls (under the contract toasts) ──────────────────
@@ -194,12 +198,19 @@ export class ReachHud {
     if (o.navGate && o.navGate.center.distanceTo(pp) < 25_000) {
       const list = o.traffic.arrivals(o.navGate.to, 2);
       const pt = this.project(o.navGate.center, world, cam);
-      if (list.length && !pt.behind && pt.x > 0 && pt.x < this.w - 200 && pt.y > 0 && pt.y < this.h - 60) {
-        c.fillStyle = 'rgba(111,230,255,0.8)';
-        list.forEach((s, i) => {
-          const m = Math.floor(s.eta / 60);
-          const sec = Math.floor(s.eta % 60);
-          c.fillText(`INBOUND ${m}:${String(sec).padStart(2, '0')}  ${TRAFFIC_ROLES[s.role].label.toUpperCase()} ${s.name.toUpperCase()}`, pt.x + 18, pt.y + 22 + i * 14);
+      if (list.length && !pt.behind && pt.x > 0 && pt.x < this.w && pt.y > 0 && pt.y < this.h) {
+        // Its own label, anchored on the nav diamond: it gives way to the Lantern's name (and everything else).
+        hudLabels.add({
+          id: 'arrivals',
+          x: pt.x,
+          y: pt.y,
+          r: 14,
+          lines: list.map((s) => {
+            const m = Math.floor(s.eta / 60);
+            const sec = Math.floor(s.eta % 60);
+            return { text: `INBOUND ${m}:${String(sec).padStart(2, '0')}  ${TRAFFIC_ROLES[s.role].label.toUpperCase()} ${s.name.toUpperCase()}`, color: 'rgba(111,230,255,0.8)' };
+          }),
+          priority: LABEL_PRIORITY.arrivals,
         });
       }
     }
@@ -251,6 +262,7 @@ export class ReachHud {
       c.closePath();
       c.stroke();
       c.lineWidth = 1.2;
+      hudLabels.obstacle(pt.x - r, pt.y - r, r * 2, r * 2);
     } else {
       // Edge arrow toward the call.
       world.toRender(a.position, _p).applyMatrix4(cam.matrixWorldInverse);
