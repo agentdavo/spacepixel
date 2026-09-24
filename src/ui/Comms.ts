@@ -5,6 +5,27 @@ import { installSettingsKeys } from '@/game/Settings';
 import { lineHold, typeDuration } from './subtitleTiming';
 import './campaign.css';
 import './subtitles.css';
+import { HUD, claim } from './hudLayout';
+
+/**
+ * Radio panels on screen, oldest first. Several systems own a Comms (flight
+ * barks, contract ops, the campaign): they stack upward from the base slot
+ * instead of drawing over each other, and claim their rects (hudLayout).
+ */
+const STACK: Comms[] = [];
+let stackIds = 0;
+
+function restack(): void {
+  let bottom = HUD.commsBottom;
+  const vh = window.innerHeight;
+  for (const c of STACK) {
+    const el = c.panel;
+    el.style.bottom = `${bottom}px`;
+    const h = el.offsetHeight || 130;
+    claim(c.claimId, { x: el.offsetLeft, y: vh - bottom - h, w: el.offsetWidth || 490, h });
+    bottom += h + HUD.commsGap;
+  }
+}
 
 /**
  * Radio chatter panel (bottom-left, above the flight readouts): portrait,
@@ -74,6 +95,8 @@ export class Comms {
   private time = 0;
   private burst = 0;
   private shown = false;
+  /** hudLayout claim id. */
+  readonly claimId = `comms-${stackIds++}`;
   private lastChars = -1;
   private lastTick = -1;
   private sig = -1;
@@ -172,6 +195,7 @@ export class Comms {
 
   destroy(): void {
     this.clear();
+    claim(this.claimId, null);
     window.removeEventListener('resize', this.onResize);
     this.el.remove();
   }
@@ -188,6 +212,7 @@ export class Comms {
       return;
     }
     // phase === 'line'
+    if (this.shown && STACK[STACK.length - 1] === this) restack();
     this.lineT += dt;
     if (this.lineT >= this.lineEnd) {
       this.endLine();
@@ -293,7 +318,17 @@ export class Comms {
   private setShown(v: boolean): void {
     this.shown = v;
     this.el.classList.toggle('show', v);
+    const i = STACK.indexOf(this);
+    if (v && i < 0) STACK.push(this);
+    else if (!v && i >= 0) STACK.splice(i, 1);
+    if (!v) claim(this.claimId, null);
+    restack();
     if (v) this.measure();
+  }
+
+  /** The panel element (stacking). */
+  get panel(): HTMLElement {
+    return this.el;
   }
 
   private measure(): void {

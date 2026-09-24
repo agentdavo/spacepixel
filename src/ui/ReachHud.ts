@@ -5,6 +5,7 @@ import type { BodyInstance } from '@/world/StarSystemView';
 import type { Ambush, Traffic, TrafficShip } from '@/world/Traffic';
 import { KIND_LABEL } from '@/universe/bodies';
 import { TRAFFIC_ROLES } from '@/universe/traffic';
+import { HUD, centerBand, claim, claimRect, fitText, hailBottom } from './hudLayout';
 
 /**
  * The living-Reach overlay (its own canvas above the flight HUD):
@@ -150,13 +151,14 @@ export class ReachHud {
     if (nearest && nearAlt < 60_000) {
       c.textAlign = 'center';
       c.fillStyle = 'rgba(216,208,255,0.85)';
-      c.fillText(`${nearest.name.toUpperCase()} · ${(nearAlt / 1000).toFixed(1)} km — ${nearest.description}`, this.w / 2, this.h - 58);
+      c.fillText(fitText(c, `${nearest.name.toUpperCase()} · ${(nearAlt / 1000).toFixed(1)} km — ${nearest.description}`, centerBand(this.w).width, 12, 10, '"Share Tech Mono", monospace'), this.w / 2, this.h - 58);
+      c.font = '12px "Share Tech Mono", monospace';
       c.textAlign = 'left';
     }
     if (o.ringDensity > 0.02) {
       c.textAlign = 'center';
       c.fillStyle = o.ringDensity > 0.15 ? AMBER : GREEN;
-      c.fillText(`RING PLANE · DEBRIS ${o.ringDensity > 0.15 ? 'DENSE' : 'LIGHT'}`, this.w / 2, 48);
+      c.fillText(`RING PLANE · DEBRIS ${o.ringDensity > 0.15 ? 'DENSE' : 'LIGHT'}`, this.w / 2, HUD.statusSubY + (this.navNoise > 0 ? 18 : 0));
       c.textAlign = 'left';
     }
 
@@ -179,8 +181,9 @@ export class ReachHud {
       c.globalAlpha = 1;
     }
 
-    // ── distress calls ──────────────────────────────────────────────
-    let y = 96;
+    // ── distress calls (under the contract toasts) ──────────────────
+    const toasts = claimRect('toasts');
+    let y = Math.max(96, toasts ? toasts.y + toasts.h + 22 : 0);
     for (const a of o.traffic.ambushes) {
       if (a.resolved) continue;
       this.distress(a, pp, world, cam, time, y);
@@ -203,7 +206,10 @@ export class ReachHud {
 
     // ── hail card ───────────────────────────────────────────────────
     if (this.hailed && time < this.hailed.until && this.hailed.t.ship.alive) this.hailCard(this.hailed.t, this.hailed.line, pp, o.traffic);
-    else this.hailed = null;
+    else {
+      this.hailed = null;
+      claim('hail', null);
+    }
 
     // ── banner ──────────────────────────────────────────────────────
     if (this.banner && time < this.banner.until) {
@@ -212,9 +218,8 @@ export class ReachHud {
       c.font = '700 18px "Oxanium", sans-serif';
       c.fillStyle = b.color;
       c.fillText(b.text, this.w / 2, this.h * 0.28);
-      c.font = '12px "Share Tech Mono", monospace';
       c.fillStyle = 'rgba(255,255,255,0.8)';
-      c.fillText(b.sub, this.w / 2, this.h * 0.28 + 20);
+      c.fillText(fitText(c, b.sub, centerBand(this.w).width, 12, 10, '"Share Tech Mono", monospace'), this.w / 2, this.h * 0.28 + 20);
       c.textAlign = 'left';
     }
     c.restore();
@@ -230,7 +235,7 @@ export class ReachHud {
     c.textAlign = 'center';
     c.fillStyle = blink ? RED : 'rgba(255,95,122,0.6)';
     c.font = '700 14px "Oxanium", sans-serif';
-    c.fillText(`DISTRESS · ${TRAFFIC_ROLES[v.role].label.toUpperCase()} ${v.manifest.name.toUpperCase()} · ${live} ${a.band.toUpperCase()} RAIDERS · ${(d / 1000).toFixed(1)} km`, this.w / 2, y);
+    c.fillText(fitText(c, `DISTRESS · ${TRAFFIC_ROLES[v.role].label.toUpperCase()} ${v.manifest.name.toUpperCase()} · ${live} ${a.band.toUpperCase()} RAIDERS · ${(d / 1000).toFixed(1)} km`, centerBand(this.w).width, 14, 11, '"Oxanium", sans-serif', '700 '), this.w / 2, y);
     c.font = '12px "Share Tech Mono", monospace';
     c.textAlign = 'left';
     const pt = this.project(a.position, world, cam);
@@ -265,8 +270,9 @@ export class ReachHud {
 
   private hailCard(t: TrafficShip, line: string, pp: Vector3, traffic: Traffic): void {
     const c = this.ctx;
-    const x = this.w - 330;
-    const y0 = this.h - 250;
+    // Bottom-right, stacked above the weapons block (hudLayout).
+    const x = this.w - HUD.margin - 312;
+    const y0 = hailBottom(this.h) - (8 + 6 * 17 + 40);
     const rows: [string, string][] = [
       ['CALLSIGN', `${t.manifest.name.toUpperCase()}  ${t.manifest.registry}`],
       ['TYPE', `${TRAFFIC_ROLES[t.role].label.toUpperCase()} · ${t.ship.model.blueprint.name.toUpperCase()} HULL`],
@@ -277,6 +283,7 @@ export class ReachHud {
     ];
     c.fillStyle = 'rgba(0,10,6,0.72)';
     c.fillRect(x - 12, y0 - 24, 324, 32 + rows.length * 17 + 40);
+    claim('hail', { x: x - 12, y: y0 - 24, w: 324, h: 32 + rows.length * 17 + 40 });
     c.strokeStyle = FLAG_COL[t.flag] ?? GREEN;
     c.strokeRect(x - 12, y0 - 24, 324, 32 + rows.length * 17 + 40);
     c.fillStyle = FLAG_COL[t.flag] ?? GREEN;

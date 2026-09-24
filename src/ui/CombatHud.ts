@@ -3,6 +3,7 @@ import type { WorldSpace } from '@/core/WorldSpace';
 import type { ShipEntity } from '@/sim/Fleet';
 import { gunOf, missileOf, selectedSubsystem, subsystemPosition } from '@/sim/Combat';
 import { FACING_NAMES, ZONE_NAMES } from '@/sim/Damage';
+import { HUD, claimRect, targetBottom, weaponsRect } from './hudLayout';
 
 /**
  * Combat readouts on their own canvas (layered over FlightHud):
@@ -78,13 +79,14 @@ export class CombatHud {
 
   private weapons(p: ShipEntity, time: number): void {
     const c = this.ctx;
-    const x = this.w - 250;
-    let y = this.h - 132;
+    const r = weaponsRect(this.w, this.h);
+    const x = r.x + 12;
+    let y = r.y + 18;
     const gun = gunOf(p);
     const msl = missileOf(p);
     const cs = p.combat;
     c.fillStyle = 'rgba(0,10,6,0.45)';
-    c.fillRect(x - 12, y - 18, 240, 126);
+    c.fillRect(r.x, r.y, r.w, r.h);
     c.fillStyle = GREEN;
     if (gun) {
       c.fillText(`[R] ${gun.name}`, x, y);
@@ -162,9 +164,12 @@ export class CombatHud {
     const c = this.ctx;
     const st = t.combat.dmg;
     const x = 24;
-    let y = 118;
+    // Below the dev line (or the expanded debug panel), above the comms stack.
+    const debug = claimRect('debug');
+    const top = Math.max(HUD.targetY, debug ? debug.y + debug.h + 12 : 0);
+    let y = top + 18;
     const subs = st.subsystems;
-    const rows = Math.min(subs.length, 14);
+    const rows = Math.max(0, Math.min(subs.length, 14, Math.floor((targetBottom(this.h) - top - 112) / 15)));
     c.fillStyle = 'rgba(0,10,6,0.45)';
     c.fillRect(x - 12, y - 18, 262, 112 + rows * 15);
     const dist = t.flight.position.distanceTo(player.flight.position);

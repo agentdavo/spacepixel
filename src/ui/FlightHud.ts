@@ -5,6 +5,7 @@ import { hostile as isHostile, type Fleet, type ShipEntity } from '@/sim/Fleet';
 import type { LockState } from '@/sim/Missiles';
 import { leadSpeedOf } from '@/sim/Combat';
 import type { MissionRunner } from '@/game/Missions';
+import { HUD, centerBand, corridorY, fitText, freeSpan, objectivesX, placeIn, promptY } from './hudLayout';
 
 /**
  * Minimal flight HUD on one 2D canvas (M19 turns this into the full CRT HUD).
@@ -250,12 +251,13 @@ export class FlightHud {
   /** Objectives panel (top-right) + mission outcome banner. */
   drawObjectives(m: MissionRunner, time: number): void {
     const c = this.ctx;
-    const x = this.w - 340;
-    let y = 60;
+    const x = objectivesX(this.w) + 12;
+    let y = HUD.objectivesY;
     c.fillStyle = 'rgba(0,10,6,0.55)';
-    c.fillRect(x - 12, y - 20, 330, 30 + m.def.objectives.length * 20);
+    c.fillRect(x - 12, y - 20, HUD.objectivesW, 30 + m.def.objectives.length * 20);
     c.fillStyle = '#ffffff';
-    c.fillText(`${m.def.episode} · ${m.def.title}`, x, y);
+    c.fillText(fitText(c, `${m.def.episode} · ${m.def.title}`, HUD.objectivesW - 20, 13, 11, '"Share Tech Mono", monospace'), x, y);
+    c.font = '13px "Share Tech Mono", monospace';
     y += 22;
     m.def.objectives.forEach((o, i) => {
       const st = m.state[i];
@@ -264,7 +266,8 @@ export class FlightHud {
       else if (st === 'failed') c.fillStyle = RED;
       else c.fillStyle = (time * 1.5) % 1 < 0.75 ? AMBER : '#ffffff';
       const box = st === 'done' ? '[■]' : st === 'failed' ? '[×]' : '[ ]';
-      c.fillText(`${box} ${o.text}${o.optional ? ' (opt)' : ''}`, x, y);
+      c.fillText(fitText(c, `${box} ${o.text}${o.optional ? ' (opt)' : ''}`, HUD.objectivesW - 20, 13, 11, '"Share Tech Mono", monospace'), x, y);
+      c.font = '13px "Share Tech Mono", monospace';
       y += 20;
     });
     if (m.outcome !== 'running') {
@@ -405,18 +408,21 @@ export class FlightHud {
   /** Campaign objectives panel (hidden script cues already filtered out). */
   drawCampaign(title: string, objectives: { text: string; state: string; optional: boolean }[], outcome: string, time: number): void {
     const c = this.ctx;
-    const x = this.w - 360;
-    let y = 60;
+    const x = objectivesX(this.w) + 12;
+    let y = HUD.objectivesY;
+    const shown = objectives.filter((o) => o.state !== 'locked').length;
     c.fillStyle = 'rgba(0,10,6,0.55)';
-    c.fillRect(x - 12, y - 20, 350, 30 + objectives.length * 20);
+    c.fillRect(x - 12, y - 20, HUD.objectivesW, 30 + shown * 20);
     c.fillStyle = '#ffffff';
-    c.fillText(title, x, y);
+    c.fillText(fitText(c, title, HUD.objectivesW - 20, 13, 11, '"Share Tech Mono", monospace'), x, y);
+    c.font = '13px "Share Tech Mono", monospace';
     y += 22;
     for (const o of objectives) {
       if (o.state === 'locked') continue;
       c.fillStyle = o.state === 'done' ? GREEN : o.state === 'failed' ? RED : (time * 1.5) % 1 < 0.75 ? AMBER : '#ffffff';
       const box = o.state === 'done' ? '[■]' : o.state === 'failed' ? '[×]' : '[ ]';
-      c.fillText(`${box} ${o.text}${o.optional ? ' (opt)' : ''}`, x, y);
+      c.fillText(fitText(c, `${box} ${o.text}${o.optional ? ' (opt)' : ''}`, HUD.objectivesW - 20, 13, 11, '"Share Tech Mono", monospace'), x, y);
+      c.font = '13px "Share Tech Mono", monospace';
       y += 20;
     }
     if (outcome === 'success' || outcome === 'failure') {
@@ -571,9 +577,11 @@ export class FlightHud {
       c.lineWidth = 2;
       c.strokeRect(a.x - 12, a.y - 8, 24, 16);
     }
-    // Deviation needles (localizer / glideslope) and readouts, lower centre.
-    const cx = this.w / 2;
-    const cy = this.h - 150;
+    // Deviation needles (localizer / glideslope) and readouts, lower centre (clear of the radio panels).
+    const cy = corridorY(this.h);
+    const span = freeSpan(this.w, cy, 150);
+    const spanW = Math.min(560, span.x1 - span.x0);
+    const cx = placeIn(this.w, span, spanW);
     const half = 40 + Math.max(0, lz) * 0.05;
     const nx = Math.max(-1, Math.min(1, lx / (half * 2)));
     const ny = Math.max(-1, Math.min(1, ly / (half * 1.4)));
@@ -602,23 +610,31 @@ export class FlightHud {
     c.fillStyle = '#6fe6ff';
     c.fillText(`APPROACH ${name.toUpperCase()}`, cx, cy - 52);
     c.fillStyle = '#ffffff';
-    c.fillText(`RNG ${(range / 1000).toFixed(2)} km · CLS ${closure.toFixed(0)} m/s · LAT ${Math.abs(lx).toFixed(0)} m ${lx >= 0 ? 'R' : 'L'} · VRT ${Math.abs(ly).toFixed(0)} m ${ly >= 0 ? 'HI' : 'LO'}`, cx, cy + 58);
+    c.fillText(fitText(c, `RNG ${(range / 1000).toFixed(2)} km · CLS ${closure.toFixed(0)} m/s · LAT ${Math.abs(lx).toFixed(0)} m ${lx >= 0 ? 'R' : 'L'} · VRT ${Math.abs(ly).toFixed(0)} m ${ly >= 0 ? 'HI' : 'LO'}`, spanW, 13, 10, '"Share Tech Mono", monospace'), cx, cy + 58);
     c.fillStyle = range < 1400 ? GREEN : 'rgba(125,255,178,0.75)';
-    c.fillText(lz < 60 ? 'BEHIND THE BAY — CIRCLE OUT TO THE CORRIDOR' : range < 1000 ? 'GUIDANCE ENGAGING' : 'AUTO-DOCK AT 1.0 km · [G] CANCEL', cx, cy + 76);
+    c.fillText(fitText(c, lz < 60 ? 'BEHIND THE BAY — CIRCLE OUT TO THE CORRIDOR' : range < 1000 ? 'GUIDANCE ENGAGING' : 'AUTO-DOCK AT 1.0 km · [G] CANCEL', spanW, 13, 10, '"Share Tech Mono", monospace'), cx, cy + 76);
+    c.font = '13px "Share Tech Mono", monospace';
     c.textAlign = 'left';
   }
 
-  /** One-line docking prompt / controller message, lower centre. */
+  /**
+   * One-line docking prompt / controller message: the prompt row above the
+   * subtitle band, fitted to the centre band and slid clear of the radio
+   * panels (hudLayout).
+   */
   drawDockMessage(text: string, color: string): void {
     if (!text) return;
     const c = this.ctx;
     c.textAlign = 'center';
-    c.font = '15px "Share Tech Mono", monospace';
-    const w = c.measureText(text).width + 28;
+    const y = promptY(this.h);
+    const span = freeSpan(this.w, y - 5, 26);
+    const fitted = fitText(c, text, Math.min(centerBand(this.w).width, span.x1 - span.x0) - 28, 15, 11, '"Share Tech Mono", monospace');
+    const w = c.measureText(fitted).width + 28;
+    const x = placeIn(this.w, span, w);
     c.fillStyle = 'rgba(0,10,6,0.6)';
-    c.fillRect(this.w / 2 - w / 2, this.h * 0.7 - 18, w, 26);
+    c.fillRect(x - w / 2, y - 18, w, 26);
     c.fillStyle = color;
-    c.fillText(text, this.w / 2, this.h * 0.7);
+    c.fillText(fitted, x, y);
     c.font = '13px "Share Tech Mono", monospace';
     c.textAlign = 'left';
   }

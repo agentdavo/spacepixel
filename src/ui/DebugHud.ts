@@ -3,6 +3,7 @@ import type { InkPipeline } from '@/render/post/InkPipeline';
 import type { GameScene } from '@/world/GameScene';
 import type { DebugView } from '@/core/Flags';
 import { flags } from '@/core/Flags';
+import { claim } from './hudLayout';
 
 const VIEWS: DebugView[] = ['final', 'color', 'normal', 'depth', 'id', 'edges'];
 
@@ -72,6 +73,13 @@ export class DebugHud implements Updatable {
   }
 
   private render(): void {
+    this.renderPanel();
+    // The dev panel's rect (hudLayout): the target panel starts below it.
+    const e = this.el;
+    claim('debug', e.isConnected ? { x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: e.offsetHeight } : null);
+  }
+
+  private renderPanel(): void {
     const { info, stats } = this.engine;
     const s = this.ink.settings;
     const p = this.engine.perf.summary();

@@ -1,5 +1,6 @@
 import { Vector3, type PerspectiveCamera } from 'three';
 import type { WorldSpace } from '@/core/WorldSpace';
+import { HUD, centerBand, claim, fitText, objectivesX } from './hudLayout';
 
 /**
  * Free-roam contract overlay: its own canvas over the flight HUD, so the
@@ -38,6 +39,7 @@ export class ContractHud {
 
   /** Clear for a new frame (and track the window size). */
   begin(): void {
+    claim('toasts', null);
     const dpr = Math.min(window.devicePixelRatio, 2);
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -71,13 +73,15 @@ export class ContractHud {
   /** Top-right: the active contracts, tracked one first-class. */
   panel(rows: HudContract[], hint: boolean): void {
     const c = this.ctx;
-    const x = this.w - 372;
-    let y = 60;
+    // The shared objectives column (hudLayout): same spot as campaign / mission objectives.
+    const W = HUD.objectivesW;
+    const x = objectivesX(this.w) + 12;
+    let y = HUD.objectivesY;
     const h = 30 + rows.length * 38 + (hint ? 16 : 0);
     c.save();
     c.shadowBlur = 0;
     c.fillStyle = 'rgba(12,6,0,0.55)';
-    c.fillRect(x - 12, y - 20, 362, h);
+    c.fillRect(x - 12, y - 20, W, h);
     c.fillStyle = ORANGE;
     c.fillRect(x - 12, y - 20, 3, h);
     c.restore();
@@ -91,16 +95,16 @@ export class ContractHud {
       c.fillText(`${r.tracked ? '▶' : '·'} ${r.kind}`, x, y);
       const kw = c.measureText(`▶ ${r.kind}  `).width;
       c.fillStyle = r.tracked ? '#ffffff' : 'rgba(255,255,255,0.7)';
-      c.fillText(clip(c, r.title, 300 - kw - 52), x + kw, y);
+      c.fillText(clip(c, r.title, W - 62 - kw - 52), x + kw, y);
       if (r.timer) {
         c.textAlign = 'right';
         c.fillStyle = r.urgent ? RED : r.timer === 'DONE' ? GREEN : 'rgba(255,255,255,0.75)';
-        c.fillText(r.timer, x + 340, y);
+        c.fillText(r.timer, x + W - 22, y);
         c.textAlign = 'left';
       }
       y += 16;
       c.fillStyle = r.tracked ? GREEN : 'rgba(125,255,178,0.55)';
-      c.fillText(`  ${clip(c, r.status, 330)}`, x, y);
+      c.fillText(`  ${clip(c, r.status, W - 36)}`, x, y);
       y += 22;
     }
     if (hint) {
@@ -192,17 +196,23 @@ export class ContractHud {
     c.textAlign = 'left';
   }
 
-  /** Toasts: centre, under the status strip; 5 s each. */
+  /**
+   * Toasts: centre, under the status strip, fitted to the centre band (clear
+   * of the target panel and the objectives column); 5 s each. Claims their
+   * rows so the distress list starts below them.
+   */
   drawToasts(): void {
     const now = performance.now();
     this.toasts = this.toasts.filter((t) => now - t.t0 < 5000);
     const c = this.ctx;
-    let y = this.h * 0.14;
-    c.font = '700 15px "Oxanium", sans-serif';
+    let y = HUD.toastY;
+    const band = centerBand(this.w).width;
+    claim('toasts', this.toasts.length ? { x: this.w / 2 - band / 2, y: y - 17, w: band, h: this.toasts.length * HUD.toastRow } : null);
     c.textAlign = 'center';
     for (const t of this.toasts) {
       const a = Math.min(1, (5000 - (now - t.t0)) / 600);
-      const w = c.measureText(t.text).width + 36;
+      const text = fitText(c, t.text, band - 36, 15, 11, '"Oxanium", sans-serif', '700 ');
+      const w = c.measureText(text).width + 36;
       c.globalAlpha = a;
       c.save();
       c.shadowBlur = 0;
@@ -218,8 +228,8 @@ export class ContractHud {
       c.fillRect(this.w / 2 - w / 2 - 4, y - 17, 4, 26);
       c.restore();
       c.fillStyle = t.color;
-      c.fillText(t.text, this.w / 2, y);
-      y += 32;
+      c.fillText(text, this.w / 2, y);
+      y += HUD.toastRow;
     }
     c.globalAlpha = 1;
     c.textAlign = 'left';

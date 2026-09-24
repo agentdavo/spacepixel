@@ -12,7 +12,8 @@
   z-index: 12;
   display: grid;
   grid-template-columns: var(--port) minmax(0, 1fr);
-  width: min(490px, calc(100vw - 40px));
+  /* Narrower on small screens so the centred prompt row stays clear (hudLayout). */
+  width: min(490px, max(360px, 35vw), calc(100vw - 40px));
   pointer-events: none;
   font-family: var(--font-mono);
   opacity: 0;
