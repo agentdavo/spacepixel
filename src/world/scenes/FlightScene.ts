@@ -838,6 +838,8 @@ export class FlightScene implements GameScene, FlightHostScene {
       if (d < 3000) near++;
     }
     a.combatIntensity = combatIntensity(nearest, near, this.player.sinceHit);
+    // Soundtrack follows the galaxy / episode (no-op unless something changed).
+    this.audio.setPlace(this.systemId, this.view.system.faction, this.campaign?.mission.episode);
     this.audio.update(a);
     // Episode outcome stingers.
     const outcome = this.campaign?.runner.outcome ?? 'running';

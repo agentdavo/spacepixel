@@ -1,9 +1,11 @@
 import { AudioEngine, type AudioEngineOptions, type BusName } from './AudioEngine';
 import { Sfx, type CruiseState, type Faction, type JumpPhase, type PlayOpts, type QuatLike, type RadioKind, type SfxKind, type UiKind, type Vec3Like } from './Sfx';
 import { Music, MOODS, type Mood, type StingerKind } from './Music';
+import { SCORE_IDS, SCORE_INFO, scoreFor, type ScoreId, type ScorePick } from './score/catalog';
+import { installSettingsKeys, onSettings, setSoundtrackProbe, settings } from '@/game/Settings';
 
-export { AudioEngine, Sfx, Music, MOODS };
-export type { BusName, CruiseState, Faction, JumpPhase, Mood, PlayOpts, QuatLike, RadioKind, SfxKind, StingerKind, UiKind, Vec3Like };
+export { AudioEngine, Sfx, Music, MOODS, SCORE_IDS, SCORE_INFO, scoreFor };
+export type { BusName, CruiseState, Faction, JumpPhase, Mood, PlayOpts, QuatLike, RadioKind, ScoreId, ScorePick, SfxKind, StingerKind, UiKind, Vec3Like };
 
 /**
  * The one audio entry point for scenes.
@@ -136,11 +138,60 @@ export class GameAudio {
   private topFire = new TopK(MAX_REMOTE_FIRE);
   private topHit = new TopK(MAX_HITS);
   private topKill = new TopK(MAX_KILLS);
+  // Where the player is, for the soundtrack (see setPlace).
+  private placeSystem: string | null = null;
+  private placeFaction: string | null = null;
+  private placeEpisode = 0;
+  private placeSetting = '';
+  private offSettings: (() => void) | null = null;
+  /** The last soundtrack decision (for HUD / audio test readouts). */
+  pick: ScorePick = { id: 'classic', variant: 0, reason: 'default' };
 
   constructor(opts: AudioEngineOptions = {}) {
     this.engine = new AudioEngine(opts);
     this.sfx = new Sfx(this.engine);
     this.music = new Music(this.engine);
+    // Live renders follow the player's soundtrack setting; offline renders pick scores explicitly.
+    if (this.engine.live) {
+      this.offSettings = onSettings(() => this.applyPlace(3));
+      setSoundtrackProbe(() => SCORE_INFO[this.pick.id].title);
+      // Shift+F7 must work wherever there is music, not only once a subtitle/comms UI exists.
+      installSettingsKeys();
+    }
+  }
+
+  /**
+   * Tell the soundtrack where the player is. Cheap to call every frame: it
+   * only re-orchestrates when the system, faction, episode or the player's
+   * soundtrack setting changes. Resolution: pinned soundtrack → episode →
+   * special system → faction (src/audio/score/catalog.ts).
+   */
+  setPlace(system: string | null, faction?: string | null, episode?: number | null, fade = 4): void {
+    const ep = episode ?? 0;
+    if (system === this.placeSystem && (faction ?? null) === this.placeFaction && ep === this.placeEpisode && settings.soundtrack === this.placeSetting) return;
+    this.placeSystem = system;
+    this.placeFaction = faction ?? null;
+    this.placeEpisode = ep;
+    this.applyPlace(fade);
+  }
+
+  /** Pin a score directly (audio test scene, captures). `null` returns to setPlace's choice. */
+  setScore(id: ScoreId | null, variant = 0, fade = 2): void {
+    if (id === null) return this.applyPlace(fade);
+    this.pick = { id, variant, reason: 'user' };
+    this.music.setScore(id, variant, fade);
+  }
+
+  private applyPlace(fade: number): void {
+    this.placeSetting = settings.soundtrack;
+    this.pick = scoreFor({ system: this.placeSystem, faction: this.placeFaction, episode: this.placeEpisode || null }, settings.soundtrack);
+    this.music.setScore(this.pick.id, this.pick.variant, fade);
+  }
+
+  /** "Castellan Fleet March · 艦隊行進曲" for the current score. */
+  get scoreLabel(): string {
+    const i = SCORE_INFO[this.music.score];
+    return `${i.title} · ${i.jp}`;
   }
 
   /** Context created and running (false before the first gesture, or if Web Audio is blocked). */
@@ -321,6 +372,8 @@ export class GameAudio {
   }
 
   dispose(): void {
+    this.offSettings?.();
+    this.offSettings = null;
     this.music.dispose();
     this.engine.dispose();
   }

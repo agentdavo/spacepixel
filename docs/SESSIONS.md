@@ -11,15 +11,17 @@ touching their files.
 | Turrets, shields, weapon impacts | turrets session · `claude/ship-turrets-shields-weapons-8lz4su` | `src/sim/Weapons.ts`, `Damage.ts`, `Combat.ts`, weapon/impact FX + SFX (`src/audio/Sfx.ts`) |
 | **Character voices, chat, soundtrack** | voices/score session · `claude/ova-soundtrack-voices` | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
 
-## Soundtrack backend (in progress)
+## Soundtrack backend (landed)
 
-A 90s OVA score backend: FM and analog synths, a string section (legato,
-tremolo, pizzicato, swells) and drum-machine kits (909/707/Linn-style, gated
-snare, Simmons toms, timpani). Each **score** is a palette plus arrangement
-style. Faction territory, special systems and campaign episodes each get
-their own score, and players can pin one. The hooks are
-`audio.music.setScore(id)` and `scoreFor({ system, faction, episode })`. The
-FlightScene diffs stay small (next to the existing `setMood` calls).
+Eight scores re-orchestrate the mood sequencer (see README, *Soundtrack*).
+Hooks for other owners:
+
+- `getAudio().setPlace(systemId, faction, episode)`: cheap per frame. It
+  re-orchestrates only on change. FlightScene calls it next to
+  `audio.update()`, and main.ts calls it before a briefing and on the title.
+- `getAudio().setScore(id, variant)` pins a score (audio test scene, captures).
+- Title, prologue and trailer stay on the **Original Score** unless the player
+  pinned one, so `make-video` / trailer renders are unchanged.
 
 ## Requests
 
