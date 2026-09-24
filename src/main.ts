@@ -14,6 +14,9 @@ import { showEyecatch, showDebrief } from '@/ui/Eyecatch';
 import { loadProfile, saveProfile } from '@/game/Profile';
 import type { FlightScene } from '@/world/scenes/FlightScene';
 import type { PrologueScene } from '@/world/scenes/PrologueScene';
+import type { TrailerScene } from '@/world/scenes/TrailerScene';
+import { disposeTree } from '@/core/dispose';
+import { PhotoMode } from '@/ui/PhotoMode';
 import { getAudio } from '@/audio';
 import { DynamicResolution } from '@/core/DynamicResolution';
 
@@ -48,12 +51,23 @@ async function boot(): Promise<void> {
 
   let ink: InkPipeline | null = null;
   let debugHud: DebugHud | null = null;
+  let current: GameScene | null = null;
+  const photo = new PhotoMode(canvas, uiRoot);
 
-  /** (Re)build the running scene + its ink pipeline. */
+  /** (Re)build the running scene + its ink pipeline; the old one is torn down (GPU + DOM). */
   async function load(name: string): Promise<GameScene> {
     engine.clearSystems();
     input.override = null;
+    photo.exit();
+    if (current) {
+      current.dispose?.();
+      disposeTree(current.scene);
+      current = null;
+    }
+    ink?.dispose();
+    ink = null;
     const game = await SCENES[name]();
+    current = game;
     engine.onResize(game);
     ink = new InkPipeline(info.renderer, game.scene, game.camera, info.isWebGPU);
     ink.settings.enabled = flags.ink;
@@ -61,7 +75,17 @@ async function boot(): Promise<void> {
     ink.setView(flags.view);
     engine.onResize(ink);
     const pipeline = ink;
-    engine.addSystem(game);
+    // Photo mode (F10) freezes the scene and flies the lens itself.
+    engine.addSystem({
+      update: (ctx) => {
+        if (photo.request) {
+          photo.request = false;
+          photo.enter(game.camera);
+        }
+        if (photo.active) photo.update(ctx.dt);
+        else game.update(ctx);
+      },
+    });
     engine.addSystem({ update: (ctx) => pipeline.update(ctx.time) });
     if (flags.quality === 'low') pipeline.setRenderScale(0.75);
     const dynres = new DynamicResolution(engine.perf, pipeline);
@@ -69,9 +93,13 @@ async function boot(): Promise<void> {
     engine.addSystem({ update: (ctx) => dynres.update(ctx.dt) });
     if (!debugHud) debugHud = new DebugHud(engine, pipeline, game, name, uiRoot);
     debugHud.game = game;
+    debugHud.ink = pipeline;
     debugHud.sceneName = name;
     engine.addSystem(debugHud);
-    engine.setRender(() => pipeline.render());
+    engine.setRender(() => {
+      pipeline.render();
+      if (photo.capture) photo.save();
+    });
     console.info(`[vanguard] scene=${name}`);
     return game;
   }
@@ -84,7 +112,13 @@ async function boot(): Promise<void> {
     ready: true,
     frame: () => engine.frameContext.frame,
     backend: info.backendName,
-    hooks: { ...window.__VANGUARD__?.hooks, perf: () => engine.perf.summary(), step: (n: number) => engine.step(n) },
+    hooks: {
+      ...window.__VANGUARD__?.hooks,
+      perf: () => engine.perf.summary(),
+      step: (n: number) => engine.step(n),
+      /** GPU objects the renderer holds (attract-check leak test). */
+      memory: () => ({ ...(info.renderer.info as unknown as { memory: Record<string, number> }).memory }),
+    },
   };
   console.info(`[vanguard] ${info.backendName} backend · ${info.adapterDescription}`);
 
@@ -99,9 +133,26 @@ async function boot(): Promise<void> {
 
   /** The ~60 s cold open (src/cinema/prologue.ts); resolves when it ends or is skipped. */
   async function playPrologue(): Promise<void> {
-    const reel = (await load('prologue')) as PrologueScene;
+    await playReel('prologue', false);
+  }
+
+  /**
+   * A reel (the prologue or the 90 s trailer) that hands back when it ends or
+   * is skipped. As an attract reel, any key, click or stick returns to the title.
+   */
+  async function playReel(name: 'prologue' | 'trailer', attract: boolean): Promise<void> {
+    const reel = (await load(name)) as PrologueScene | TrailerScene;
     reel.exitOnSkip = true;
+    const poke = () => reel.skip();
+    if (attract) {
+      window.addEventListener('keydown', poke, true);
+      window.addEventListener('pointerdown', poke, true);
+      window.addEventListener('gamepadconnected', poke);
+    }
     await reel.done;
+    window.removeEventListener('keydown', poke, true);
+    window.removeEventListener('pointerdown', poke, true);
+    window.removeEventListener('gamepadconnected', poke);
   }
 
   /**
@@ -150,13 +201,23 @@ async function boot(): Promise<void> {
   }
 
   // Front end: title card over the live showcase → briefing → flight. Left
-  // idle, the title plays the prologue as an attract reel, then comes back.
+  // idle, the title runs an attract loop — the prologue, then the trailer,
+  // alternating — and comes back to the title between reels (any input stops it).
+  // ?idle=S shortens the idle wait, ?reel=N plays reels N× faster (attract-check).
+  const idleMs = (Number(q.get('idle')) || 45) * 1000;
+  const ATTRACT = ['prologue', 'trailer'] as const;
+  let attracts = 0;
+  const attractStats = { reels: 0, titles: 0 };
+  window.__VANGUARD__!.hooks = { ...window.__VANGUARD__!.hooks, attract: attractStats };
   for (;;) {
     getAudio().music.setMood('title');
-    const choice = await titleScreen(uiRoot, { idleMs: 45_000 });
-    if (choice === 'prologue' || choice === 'attract') {
-      if (choice === 'prologue') getAudio().ui('confirm');
-      await playPrologue();
+    attractStats.titles++;
+    const choice = await titleScreen(uiRoot, { idleMs });
+    if (choice === 'prologue' || choice === 'trailer' || choice === 'attract') {
+      if (choice !== 'attract') getAudio().ui('confirm');
+      const reel = choice === 'attract' ? ATTRACT[attracts++ % ATTRACT.length] : choice;
+      await playReel(reel, choice === 'attract');
+      attractStats.reels++;
       await load('showcase');
       continue;
     }

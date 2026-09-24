@@ -94,6 +94,7 @@ export const DEFAULT_INK: InkSettings = {
  */
 export class InkPipeline {
   readonly pipeline: RenderPipeline;
+  private readonly glow: { dispose(): void };
   readonly settings: InkSettings;
   readonly scenePass: ReturnType<typeof pass>;
   readonly isWebGPU: boolean;
@@ -173,6 +174,7 @@ export class InkPipeline {
 
     // Bloom reads the pre-ink HDR buffer so only true emissives glow.
     const glow = bloom(color, this.settings.bloomStrength, this.settings.bloomRadius, this.settings.bloomThreshold);
+    this.glow = glow;
     // Set-piece depth fog (dense nebula): zero at postFx.fog = 0.
     const fogK = this.fog.mul(float(1).sub(exp(depthKm.div(max(this.fogRange, 0.001)).negate())));
     const fogged = mix(inked, this.fogColor, fogK);
@@ -217,6 +219,13 @@ export class InkPipeline {
     this.pipeline = new RenderPipeline(renderer, final);
     this.pipeline.outputColorTransform = false;
     this.applySettings();
+  }
+
+  /** Release the scene pass and bloom render targets and the output quad (scene swaps). */
+  dispose(): void {
+    this.scenePass.dispose();
+    this.glow.dispose();
+    this.pipeline.dispose();
   }
 
   applySettings(): void {

@@ -8,10 +8,10 @@ import { describeSettings, installSettingsKeys, onSettings } from '@/game/Settin
  * style.css with the CRT treatment. Each screen resolves a promise when the
  * player moves on, so the boot flow in main.ts reads top to bottom.
  */
-export type TitleChoice = 'launch' | 'free' | 'map' | 'hangar' | 'paint' | 'showcase' | 'prologue' | 'attract';
+export type TitleChoice = 'launch' | 'free' | 'map' | 'hangar' | 'paint' | 'showcase' | 'prologue' | 'trailer' | 'attract';
 
 export interface TitleOptions {
-  /** Resolve with 'attract' after this long with no input (the prologue plays as an attract reel). */
+  /** Resolve with 'attract' after this long with no input (the prologue / trailer play as attract reels). */
   idleMs?: number;
 }
 
@@ -23,6 +23,7 @@ export function titleScreen(root: HTMLElement, opts: TitleOptions = {}): Promise
     { id: 'launch', label: `LAUNCH — EPISODE ${String(profile.episode).padStart(2, '0')}` },
     ...(career ? [{ id: 'free' as const, label: 'CONTINUE — FREE FLIGHT' }] : []),
     { id: 'prologue', label: 'PROLOGUE — THE LONG DARK' },
+    { id: 'trailer', label: 'TRAILER' },
     { id: 'paint', label: 'PAINT SHOP' },
     { id: 'hangar', label: 'HANGAR / MODEL SHEETS' },
     { id: 'showcase', label: 'SHOWCASE' },

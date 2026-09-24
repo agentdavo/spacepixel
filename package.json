@@ -17,7 +17,8 @@
     "econ-sim": "node scripts/econ-sim.mjs",
     "record": "node scripts/record.mjs",
     "make-video": "node scripts/make-video.mjs",
-    "balance": "node scripts/balance.mjs"
+    "balance": "node scripts/balance.mjs",
+    "attract-check": "node scripts/attract-check.mjs"
   },
   "dependencies": {
     "three": "^0.186.0"

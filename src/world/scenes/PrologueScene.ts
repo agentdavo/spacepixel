@@ -23,6 +23,7 @@ import { CombatFx } from '../CombatFx';
  *
  *   t=SECONDS   start (seek) anywhere on the timeline — deterministic, for captures
  *   loop=0      hold the last frame instead of looping (direct loads loop)
+ *   reel=N      play N× faster (attract-mode soak tests: scripts/attract-check.mjs)
  *
  * Hosts that await it (first launch, title attract) set `exitOnSkip` and
  * read `done`; loaded directly, Skip jumps to the title card and the reel
@@ -48,6 +49,7 @@ export class PrologueScene implements GameScene {
   private exitT = -1;
   private finished = false;
   private readonly loop: boolean;
+  private readonly speed: number;
   /** Shader warm-up: one black frame parked on each shot before the film starts. */
   private warm = 0;
   private readonly startT: number;
@@ -57,6 +59,7 @@ export class PrologueScene implements GameScene {
   constructor() {
     const q = new URLSearchParams(location.search);
     this.loop = q.get('loop') !== '0';
+    this.speed = Math.max(0.1, Number(q.get('reel') ?? 1) || 1);
     this.done = new Promise((r) => (this.resolveDone = r));
     this.visuals = new WeaponVisuals(this.weapons, this.missiles);
     this.scene.add(this.visuals.group);
@@ -105,6 +108,11 @@ export class PrologueScene implements GameScene {
     this.resolveDone();
   }
 
+  /** Host swapping scenes: stop the voice, drop the overlay and the sets. */
+  dispose(): void {
+    this.finish();
+  }
+
   update(ctx: FrameContext): void {
     if (this.finished) return;
     if (this.warm <= PROLOGUE.length) {
@@ -120,19 +128,19 @@ export class PrologueScene implements GameScene {
       return;
     }
     const before = this.cinema.t;
-    this.cinema.update(ctx.dt);
+    this.cinema.update(ctx.dt * this.speed);
     // Narrator: speak each caption as the playhead crosses it (a loop / seek back just re-arms).
-    if (this.exitT < 0 && this.cinema.t > before) {
+    if (this.exitT < 0 && this.cinema.t > before && this.speed <= 1) {
       for (const c of cuesCrossed(this.narration, before, this.cinema.t)) getVoice().speak({ who: c.who, text: c.caption.text, channel: c.channel, maxDur: c.maxDur, maxSqueeze: c.maxSqueeze });
     }
-    const dt = ctx.dt;
+    const dt = ctx.dt * this.speed;
     // Everything the weapons sim emitted this frame → flashes, beams, particles.
     this.visuals.update(this.world, dt);
     this.combatFx.consume(dt);
     this.combatFx.update(dt, this.world.eye);
     this.overlay.setSkipVisible(locate(PROLOGUE, this.cinema.t).index < PROLOGUE.length - 1 || this.exitOnSkip);
     if (this.exitT >= 0) {
-      this.exitT += dt;
+      this.exitT += ctx.dt;
       // Skipped: fade the frame to black over the sequencer's grade, then hand back.
       const k = Math.min(1, this.exitT / 0.45);
       postFx.fade = Math.max(postFx.fade, k);
