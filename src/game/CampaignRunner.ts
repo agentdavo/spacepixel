@@ -64,6 +64,29 @@ export interface CampaignHost {
 interface TaggedShip {
   tag: string;
   ship: ShipEntity;
+  /** Index into mission.spawns and member index within the group (snapshots). */
+  spawn: number;
+  member: number;
+}
+
+type V3 = [number, number, number];
+
+/**
+ * A running mission's progress as plain JSON (free-roam contracts persist
+ * it when the pilot leaves the system or dies, and resume from it): clock,
+ * flags (with the time each was set, so flag-delayed spawns keep counting),
+ * objective states, chatter already played, kills, which spawn groups were
+ * released and where each member was (dead members stay dead), dwell progress.
+ */
+export interface RunnerSnapshot {
+  time: number;
+  flags: [string, number][];
+  state: ('locked' | 'active' | 'done' | 'failed')[];
+  fired: string[];
+  kills: [string, number][];
+  released: number[];
+  ships: { spawn: number; member: number; alive: boolean; pos: V3; vel: V3; hull: number }[];
+  dwells: [string, number][];
 }
 
 export class CampaignRunner {
@@ -83,6 +106,8 @@ export class CampaignRunner {
   private fired = new Set<string>();
   private kills = new Map<FactionId, number>();
   private lastJumps = 0;
+  private released = new Set<number>();
+  private restoredDwells = new Map<string, number>();
   readonly ctx: CampaignContext;
 
   constructor(
@@ -268,7 +293,7 @@ export class CampaignRunner {
       const hold = sp.params?.hold;
       if (sp.kind === 'beacon' && typeof hold === 'number') {
         const r = sp.params?.radius;
-        this.dwells.push({ tag: sp.tag, position: handle.position, radius: typeof r === 'number' ? r : 300, hold, progress: 0 });
+        this.dwells.push({ tag: sp.tag, position: handle.position, radius: typeof r === 'number' ? r : 300, hold, progress: this.restoredDwells.get(sp.tag) ?? 0 });
       }
     }
   }
@@ -283,16 +308,76 @@ export class CampaignRunner {
       const base = this.resolve(s.place);
       if (!base) continue;
       this.pendingSpawns.splice(k, 1);
+      const index = this.mission.spawns.indexOf(s);
+      this.released.add(index);
       for (let i = 0; i < s.count; i++) {
         // Loose wedge so groups don't spawn inside each other.
         const pos = base.clone().add(new Vector3((i % 2 ? 1 : -1) * Math.ceil(i / 2) * 60, (i % 3) * 12, -Math.ceil(i / 2) * 45));
         const ship = this.host.spawnShip(s, i, pos);
-        const tag = s.tag ? (s.count > 1 ? `${s.tag}-${i + 1}` : s.tag) : `${s.blueprint}-${i + 1}`;
-        this.tagged.push({ tag, ship });
+        this.tagged.push({ tag: tagFor(s, i), ship, spawn: index, member: i });
       }
       if (s.role === 'escort' && s.tag) {
         this.escorts.push({ tag: s.tag, ships: this.shipsTagged(s.tag), target: null, halted: false });
       }
+    }
+  }
+
+  /** Progress as plain JSON (see RunnerSnapshot). */
+  snapshot(): RunnerSnapshot {
+    const v = (x: { x: number; y: number; z: number } | undefined): V3 => (x ? [x.x, x.y, x.z] : [0, 0, 0]);
+    return {
+      time: this.time,
+      flags: [...this.flags].map((f) => [f, this.flagTime.get(f) ?? 0]),
+      state: [...this.state],
+      fired: [...this.fired],
+      kills: [...this.kills],
+      released: [...this.released],
+      ships: this.tagged.map((t) => ({
+        spawn: t.spawn,
+        member: t.member,
+        alive: t.ship.alive,
+        pos: v(t.ship.flight.position),
+        vel: v((t.ship.flight as { velocity?: Vector3 }).velocity),
+        hull: t.ship.hullMax > 0 ? t.ship.hull / t.ship.hullMax : 1,
+      })),
+      dwells: this.dwells.map((d) => [d.tag, d.progress]),
+    };
+  }
+
+  /**
+   * Resume from a snapshot. Call instead of a fresh start, BEFORE `begin()`:
+   * flags come back silently (no chatter, no script commands), released
+   * groups respawn where they were (survivors only, at their hull), pending
+   * spawns keep their timers, dwell rings keep their progress.
+   */
+  restore(snap: RunnerSnapshot): void {
+    this.time = snap.time;
+    for (const [f, t] of snap.flags) {
+      this.flags.add(f);
+      this.flagTime.set(f, t);
+    }
+    for (const f of this.flags) {
+      const m = /^halt:(.+)$/.exec(f);
+      if (m && !this.flags.has(`resume:${m[1]}`)) this.halted.add(m[1]);
+    }
+    if (snap.state.length === this.state.length) for (let i = 0; i < this.state.length; i++) this.state[i] = snap.state[i];
+    for (const id of snap.fired) this.fired.add(id);
+    for (const [f, n] of snap.kills) this.kills.set(f as FactionId, n);
+    for (const [tag, p] of snap.dwells) this.restoredDwells.set(tag, p);
+    for (const index of snap.released) {
+      const spec = this.mission.spawns[index];
+      if (!spec) continue;
+      const k = this.pendingSpawns.indexOf(spec);
+      if (k >= 0) this.pendingSpawns.splice(k, 1);
+      this.released.add(index);
+      for (const m of snap.ships) {
+        if (m.spawn !== index || !m.alive) continue;
+        const ship = this.host.spawnShip(spec, m.member, new Vector3(...m.pos));
+        (ship.flight as { velocity?: Vector3 }).velocity?.set(...m.vel);
+        ship.hull = Math.max(1, ship.hullMax * m.hull);
+        this.tagged.push({ tag: tagFor(spec, m.member), ship, spawn: index, member: m.member });
+      }
+      if (spec.role === 'escort' && spec.tag) this.escorts.push({ tag: spec.tag, ships: this.shipsTagged(spec.tag), target: null, halted: false });
     }
   }
 
@@ -317,6 +402,10 @@ export class CampaignRunner {
   tagOf(ship: ShipEntity): string | undefined {
     return this.tagged.find((t) => t.ship === ship)?.tag;
   }
+}
+
+function tagFor(s: SpawnSpec, i: number): string {
+  return s.tag ? (s.count > 1 ? `${s.tag}-${i + 1}` : s.tag) : `${s.blueprint}-${i + 1}`;
 }
 
 /** 'convoy' matches 'convoy', 'convoy-1', 'convoy-2' … */

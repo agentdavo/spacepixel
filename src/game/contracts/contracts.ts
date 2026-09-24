@@ -26,6 +26,7 @@
  * contract is plain JSON and survives the save file.
  */
 import type { Character } from '../campaign/types';
+import type { RunnerSnapshot } from '../CampaignRunner';
 import type { CommodityId, EconFaction, StationKind, TradeLedger } from '../economy';
 
 export type ContractKind = 'courier' | 'haul' | 'escort' | 'bounty' | 'patrol' | 'salvage' | 'recon' | 'sortie' | 'priority';
@@ -146,6 +147,10 @@ export interface Contract {
   ambushed?: boolean;
   /** Priority orders: the campaign episode number. */
   episode?: number;
+  /** Operation progress saved when the pilot left the system (or was towed home) mid-op. */
+  progress?: RunnerSnapshot;
+  /** Offered in conversation (src/game/contracts/named.ts), not posted on a board. */
+  named?: string;
 }
 
 export interface Receipt {

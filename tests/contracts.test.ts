@@ -467,3 +467,68 @@ test('ops: every posted contract with an op builds a runnable mission', () => {
     }
   }
 });
+
+// ── Leaving mid-operation: progress persists and resumes ─────────────────
+
+test('ops: escort progress survives leaving the system (snapshot → JSON → restore)', () => {
+  const k = offer('escort', { tier: 2, rep: { concord: 30, choir: 30, rustwake: 30 } });
+  const a = run(k);
+  a.step(2);
+  a.goTo('freighter', new Vector3(300, 0, 0));
+  a.step(2);
+  assert.equal(a.r.escorts[0].halted, false, 'under way');
+  // Let the first wave arrive, kill one raider, move the freighter down the lane.
+  a.step(60);
+  const w1 = a.r.shipsTagged('raiders-w1');
+  assert.ok(w1.length > 1, 'wave one is out');
+  w1[0].alive = false;
+  a.r.onKill(w1[0]);
+  const fr = a.r.shipsTagged('freighter')[0];
+  const mid = v(k.op!.start!).lerp(v(k.op!.end!), 0.4);
+  fr.flight.position.copy(mid);
+  fr.hull = fr.hullMax * 0.55;
+  a.step();
+  const aliveBefore = a.r.ctx.aliveCount('raiders');
+  assert.ok(a.h.beats.length > 0);
+
+  const snap = JSON.parse(JSON.stringify(a.r.snapshot()));
+  const h = host();
+  const r = new CampaignRunner(buildOp({ ...k, progress: snap }, [0, 0, 0])!.mission, h as unknown as CampaignHost);
+  r.restore(snap);
+  r.begin();
+  assert.ok(r.flags.has('resume:freighter') && r.flags.has('raid-seen'), 'flags come back');
+  assert.equal(h.beats.length, 0, 'no chatter replays on resume');
+  assert.equal(r.escorts.length, 1);
+  const fr2 = r.shipsTagged('freighter')[0];
+  assert.ok(fr2.flight.position.distanceTo(mid) < 1e-6, 'the freighter is where she was');
+  assert.ok(Math.abs(fr2.hull / fr2.hullMax - 0.55) < 1e-6, 'at the hull she had');
+  assert.equal(r.ctx.aliveCount('raiders'), aliveBefore, 'dead raiders stay dead');
+  assert.equal(r.shipsTagged('raiders-w1').length, w1.length - 1);
+  r.update(0.5);
+  assert.equal(r.escorts[0].halted, false, 'she keeps flying');
+  assert.ok(r.state.includes('done'), 'objective states restored');
+  // Finish the job from the restored state: every wave out and down, then arrive.
+  for (let i = 0; i < 400; i++) {
+    for (const s of r.shipsTagged('raiders')) if (s.alive) (s.alive = false), r.onKill(s);
+    r.update(0.5);
+  }
+  for (const s of r.shipsTagged('freighter')) s.flight.position.copy(v(k.op!.end!));
+  r.update(0.5);
+  assert.equal(r.outcome, 'success');
+});
+
+test('ops: salvage dwell progress survives a resume', () => {
+  const k = offer('salvage', { tier: 3, rep: { concord: 60, choir: 60, rustwake: 60 } });
+  const a = run(k);
+  a.goTo('survey');
+  const hold = k.op!.hold ?? 8;
+  a.step(Math.floor(hold / 0.5 / 2));
+  const p = a.r.dwells[0].progress;
+  assert.ok(p > 0.3 && p < 1, `progress ${p}`);
+  const snap = a.r.snapshot();
+  const r = new CampaignRunner(buildOp(k, [0, 0, 0])!.mission, host() as unknown as CampaignHost);
+  r.restore(snap);
+  r.begin();
+  assert.ok(Math.abs(r.dwells[0].progress - p) < 1e-9, 'dwell progress restored');
+  assert.equal(r.flags.has('survey-held'), false);
+});

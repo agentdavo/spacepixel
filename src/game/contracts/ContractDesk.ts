@@ -121,6 +121,11 @@ class LiveOp {
       spawnShip: (spec, i, pos) => self.spawn(spec, i, pos),
       spawnSetPiece: (spec, pos) => {
         const piece = createSetPiece(spec, pos);
+        // Resumed op: a flight core already taken aboard stays taken.
+        if ('recovered' in piece && self.runner.flags.has(`${spec.tag}-recovered`)) {
+          (piece as { recovered: boolean }).recovered = true;
+          piece.group.visible = false;
+        }
         scene.world.root.add(piece.group);
         self.pieces.push(piece);
         return piece;
@@ -299,7 +304,7 @@ export class ContractDesk {
     bindContractsTab(this);
     this.tracked = this.book.active[0]?.id ?? null;
     window.addEventListener('keydown', (e) => this.onKey(e));
-    window.addEventListener('pagehide', () => saveContracts(this.book));
+    window.addEventListener('pagehide', () => this.saveAll());
     scene.starMap.overlay = (c, at, time) => this.drawMap(c, at, time);
   }
 
@@ -458,7 +463,7 @@ export class ContractDesk {
       this.saveT += dt;
       if (this.saveT > 10) {
         this.saveT = 0;
-        saveContracts(this.book);
+        this.saveAll();
       }
     }
 
@@ -477,7 +482,13 @@ export class ContractDesk {
     this.deadFor = 0;
 
     const sys = s.currentSystemId();
-    for (const [id, op] of this.ops) if (op.system !== sys || !this.book.active.some((k) => k.id === id)) this.teardown(id);
+    let left = false;
+    for (const [id, op] of this.ops)
+      if (op.system !== sys || !this.book.active.some((k) => k.id === id)) {
+        this.teardown(id);
+        left = true;
+      }
+    if (left) saveContracts(this.book);
     if (!frozen && !s.docking.busy) for (const k of this.book.active) if (!this.ops.has(k.id) && this.wantsOp(k, sys)) this.startOp(k);
 
     for (const [id, op] of this.ops) {
@@ -524,14 +535,43 @@ export class ContractDesk {
     }
     const op = new LiveOp(k, build, this, this.scene);
     this.ops.set(k.id, op);
+    let resumed = false;
+    if (k.progress) {
+      try {
+        op.runner.restore(k.progress);
+        resumed = true;
+      } catch {
+        /* a malformed save: start the operation fresh */
+      }
+    }
     op.runner.begin();
+    if (resumed) this.hud.toast(`OPERATION RESUMED · ${k.title.toUpperCase()}`, '#ffb347');
   }
 
+  /**
+   * Put an operation away. A still-running one (the pilot jumped out, or was
+   * towed home) keeps its progress in the book and resumes on return.
+   */
   private teardown(id: string): void {
     const op = this.ops.get(id);
     if (!op) return;
+    this.keepProgress(op);
     op.dispose();
     this.ops.delete(id);
+  }
+
+  private keepProgress(op: LiveOp): void {
+    if (op.runner.outcome !== 'running') return;
+    const id = op.contract.id;
+    if (!this.book.active.some((k) => k.id === id)) return;
+    const snap = op.runner.snapshot();
+    this.book = { ...this.book, active: this.book.active.map((k) => (k.id === id ? { ...k, progress: snap } : k)) };
+  }
+
+  /** Save the book with every live operation's progress (periodic save, page hide). */
+  private saveAll(): void {
+    for (const op of this.ops.values()) this.keepProgress(op);
+    saveContracts(this.book);
   }
 
   /** Was this ship spawned by a contract? (free-roam kills of it don't cost standing) */
