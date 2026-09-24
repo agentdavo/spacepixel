@@ -1,6 +1,7 @@
 import { Vector3, type PerspectiveCamera } from 'three';
 import type { WorldSpace } from '@/core/WorldSpace';
 import { HUD, centerBand, claim, fitText, objectivesX } from './hudLayout';
+import { LABEL_PRIORITY, hudLabels } from './HudLabels';
 
 /**
  * Free-roam contract overlay: its own canvas over the flight HUD, so the
@@ -139,10 +140,19 @@ export class ContractHud {
         c.lineTo(pt.x, pt.y + r + 7);
         c.stroke();
       }
-      c.fillText(`${label}  ${range}`, pt.x + r + 8, pt.y + 1);
-      c.globalAlpha = 0.7;
-      c.fillText(`CONTRACT · ${kind}`, pt.x + r + 8, pt.y + 15);
-      c.globalAlpha = 1;
+      const col = primary ? ORANGE : 'rgba(255,179,71,0.55)';
+      const font = '13px "Share Tech Mono", monospace';
+      hudLabels.add({
+        id: `ct:${label}:${kind}`,
+        x: pt.x,
+        y: pt.y,
+        r: r + 2,
+        lines: [
+          { text: `${label}  ${range}`, color: col, font },
+          { text: `CONTRACT · ${kind}`, color: col, font, alpha: 0.7 },
+        ],
+        priority: primary ? LABEL_PRIORITY.contract : LABEL_PRIORITY.contractOther,
+      });
       return;
     }
     // Off-screen: arrow on an ellipse toward the target.

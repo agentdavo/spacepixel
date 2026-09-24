@@ -47,6 +47,13 @@ export interface BaySpec {
 export const LINER_SHADE = 0.9;
 const RIB_SHADE = 0.75;
 const COLLAR_SHADE = 0.6;
+/**
+ * Emissive of the mouth lip and the berth door outline. At 0.7 / 0.5 (×3
+ * HDR) they bloomed into a wide cyan halo that, with the curtain's edge glow,
+ * washed the collar and the first stretch of deck white-teal near the mouth.
+ */
+const LIP_GLOW = 0.35;
+const DOOR_GLOW = 0.3;
 
 /** Interior half-extents in metres at `scale` (for cameras / docking depth). */
 export function bayInterior(s: BaySpec, scale: number): { hw: number; hh: number; depth: number } {
@@ -115,11 +122,11 @@ export function hollowBay(s: BaySpec): Part[] {
     },
     { name: `${id}-ceiling-strip`, paint: 'glass', emissive: 0.45, pos: [x, mTop - liner - 0.006, zi], shape: { kind: 'box', w: 0.03, h: 0.012, d: inD - 0.1 } },
     // The berth door on the back wall: a thin lit outline.
-    { name: `${id}-door-top`, paint: 'glow', emissive: 0.5, color: s.light, pos: [x, s.y + s.h * 0.22, s.back + liner * 2 + 0.004], repeat: { count: 2, step: [0, -s.h * 0.44, 0] }, shape: { kind: 'box', w: s.w * 0.46, h: 0.018, d: 0.008 } },
-    { name: `${id}-door-side`, paint: 'glow', emissive: 0.5, color: s.light, mirror: x === 0, pos: [x + s.w * 0.23, s.y, s.back + liner * 2 + 0.004], shape: { kind: 'box', w: 0.018, h: s.h * 0.44 + 0.018, d: 0.008 } },
+    { name: `${id}-door-top`, paint: 'glow', emissive: DOOR_GLOW, color: s.light, pos: [x, s.y + s.h * 0.22, s.back + liner * 2 + 0.004], repeat: { count: 2, step: [0, -s.h * 0.44, 0] }, shape: { kind: 'box', w: s.w * 0.46, h: 0.018, d: 0.008 } },
+    { name: `${id}-door-side`, paint: 'glow', emissive: DOOR_GLOW, color: s.light, mirror: x === 0, pos: [x + s.w * 0.23, s.y, s.back + liner * 2 + 0.004], shape: { kind: 'box', w: 0.018, h: s.h * 0.44 + 0.018, d: 0.008 } },
     // Lit lip around the mouth (thin: it frames the hole, it doesn't flood it).
-    { name: `${id}-lip`, paint: 'glow', emissive: 0.7, color: s.light, pos: [x, mTop + 0.012, s.mouth + 0.005], repeat: { count: 2, step: [0, -(s.h + 0.024), 0] }, shape: { kind: 'box', w: s.w + 0.05, h: 0.022, d: 0.03 } },
-    { name: `${id}-lip-side`, paint: 'glow', emissive: 0.7, color: s.light, mirror: x === 0, pos: [x + s.w / 2 + 0.012, s.y, s.mouth + 0.005], shape: { kind: 'box', w: 0.022, h: s.h + 0.02, d: 0.03 } },
+    { name: `${id}-lip`, paint: 'glow', emissive: LIP_GLOW, color: s.light, pos: [x, mTop + 0.012, s.mouth + 0.005], repeat: { count: 2, step: [0, -(s.h + 0.024), 0] }, shape: { kind: 'box', w: s.w + 0.05, h: 0.022, d: 0.03 } },
+    { name: `${id}-lip-side`, paint: 'glow', emissive: LIP_GLOW, color: s.light, mirror: x === 0, pos: [x + s.w / 2 + 0.012, s.y, s.mouth + 0.005], shape: { kind: 'box', w: 0.022, h: s.h + 0.02, d: 0.03 } },
   ];
   return parts;
 }

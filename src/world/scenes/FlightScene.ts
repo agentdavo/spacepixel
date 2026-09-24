@@ -27,6 +27,7 @@ import { CombatFx } from '../CombatFx';
 import { StarSystemView, type GateInstance } from '../StarSystemView';
 import { Hyperspace } from '../Hyperspace';
 import { SpaceDust } from '../SpaceDust';
+import { bayDust } from '../BayDust';
 import { MultiplaneSky } from '../MultiplaneSky';
 import { generateUniverse, specialSystem } from '@/universe/generate';
 import { CampaignSession, type FlightHostScene } from '@/game/CampaignSession';
@@ -45,6 +46,7 @@ import { updateAI, issueOrder, setFormation, setAutopilot, brainOf } from '@/sim
 import { DockingController, berth, type Dockable } from '../Docking';
 import { stageReach } from '../ReachStage';
 import { Traffic, type TrafficEvent } from '../Traffic';
+import { hudLabels } from '@/ui/HudLabels';
 import { ReachHud } from '@/ui/ReachHud';
 import { ambushReward } from '@/universe/traffic';
 import { BLUEPRINTS } from '@/assets/blueprints';
@@ -137,6 +139,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   readonly starMap: StarMap;
   private hyperspace = new Hyperspace();
   private dust = new SpaceDust();
+  /** `?dust=0` hides the space dust (captures: isolate what draws over a scene). */
+  private dustOn = new URLSearchParams(location.search).get('dust') !== '0';
   /** ?planes=N km strata (default 16, 0 = off). */
   private planes: MultiplaneSky | null = (() => {
     const n = Number(new URLSearchParams(location.search).get('planes') ?? 16);
@@ -675,8 +679,10 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.view.backdrop.follow(this.camera);
     this.view.update(time, this.world.eye);
     this.ports.update(time);
-    this.dust.update(this.world.eye, pf.velocity, dt);
-    this.dust.object.visible = this.jumpPhase !== 'tunnel' && !this.ports.active;
+    // No dust in a hangar: it fades out down the bay corridor and streaks in the host's frame (BayDust.ts).
+    this.dust.intensity = bayDust(this.world.eye, pf.velocity, [this.docking.target, this.docking.nearest], _dustVel);
+    this.dust.update(this.world.eye, _dustVel, dt);
+    this.dust.object.visible = this.jumpPhase !== 'tunnel' && !this.ports.active && this.dustOn;
     if (this.planes) {
       this.planes.update(this.world.eye, pf.speed);
       // A world filling the sky clears the km strata off its face.
@@ -704,6 +710,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       // Cutaway (docking, or the salvage tow after a free-flight death): the frame belongs to the cinematography.
       this.hud.clear();
       this.combatHud.clear();
+      hudLabels.discard();
       this.updateCinema();
       this.starMap.draw(time);
       return;
@@ -730,6 +737,8 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.hud.drawCampaign(`EP ${String(m.episode).padStart(2, '0')} · ${m.title}`, this.campaign.visibleObjectives(), this.campaign.runner.outcome, time);
       for (const d of this.campaign.runner.dwells) this.hud.drawDwell(d.position, d.radius, d.progress, this.camera, this.world);
     }
+    // World-space labels from every layer, decluttered in one pass (src/ui/HudLabels.ts).
+    hudLabels.flush(this.hud.context, window.innerWidth, window.innerHeight, time);
     this.starMap.draw(time);
   }
 
@@ -1713,6 +1722,7 @@ function copyFlight(from: FlightModel, to: FlightModel): void {
 
 const _v = new Vector3();
 const _to = new Vector3();
+const _dustVel = new Vector3();
 
 /**
  * Demo/capture mode: the AI flies the player (autopilot); this only adds a

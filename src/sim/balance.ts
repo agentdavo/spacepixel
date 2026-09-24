@@ -26,7 +26,7 @@ import { ShipTurrets } from '@/game/outfitting/turrets';
  * rates come out like a skilled player's, not an aimbot's.
  */
 const DT = 1 / 60;
-const DEBUG = false;
+const DEBUG = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.DUEL_DEBUG === "1";
 const ORIGIN = new Vector3(2_400_000, 150_000, -1_100_000);
 
 let seed = 1;
@@ -435,6 +435,77 @@ export function effectsScenario(): ScenarioResult {
   };
 }
 
+// ── micro-missile swarms vs point defence ───────────────────────────
+
+/**
+ * Three 12-round micro-missile swarms from a Kestrel 2.2 km out at a target
+ * whose point defence is live: a Lantern Guard (capital flak, Capitals) or a
+ * Mk III Resolute (fitted PD turrets, ShipTurrets). PD should thin a swarm,
+ * not stop it.
+ */
+export function swarmVsPd(targetBp: string, hullId: string | null): { launched: number; intercepted: number; hits: number } {
+  seed = 13;
+  const w = world();
+  const turrets = new ShipTurrets(w.fleet, w.weapons, w.capitals);
+  let tgt: ShipEntity;
+  if (hullId) {
+    const e = CATALOG_BY_ID[hullId];
+    tgt = w.fleet.spawn(e.blueprint, 'concord', ORIGIN.clone(), new Vector3(1, 0, 0));
+    applyFit(tgt, e, goodFit(hullId));
+  } else {
+    tgt = w.fleet.spawn(targetBp, 'concord', ORIGIN.clone(), new Vector3(1, 0, 0));
+    w.capitals.register(tgt, { launchBlueprint: null });
+  }
+  const shooter = w.fleet.spawn('vf27-kestrel', 'choir', ORIGIN.clone().add(new Vector3(0, 300, 2200)), new Vector3(0, -300, -2200).normalize(), { isPlayer: true });
+  shooter.target = tgt;
+  let intercepted = 0;
+  let hits = 0;
+  let launched = 0;
+  for (let k = 0; k < 3; k++) {
+    w.missiles.salvo(shooter, tgt, MISSILES.micro);
+    for (let t = 0; t < 8; t += DT) {
+      // Station-keeping 2.2 km out, but flying at the target (a swarm comes off a moving fighter).
+      shooter.flight.position.copy(ORIGIN).add(_b.set(0, 300, 2200));
+      hold(shooter, _a.set(0, -300, -2200).normalize().multiplyScalar(160));
+      shooter.controls.fire = false;
+      tgt.flight.velocity.set(0, 0, 0);
+      tgt.flight.position.copy(ORIGIN);
+      w.capitals.step(DT);
+      turrets.step(DT, null);
+      w.fleet.step(DT);
+      w.weapons.step(DT);
+      w.missiles.step(DT);
+      for (const e of w.missiles.events) {
+        if (e.kind === 'launch') launched++;
+        if (e.kind !== 'detonate') continue;
+        if (e.intercepted) intercepted++;
+        else hits++;
+      }
+    }
+  }
+  return { launched, intercepted, hits };
+}
+
+export function swarmScenario(): ScenarioResult {
+  const lg = swarmVsPd('ffc-lantern-guard', null);
+  const res = swarmVsPd('cr5-resolute', 'cr5-resolute');
+  const pct = (x: { launched: number; intercepted: number }) => (100 * x.intercepted) / Math.max(1, x.launched);
+  const hit = (x: { launched: number; hits: number }) => (100 * x.hits) / Math.max(1, x.launched);
+  return {
+    name: 'micro-missile swarms vs point defence (3 × 12 from 2.2 km)',
+    metrics: {
+      lanternGuard: `${lg.launched} launched · ${lg.intercepted} shot down · ${lg.hits} hit`,
+      resoluteMk3: `${res.launched} launched · ${res.intercepted} shot down · ${res.hits} hit`,
+    },
+    checks: [
+      check('Lantern Guard PD thins the swarm (% shot down)', pct(lg), '10..60', pct(lg) >= 10 && pct(lg) <= 60),
+      check('… and the swarm still matters (% hit)', hit(lg), '>= 35', hit(lg) >= 35),
+      check('Resolute PD turrets thin the swarm (% shot down)', pct(res), '5..60', pct(res) >= 5 && pct(res) <= 60),
+      check('… and the swarm still matters (% hit)', hit(res), '>= 35', hit(res) >= 35),
+    ],
+  };
+}
+
 // ── outfitting: fitted player hulls vs AI warships ──────────────────
 
 /** A "good" dockside fit: Mk III guns, turrets, shield, plate and reactor (legal on the power budget). */
@@ -456,6 +527,10 @@ export interface DuelOut {
   hullLeft: number;
   power: { draw: number; output: number };
   torps: number;
+  /** Incoming damage the attacker took (after type multipliers), shield / hull, by damage type. */
+  taken: Record<string, { shield: number; hull: number }>;
+  /** Attacker torpedoes shot down by the target's point defence. */
+  intercepted: number;
 }
 
 /**
@@ -465,13 +540,21 @@ export interface DuelOut {
  * The attacker's turrets are the real outfitting system (assisted aim,
  * FREE); torpedoes go in on reload.
  */
-export function fittedDuel(hullId: string, fit: Fit, targetBp: string, range = 1500, maxT = 300, seeds = [31, 47, 59, 73]): DuelOut {
+export function fittedDuel(hullId: string, fit: Fit, targetBp: string, range = 1500, maxT = 300, seeds = [31, 47, 59, 73, 89, 97]): DuelOut {
   // Every stream (capital turret cadence and scatter included) forks from the
   // world seed, so the bands are repeatable; average a few seeds (a capital
   // duel is chaotic: facings, torpedo intercepts).
   const runs = seeds.map((sd) => duelInner(hullId, fit, targetBp, range, maxT, sd));
+  if (DEBUG) for (const r of runs) console.log(hullId, targetBp, r.t.toFixed(1), (r.hullLeft * 100).toFixed(0), r.torps, r.intercepted);
   const mean = (f: (d: DuelOut) => number) => runs.reduce((n, d) => n + f(d), 0) / runs.length;
-  return { t: mean((d) => d.t), hullLeft: mean((d) => d.hullLeft), power: runs[0].power, torps: Math.round(mean((d) => d.torps)) };
+  const taken: DuelOut['taken'] = {};
+  for (const r of runs)
+    for (const [k, v] of Object.entries(r.taken)) {
+      const o = (taken[k] ??= { shield: 0, hull: 0 });
+      o.shield += v.shield / runs.length;
+      o.hull += v.hull / runs.length;
+    }
+  return { t: mean((d) => d.t), hullLeft: mean((d) => d.hullLeft), power: runs[0].power, torps: Math.round(mean((d) => d.torps)), taken, intercepted: Math.round(mean((d) => d.intercepted)) };
 }
 
 function duelInner(hullId: string, fit: Fit, targetBp: string, range: number, maxT: number, sd: number): DuelOut {
@@ -491,6 +574,18 @@ function duelInner(hullId: string, fit: Fit, targetBp: string, range: number, ma
   const zero = new Vector3();
   const aim = new Vector3();
   let torps = 0;
+  let intercepted = 0;
+  const taken: DuelOut['taken'] = {};
+  const hit = w.fleet.hit.bind(w.fleet);
+  w.fleet.hit = (s, amount, type, point, normal, shooter) => {
+    const r = hit(s, amount, type, point, normal, shooter);
+    if (s === sh) {
+      const o = (taken[type] ??= { shield: 0, hull: 0 });
+      o.shield += r.shieldDamage;
+      o.hull += r.hullDamage;
+    }
+    return r;
+  };
   let t = 0;
   for (; t < maxT && tgt.alive && sh.alive; t += DT) {
     tgt.flight.velocity.set(0, 0, 0);
@@ -509,8 +604,9 @@ function duelInner(hullId: string, fit: Fit, targetBp: string, range: number, ma
     w.fleet.step(DT);
     w.weapons.step(DT);
     w.missiles.step(DT);
+    for (const e of w.missiles.events) if (e.kind === 'detonate' && e.intercepted && e.shooter === sh) intercepted++;
   }
-  return { t: tgt.alive ? Infinity : t, hullLeft: sh.alive ? sh.hull / sh.hullMax : 0, power: r.power, torps };
+  return { t: tgt.alive ? Infinity : t, hullLeft: sh.alive ? sh.hull / sh.hullMax : 0, power: r.power, torps, taken, intercepted };
 }
 
 export function outfitScenario(): ScenarioResult {
@@ -519,7 +615,12 @@ export function outfitScenario(): ScenarioResult {
   const valGood = fittedDuel('ffl3-valiant', goodFit('ffl3-valiant'), 'choir-vesper', 1800);
   const valStock = fittedDuel('ffl3-valiant', stockFit(CATALOG_BY_ID['ffl3-valiant']), 'choir-vesper', 1800);
   const bulGood = fittedDuel('gs12-bulwark', goodFit('gs12-bulwark'), 'ffc-lantern-guard', 1200, 400);
-  const fmt = (d: DuelOut) => `${d.t.toFixed(1)} s · hull left ${(d.hullLeft * 100).toFixed(0)}% · ${d.torps} torpedoes · ${d.power.draw}/${d.power.output} MW`;
+  const fmt = (d: DuelOut) => {
+    const took = Object.entries(d.taken)
+      .map(([k, v]) => `${k} ${Math.round(v.shield)}/${Math.round(v.hull)}`)
+      .join(', ');
+    return `${d.t.toFixed(1)} s · hull left ${(d.hullLeft * 100).toFixed(0)}% · ${d.torps} torpedoes (${d.intercepted} shot down) · ${d.power.draw}/${d.power.output} MW · took shield/hull: ${took || 'nothing'}`;
+  };
   // The stock Kestrel through the fit layer is the legacy Kestrel, number for number.
   const k = CATALOG_BY_ID['vf27-kestrel'];
   const kf = computeFit(k, stockFit(k));
@@ -534,11 +635,15 @@ export function outfitScenario(): ScenarioResult {
       bulwarkGoodVsLanternGuard: fmt(bulGood),
     },
     checks: [
+      // A corvette is a real threat to a T5/T6 warship: a clean win, but it costs plating.
       check('Resolute (Mk III fit) solo kills a Lantern Guard (s)', resGood.t, '60..120', resGood.t >= 60 && resGood.t <= 120),
-      check('… and survives (hull left %)', resGood.hullLeft * 100, '> 10', resGood.hullLeft > 0.1),
-      check('Mk III fit beats stock (s faster)', resStock.t - resGood.t, '> 0', resStock.t > resGood.t),
-      check('Valiant (Mk III fit) wins a duel with a Vesper (s)', valGood.t, '20..120', valGood.t >= 20 && valGood.t <= 120),
-      check('… and survives (hull left %)', valGood.hullLeft * 100, '> 10', valGood.hullLeft > 0.1),
+      check('… and it costs (hull left %)', resGood.hullLeft * 100, '30..80', resGood.hullLeft >= 0.3 && resGood.hullLeft <= 0.8),
+      check('Mk III fit beats stock (hull left, points)', (resGood.hullLeft - resStock.hullLeft) * 100, '> 0', resGood.hullLeft > resStock.hullLeft && resStock.t >= resGood.t),
+      check('Valiant (Mk III fit) wins a duel with a Vesper (s)', valGood.t, '45..120', valGood.t >= 45 && valGood.t <= 120),
+      check('… and it costs (hull left %)', valGood.hullLeft * 100, '30..80', valGood.hullLeft >= 0.3 && valGood.hullLeft <= 0.8),
+      check('… not on torpedoes alone: the Vesper PD shoots some down', valGood.intercepted, '>= 1', valGood.intercepted >= 1),
+      info('Resolute (stock) vs Lantern Guard (s)', resStock.t, `hull left ${(resStock.hullLeft * 100).toFixed(0)}% · refit before taking a picket alone`),
+      info('Valiant (stock) vs Vesper (s)', valStock.t, `hull left ${(valStock.hullLeft * 100).toFixed(0)}%`),
       check('good fits are legal on the power budget', Math.max(resGood.power.draw - resGood.power.output, valGood.power.draw - valGood.power.output), '<= 0', resGood.power.draw <= resGood.power.output && valGood.power.draw <= valGood.power.output),
       check('stock Kestrel through the fit layer = legacy Kestrel', legacy ? 1 : 0, '== 1', legacy),
       info('Bulwark (Mk III) vs Lantern Guard (s)', bulGood.t, `gunship: not what it is for · hull left ${(bulGood.hullLeft * 100).toFixed(0)}%`),
@@ -554,6 +659,7 @@ const SCENARIOS: [string, () => ScenarioResult][] = [
   ['turret', turretScenario],
   ['capital', capitalScenario],
   ['effects', effectsScenario],
+  ['swarm', swarmScenario],
   ['outfit', outfitScenario],
 ];
 

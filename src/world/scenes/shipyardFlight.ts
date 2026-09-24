@@ -4,7 +4,7 @@ import { KESTREL_SPEC } from '@/sim/FlightModel';
 import type { ShipEntity } from '@/sim/Fleet';
 import type { ChaseCamera } from '@/sim/ChaseCamera';
 import { CATALOG_BY_ID, type CatalogEntry } from '@/game/shipyard/catalog';
-import { bridgeFraming, chaseFraming, flightSpecFor, type ChaseFraming } from '@/game/shipyard/flight';
+import { bridgeFraming, chaseFraming, flightSpecFor, hasBowBattery, type ChaseFraming } from '@/game/shipyard/flight';
 
 /**
  * `?ship=<blueprint id>` support for flight test scenes (dogfight): which
@@ -42,7 +42,7 @@ export function applyShipyardFlight(ship: ShipEntity, chase: ChaseCamera, camera
   const q = new URLSearchParams(window.location.search);
   const socket = ship.model.sockets.get('bridge');
   const bridge = !!socket && q.get('bridge') !== '0' && (q.get('bridge') === '1' || entry?.camera === 'bridge');
-  const framing = bridge && socket ? bridgeFraming([socket.position.x, socket.position.y, socket.position.z], length) : chaseFraming(length);
+  const framing = bridge && socket ? bridgeFraming([socket.position.x, socket.position.y, socket.position.z], length, hasBowBattery(entry)) : chaseFraming(length);
   if (length > 20 || bridge) {
     const t = chase.tuning;
     t.offset.copy(new Vector3(...framing.offset));
