@@ -1,7 +1,8 @@
 import { Vector3 } from 'three';
 import { hostile, type ShipEntity } from '../Fleet';
 import { GUN, inFiringSolution, leadPoint, noseAngleTo, setSpeed, steerToward } from './Pilot';
-import { gunOf, gunRange, leadSpeedOf } from '../Combat';
+import { gunOf, gunRange, leadSpeedOf, selectSubsystem, selectedSubsystem, subsystemPosition, toLocal } from '../Combat';
+import { AIM_SPHERE, BOMBER_PREFS, FIGHTER_PREFS, chooseAttackSubsystem } from '../Subsystems';
 import { avoidance, type Obstacle } from './Avoid';
 import { findChaser, flyFormation } from './Squadron';
 import { isCapital, rand, setManeuver, type Brain } from './state';
@@ -20,6 +21,8 @@ import { isCapital, rand, setManeuver, type Brain } from './state';
  *             hostile on my tail    → break → jink / barrel roll / split-S
  *             no target             → form on leader, else patrol
  *             nose-to-nose, closing → headOn
+ *             (a target with hardware: work the shield facing, then aim at
+ *              the exposed mount — `pickAttackSubsystem`)
  *             too close / overshoot → extend (boom & zoom) or reversal
  *             otherwise             → pursue (lead-shoot)
  *
@@ -38,6 +41,7 @@ const _los = new Vector3();
 const _fwd = new Vector3();
 const _up = new Vector3();
 const _tf = new Vector3();
+const _tp = new Vector3();
 
 // ── perception ─────────────────────────────────────────────────────────
 
@@ -126,6 +130,36 @@ function syncPerception(s: ShipEntity, b: Brain): void {
   if (s.target && s.target.id !== b.perceivedId) perceive(s, b, 0);
 }
 
+/** Bombers (Psalter, Warhorse) go for the shield generator and engines; fighters strip turrets and lances. */
+function isBomber(s: ShipEntity): boolean {
+  const r = s.combat.stats.role;
+  return r.includes('bomber') || r.includes('strike');
+}
+
+/**
+ * On a target with hardware (capitals, gunships): which mount to shoot,
+ * written to the ship's own sub-target (so its torpedoes home on it too).
+ * An "attack my target" order follows the leader's pick — the player's B
+ * selection — shielded or not (the wing works that facing down first).
+ * Otherwise nothing until a facing is down (shoot the hull: the facing in
+ * the way takes it), then the nearest exposed mount by role.
+ */
+export function pickAttackSubsystem(s: ShipEntity, b: Brain): void {
+  const t = s.target;
+  // (An autopiloted player keeps the pilot's own B selection.)
+  if (!t || !t.alive || s.isPlayer || !t.combat.dmg.subsystems.length) return;
+  const st = t.combat.dmg;
+  const leader = b.order === 'attackMyTarget' && b.leader && b.leader.alive && b.leader !== s ? b.leader : null;
+  const ordered = leader ? selectedSubsystem(leader, t) : null;
+  if (ordered) {
+    selectSubsystem(s, t, st.subsystems.indexOf(ordered));
+    return;
+  }
+  toLocal(t, s.flight.position, _tmp);
+  const keep = s.combat.subShip === t.id ? s.combat.subTarget : -1;
+  selectSubsystem(s, t, chooseAttackSubsystem(st, t.shield, _tmp.x, _tmp.y, _tmp.z, isBomber(s) ? BOMBER_PREFS : FIGHTER_PREFS, keep));
+}
+
 // ── decisions ──────────────────────────────────────────────────────────
 
 function startReversal(s: ShipEntity, b: Brain): void {
@@ -144,6 +178,34 @@ function startReversal(s: ShipEntity, b: Brain): void {
 
 function extendDistance(b: Brain): number {
   return 550 + 450 * (1 - b.personality.aggression);
+}
+
+/** Strafing runs: break off this close to the aim point (m) or when avoidance urgency passes STRAFE_URGENCY; run back out to STRAFE_OUT. */
+const STRAFE_BREAK = 320;
+const STRAFE_URGENCY = 0.3;
+const STRAFE_OUT = 1300;
+
+/**
+ * Attack runs on a hull: pursue the aim point (the picked mount, else the
+ * centre) from standoff, fire through the pass, break off before the
+ * plating (or collision avoidance) does it for us, extend, reverse, again.
+ */
+function strafe(s: ShipEntity, b: Brain): void {
+  const t = s.target!;
+  const sub = selectedSubsystem(s, t);
+  _tp.copy(sub ? subsystemPosition(t, sub, _tp) : t.flight.position);
+  const d = _tp.distanceTo(s.flight.position);
+  const m = b.maneuver;
+  if (m === 'extend') {
+    if (b.maneuverT < b.maneuverMax && d < STRAFE_OUT) return;
+    startReversal(s, b);
+    return;
+  }
+  if (d < STRAFE_BREAK || b.urgency > STRAFE_URGENCY) {
+    setManeuver(b, 'extend', 7);
+    return;
+  }
+  if (m !== 'pursue') setManeuver(b, 'pursue');
 }
 
 export function think(s: ShipEntity, b: Brain, ships: readonly ShipEntity[]): void {
@@ -173,6 +235,7 @@ export function think(s: ShipEntity, b: Brain, ships: readonly ShipEntity[]): vo
       break;
   }
   syncPerception(s, b);
+  pickAttackSubsystem(s, b);
 
   // 2. Committed maneuvers run to completion.
   const m = b.maneuver;
@@ -210,7 +273,13 @@ export function think(s: ShipEntity, b: Brain, ships: readonly ShipEntity[]): vo
     return;
   }
 
-  // 5. Dogfight geometry (from perception).
+  // 5. A capital (or corvette) is terrain with guns: strafing runs at the picked mount.
+  if (s.target.combat.dmg.capital) {
+    strafe(s, b);
+    return;
+  }
+
+  // 5b. Dogfight geometry (from perception).
   const f = s.flight;
   _los.subVectors(b.pPos, f.position);
   const d = Math.max(1, _los.length());
@@ -282,16 +351,20 @@ function attack(s: ShipEntity, b: Brain, ships: readonly ShipEntity[], dt: numbe
   const t = s.target!;
   const f = s.flight;
   const p = b.personality;
-  _los.subVectors(b.pPos, f.position);
+  // Aim at the picked mount (its offset from the hull centre, on the perceived hull), else the centre.
+  const sub = selectedSubsystem(s, t);
+  _tp.copy(b.pPos);
+  if (sub) _tp.add(subsystemPosition(t, sub, _tf).sub(t.flight.position));
+  _los.subVectors(_tp, f.position);
   const d = Math.max(1, _los.length());
 
   // Lead for the gun actually selected (hymn pulses are faster than autocannon slugs).
   const gun = gunOf(s);
   const boltSpeed = leadSpeedOf(s);
   const range = gun ? Math.min(GUN.range, gunRange(gun)) : GUN.range;
-  const tof = leadPoint(f.position, f.velocity, b.pPos, b.pVel, p.skill > 0.5 ? _tmp.copy(b.pAcc).multiplyScalar(p.skill) : null, b.aim, boltSpeed);
+  const tof = leadPoint(f.position, f.velocity, _tp, b.pVel, p.skill > 0.5 ? _tmp.copy(b.pAcc).multiplyScalar(p.skill) : null, b.aim, boltSpeed);
   // Beyond gun range, lag toward pure pursuit so we don't cut across its bow early.
-  if (tof < 0 || d > GUN.range * 1.4) b.aim.copy(b.pPos);
+  if (tof < 0 || d > GUN.range * 1.4) b.aim.copy(_tp);
   // Pilot sloppiness: a smooth wobble on the aim point (even aces tremble a
   // little; a rookie's spray is several ship-widths at range). Two
   // frequencies so a burst isn't all-hit or all-miss.
@@ -322,7 +395,8 @@ function attack(s: ShipEntity, b: Brain, ships: readonly ShipEntity[], dt: numbe
   setSpeed(s.controls, f, spd, d > 900);
 
   const slack = (1 - p.skill) * 0.012;
-  if (urgency < 0.5 && inFiringSolution(f, b.aim, d, t.radius, slack, range) && !friendlyInLine(s, d, ships)) s.controls.fire = true;
+  const size = sub ? sub.radius * AIM_SPHERE : t.radius;
+  if (urgency < 0.5 && inFiringSolution(f, b.aim, d, size, slack, range) && !friendlyInLine(s, d, ships)) s.controls.fire = true;
 }
 
 /** Roll so the target sits in the lift plane (for pulls in reversals). */
@@ -352,6 +426,7 @@ function patrolDir(s: ShipEntity, b: Brain, out: Vector3): Vector3 {
 
 export function fly(s: ShipEntity, b: Brain, ships: readonly ShipEntity[], obstacles: readonly Obstacle[], dt: number, time: number): void {
   const urgency = flyManeuver(s, b, ships, obstacles, dt, time);
+  b.urgency = urgency;
   // Imminent collision: burner off and throttle back — turn radius goes as v².
   if (urgency > 0.35) {
     const c = s.controls;

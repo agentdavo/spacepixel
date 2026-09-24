@@ -99,6 +99,8 @@ export interface Brain {
   /** Current lead / aim point (world) — HUD, debug lines. */
   aim: Vector3;
   noisePhase: number;
+  /** Collision-avoidance urgency on the last flown frame (0..1): strafing runs on a capital break off when it rises. */
+  urgency: number;
 }
 
 export function gainsFor(p: Personality): SteerGains {
@@ -139,6 +141,7 @@ export function createBrain(seed: number, p: Personality = PERSONALITIES.veteran
     lastTVel: new Vector3(),
     aim: new Vector3(),
     noisePhase: (seed * 1.618) % (Math.PI * 2),
+    urgency: 0,
   };
 }
 
