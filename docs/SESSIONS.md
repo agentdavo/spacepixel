@@ -8,7 +8,7 @@ touching their files.
 | Area | Owner (session / branch) | Files |
 |---|---|---|
 | Engine, world, campaign, merges | Vanguard lead · `claude/vanguard-space-combat-0l3bfi` | everything not listed below |
-| Turrets, shields, weapon impacts, subsystems, kill paths | **Vanguard lead** (the user moved it here on 24 Sep; batch 6) · `claude/vanguard-space-combat-0l3bfi` | `src/sim/turrets/**`, `src/sim/Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, weapon/impact FX (`WeaponVisuals`, `CombatFx`, `DamageFx`), `CombatHud.ts`; impact SFX in `src/audio/Sfx.ts` |
+| Turrets, shields, weapon impacts (batch 6) | turrets session · `claude/ship-turrets-shields-weapons-8lz4su` (the user returned it there on 24 Sep) | `src/sim/turrets/**`, `src/sim/Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, weapon/impact FX + SFX |
 | **Character voices, chat, soundtrack** | voices/score session · `claude/ova-soundtrack-voices` | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
 
 ## Soundtrack backend (landed)
