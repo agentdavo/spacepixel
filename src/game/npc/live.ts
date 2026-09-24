@@ -15,7 +15,7 @@
  * ?rivalstate=ismene:hiding:4[:tier[:met]] sets a rival's status (grudge, tier, times met);
  * ?npcmemory=1 seeds a few remembered events so `{memory}` has something to say.
  */
-import { counter, fact, saveWorld, setFact, world, type WorldEvent, type WorldScope, type WorldState } from '../world/WorldState';
+import { counter, fact, sanitizeWorld, saveWorld, setFact, world, type WorldEvent, type WorldScope, type WorldState } from '../world/WorldState';
 import { loadProfile } from '../Profile';
 import type { Contract } from '../contracts/contracts';
 import type { Conversation } from '@/dialog/types';
@@ -181,6 +181,27 @@ function stageOnce(): void {
     ];
     for (const [k, s, d] of seed) if (!world().state.log.some((e) => e.kind === k && e.data?.sys === d?.sys)) world().event(k, s, d);
   }
+}
+
+// ── replays (MP-0) ────────────────────────────────────────────────────
+
+let recorder: ((w: WorldState) => void) | null = null;
+
+/**
+ * Every world change reaches `fn` (the flight scene hands it to the replay
+ * recorder, which keeps only changes made outside a sim tick: conversations,
+ * the dock screen). In-tick changes (rivals, arcs ticking in flight) replay
+ * by themselves.
+ */
+export function recordWorldChanges(fn: (w: WorldState) => void): void {
+  const first = !recorder;
+  recorder = fn;
+  if (first) world().on((w) => recorder?.(w));
+}
+
+/** A replay tape's world change (the same one the live session made from a conversation). */
+export function applyRecordedWorld(raw: unknown): void {
+  world().update(() => sanitizeWorld(raw));
 }
 
 /** For the THREADS tab. */

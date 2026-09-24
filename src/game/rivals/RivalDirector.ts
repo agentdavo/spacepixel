@@ -146,7 +146,7 @@ export class RivalDirector {
     this.checkT = CHECK_EVERY;
     if (!s.player.alive || s.docking.busy || this.hostilesNear(5000) || this.nearStation(18_000)) return;
     const sys = s.currentSystemId();
-    const enc = pickEncounter(world().state, { now: this.now(), system: { id: sys, faction: this.sysFaction() }, mode: 'lane', seed: hashStr(`${sys}:${Math.floor(this.now() / CHECK_EVERY)}`) });
+    const enc = pickEncounter(world().state, { now: this.now(), system: { id: sys, faction: this.sysFaction() }, mode: 'lane', seed: hashStr(`${this.scene.universe.seed}:${sys}:${Math.floor(this.now() / CHECK_EVERY)}`) });
     if (enc) this.begin(enc, 'lane', null);
   }
 

@@ -285,7 +285,14 @@ speaker first, then kinds they care about, then recency).
 
 Captures: `?npc=odile:shut,magpie:hunted` (arc steps), `?rivalstate=ismene:hiding:4[:tier[:met]]`,
 `?npcmemory=1` (seed a few remembered events), `?rival=<id>` (force an
-intercept), `?docktab=threads`.
+intercept), `?docktab=threads`. World changes made in conversation are
+recorded on the replay tape (`world` command); rivals and arcs ticking in
+flight are part of the fixed-step sim and replay by themselves.
+
+![Magpie's thread at Quilegard](docs/screenshots/npc-concourse-magpie.jpg)
+![THREADS tab](docs/screenshots/npc-threads.jpg)
+![Red Sabine intercepts](docs/screenshots/npc-rival-intercept.jpg)
+![Ismene gone to ground](docs/screenshots/npc-rival-ismene-ground.jpg)
 
 ## The living Reach
 

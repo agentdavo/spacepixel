@@ -54,6 +54,7 @@ import { WingDocking } from '../WingDocking';
 import { PlanetaryPorts } from '../surface/PlanetaryPorts';
 import '@/ui/Concourse'; // registers the CONCOURSE dock tab (people, conversations)
 import { RivalDirector } from '@/game/rivals/RivalDirector';
+import { applyRecordedWorld, recordWorldChanges } from '@/game/npc/live';
 import { FlightRadio } from '@/dialog/FlightRadio';
 import { loadLedger, saveLedger } from '@/game/Profile';
 import { MISSILE_MAX, cargoUsed, dockingClearance, reputationForKill, type EconFaction, type TradeLedger } from '@/game/economy';
@@ -384,6 +385,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
     this.contracts = new ContractDesk(this);
     this.rivals = new RivalDirector(this);
+    // Conversations and the dock screen change the world outside a tick: on the replay tape.
+    recordWorldChanges((w) => this.replay.note('world', w));
     this.outfit.bind(this);
     bindOutfitter(this.outfit);
     this.outfit.settle(); // hold size, hangar complement
@@ -1665,6 +1668,9 @@ export class FlightScene implements GameScene, FlightHostScene {
         break;
       case 'launch':
         this.docking.launch();
+        break;
+      case 'world':
+        applyRecordedWorld(a);
         break;
       default:
         console.warn(`[replay] unknown command ${cmd.c}`);
