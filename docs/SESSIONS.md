@@ -8,7 +8,7 @@ touching their files.
 | Area | Owner (session / branch) | Files |
 |---|---|---|
 | Engine, world, campaign, merges | Vanguard lead · `claude/vanguard-space-combat-0l3bfi` | everything not listed below |
-| Turrets, shields, weapon impacts, subsystems, kill paths | **Vanguard lead** (the user moved it here on 24 Sep; batch 6) · `claude/vanguard-space-combat-0l3bfi` | `src/sim/turrets/**`, `src/sim/Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, weapon/impact FX (`WeaponVisuals`, `CombatFx`, `DamageFx`), `CombatHud.ts`; impact SFX in `src/audio/Sfx.ts` |
+| Turrets, shields, weapon impacts (batch 6) | turrets session · `claude/ship-turrets-shields-weapons-8lz4su` (the user returned it there on 24 Sep) | `src/sim/turrets/**`, `src/sim/Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, weapon/impact FX + SFX |
 | **Character voices, chat, soundtrack** | voices/score session · `claude/ova-soundtrack-voices` | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
 | **New race: the Kessen (mecha)** — design only so far | mecha-race session · `claude/mecha-race-design-qtw680` | `docs/KESSEN.md`, `docs/concepts/kessen/**`, `scripts/concepts/kessen/**` (no `src/` files touched) |
 
@@ -26,18 +26,18 @@ Hooks for other owners:
 
 ## Requests
 
-- **Overlap: turrets / shields / impacts (lead session, 24 Sep ~09:20).** The
-  user also asked the lead session for this, and it launched three agents on
-  `claude/vanguard-space-combat-0l3bfi` before seeing this file: articulated
-  turret rigs + muzzle origins (`src/sim/turrets/**`, blueprint turret parts,
-  `ai/Turret.ts`, `Capitals.ts`), shields v2 + impacts (shield facings incl.
-  fore/aft and dorsal/ventral, hit/decal FX, `WeaponVisuals.ts`, `CombatFx.ts`,
-  `DamageFx.ts`), and subsystems + kill paths (`Damage.ts`, `Combat.ts`,
-  `CombatHud.ts`, wrecks/salvage). Turrets session: please pull this branch
-  before touching those files, and note here what you've already built so the
-  two efforts can be merged rather than duplicated.
+- **Batch 6 overlap, resolved (user, 24 Sep ~10:20).** Batch 6 (turrets,
+  shields, impacts, subsystems, kill paths) stays with the turrets session.
+  The lead session's three batch 6 agents are **paused** and it will start no
+  new batch 6 work. Their unfinished, unverified work is committed on local
+  branches in the lead session's container (not pushed):
+  `worktree-agent-a9181dba8d1e07ff0` (turret rigs + muzzles, 6 commits),
+  `worktree-agent-ad2e6ed36bfec934d` (shields v2 + impact decals, 2 commits),
+  `worktree-agent-a936121b44b53858f` (subsystems v2 + kill paths: structural
+  break-up, reactor, bridge kill, wrecks/salvage, 14 commits). Ask the lead
+  session (via the user) to push any of them if you want to mine them.
 
-- **Voices → lead (batch 6):** once shields v2, subsystems and kill paths emit
+- **Voices → batch 6 owner (turrets session):** once shields v2, subsystems and kill paths emit
   events, list their `WeaponEvent.kind` names here (e.g. `facing-down`,
   `reactor-critical`, `bridge-kill`, `turret-destroyed`). The voices session
   will add wingman / Cantor / station-control barks for them (voiced,
