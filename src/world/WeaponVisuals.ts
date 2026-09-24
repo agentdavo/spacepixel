@@ -103,8 +103,8 @@ interface ShieldFx {
   ship: ShipEntity | null;
 }
 
-/** Shell-local axis of each capital facing (fore, aft, port, starboard — see Damage.FACING). */
-const FACING_DIR = [new Vector3(0, 0, 1), new Vector3(0, 0, -1), new Vector3(1, 0, 0), new Vector3(-1, 0, 0)];
+/** Shell-local axis of each capital facing (fore, aft, port, starboard, dorsal, ventral — see Damage.FACING / FACING_AXIS). */
+const FACING_DIR = [new Vector3(0, 0, 1), new Vector3(0, 0, -1), new Vector3(1, 0, 0), new Vector3(-1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, -1, 0)];
 
 interface BeamFx {
   core: Mesh;

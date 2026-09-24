@@ -145,6 +145,7 @@ export class CombatTestScene implements GameScene {
     st.facings.fill(st.facingMax * 0.7);
     st.facings[2] = 0;
     st.down = 0b0100;
+    st.cooldown[2] = 1e3; // stays down: no regen, no charge shunted back in (Damage.ts)
     cap.shield = st.facings.reduce((a, b) => a + b, 0);
     cap.sinceHit = 0;
 

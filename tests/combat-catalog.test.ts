@@ -10,7 +10,7 @@ test('every catalogued hull without a combat-table entry gets catalogue combat s
     const s = statsFromCatalog(e);
     assert.equal(s.hull, e.stats.hull, e.id);
     assert.equal(s.shield, e.stats.shield, e.id);
-    assert.equal(s.facings, e.length >= 100 ? 4 : 1, e.id);
+    assert.equal(s.facings, e.length >= 400 ? 6 : e.length >= 100 ? 4 : 2, e.id);
   }
 });
 

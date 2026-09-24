@@ -39,7 +39,7 @@ export class EventTap {
 }
 
 export function blankWeaponEvent(): WeaponEvent {
-  return { kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1 };
+  return { kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1, strength: -1, bleed: 0 };
 }
 
 export function blankMissileEvent(): MissileEvent {
@@ -57,6 +57,8 @@ export function copyWeaponEvent(e: WeaponEvent, o: WeaponEvent): WeaponEvent {
   o.sub = e.sub;
   o.subHp = e.subHp;
   o.facing = e.facing;
+  o.strength = e.strength;
+  o.bleed = e.bleed;
   return o;
 }
 

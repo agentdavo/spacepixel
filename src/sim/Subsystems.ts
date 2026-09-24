@@ -30,7 +30,7 @@
  *              else is ever restored in flight (lances, hangars, engines,
  *              bridge and shield generator stay dead until the yard).
  */
-import { DAMAGE_MUL, facingOf, hitSubsystem, type DamageState, type Pools, type Subsystem, type SubsystemKind } from './Damage.ts';
+import { DAMAGE_MUL, facingOf, facingUp, hitSubsystem, type DamageState, type Pools, type Subsystem, type SubsystemKind } from './Damage.ts';
 import type { DamageType } from './Loadouts';
 
 /** Aimed-hit sphere as a fraction of a subsystem's routing radius (Combat.raycastShip). */
@@ -54,16 +54,19 @@ export const REPAIR = { delay: 20, rate: 0.01, restoreAfter: 180, restoreEvery: 
 const _p = { x: 0, y: 0, z: 0 };
 
 /**
- * Exposed: the shield layer over this mount is down. Capitals: the facing
- * that covers the mount's position (Damage.facingOf); anything else: its one
- * bubble (`shield` = the ship's current shield pool).
+ * Exposed: the shield layer over this mount is down — the facing that covers
+ * the mount's position (Damage.facingOf, the same function every hit and the
+ * shield shell use: fore / aft halves on fighters and gunships, 4 or 6
+ * facings on capitals) holds no charge. A hull without facings falls back on
+ * its pool (`shield` = the ship's current shield).
  */
 export function subsystemExposed(st: DamageState, shield: number, sub: Subsystem): boolean {
-  if (!st.capital || !st.facings.length) return shield <= 0;
+  if (!st.facings.length) return shield <= 0;
   _p.x = sub.x;
   _p.y = sub.y;
   _p.z = sub.z;
-  return st.facings[facingOf(st, _p)] <= 0;
+  // (Any charge left holds the shell — the same test raycastShip makes — so 0, not facingUp's default margin.)
+  return !facingUp(st, facingOf(st, _p), 0);
 }
 
 /** Intact subsystems whose shield is down. */
@@ -181,9 +184,9 @@ export function segmentSubsystem(subs: readonly Subsystem[], ox: number, oy: num
 export type KindWeights = Readonly<Record<SubsystemKind, number>>;
 
 /** Fighters strip the guns that shoot at them: turrets and lances first. */
-export const FIGHTER_PREFS: KindWeights = { turret: 1, lance: 1, hangar: 2.5, engine: 3, shieldGen: 2, bridge: 3 };
-/** Bombers go for what keeps the hull fighting: the shield generator, then engines. */
-export const BOMBER_PREFS: KindWeights = { turret: 2, lance: 2, hangar: 2, engine: 0.8, shieldGen: 0.5, bridge: 1.5 };
+export const FIGHTER_PREFS: KindWeights = { turret: 1, lance: 1, hangar: 2.5, engine: 3, shieldGen: 2, shieldEmitter: 1.5, bridge: 3 };
+/** Bombers go for what keeps the hull fighting: shield emitters (a lost one keeps its facing down) and the generator, then engines. */
+export const BOMBER_PREFS: KindWeights = { turret: 2, lance: 2, hangar: 2, engine: 0.8, shieldGen: 0.5, shieldEmitter: 0.4, bridge: 1.5 };
 
 /**
  * An attacker's pick on a capital: the exposed subsystem with the lowest

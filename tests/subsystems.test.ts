@@ -65,11 +65,17 @@ test('exposure follows the shield facing that covers the mount (Damage.facingOf)
   assert.ok(!subsystemExposed(st, 4000, subs.t0));
 });
 
-test('exposure on a single-bubble hull (gunship mounts): the bubble is down', () => {
+test('exposure on a gunship (fore / aft halves): the half the mount sits under', () => {
   const st = createDamageState(false, 200, 600, EXT, 0.1, 3);
-  const s = addSubsystem(st, { id: 'turret-dorsal', kind: 'turret', label: 'TURRET 1', x: 0, y: 5, z: 0, radius: 4, hpMax: 40 });
-  assert.ok(!subsystemExposed(st, 50, s));
-  assert.ok(subsystemExposed(st, 0, s));
+  assert.equal(st.facings.length, 2);
+  const fore = addSubsystem(st, { id: 'turret-chin', kind: 'turret', label: 'TURRET 1', x: 0, y: -5, z: 120, radius: 4, hpMax: 40 });
+  const aft = addSubsystem(st, { id: 'turret-dorsal', kind: 'turret', label: 'TURRET 2', x: 0, y: 5, z: -120, radius: 4, hpMax: 40 });
+  assert.equal(facingOf(st, fore), FACING.FORE);
+  assert.equal(facingOf(st, aft), FACING.AFT);
+  assert.ok(!subsystemExposed(st, 200, fore) && !subsystemExposed(st, 200, aft));
+  st.facings[FACING.AFT] = 0;
+  assert.ok(!subsystemExposed(st, 100, fore));
+  assert.ok(subsystemExposed(st, 100, aft));
 });
 
 test('B cycles exposed mounts first, then protected, then deselects; Shift+B runs it backwards', () => {
@@ -228,4 +234,17 @@ test('damage control: damaged mounts heal after a quiet spell; a destroyed turre
   assert.ok(subs.t1.hp >= subs.t1.hpMax * REPAIR.restoreHp);
   for (; t < REPAIR.restoreAfter + 3 * REPAIR.restoreEvery; t += dt) repairSubsystems(st, t, dt);
   assert.ok(subs.lance.destroyed, 'lances stay dead');
+});
+
+test('a shield emitter shot off drops its own facing; bombers want emitters most', () => {
+  const { st, pools, subs } = capital();
+  const em = addSubsystem(st, { id: 'emitter-port', kind: 'shieldEmitter', label: 'PORT EMITTER', x: 50, y: 0, z: -80, radius: 10, hpMax: 150, facing: FACING.PORT });
+  assert.equal(chooseAttackSubsystem(st, 4000, 600, 0, -80, BOMBER_PREFS), -1, 'all shielded');
+  st.facings[FACING.PORT] = 0;
+  assert.equal(st.subsystems[chooseAttackSubsystem(st, 4000, 600, 0, -80, BOMBER_PREFS)], em);
+  assert.equal(st.subsystems[chooseAttackSubsystem(st, 4000, 600, 0, -80, FIGHTER_PREFS)].kind, 'turret');
+  assert.ok(hitSubsystem(st, pools, em, 200));
+  assert.equal(st.facings[FACING.PORT], 0);
+  assert.ok(st.facings[FACING.FORE] > 0, 'the other facings hold');
+  assert.ok(!subs.gen.destroyed);
 });
