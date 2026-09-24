@@ -145,3 +145,15 @@ The lead session is stopping here; a project thread continues from this file.
     anvil, a call-and-response work song, "the Hammer-song") and barks:
     "Standing." (greeting), "Lid up!", "Hammer!", "Drive the spike!", "She
     walked home." (a death, said with pride).
+- **Kessen handover (24 Sep).** Everything is on
+  `claude/mecha-race-design-qtw680`: `docs/KESSEN.md` (the full proposal),
+  eight PNG sheets in `docs/concepts/kessen/`, and the three.js prototype in
+  `scripts/concepts/kessen/` (`mechkit.js` holds the 42-bone rig, 14
+  variants, poses and walk cycle; `node scripts/concepts/kessen/render.mjs`
+  re-renders the sheets). Still open for the user: sign-off on the name
+  ("Kessen" is also a 2000 Koei PS2 title) and whether "5 levels" means five
+  size classes (as drawn) or five upgrade tiers per frame. The next step is
+  implementation, which touches lead-owned files (see the request above).
+  **Answered (user, 24 Sep):** keep "Kessen" for now (it may be renamed
+  later) and five size classes. The Kessen project thread now carries the
+  work on `claude/project-thread-t748fw` (see the table).
