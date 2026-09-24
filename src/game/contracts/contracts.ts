@@ -856,7 +856,7 @@ function briefOf(k: Contract, cl: Client, idx: Map<string, ReachSystem>, rnd: ()
       body = `A sealed case — do not open it, do not scan it, do not ask. Deliver it to ${k.destName} in ${sysName(idx, k.destSystem)}, ${hops}. The consignee pays on receipt.${k.tier >= 2 ? ' Someone else knows it is moving. Expect company at the far end.' : ''}`;
       break;
     case 'haul':
-      body = `${k.cargo!.units} ${k.cargo!.unit}s of ${k.cargo!.name.toLowerCase()} go into your pod here and come out at ${k.destName}, ${hops}. Every unit is counted at both ends. Sell one on the way and it is theft, and we will know.${k.tier >= 2 ? ' Raiders have been sniffing the lanes for loaded pods.' : ''}`;
+      body = `A consignment of ${k.cargo!.units} × ${k.cargo!.name.toLowerCase()} goes into your pod here and come out at ${k.destName}, ${hops}. Every unit is counted at both ends. Sell one on the way and it is theft, and we will know.${k.tier >= 2 ? ' Raiders have been sniffing the lanes for loaded pods.' : ''}`;
       break;
     case 'escort':
       body = `The ${op!.freighter!.name} runs ${op!.endKind === 'gate' ? `out to the ${op!.endName}` : `in to ${op!.endName}`}. She cannot fight and she cannot run. Fly close, keep the raiders off her hull, and come back here for your fee. ${op!.waves > 1 ? 'Expect them twice.' : 'Expect them once.'}`;

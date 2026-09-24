@@ -105,6 +105,9 @@ in · **X** abandon. Pure + tested: `src/game/contracts/`,
 `tests/contracts.test.ts`. Captures:
 `?scene=flight&contract=<kind>&cphase=board|op|pay|map`.
 
+![Contracts board](docs/screenshots/contracts-board.jpg)
+![Escort contract in flight](docs/screenshots/contracts-escort.jpg)
+
 ## Scenes (`?scene=`)
 
 `flight` (default game) · `showcase` · `hangar` (model sheets) · `paint`

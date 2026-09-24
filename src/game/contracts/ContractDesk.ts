@@ -356,6 +356,19 @@ export class ContractDesk {
     return null;
   }
 
+  /**
+   * Accept an offer by id from a station's current board (dialog effects:
+   * "take the job" from a conversation). Returns an error line or null.
+   */
+  acceptById(stationId: string, id: string, io: LedgerIO = this.sceneLedger()): string | null {
+    const k = this.offers(stationId).find((x) => x.id === id);
+    return k ? this.accept(k, io) : 'OFFER NOT ON THE BOARD';
+  }
+
+  private sceneLedger(): LedgerIO {
+    return { ledger: () => this.scene.ledger, setLedger: (l) => ((this.scene.ledger = l), saveLedger(l)) };
+  }
+
   decline(k: Contract): void {
     this.setBook(declineContract(this.book, k.id));
   }
@@ -387,8 +400,7 @@ export class ContractDesk {
   onDocked(stationId: string): { text: string; cls?: string }[] {
     for (const [id, op] of this.ops) if (op.runner.outcome !== 'running') this.teardown(id);
     this.lastReceipts = null;
-    const io: LedgerIO = { ledger: () => this.scene.ledger, setLedger: (l) => ((this.scene.ledger = l), saveLedger(l)) };
-    const paid = this.turnIn(stationId, io);
+    const paid = this.turnIn(stationId, this.sceneLedger());
     const notes = paid.map((r) => ({ text: `CONTRACT SETTLED · ${r.title.toUpperCase()} · +${r.amount.toLocaleString('en-US')} sh · STANDING +${r.rep}`, cls: 'ok' }));
     const waiting = this.book.active.filter((k) => k.payAt === stationId && k.kind === 'haul' && k.state === 'active');
     for (const k of waiting) notes.push({ text: `CONSIGNMENT SHORT: ${k.cargo!.units} × ${k.cargo!.name.toUpperCase()} REQUIRED FOR ${k.title.toUpperCase()}`, cls: 'err' });
@@ -589,7 +601,6 @@ export class ContractDesk {
   // ── Star map ──────────────────────────────────────────────────────────
 
   private drawMap(c: CanvasRenderingContext2D, at: (id: string) => { x: number; y: number } | null, time: number): void {
-    const w = window.innerWidth;
     c.save();
     c.font = '12px "Share Tech Mono", monospace';
     // One tag per contract at the system it points to.
@@ -618,8 +629,9 @@ export class ContractDesk {
       c.textAlign = 'left';
     }
     // Side list.
-    let y = 120;
-    const x0 = w - 380;
+    // Under the map header (top-left): the systems start further in.
+    let y = 112;
+    const x0 = 40;
     if (this.book.active.length || this.priority) {
       c.fillStyle = '#ffb347';
       c.font = '700 13px "Oxanium", sans-serif';
@@ -689,7 +701,14 @@ export class ContractDesk {
       this.book.clock = e * BOARD_PERIOD + 1;
       for (const st of stations) {
         const offers = generateBoard({ reach: this.reach, station: st, clock: this.book.clock, rep: s.ledger.rep, tier: kind === 'sortie' ? 2 : this.tier(), goods: COMMODITIES, priority: null });
-        found = offers.find((k) => k.kind === kind && (phase !== 'op' || !k.op || k.op.system === sys) && (kind !== 'courier' || k.tier >= 2 || phase !== 'op')) ?? null;
+        found =
+          offers.find(
+            (k) =>
+              k.kind === kind &&
+              (phase !== 'op' || !k.op || k.op.system === sys) &&
+              (phase !== 'map' || nextSystem(k) !== sys) &&
+              (kind !== 'courier' || k.tier >= 2 || phase !== 'op'),
+          ) ?? null;
         if (found) break;
       }
     }
@@ -726,7 +745,11 @@ export class ContractDesk {
     const anchor = toU(op.start ?? op.center);
     const dir = op.end ? toU(op.end).sub(anchor).normalize() : new Vector3(0.3, 0, 1).normalize();
     if (k.kind === 'escort') {
-      pf.position.copy(anchor).addScaledVector(dir, -700).add(_v.set(-160, 70, 0));
+      // Off the freighter's quarter, so the chase camera frames her past the nose.
+      const side = new Vector3(-dir.z, 0, dir.x).normalize();
+      pf.position.copy(anchor).addScaledVector(dir, -650).addScaledVector(side, 260).add(_v.set(0, 60, 0));
+      const aim = anchor.clone().addScaledVector(dir, 900);
+      dir.subVectors(aim, pf.position).normalize();
     } else {
       pf.position.copy(anchor).addScaledVector(dir, -2600).add(_v.set(0, 300, 0));
       dir.subVectors(anchor, pf.position).normalize();

@@ -78,17 +78,17 @@ export function buildOp(k: Contract, offset: V3, opts: OpOptions = {}): OpBuild 
       const side: V3 = [-dir[2], 0, dir[0]];
       spawns.push({ blueprint: fr.blueprint, faction: k.faction, count: 1, place: at(start), tag: 'freighter', name: fr.name, role: 'escort', routeTo: 'dest' });
       for (let w = 1; w <= op.waves; w++) {
-        const s = w % 2 ? 1 : -1;
+        const s = (w % 2 ? 1 : -1) * (opts.stage ? 0.3 : 1);
         spawns.push({
           blueprint: en.blueprint,
           faction: en.faction,
           count: op.hostiles,
-          place: { at: 'tag', tag: 'freighter', offset: [dir[0] * 3200 + side[0] * 1600 * s, 350, dir[2] * 3200 + side[2] * 1600 * s] },
+          place: { at: 'tag', tag: 'freighter', offset: [dir[0] * (opts.stage ? 900 : 3200) + side[0] * 1600 * s, 350, dir[2] * (opts.stage ? 900 : 3200) + side[2] * 1600 * s] },
           tag: `raiders-w${w}`,
           name: en.name,
           role: 'hostile',
           whenFlag: 'resume:freighter',
-          delay: d(18 + (w - 1) * 40, 2 + (w - 1) * 5),
+          delay: d(18 + (w - 1) * 40, (w - 1) * 5),
         });
       }
       setpieces.push({ kind: 'beacon', tag: 'dest', place: at(end), params: { label: op.endName ?? 'Destination', color: '#6fe6ff' } });
