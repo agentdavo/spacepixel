@@ -465,6 +465,7 @@ const KIND_WEIGHTS: Record<StationKind, Partial<Record<ContractKind, number>>> =
   freeport: { courier: 3, haul: 2, bounty: 2, escort: 2, salvage: 1, recon: 1 },
   orbital: { courier: 3, haul: 3, escort: 2, patrol: 1, recon: 0.6, bounty: 0.6, sortie: 0.25 },
   carrier: { patrol: 2, bounty: 2, recon: 2, sortie: 0.6 },
+  surface: { courier: 3, haul: 3, escort: 1 },
 };
 
 /** What a station kind ships out as bulk consignments. */
@@ -475,6 +476,7 @@ const EXPORTS: Record<StationKind, CommodityId[]> = {
   freeport: ['luxury', 'relics', 'spares', 'medical'],
   orbital: ['rations', 'medical', 'luxury'],
   carrier: ['munitions'],
+  surface: ['spares', 'munitions'],
 };
 
 function weighted<T extends string>(w: Partial<Record<T, number>>, rnd: () => number): T {

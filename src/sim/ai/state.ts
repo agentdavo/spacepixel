@@ -154,7 +154,9 @@ export function isCapital(s: ShipEntity): boolean {
 /** The ship's brain, created on first use (personality by faction). */
 export function brainOf(s: ShipEntity): Brain {
   if (isBrain(s.brain)) return s.brain;
-  const b = createBrain(s.id, s.faction === 'choir' ? PERSONALITIES.zealot : PERSONALITIES.veteran);
+  // Seeded from the ship's own stream (world seed × id), not the bare id: a
+  // different world seed flies different dice, the same seed the same ones.
+  const b = createBrain(s.rng ? s.rng.fork('brain').seed : s.id, s.faction === 'choir' ? PERSONALITIES.zealot : PERSONALITIES.veteran);
   s.brain = b;
   return b;
 }

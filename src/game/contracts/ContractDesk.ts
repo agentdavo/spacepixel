@@ -474,6 +474,14 @@ export class ContractDesk {
   private setBook(b: ContractBook): void {
     this.book = b;
     saveContracts(b);
+    // Accept / decline / turn-in from the dock screen or a conversation: on the replay tape.
+    this.scene.replay.note('book', b);
+  }
+
+  /** A replay tape's contract book (the same change the live session made from the dock screen). */
+  replaceBook(b: ContractBook): void {
+    this.book = b;
+    saveContracts(b);
   }
 
   radio(): Comms {

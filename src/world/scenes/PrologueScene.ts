@@ -127,6 +127,7 @@ export class PrologueScene implements GameScene {
     }
     const dt = ctx.dt;
     // Everything the weapons sim emitted this frame → flashes, beams, particles.
+    this.visuals.consume();
     this.visuals.update(this.world, dt);
     this.combatFx.consume(dt);
     this.combatFx.update(dt, this.world.eye);
