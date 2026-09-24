@@ -42,7 +42,7 @@ export interface EconShift {
   after: EconSummary;
   /** Mean refinery Ebon mid, default vs world. */
   ebon: [number, number];
-  /** Share of the world's best safe holds (per scan) that carry any Ebon. */
+  /** Share of the units in the world's best safe holds (per scan) that are Ebon. */
   ebonInSafe: number;
   /** Mean mid per commodity, default vs world. */
   mids: Record<CommodityId, [number, number]>;
@@ -57,9 +57,10 @@ export function econShift(w: WorldState, markets: readonly SimMarket[], hops: (a
   return withWorld(w, sysOf, () => {
     const after = summarise(markets, hops, samples, 2);
     const e1 = meanMid(markets, 'ebon', 'refinery');
-    const withEbon = after.scans.filter((s) => (s.bestSafe?.mix.ebon ?? 0) > 0).length;
+    const units = after.scans.reduce((n, s) => n + (s.bestSafe?.units ?? 0), 0);
+    const ebonUnits = after.scans.reduce((n, s) => n + (s.bestSafe?.mix.ebon ?? 0), 0);
     const mids = Object.fromEntries(COMMODITIES.map((c) => [c.id, [mids0[c.id], meanMid(markets, c.id)]])) as Record<CommodityId, [number, number]>;
-    return { before, after, ebon: [e0, e1] as [number, number], ebonInSafe: withEbon / Math.max(1, after.scans.length), mids };
+    return { before, after, ebon: [e0, e1] as [number, number], ebonInSafe: ebonUnits / Math.max(1, units), mids };
   });
 }
 
@@ -67,7 +68,7 @@ export function econShift(w: WorldState, markets: readonly SimMarket[], hops: (a
 export const POSTGAME = {
   /** Refinery Ebon falls at least this far. */
   ebonDrop: 0.6,
-  /** At most this share of best safe holds still carry Ebon. */
+  /** At most this share of the best safe holds' cargo is still Ebon (a flask of filler, not a run). */
   ebonInSafe: 0.1,
   /** A safe hold still earns this (median). */
   safeMedianMin: 900,

@@ -2,6 +2,7 @@ import { Matrix4, Quaternion, Vector3 } from 'three';
 import { hostile, type Fleet, type ShipEntity } from '@/sim/Fleet';
 import type { Weapons, Beam } from '@/sim/Weapons';
 import type { Capitals } from '@/sim/Capitals';
+import type { Rng } from '@/sim/Rng';
 import { GUNS, type GunSpec, type Loadout, type MountSpec } from '@/sim/Loadouts';
 import { createTurretSolution, issueOrder, leadPoint, turretAim, turretCanPoint, turretSelectTarget, TURRET_DEFAULTS, type TurretMount, type TurretSolution } from '@/sim/ai';
 import type { ArticulationNode } from '@/assets/ShipBuilder';
@@ -76,17 +77,19 @@ export class ShipTurrets {
   mode: TurretMode = 'free';
   private rt = new Map<ShipEntity, ShipRt>();
   private hangars = new Map<ShipEntity, HangarRt>();
-  private rng = 777;
+  /** The world's 'turrets' stream (src/sim/Rng.ts). */
+  readonly rng: Rng;
 
   constructor(
     private fleet: Fleet,
     private weapons: Weapons,
     private capitals: Capitals | null = null,
-  ) {}
+  ) {
+    this.rng = fleet.rng.fork('turrets');
+  }
 
   private rand(): number {
-    this.rng = (this.rng * 16807) % 2147483647;
-    return (this.rng - 1) / 2147483646;
+    return this.rng.next();
   }
 
   cycleMode(): TurretMode {

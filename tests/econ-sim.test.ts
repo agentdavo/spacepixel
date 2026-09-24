@@ -4,6 +4,7 @@ import { Vector3 } from 'three';
 import { BANDS, SAFE_RISK, bestHold, scanRoutes, summarise, type SimMarket } from '../src/game/econSim.ts';
 import { buy, newLedger, sell, hazard } from '../src/game/economy.ts';
 import { placeStations, systemRisk, type StationSystemInput } from '../src/universe/stations.ts';
+import { surfacePorts } from '../src/universe/surfacePorts.ts';
 
 /**
  * Economy balance on a synthetic Reach (the real one is `npm run econ-sim`):
@@ -38,7 +39,11 @@ function reach(): { markets: SimMarket[]; hops: (a: string, b: string) => number
       }),
     };
     const risk = systemRisk(sys.threat, sys.faction, CHAIN[i + 1]?.id === 'null');
-    for (const st of placeStations(1994, input)) markets.push({ id: st.id, name: st.name, kind: st.kind, faction: st.faction, risk, system: sys.id });
+    const stations = placeStations(1994, input);
+    for (const st of stations) markets.push({ id: st.id, name: st.name, kind: st.kind, faction: st.faction, risk, system: sys.id });
+    // Planetary ports: a city market under every orbital port.
+    const ports = surfacePorts(1994, { id: sys.id, name: sys.id, planets: input.planets.map((pl) => ({ preset: { name: pl.name, radius: pl.radius }, position: pl.position })), stations });
+    for (const sp of ports) markets.push({ id: sp.id, name: sp.name, kind: sp.kind, faction: sp.faction, risk, system: sys.id });
     if (sys.faction === 'concord') markets.push({ id: 'carrier:Hesperus Dawn', name: 'Hesperus Dawn', kind: 'carrier', faction: 'concord', risk: 0, system: sys.id });
   });
   const idx = new Map(CHAIN.map((s, i) => [s.id, i]));
@@ -98,7 +103,7 @@ test('world scenario: after Episode 19 Ebon collapses out of the trade, and the 
   const { fastForward } = await import('../src/game/world/sim.ts');
   const { markets, hops } = reach();
   const s = econShift(fastForward(19), markets, hops, 4);
-  const line = `refinery Ebon ${Math.round(s.ebon[0])} → ${Math.round(s.ebon[1])} · safe ${s.before.safe.median} → ${s.after.safe.median} · Ebon in ${Math.round(s.ebonInSafe * 100)}% of best holds`;
+  const line = `refinery Ebon ${Math.round(s.ebon[0])} → ${Math.round(s.ebon[1])} · safe ${s.before.safe.median} → ${s.after.safe.median} · Ebon ${Math.round(s.ebonInSafe * 100)}% of best-hold cargo`;
   console.log(`  post-Ep19: ${line}`);
   assert.ok(s.ebon[1] <= s.ebon[0] * (1 - POSTGAME.ebonDrop), line);
   assert.ok(s.ebonInSafe <= POSTGAME.ebonInSafe, line);

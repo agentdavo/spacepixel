@@ -278,3 +278,18 @@ test('news: the chapter headline, the count and local events lead the ticker', (
   assert.ok(lines.some((l) => /Anchorage run safe/.test(l)), lines.join(' | '));
   assert.deepEqual(worldNews(emptyWorld(), REACH, { sysId: 'meridian' }), []);
 });
+
+test('determinism: the same world stepped at 60 Hz with the same deeds is bit-identical (replays)', () => {
+  const run = () => {
+    let w = fastForward(10, 850); // a news slot turns at 900 s
+    for (let i = 0; i < 60 * 180; i++) {
+      w = stepWorld(w, 1 / 60, REACH).w;
+      if (i === 900) w = actAmbush(w, 'lysowick', 'concord', 2, true);
+      if (i === 4000) w = actTrade(w, 'meridian-refinery-1', 'meridian', 'ebon', 5);
+    }
+    return JSON.stringify(w);
+  };
+  const a = run();
+  assert.equal(a, run());
+  assert.ok(JSON.parse(a).log.some((e: { kind: string }) => e.kind === 'news'), 'the Reach moved');
+});

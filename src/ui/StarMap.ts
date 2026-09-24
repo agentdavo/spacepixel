@@ -223,9 +223,12 @@ export class StarMap {
       c.fillStyle = '#ffffff';
       c.fillText(`${hv.name.toUpperCase()} · CLASS ${hv.starClass} · ${hv.faction.toUpperCase()} · THREAT ${(hv.threat * 100).toFixed(0)}%`, 40, h - 50);
       if (hv.blurb) c.fillText(hv.blurb, 40, h - 32);
-      hv.stations.forEach((st, i) => {
-        c.fillStyle = FACTION_COLOR[st.faction] ?? '#fff';
-        c.fillText(`■ ${st.name.toUpperCase()} · ${st.kind === 'orbital' ? 'ORBITAL PORT' : st.kind.toUpperCase()}`, 40, h - 70 - (hv.stations.length - 1 - i) * 16);
+      // Stations, then the surface ports under the orbital tethers (▼).
+      const docks = [...hv.stations.map((st) => `■ ${st.name.toUpperCase()} · ${st.kind === 'orbital' ? 'ORBITAL PORT' : st.kind.toUpperCase()}`), ...(hv.surfacePorts ?? []).map((sp) => `▼ ${sp.name.toUpperCase()} · SURFACE PORT`)];
+      const owners = [...hv.stations.map((st) => st.faction), ...(hv.surfacePorts ?? []).map((sp) => sp.faction)];
+      docks.forEach((line, i) => {
+        c.fillStyle = FACTION_COLOR[owners[i]] ?? '#fff';
+        c.fillText(line, 40, h - 70 - (docks.length - 1 - i) * 16);
       });
     }
     this.drawSurvey(this.hover ?? this.destination ?? cur, w, h);

@@ -6,7 +6,8 @@
  *   npm run econ-sim -- -v      # every scan, not just the summary
  *
  * Loads the real seeded Reach (seed 1994) through Vite's SSR loader, adds the
- * Hesperus Dawn's hangar market in Directorate space, and scans every
+ * Hesperus Dawn's hangar market in Directorate space and the surface ports
+ * under the orbital tethers, and scans every
  * station pair within two Lantern hops at 12 points over ~4 h of play clock.
  * Pure logic lives in src/game/econSim.ts (also run by tests/econ-sim.test.ts).
  */
@@ -27,6 +28,7 @@ try {
   const markets = [];
   for (const sys of u.systems.values()) {
     for (const st of sys.stations) markets.push({ id: st.id, name: st.name, kind: st.kind, faction: st.faction, risk: st.risk ?? 0, system: sys.id });
+    for (const st of sys.surfacePorts ?? []) markets.push({ id: st.id, name: st.name, kind: st.kind, faction: st.faction, risk: st.risk ?? 0, system: sys.id });
     if (sys.faction === 'concord') markets.push({ id: 'carrier:Hesperus Dawn', name: 'Hesperus Dawn', kind: 'carrier', faction: 'concord', risk: 0, system: sys.id });
   }
   const hopCache = new Map();
@@ -105,7 +107,7 @@ try {
   console.log(`    best safe ${post.before.safe.median} → ${post.after.safe.median} sh/hold (median) · risky ${post.before.risky.median} → ${post.after.risky.median} · starter ${post.before.starter.median} → ${post.after.starter.median}`);
   console.log(`    best safe route now  ${fmt(post.after.scans[0].bestSafe)}`);
   scenario('post-Ep19 refinery Ebon collapses', pct(post.ebon[0], post.ebon[1]), post.ebon[1] <= post.ebon[0] * (1 - P.ebonDrop), `≤ −${P.ebonDrop * 100}%`);
-  scenario('post-Ep19 Ebon leaves the safe trade', `${Math.round(post.ebonInSafe * 100)}% of best holds carry Ebon`, post.ebonInSafe <= P.ebonInSafe, `≤ ${P.ebonInSafe * 100}%`);
+  scenario('post-Ep19 Ebon leaves the safe trade', `${Math.round(post.ebonInSafe * 100)}% of best-hold cargo is Ebon`, post.ebonInSafe <= P.ebonInSafe, `≤ ${P.ebonInSafe * 100}%`);
   scenario('post-Ep19 the Reach still pays a living', post.after.safe.median, post.after.safe.median >= P.safeMedianMin, `safe median ≥ ${P.safeMedianMin}`);
   scenario('post-Ep19 gate fuel is free', W.lanternToll(W.fastForward(19)), W.lanternToll(W.fastForward(19)) === 0 && W.lanternToll(W.fastForward(18)) > 0, 'toll 0 after, > 0 before');
 

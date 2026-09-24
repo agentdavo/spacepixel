@@ -1,10 +1,15 @@
-import { Matrix4, Quaternion, Vector3, type PerspectiveCamera } from 'three';
+import { Matrix4, Quaternion, Vector3, type Group, type PerspectiveCamera } from 'three';
 import { hostile, type Fleet, type ShipEntity } from '@/sim/Fleet';
 import type { EconFaction, MarketSpec } from '@/game/economy';
 import type { StarSystemView } from './StarSystemView';
 import { BAY_INSIDE, BAY_INTERIOR, type StationView } from './Station';
 import { CV_BAY, HESPERUS_DAWN } from '@/assets/blueprints/concord-fleet';
 import { BayCurtain } from './BayCurtain';
+import { approachProfile, berthClassFor, carrierBerth, BERTH_LABEL, type ApproachProfile, type BerthClass } from './berths/classes';
+import { hullHalfExtents, type StationBerth } from './berths/sites';
+import { HullBerth } from './berths/HullBerth';
+import { BerthFx } from './berths/BerthFx';
+import type { BerthHost, BerthSequence } from './berths/sequence';
 
 /**
  * Docking (stations, friendly carriers, orbital ports).
@@ -28,6 +33,14 @@ import { BayCurtain } from './BayCurtain';
  *   handed back to the pilot.
  *
  * Physics stays in metres; everything here is laid out in 1 km steps.
+ *
+ * Every hull size docks (world/berths): fighters (≤ 40 m) fly into the bay
+ * as above; gunships and corvettes are clamped alongside a gantry; frigates
+ * moor off a pylon on a tether; carriers take corvettes alongside. Those
+ * berths — and the planetary descent to a surface port (world/surface) —
+ * hand the ship to a `BerthSequence` for the scripted phases; the request /
+ * corridor / clearance logic is shared, with approach numbers from the hull
+ * length (`approachProfile`).
  */
 export interface Dockable extends MarketSpec {
   name: string;
@@ -47,6 +60,18 @@ export interface Dockable extends MarketSpec {
   curtain?: BayCurtain;
   station?: StationView;
   ship?: ShipEntity;
+  /** Hull size class this berth serves ('descent': the landing corridor to a surface port). Default 'bay'. */
+  cls?: BerthClass | 'descent';
+  /** Approach numbers (capture window, closing-speed cap, corridor scale); default: the bay's. */
+  profile?: ApproachProfile;
+  /** Scripted berthing for non-bay berths (clamp, mooring, alongside, descent). */
+  seq?: BerthSequence;
+  /** Request range from `p` (default: distance to the bay point). */
+  rangeTo?(p: Vector3): number;
+  /** Berth refused outright (a frigate at a carrier), with the reason. */
+  deny?: string;
+  /** HUD / radio label for the berth ("CLAMP BERTH 2"). */
+  label?: string;
 }
 
 export type DockPhase = 'free' | 'cleared' | 'auto' | 'docked' | 'launch';
@@ -75,7 +100,9 @@ const _by = new Vector3();
 const _bz = new Vector3();
 const ZERO = new Vector3();
 
-export class DockingController {
+const BAY_PROFILE = approachProfile('bay', 17);
+
+export class DockingController implements BerthHost {
   phase: DockPhase = 'free';
   /** Dockable we're cleared for / berthed at. */
   target: Dockable | null = null;
@@ -103,6 +130,15 @@ export class DockingController {
    */
   lockout: string | null = null;
   private orbitA = 0;
+  /** Berth visuals (umbilicals, tether, lighter), under the world root once attached. */
+  fx: BerthFx | null = null;
+  /** Real seconds (berth lights keep pulsing while the world is frozen). */
+  clock = 0;
+  private hullDocks = new Map<string, Dockable>();
+  private alongside = new WeakMap<Dockable, number>();
+  private slowT = 0;
+  /** Planetary descents: the flight scene supplies a landing-corridor dockable per orbital port. */
+  descent: ((st: StationView) => Dockable | null) | null = null;
 
   constructor(
     private view: () => StarSystemView,
@@ -113,6 +149,31 @@ export class DockingController {
   /** The player changed hulls at the shipyard: guidance flies the new one. */
   setPlayer(p: ShipEntity): void {
     this.player = p;
+    this.hullDocks.clear();
+  }
+
+  /** Berth visuals live under the world root (universe-positioned). */
+  attach(root: Group): void {
+    this.fx ??= new BerthFx();
+    root.add(this.fx.group);
+  }
+
+  /** BerthHost: the ship guidance flies. */
+  get ship(): ShipEntity {
+    return this.player;
+  }
+
+  /** Size class of the hull we're flying. */
+  get berthClass(): BerthClass {
+    return berthClassFor(this.player.model.length);
+  }
+
+  /** Letterbox caption + iris for the current sequence (null: the bay's own). */
+  caption(): { title: string; sub: string; iris: number } | null {
+    const d = this.target;
+    if (!d?.seq || !this.busy || this.phase === 'docked') return null;
+    const ph = this.phase as 'auto' | 'launch';
+    return { ...d.seq.caption(ph, this.t), iris: d.seq.iris(ph, this.t) };
   }
 
   /** The docking sequence owns the ship (inputs ignored, HUD hidden). */
@@ -134,7 +195,15 @@ export class DockingController {
   dockables(): Dockable[] {
     const out = this.list;
     out.length = 0;
+    const cls = this.berthClass;
     for (const st of this.view().stations) {
+      const desc = this.descent?.(st);
+      if (desc) out.push(desc);
+      if (cls !== 'bay') {
+        const hd = this.hullDock(st, cls);
+        if (hd) out.push(hd);
+        continue;
+      }
       let d = this.stationDocks.get(st);
       if (!d) {
         d = {
@@ -160,10 +229,123 @@ export class DockingController {
     }
     for (const s of this.fleet.ships) {
       if (!s.alive || s.isPlayer || s.team !== this.player.team || s.model.radius < 200 || !ECON.has(s.faction)) continue;
-      const d = this.carrierDock(s);
+      const offer = carrierBerth(cls);
+      const d = offer === 'hangar' ? this.carrierDock(s) : this.carrierAlongside(s, offer !== null);
       if (d) out.push(d);
     }
     return out;
+  }
+
+  /**
+   * A station's clamp gantry (gunships, corvettes) or mooring pylon (frigates)
+   * for the hull we fly: the site nearest the ship, locked once cleared.
+   */
+  private hullDock(st: StationView, cls: BerthClass): Dockable | null {
+    if (this.target?.station === st && this.target.cls === cls && this.phase !== 'free') return this.target;
+    const sites = st.berths.filter((b) => b.cls === cls);
+    if (!sites.length) return null;
+    const p = this.player.flight.position;
+    let best: Dockable | null = null;
+    let bd = Infinity;
+    for (const b of sites) {
+      const d = this.hullSite(st, b, cls);
+      const r = d.bay.distanceTo(p);
+      if (r < bd) {
+        bd = r;
+        best = d;
+      }
+    }
+    return best;
+  }
+
+  private hullSite(st: StationView, b: StationBerth, cls: BerthClass): Dockable {
+    const key = `${st.site.id}:${b.cls}:${b.index}`;
+    let d = this.hullDocks.get(key);
+    if (d) return d;
+    const model = this.player.model;
+    const half = hullHalfExtents(model);
+    const L = model.length;
+    // Station frame: hull centre alongside the pad / off the bollard, nose out (+Z).
+    const centre = b.tip.clone().addScaledVector(b.side, b.gap + half.x);
+    const right = new Vector3().crossVectors(b.up, new Vector3(0, 0, 1));
+    const toBerth = (v: Vector3) => {
+      const o = v.clone().sub(centre);
+      return new Vector3(o.dot(right), o.dot(b.up), o.z);
+    };
+    const profile = approachProfile(cls, L);
+    const label = `${BERTH_LABEL[cls]}${cls === 'clamp' ? ` ${b.index + 1}` : ''}`;
+    d = {
+      id: st.site.id,
+      kind: st.site.kind,
+      faction: st.site.faction,
+      name: st.site.name,
+      bay: centre.clone().applyQuaternion(st.quaternion).add(st.center),
+      axis: st.axis,
+      up: b.up.clone().applyQuaternion(st.quaternion),
+      velocity: ZERO,
+      center: st.center,
+      radius: st.radius,
+      inside: 0,
+      interior: { hw: half.x * 2, hh: half.y * 2, depth: 0 },
+      station: st,
+      risk: st.site.risk,
+      cls,
+      profile,
+      label,
+      seq: new HullBerth({
+        mode: cls === 'clamp' ? 'clamp' : 'mooring',
+        profile,
+        length: L,
+        halfBeam: half.x,
+        anchor: toBerth(b.tip),
+        root: toBerth(b.root),
+        towerHalf: b.towerHalf,
+        station: st.model,
+        channel: b.channel,
+        name: st.site.name,
+      }),
+    };
+    this.hullDocks.set(key, d);
+    return d;
+  }
+
+  /** Corvettes ride alongside a friendly carrier on a tether; frigates are turned away. */
+  private carrierAlongside(s: ShipEntity, ok: boolean): Dockable | null {
+    const key = `carrier:${s.name}:alongside:${ok ? 1 : 0}`;
+    let d = this.hullDocks.get(key);
+    if (!d) {
+      const ch = hullHalfExtents(s.model);
+      const half = hullHalfExtents(this.player.model);
+      const L = this.player.model.length;
+      const profile = approachProfile('clamp', L);
+      d = {
+        id: `carrier:${s.name}`,
+        kind: 'carrier',
+        faction: s.faction as EconFaction,
+        name: s.name,
+        bay: new Vector3(),
+        axis: new Vector3(),
+        up: new Vector3(),
+        velocity: s.flight.velocity,
+        center: s.flight.position,
+        radius: s.model.radius * 0.6,
+        inside: 0,
+        interior: { hw: half.x * 2, hh: half.y * 2, depth: 0 },
+        ship: s,
+        cls: 'clamp',
+        profile,
+        label: 'ALONGSIDE',
+        deny: ok ? undefined : 'THE DECK TAKES FIGHTERS AND CORVETTES — MOOR A FRIGATE AT A STATION',
+        seq: ok ? new HullBerth({ mode: 'alongside', profile, length: L, halfBeam: half.x, anchor: new Vector3(-(70 + half.x), 0, 0), root: new Vector3(-(70 + half.x + 40), 30, -L * 0.2), towerHalf: 0, name: s.name }) : undefined,
+      };
+      this.alongside.set(d, ch.x + 70 + half.x); // lateral offset from the carrier centreline
+      this.hullDocks.set(key, d);
+    }
+    const f = s.flight;
+    d.bay.set(this.alongside.get(d) ?? 0, 0, 0).applyQuaternion(f.orientation).add(f.position);
+    d.axis.set(0, 0, 1).applyQuaternion(f.orientation).normalize();
+    d.up.set(0, 1, 0).applyQuaternion(f.orientation);
+    return d;
   }
 
   private carrierDock(s: ShipEntity): Dockable | null {
@@ -239,6 +421,10 @@ export class DockingController {
       return;
     }
     if (!this.player.alive) return;
+    if (d.deny) {
+      this.say(`${d.name.toUpperCase()}: ${d.deny}`, '#ffc46b', 5);
+      return;
+    }
     const h = this.hostileNear();
     if (h) {
       this.say(`${d.name.toUpperCase()}: DOCKING DENIED — HOSTILES WITHIN 10 km`, '#ff5f7a', 5);
@@ -253,7 +439,11 @@ export class DockingController {
     this.target = d;
     this.t = 0;
     this.player.flight.cruise = 'off'; // drop out of cruise for the approach
-    this.say(`${d.name.toUpperCase()}: CLEARED TO DOCK, BERTH ${berth(d)}. FLY THE CORRIDOR — GUIDANCE TAKES YOU AT 1 km.`, '#6fe6ff', 6);
+    const prof = d.profile ?? BAY_PROFILE;
+    const at = `${(prof.autoRange / 1000).toFixed(1)} km`;
+    if (d.cls === 'descent') this.say(`${d.name.toUpperCase()}: CLEARED FOR DESCENT. FOLLOW THE TETHER DOWN — GUIDANCE TAKES YOU AT THE ENTRY GATE.`, '#6fe6ff', 6);
+    else if (d.cls && d.cls !== 'bay') this.say(`${d.name.toUpperCase()}: CLEARED, ${d.label ?? 'BERTH'}. FLY THE CORRIDOR UNDER ${Math.round(prof.maxClosing)} m/s — GUIDANCE TAKES YOU AT ${at}.`, '#6fe6ff', 6);
+    else this.say(`${d.name.toUpperCase()}: CLEARED TO DOCK, BERTH ${berth(d)}. FLY THE CORRIDOR — GUIDANCE TAKES YOU AT 1 km.`, '#6fe6ff', 6);
   }
 
   /** Bay-local → universe. */
@@ -275,6 +465,8 @@ export class DockingController {
     this.messageT -= dt;
     if (this.messageT <= 0) this.message = '';
     this.sinceLaunch += dt;
+    this.clock += dt;
+    this.slowT -= dt;
     const all = this.dockables();
     // Stale target (jumped away, carrier died).
     if (this.target && !all.includes(this.target)) {
@@ -286,7 +478,7 @@ export class DockingController {
       let best: Dockable | null = null;
       let bd = DOCK_RANGE;
       for (const d of all) {
-        const dist = d.bay.distanceTo(pf.position);
+        const dist = d.rangeTo ? d.rangeTo(pf.position) : d.bay.distanceTo(pf.position);
         if (dist < bd) {
           bd = dist;
           best = d;
@@ -302,11 +494,12 @@ export class DockingController {
       case 'cleared': {
         const d = this.target!;
         const range = d.bay.distanceTo(pf.position);
+        const prof = d.profile ?? BAY_PROFILE;
         if (!this.player.alive) {
           this.reset();
           break;
         }
-        if (range > LAPSE_RANGE) {
+        if ((d.rangeTo ? d.rangeTo(pf.position) : range) > (d.profile ? prof.lapseRange : LAPSE_RANGE)) {
           this.say('CLEARANCE LAPSED — OUT OF RANGE', '#ffc46b');
           this.reset();
           break;
@@ -317,7 +510,14 @@ export class DockingController {
           break;
         }
         const l = this.toLocal(d, pf.position, _b);
-        if (range < AUTO_RANGE && l.z > 60 && Math.hypot(l.x, l.y) < 700) this.beginAuto();
+        if (range < (d.profile ? prof.autoRange : AUTO_RANGE) && l.z > prof.minOut && Math.hypot(l.x, l.y) < prof.lateralTol) {
+          const closing = _c.subVectors(pf.velocity, d.velocity).length();
+          if (closing <= prof.maxClosing) this.beginAuto();
+          else if (this.slowT <= 0) {
+            this.slowT = 3;
+            this.say(`${d.name.toUpperCase()}: TOO FAST FOR GUIDANCE — SLOW BELOW ${Math.round(prof.maxClosing)} m/s`, '#ffc46b', 3);
+          }
+        }
         break;
       }
       case 'auto':
@@ -325,6 +525,11 @@ export class DockingController {
         break;
       case 'docked': {
         const d = this.target!;
+        if (d.seq) {
+          this.t += dt;
+          d.seq.hold(this, d, this.t);
+          break;
+        }
         this.toWorld(d, _a.set(0, 0, -d.inside), pf.position);
         pf.velocity.copy(d.velocity);
         this.syncModel();
@@ -345,6 +550,7 @@ export class DockingController {
     this.toLocal(d, pf.position, this.s0);
     this.q0.copy(pf.orientation);
     pf.cruise = 'off';
+    d.seq?.begin(this, d, this.s0, this.q0);
     this.say(`${d.name.toUpperCase()}: GUIDANCE HAS YOUR SHIP. HANDS OFF THE STICK, VANGUARD.`, '#6fe6ff', 5);
   }
 
@@ -376,6 +582,16 @@ export class DockingController {
     const d = this.target!;
     const pf = this.player.flight;
     this.t += dt;
+    if (d.seq) {
+      d.seq.auto(this, d, Math.min(this.t, d.seq.tAuto), dt);
+      if (this.t >= d.seq.tAuto) {
+        this.phase = 'docked';
+        this.t = 0;
+        this.player.model.root.visible = d.seq.showsShip;
+        this.onDocked?.(d);
+      }
+      return;
+    }
     const u = Math.min(1, this.t / T_AUTO);
     const e = 1 - (1 - u) * (1 - u); // ease out: arrive, slow, stop
     const dedt = (2 * (1 - u)) / T_AUTO;
@@ -408,7 +624,11 @@ export class DockingController {
     this.target = d;
     this.phase = 'docked';
     this.t = 0;
-    this.player.model.root.visible = false;
+    this.player.model.root.visible = d.seq ? d.seq.showsShip : false;
+    if (d.seq) {
+      this.toLocal(d, this.player.flight.position, this.s0);
+      d.seq.begin(this, d, this.s0, this.player.flight.orientation);
+    }
     this.update(0);
     this.onDocked?.(d);
   }
@@ -426,13 +646,28 @@ export class DockingController {
     this.phase = 'launch';
     this.t = 0;
     this.player.model.root.visible = true;
-    this.say(`${this.target.name.toUpperCase()}: LAUNCH, LAUNCH, LAUNCH. GOOD HUNTING, VANGUARD.`, '#7dffb2', 5);
+    const d = this.target;
+    const line = d.cls === 'descent' ? 'CLEAR TO LIFT. SEE YOU ABOVE THE WEATHER, VANGUARD.' : d.seq ? 'LINES CLEAR. GOOD HUNTING, VANGUARD.' : 'LAUNCH, LAUNCH, LAUNCH. GOOD HUNTING, VANGUARD.';
+    this.say(`${d.name.toUpperCase()}: ${line}`, '#7dffb2', 5);
   }
 
   private stepLaunch(dt: number): void {
     const d = this.target!;
     const pf = this.player.flight;
     this.t += dt;
+    if (d.seq) {
+      d.seq.launch(this, d, Math.min(this.t, d.seq.tLaunch), dt);
+      if (this.t >= d.seq.tLaunch) {
+        d.seq.end(this, d);
+        pf.throttle = 0.8;
+        pf.boosting = false;
+        this.phase = 'free';
+        this.sinceLaunch = 0;
+        this.target = null;
+        this.onLaunched?.(d);
+      }
+      return;
+    }
     const u = Math.min(1, this.t / T_LAUNCH);
     const run = LAUNCH_RUN + d.inside;
     this.toWorld(d, _b.set(0, 0, -d.inside + run * u * u), pf.position);
@@ -453,7 +688,7 @@ export class DockingController {
     }
   }
 
-  private syncModel(plume?: number): void {
+  syncModel(plume?: number): void {
     const s = this.player;
     s.model.root.position.copy(s.flight.position);
     s.model.root.quaternion.copy(s.flight.orientation);
@@ -462,6 +697,7 @@ export class DockingController {
 
   /** Abort everything (jumps, campaign starts). */
   reset(): void {
+    if (this.target?.seq && this.phase !== 'free') this.target.seq.end(this, this.target);
     if (this.phase === 'docked' || this.phase === 'launch' || this.phase === 'auto') this.player.model.root.visible = this.player.alive;
     this.phase = 'free';
     this.target = null;
@@ -482,6 +718,14 @@ export class DockingController {
   camera(eye: Vector3, cam: PerspectiveCamera, dt: number): boolean {
     const d = this.target;
     if (!d || !this.busy) return false;
+    if (d.seq) {
+      const fov = d.seq.camera(this, d, this.phase as 'auto' | 'docked' | 'launch', this.t, eye, cam, dt);
+      if (Math.abs(cam.fov - fov) > 1e-3) {
+        cam.fov = fov;
+        cam.updateProjectionMatrix();
+      }
+      return true;
+    }
     const ship = this.player.flight.position;
     const I = d.interior;
     let fov = 40;

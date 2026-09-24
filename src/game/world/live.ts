@@ -28,7 +28,8 @@ export function reachInfo(u: Universe): ReachInfo {
       name: s.name,
       faction: s.faction,
       threat: s.threat,
-      stations: s.stations.map((st) => ({ id: st.id, name: st.name, kind: st.kind, faction: st.faction })),
+      // Surface ports (planetfall markets) count as the system's stations too.
+      stations: [...s.stations, ...(s.surfacePorts ?? [])].map((st) => ({ id: st.id, name: st.name, kind: st.kind, faction: st.faction })),
       gates: s.gates.map((g) => g.to),
     })),
   };
@@ -166,6 +167,11 @@ export class WorldRuntime {
   }
   engagement(id: string): Engagement | null {
     return engagementById(world().state, this.reach, id);
+  }
+  /** An episode debriefed as a success. */
+  episode(ep: number): void {
+    this.apply((w) => completeEpisode(w, ep));
+    persistWorld();
   }
   /** Orders taken: the engagement waits for the pilot instead of being fought without them. */
   takeSchedule(id: string): void {

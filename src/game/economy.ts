@@ -33,7 +33,7 @@
  */
 
 export type CommodityId = 'ebon' | 'relics' | 'cores' | 'spares' | 'rations' | 'munitions' | 'medical' | 'luxury';
-export type StationKind = 'refinery' | 'salvage' | 'bastion' | 'freeport' | 'orbital' | 'carrier';
+export type StationKind = 'refinery' | 'salvage' | 'bastion' | 'freeport' | 'orbital' | 'carrier' | 'surface';
 export type EconFaction = 'concord' | 'choir' | 'rustwake';
 
 export interface Commodity {
@@ -65,6 +65,7 @@ export const KIND_LABEL: Record<StationKind, string> = {
   freeport: 'FREE PORT',
   orbital: 'ORBITAL PORT · LANDING CORRIDOR',
   carrier: 'FLEET CARRIER · HANGAR DECK',
+  surface: 'SURFACE PORT · PLANETFALL',
 };
 
 export const FACTION_LABEL: Record<EconFaction, string> = {
@@ -84,6 +85,9 @@ const KIND_MUL: Record<StationKind, Partial<Record<CommodityId, number>>> = {
   freeport: { ebon: 1.05, relics: 0.92, cores: 1.0, spares: 1.0, rations: 1.05, munitions: 1.18, medical: 1.08, luxury: 0.84 },
   orbital: { rations: 0.64, medical: 0.74, luxury: 0.8, relics: 1.36, ebon: 1.3, cores: 1.26, spares: 1.12, munitions: 1.0 },
   carrier: { munitions: 0.85, rations: 1.0, medical: 1.24, ebon: 1.46, spares: 1.3 },
+  // A city on the ground: it eats, heals and spends (food, medicine, luxuries
+  // up the tether from off-world), and its foundries turn out spares and charges.
+  surface: { rations: 1.3, medical: 1.3, luxury: 1.3, ebon: 1.2, cores: 1.16, spares: 0.72, munitions: 0.82, relics: 1.08 },
 };
 
 const FACTION_MUL: Record<EconFaction, Partial<Record<CommodityId, number>>> = {
@@ -95,7 +99,7 @@ const FACTION_MUL: Record<EconFaction, Partial<Record<CommodityId, number>>> = {
   rustwake: { ebon: 0.93, relics: 0.9, spares: 0.92, munitions: 1.15, rations: 1.1 },
 };
 
-const SPREAD: Record<StationKind, number> = { refinery: 0.12, salvage: 0.12, bastion: 0.12, freeport: 0.07, orbital: 0.1, carrier: 0.16 };
+const SPREAD: Record<StationKind, number> = { refinery: 0.12, salvage: 0.12, bastion: 0.12, freeport: 0.07, orbital: 0.1, carrier: 0.16, surface: 0.1 };
 
 /** Anything with an id, a kind and a faction can hold a market (stations, carriers). */
 export interface MarketSpec {

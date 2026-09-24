@@ -313,6 +313,7 @@ export class CombatTestScene implements GameScene {
     this.camera.lookAt(look.sub(this.world.eye));
     this.backdrop.follow(this.camera);
     const vdt = this.frozen ? 0 : dt;
+    this.visuals.consume();
     this.visuals.update(this.world, vdt);
     this.combatFx.update(vdt, this.world.eye);
     this.hud.draw(this.player, this.target, this.camera, this.world, this.simT, this.stage === 'capital' || this.stage === 'shield');

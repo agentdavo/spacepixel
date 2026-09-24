@@ -254,7 +254,7 @@ const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi 
  * market (bastions, carriers, ports that burned it for Lantern transits)
  * falls further than the refineries, so the old Ebon run pays nothing.
  */
-export const EBON_UNNEEDED: Readonly<Record<string, number>> = { refinery: 0, salvage: -0.1, freeport: -0.1, orbital: -0.16, bastion: -0.17, carrier: -0.18 };
+export const EBON_UNNEEDED: Readonly<Record<string, number>> = { refinery: 0, salvage: -0.1, freeport: -0.1, orbital: -0.16, surface: -0.17, bastion: -0.17, carrier: -0.18 };
 
 /** Price offset at a station (of `kind`) for a commodity (fraction; −0.9..+1.5). */
 export function priceOffset(w: WorldState, sysId: string, stationId: string, cid: CommodityId, kind?: string): number {
@@ -469,7 +469,7 @@ export const BACKGROUND: readonly Template[] = [
   {
     id: 'medical-shortage',
     weight: () => 0.6,
-    where: (r, u) => byStation(r, (st) => st.kind === 'orbital' || st.kind === 'bastion', u),
+    where: (r, u) => byStation(r, (st) => st.kind === 'orbital' || st.kind === 'bastion' || st.kind === 'surface', u),
     apply: (w, _s, st) => nudge(w, stationScope(st!), 'price:medical', 0.16, 0.05, 0.5),
   },
   {

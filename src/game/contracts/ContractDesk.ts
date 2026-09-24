@@ -394,7 +394,7 @@ export class ContractDesk {
     const k = scheduleContract(e, this.reach, this.book.clock, rt.state.clock);
     if (!k) return { text: 'NO SUCH FIELD', ok: false };
     const err = this.accept(k, io);
-    if (!err) rt.takeSchedule(e.id);
+    if (!err) this.scene.takeSchedule(e.id);
     return err ? { text: `ORDERS · ${err}`, ok: false } : { text: `ORDERS ACCEPTED · ENGAGEMENT ${e.number} · ${e.systemName.toUpperCase()} · ${k.reward.toLocaleString('en-US')} sh`, ok: true };
   }
 
@@ -493,6 +493,14 @@ export class ContractDesk {
   }
 
   private setBook(b: ContractBook): void {
+    this.book = b;
+    saveContracts(b);
+    // Accept / decline / turn-in from the dock screen or a conversation: on the replay tape.
+    this.scene.replay.note('book', b);
+  }
+
+  /** A replay tape's contract book (the same change the live session made from the dock screen). */
+  replaceBook(b: ContractBook): void {
     this.book = b;
     saveContracts(b);
   }
