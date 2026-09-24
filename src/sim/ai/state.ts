@@ -51,6 +51,11 @@ export interface Brain {
   pilot: PilotState;
   /** Fly this ship even if it is the player's (demo / autopilot). */
   autopilot: boolean;
+  /**
+   * Another system writes this ship's controls (ambient traffic on its lane,
+   * a raider's strafing run): `updateAI` skips it until this is cleared.
+   */
+  scripted: boolean;
 
   // ── squadron ───────────────────────────────────────────────────────
   order: Order;
@@ -107,6 +112,7 @@ export function createBrain(seed: number, p: Personality = PERSONALITIES.veteran
     gains: gainsFor(p),
     pilot: createPilotState(),
     autopilot: false,
+    scripted: false,
     order: 'engageAtWill',
     leader: null,
     formation: 'fingerFour',

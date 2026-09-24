@@ -31,6 +31,11 @@ import { postFx } from '@/render/post/PostFx';
 import { MissionRunner, type MissionContext, type MissionDef } from '@/game/Missions';
 import { updateAI, issueOrder, setFormation, setAutopilot, brainOf } from '@/sim/ai';
 import { DockingController, berth, type Dockable } from '../Docking';
+import { stageReach } from '../ReachStage';
+import { Traffic, type TrafficEvent } from '../Traffic';
+import { ReachHud } from '@/ui/ReachHud';
+import { ambushReward } from '@/universe/traffic';
+import { BLUEPRINTS } from '@/assets/blueprints';
 import { DockScreen, DockCinema } from '@/ui/DockScreen';
 import { HullCollisions } from '../HullCollisions';
 import { WingDocking } from '../WingDocking';
@@ -84,6 +89,13 @@ export class FlightScene implements GameScene, FlightHostScene {
   private hud: FlightHud;
   /** Weapons, target shield facings / subsystems, sub-target bracket (src/ui/CombatHud.ts). */
   private combatHud: CombatHud;
+  /** Ambient traffic: haulers, patrols, raiders on the lanes (world/Traffic.ts). */
+  readonly traffic: Traffic;
+  private reachHud: ReachHud;
+  private reachTime = 0;
+  private planesBase = 1;
+  /** ?traffic=0 disables ambient traffic (A/B perf checks). */
+  private trafficOn = new URLSearchParams(location.search).get('traffic') !== '0';
   readonly universe: Universe = generateUniverse(1994);
   private systemId: string;
   private view: StarSystemView;
@@ -204,6 +216,11 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.combatFx = new CombatFx(this.weapons, this.missiles);
     this.scene.add(this.combatFx.fx.object);
     this.hulls = new HullCollisions(this.fleet, () => (this.fxOn ? this.combatFx.fx : null));
+    // The timetable clock runs from a settled point (+1 day) so lanes are already busy.
+    this.traffic = new Traffic(this.fleet, this.fxOn ? this.combatFx.fx : null, (id) => id in BLUEPRINTS, this.universe.seed);
+    this.traffic.clock = 86_400 + this.ledger.clock;
+    this.traffic.onEvent = (e) => this.onTrafficEvent(e);
+    this.traffic.setSystem(this.view);
 
     this.chase.snap(this.player.flight);
     this.playerSubject = { position: this.player.flight.position, velocity: this.player.flight.velocity, radius: 9 };
@@ -230,6 +247,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
     this.hud = new FlightHud(document.getElementById('ui-root')!);
     this.combatHud = new CombatHud(document.getElementById('ui-root')!);
+    this.reachHud = new ReachHud(this.hud.context);
     const pf0 = this.player.flight;
     this.audioFrame = {
       dt: 0,
@@ -269,6 +287,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     // ?contract=<kind>&cphase=board|op|pay|map: contract captures.
     this.contracts.stageFromQuery();
     if (q.get('dockui') === '0') this.dockScreen.close();
+    // ?reach=body|ring|lane|ambush [&sys=<id>] …: living-Reach captures (world/ReachStage.ts).
+    if (q.get('reach')) this.reachFlag(q.get('reach')!, q);
     window.__VANGUARD__ = { ...window.__VANGUARD__, ready: false, frame: () => 0, backend: '', hooks: { ...window.__VANGUARD__?.hooks, scene: this } };
   }
 
@@ -316,7 +336,12 @@ export class FlightScene implements GameScene, FlightHostScene {
     // 1. AI writes controls for every non-player ship (and the player on
     //    autopilot), then one flight step for everyone — same physics.
     this.player.target = this.lock.target; // "attack my target" reads this
+    this.reachTime = time;
+    this.traffic.setSystem(this.view);
     if (this.jumpPhase === 'none') {
+      // Traffic writes its haulers' controls (and scripts raiders) before the fighter AI.
+      this.traffic.enabled = !this.campaign && this.trafficOn;
+      this.traffic.update(dt, this.player, this.weapons.events);
       updateAI(this.fleet, dt, time, this.hulls.obstacles);
       this.wingDock.update(dt, this.docking, this.player, this.fleet, this.hulls.obstacles, this.wingOrder);
       this.capitals.step(dt);
@@ -381,7 +406,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     // 4b. Mission bookkeeping (kills by faction of the victim).
     for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship) this.kills.set(e.ship.faction, (this.kills.get(e.ship.faction) ?? 0) + 1);
     // Free-roam: shooting a faction's ships costs standing with its stations.
-    if (!this.campaign) for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship && e.shooter === this.player && !this.contracts.owns(e.ship)) this.ledger = reputationForKill(this.ledger, e.ship.faction as EconFaction);
+    if (!this.campaign) for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship && e.shooter === this.player && !this.contracts.owns(e.ship) && e.ship.team !== 'renegade') this.ledger = reputationForKill(this.ledger, e.ship.faction as EconFaction);
     if (this.mission) {
       this.missionTime += dt;
       const mc = this.missionCtx;
@@ -405,11 +430,16 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.world.sync(this.camera);
 
     this.view.backdrop.follow(this.camera);
-    this.view.update(time);
+    this.view.update(time, this.world.eye);
     this.dust.update(this.world.eye, pf.velocity, dt);
     this.dust.object.visible = this.jumpPhase !== 'tunnel';
     if (this.planes) {
       this.planes.update(this.world.eye, pf.speed);
+      // A world filling the sky clears the km strata off its face.
+      const nb = this.view.nearestBody(this.world.eye);
+      const ang = nb ? Math.asin(Math.min(1, nb.body.radius / (nb.altitude + nb.body.radius))) : 0;
+      const k = Math.min(1, Math.max(0, (ang - 0.05) / 0.3));
+      this.planes.setDensity(this.planesBase * (1 - 0.8 * k * k * (3 - 2 * k)));
       this.planes.mesh.visible = this.jumpPhase !== 'tunnel';
     }
 
@@ -445,6 +475,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.combatHud.draw(this.player, this.lock.target, this.camera, this.world, time, !this.tactical && this.jumpPhase === 'none');
     this.hud.drawStatus(this.view.system.name, pf.cruise, this.jumpPhase !== 'none' ? `LANTERN TRANSIT → ${this.universe.systems.get(this.jumpTo)?.name ?? ''}` : '');
     if (this.jumpPhase === 'none' && !this.tactical) this.drawDockHud(time);
+    this.drawReachHud(time);
     if (this.mission) this.hud.drawObjectives(this.mission, time);
     if (this.campaign) {
       const m = this.campaign.mission;
@@ -518,7 +549,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     const b = tame(new Color(sys.backdrop.wisp).lerp(a, 0.55), 0.5, 0.42);
     this.planes.setPalette(a, b, tame(at(0.5), 0.6, 0.2));
     // Special skies (Dead Zone, Anchor, Nexus) belong to their set pieces.
-    this.planes.setDensity(sys.id === 'monolith' ? 0 : sys.faction === 'unknown' ? 0.35 : 1);
+    this.planesBase = sys.id === 'monolith' ? 0 : sys.faction === 'unknown' ? 0.35 : 1;
+    this.planes.setDensity(this.planesBase);
   }
 
   // ── FlightHostScene ────────────────────────────────────────────────
@@ -897,6 +929,68 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.placeCapitals();
   }
 
+  /** Planet / moon markers, traffic tags, distress calls, hail card. */
+  private drawReachHud(time: number): void {
+    if (this.jumpPhase !== 'none' || this.tactical) return;
+    const nav = this.navGate();
+    this.reachHud.navNoise = this.hud.navNoise;
+    this.reachHud.draw({
+      time,
+      cam: this.camera,
+      world: this.world,
+      player: this.player,
+      bodies: this.view.bodies,
+      traffic: this.traffic,
+      navGate: nav ? { to: nav.link.to, name: this.universe.systems.get(nav.link.to)?.name ?? nav.link.to, center: nav.center } : null,
+      ringDensity: this.view.ringDebris.density,
+    });
+  }
+
+  /** Traffic events → banners, and the standing reward hook for broken ambushes. */
+  private onTrafficEvent(e: TrafficEvent): void {
+    const t = this.reachTime;
+    if (e.kind === 'ambush') {
+      const v = e.ambush.victim;
+      this.reachHud.flash('DISTRESS CALL', `${v.manifest.name.toUpperCase()} (${v.manifest.registry}) · ${e.ambush.band.toUpperCase()} RAIDERS ON THE LANE`, '#ff5f7a', t, 4);
+      this.audio.stinger('lock');
+    } else if (e.kind === 'repelled' || e.kind === 'lost') {
+      const a = e.ambush;
+      const saved = e.kind === 'repelled';
+      if (a.playerJoined && !this.campaign) {
+        const r = ambushReward(this.ledger, a.victim.flag, a.playerKills, saved);
+        this.ledger = r.ledger;
+        saveLedger(this.ledger);
+        this.reachHud.flash(saved ? 'AMBUSH BROKEN' : 'HAULER LOST', `BOUNTY +${r.credits.toLocaleString('en-US')} sh · ${a.victim.flag.toUpperCase()} STANDING ${r.rep >= 0 ? '+' : ''}${r.rep.toFixed(1)}`, saved ? '#7dffb2' : '#ffc46b', t, 5);
+      } else if (a.position.distanceTo(this.player.flight.position) < 30_000) {
+        this.reachHud.flash(saved ? 'RAIDERS DRIVEN OFF' : 'HAULER LOST', `${a.victim.manifest.name.toUpperCase()} · ${saved ? 'the patrol got there first' : `${a.band} took her`}`, saved ? '#7dffb2' : '#ffc46b', t, 4);
+      }
+    }
+  }
+
+  /** Living-Reach capture staging: quiet the free-flight cast, warp, place. */
+  private reachFlag(mode: string, q: URLSearchParams): void {
+    setAutopilot(this.player, false);
+    input.override = null;
+    this.cinematic = false;
+    if (q.get('sys')) this.warpTo(q.get('sys')!);
+    for (const b of this.bandits) {
+      b.ship.alive = false;
+      b.ship.model.root.visible = false;
+      b.deadFor = -1e9;
+    }
+    this.cathedral.alive = this.carrier.alive = false;
+    this.cathedral.model.root.visible = this.carrier.model.root.visible = false;
+    this.cathedral.hull = this.carrier.hull = 0;
+    this.lock.target = null;
+    this.traffic.setSystem(this.view);
+    if (mode === 'ambush') this.traffic.stageAmbush(this.player);
+    else if (mode === 'lane') this.traffic.stageArrival(this.player, this.view.gates[0]?.link.to ?? '');
+    else stageReach(mode, q, { view: this.view, player: this.player, wingmen: this.wingmen.map((w) => w.ship) });
+    // &hail=1: open the hail card on whatever is under the nose (captures).
+    if (q.get('hail')) this.reachHud.hail(this.traffic.hailTarget(this.player, 12_000, 0.6), this.reachTime);
+    this.chase.snap(this.player.flight);
+  }
+
   /**
    * ?dock=approach — on the corridor 2.4 km out, cleared, flying in.
    * ?dock=auto — at 900 m, guidance engaged (cutaway).
@@ -1083,6 +1177,8 @@ export class FlightScene implements GameScene, FlightHostScene {
         this.director.cut('lock', target, Infinity);
       } else if (next === 'orbit') this.director.cut('orbit', target ?? this.playerSubject, 4);
       else this.director.cut('flyby', this.playerSubject, 3, this.player.flight);
+    } else if (code === 'KeyH') {
+      this.reachHud.hail(this.traffic.hailTarget(this.player), this.reachTime);
     } else if (code === 'KeyK') {
       this.cinematic = !this.cinematic;
     } else if (code === 'KeyM') {
