@@ -348,11 +348,24 @@ Shown on the star map header, as a small violet counter in the HUD corner,
 and on the title card once a career has heard it; every burst is a radio
 intercept banner and a ticker line.
 
+**Guild choices.** `FACT_RULES` read the arc finales the guilds write:
+a leaked Schedule (`schedule.leaked`) lifts Ebon 12 % and turns Continuity;
+diverted grams (`anchorage.fed`) ease Anchorage's refugee demand; a sealed or
+opened core, the Ember seam to Tey or the Breakers, and a defector
+(`player.defected`: Directorate berths go cold, its patrols fly as renegades).
+
+**One clock, replayable.** The world steps inside the flight scene's fixed
+60 Hz `simStep` (free flight only) and is its single clock owner; every roll
+is a hash of seed and clock slot, so a replay rebuilds it bit for bit. Changes
+made outside a tick go on the tape (`world-trade`, `world-take`,
+`world-episode`); a dock trade shows its world mark beside the price (▲/▼).
+
 Captures: `?world=ep<N>` fast-forwards the story (never saved)
 `[&wclock=<s>] [&wbreak=1] [&wclear=<system>] [&wop=line|map]`.
 
 ![The Schedule on the star map](docs/screenshots/world-schedule-map.jpg)
-![Anchorage after the Fall](docs/screenshots/world-anchorage-fall.jpg)
+![Anchorage after the Fall: refugee demand](docs/screenshots/world-anchorage-fall.jpg)
+![After the Symphony of Gates: Ebon collapses](docs/screenshots/world-ebon-collapse.jpg)
 
 ## Shipyard & outfitting
 
