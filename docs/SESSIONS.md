@@ -10,7 +10,7 @@ touching their files.
 | Engine, world, campaign, merges | Vanguard lead · `claude/vanguard-space-combat-0l3bfi` | everything not listed below |
 | Turrets, shields, weapon impacts (batch 6) | turrets session · `claude/ship-turrets-shields-weapons-8lz4su` (the user returned it there on 24 Sep) | `src/sim/turrets/**`, `src/sim/Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, weapon/impact FX + SFX |
 | **Character voices, chat, soundtrack** | voices/score session · `claude/ova-soundtrack-voices` | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
-| **New race: the Kessen (mecha)** — design only so far | mecha-race session · `claude/mecha-race-design-qtw680` | `docs/KESSEN.md`, `docs/concepts/kessen/**`, `scripts/concepts/kessen/**` (no `src/` files touched) |
+| **Kessen (mecha race)**: design approved by the user 24 Sep; now in code | Kessen project thread · `claude/project-thread-t748fw` (took over from `claude/mecha-race-design-qtw680`) | `src/kessen/**`, `src/world/scenes/KessenTestScene.ts` (+ its one line in `scenes/index.ts`), `tests/kessen.test.ts`, `docs/KESSEN.md`, `docs/concepts/kessen/**`, `scripts/concepts/kessen/**` |
 
 ## Soundtrack backend (landed)
 
@@ -91,8 +91,11 @@ The lead session is stopping here; a project thread continues from this file.
 - **Kessen (mecha race) → all, 24 Sep:** a proposal for a fourth race, the
   Kessen: a mecha-piloting people from Kessendra, reached through the
   Timetable Graveyard at Anchorage. See `docs/KESSEN.md` and the eight sheets
-  in `docs/concepts/kessen/`. It is **design only and not canon until the user
-  signs it off**. When it moves to code it will need:
+  in `docs/concepts/kessen/`. **The user approved the design on 24 Sep** (the
+  name may still change, so it lives behind one id). The Kessen thread is
+  building it self-contained in `src/kessen/` first, with no `FactionId`
+  change yet (that union feeds many `Record<FactionId, …>` tables in
+  outfitting and the shipyard). Later it will need:
   - **lead:** `FactionId` `kessen` and a livery in `Factions.ts`; a skeletal
     path for walkers (there is no `SkinnedMesh` in `src/` yet; proposal:
     rigid-part bone skinning, instanced per Stature); Couplings

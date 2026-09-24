@@ -5,7 +5,7 @@
 > Year 0 (Reach reckoning), from inside a labour frame she had just stood up
 > in the wreck
 
-**Status: proposal.** Nothing here is canon until the user signs it off. It is
+**Status: approved by the user on 24 Sep** (the name may still change). It is
 written to slot into [`LORE.md`](LORE.md) without contradicting it. Concept
 sheets are in [`docs/concepts/kessen/`](concepts/kessen/) and are rendered by
 `node scripts/concepts/kessen/render.mjs`. The mecha in them are real rigged
@@ -370,15 +370,37 @@ Three body colours and one hot accent, as with the other factions
 | glow / glass | `#74f6e2` | Loom teal |
 | (trim) | `#e8b42a` | works hazard yellow, Fettlers and cranes only |
 
-## Implementation notes (for when it moves to code)
+## Implementation
 
-- `FactionId` gains `kessen`; add a livery to `Factions.ts`.
-- There is no `SkinnedMesh` use in `src/` yet. Frames want a **FrameKit**
-  (like `HullKit` / `ShipBuilder`) that builds rigid parts on bones, plus an
-  instanced bone-palette path for 200-frame Trains under WebGPU.
+**In code (24 Sep):** the user approved the design (the name may still
+change). The race is self-contained in `src/kessen/`:
+
+- `data.ts`: the id `kessen` and every display string, the livery, the five
+  Statures, body plans and the fourteen variants with their kit.
+- `rig.ts`: the 42-bone tree and the pose types.
+- `clips.ts`: the held stances plus eight clips (idle, walk, run, fire,
+  melee, kneel, stand down, boost), pure functions of time so replays stay
+  bit-exact, and cross-fade blending.
+- `FrameKit.ts`: `KessenFrame` builds a frame in the game's cel/ink
+  renderer. Parts are merged per bone into one vertex-painted `CelMaterial`
+  mesh (ink id range 3000+), pistons are re-aimed after every pose, the
+  frame plants its lowest armour on the ground each frame, and it is scaled
+  so the top of its head sits at its Stature's height.
+- Viewer: `?scene=kessen` (keys: C camera, K clip, V variant; `?clip=`,
+  `?v=`, `?cam=`). Tests: `tests/kessen.test.ts`.
+- Not ported yet: the stencil decals (canvas textures) from the concept kit.
+
+**Still to do:**
+
+- `FactionId` gains `kessen` and a livery in `Factions.ts`. That union keys
+  `Record<FactionId, …>` tables in outfitting, the shipyard and the
+  campaign, so it wants its own change.
+- An instanced bone-palette path for 200-frame Trains under WebGPU (today
+  each frame is ~40 draw calls).
 - Sim: a walker locomotion model (ground and zero-g), **Couplings**
   (magnet-walk on a capital hull, foot IK on the hull grid), gang-fire timing
-  on the Loom, and boarding as a subsystem damage path in `Damage.ts`.
+  on the Loom, and boarding as a subsystem damage path in `Damage.ts`
+  (turrets session's file).
 - Audio (voices / score session): a Kessen score (steel percussion, anvil,
   call-and-response work song) and barks ("Standing.", "Lid up!", "Drive the
   spike!", "She walked home.").
