@@ -1,4 +1,4 @@
-import { AdditiveBlending, Color, DoubleSide, Group, Mesh, Quaternion, RingGeometry, SphereGeometry, Vector3 } from 'three';
+import { AdditiveBlending, Color, DoubleSide, Group, Mesh, Quaternion, RingGeometry, SphereGeometry, Vector2, Vector3, type Camera, type PerspectiveCamera } from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import {
   Fn,
@@ -29,7 +29,8 @@ import { buildPalette, type ColorStop } from '@/render/materials/PaletteRamp';
 import { inkMRT, noInkMRT } from '@/render/materials/InkChannels';
 import { LightRig } from '@/render/LightRig';
 import type { ShaderNode } from '@/render/tsl';
-import { planetSurface } from './planets/PlanetMaterial';
+import { planetSurface, type SurfaceOptions } from './planets/PlanetMaterial';
+import { discRadiusPx, planetLodFor, type PlanetLod } from './planets/lod';
 
 /**
  * Painted body types. `gas` / `ice-giant` read `bands` as latitude bands;
@@ -105,6 +106,15 @@ export const PLANETS: Record<string, PlanetPreset> = {
 export const planetClock: ShaderNode = uniform(0);
 let inkSerial = 0;
 const _q = new Quaternion();
+const _c = new Vector3();
+const _e = new Vector3();
+const _px = new Vector2();
+
+/** `?planetlod=0|1|2` pins every body at one detail level (A/B: 0 = full detail, the pre-LOD shader). */
+const LOD_PIN: PlanetLod | null = (() => {
+  const v = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('planetlod') : null;
+  return v === '0' || v === '1' || v === '2' ? (Number(v) as PlanetLod) : null;
+})();
 
 /**
  * A painted body: the surface shader (`planets/PlanetMaterial.ts` — banded
@@ -119,6 +129,11 @@ export class Planet {
   readonly body: Mesh;
   /** The ring mesh (RingGeometry in its local XY plane), if any. */
   readonly ring: Mesh | null = null;
+  /** Current surface detail level (0 full … 2 far impostor) and the disc radius it was picked at (px). */
+  lod: PlanetLod = 0;
+  pixelRadius = Infinity;
+  /** Force a detail level (the renderer re-picks it every frame unless `?planetlod=` pins one). */
+  readonly setLod: (lod: PlanetLod) => void;
 
   constructor(preset: PlanetPreset = PLANETS.castellan, opts: { segments?: number } = {}) {
     this.preset = preset;
@@ -133,17 +148,38 @@ export class Planet {
     const rp = preset.ring;
     const ringTex = rp ? buildPalette(rp.bands, 1024) : null;
 
-    // ── body ──────────────────────────────────────────────────────────
-    const body = new Mesh(
-      new SphereGeometry(R, seg, seg / 2),
-      planetSurface(preset, {
-        time: planetClock,
-        inkId,
-        ring: rp && ringTex ? { center: planetCenter, normal: ringNormal, inner: R * rp.inner, outer: R * rp.outer, palette: ringTex } : undefined,
-      }),
-    );
+    // ── body (LOD: full / mid / far impostor, picked per frame from the disc's size) ──
+    const surface: SurfaceOptions = {
+      time: planetClock,
+      inkId,
+      ring: rp && ringTex ? { center: planetCenter, normal: ringNormal, inner: R * rp.inner, outer: R * rp.outer, palette: ringTex } : undefined,
+    };
+    const fullGeo = new SphereGeometry(R, seg, seg / 2);
+    let farGeo: SphereGeometry | null = null;
+    const mats: (MeshBasicNodeMaterial | undefined)[] = [];
+    const matFor = (lod: PlanetLod) => (mats[lod] ??= planetSurface(preset, { ...surface, lod }));
+    const body = new Mesh(fullGeo, matFor(0));
     this.body = body;
     this.group.add(body);
+    this.setLod = (lod: PlanetLod) => {
+      if (lod === this.lod) return;
+      this.lod = lod;
+      body.material = matFor(lod);
+      body.geometry = lod === 2 ? (farGeo ??= new SphereGeometry(R, 40, 20)) : fullGeo;
+    };
+    // Measured where it is drawn (every scene, every camera); the swap shows from the next frame.
+    const lodCheck = (renderer: { getDrawingBufferSize?: (v: Vector2) => Vector2 }, camera: Camera) => {
+      if (LOD_PIN !== null) return this.setLod(LOD_PIN);
+      if (!(camera as PerspectiveCamera).isPerspectiveCamera) return;
+      const cam = camera as PerspectiveCamera;
+      body.getWorldPosition(_c);
+      cam.getWorldPosition(_e);
+      const h = renderer.getDrawingBufferSize ? renderer.getDrawingBufferSize(_px).y : 720;
+      const px = discRadiusPx(R, _c.distanceTo(_e), cam.getEffectiveFOV(), h);
+      this.pixelRadius = px;
+      this.setLod(planetLodFor(px, this.lod));
+    };
+    body.onBeforeRender = (renderer, _scene, camera) => lodCheck(renderer as never, camera);
 
     // ── atmosphere limb ──────────────────────────────────────────────
     if (!preset.airless) {
@@ -208,9 +244,10 @@ export class Planet {
       const ring = new Mesh(new RingGeometry(inner, outer, 256, 1), ringMat);
       ring.rotation.x = -Math.PI / 2 + rp.tilt;
       this.ring = ring;
-      body.onBeforeRender = () => {
+      body.onBeforeRender = (renderer, _scene, camera) => {
         this.group.getWorldPosition(planetCenter.value);
         ringNormal.value.set(0, 0, 1).applyQuaternion(ring.getWorldQuaternion(_q));
+        lodCheck(renderer as never, camera);
       };
       ring.onBeforeRender = () => {
         this.group.getWorldPosition(planetCenter.value);

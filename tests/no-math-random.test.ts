@@ -22,6 +22,8 @@ const SIM_PATHS = [
   'src/world/WingDocking.ts',
   'src/universe/traffic.ts',
   'src/game/contracts',
+  'src/game/npc',
+  'src/game/rivals',
   'src/game/CampaignRunner.ts',
   'src/game/CampaignSession.ts',
   'src/game/RescueBeat.ts',

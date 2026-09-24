@@ -73,10 +73,11 @@ export function eventLine(e: WorldEvent, reach: ReachInfo, w: WorldState): strin
       return `ENGAGEMENT ${d.n} WAS DECISIVE. ${d.how === 'protected' ? 'Somebody killed the ship nobody was allowed to touch.' : 'A pilot refused the withdrawal order.'} Ebon spiking; Continuity asking for names.`;
     case 'lane.safe':
       return `Haulers are calling the ${S} run safe again. The Point cleared it — three ambushes broken.`;
-    case 'lane.cleared':
-      return d.saved ? `Raiders broken on the ${S} lanes by a Directorate pilot. The haulers are buying the rounds.` : null;
-    case 'lane.lost':
-      return `A hauler lost on the ${S} lanes. The bands are bolder there.`;
+    // Logged by src/game/rivals (d.sys is the system's name there).
+    case 'ambush.broken':
+      return `${d.band ?? 'Raiders'} broken on the ${d.sys ?? 'lane'} run${d.victim ? ` — the ${d.victim} came through` : ''}. The haulers are buying the rounds.`;
+    case 'ambush.lost':
+      return `${d.victim ? `The ${d.victim}` : 'A hauler'} lost on the ${d.sys ?? 'lane'} run. The bands are bolder there.`;
     case 'trade.dump':
       return `Somebody dumped ${d.units} lots of ${COMMODITY_NAME[String(d.cid)] ?? d.cid} at ${n.st(String(e.scope ?? '').replace(/^station:/, ''))}. The board there hasn't recovered.`;
     case 'trade.corner':

@@ -2,7 +2,7 @@ import { Vector3, type PerspectiveCamera } from 'three';
 import type { Livery } from '@/assets/Blueprint';
 import type { Fleet, ShipEntity } from '@/sim/Fleet';
 import { DEFAULT_CHASE, type ChaseCamera } from '@/sim/ChaseCamera';
-import { bridgeFraming, chaseFraming } from '@/game/shipyard/flight';
+import { bridgeFraming, chaseFraming, hasBowBattery } from '@/game/shipyard/flight';
 import { CATALOG_BY_ID, type CatalogEntry } from '@/game/shipyard/catalog';
 import { loadHangar, saveHangar, saveLedger } from '@/game/Profile';
 import type { TradeLedger } from '@/game/economy';
@@ -117,7 +117,7 @@ export class Outfitter {
       t.shake = DEFAULT_CHASE.shake;
       camera.near = 0.3;
     } else {
-      const f = bridge && sock ? bridgeFraming([sock.position.x, sock.position.y, sock.position.z], len) : chaseFraming(len);
+      const f = bridge && sock ? bridgeFraming([sock.position.x, sock.position.y, sock.position.z], len, hasBowBattery(e)) : chaseFraming(len);
       t.offset = new Vector3(...f.offset);
       t.lookAhead = f.lookAhead;
       t.speedPullback = f.speedPullback;

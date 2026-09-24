@@ -27,6 +27,7 @@ import { CombatFx } from '../CombatFx';
 import { StarSystemView, type GateInstance } from '../StarSystemView';
 import { Hyperspace } from '../Hyperspace';
 import { SpaceDust } from '../SpaceDust';
+import { bayDust } from '../BayDust';
 import { MultiplaneSky } from '../MultiplaneSky';
 import { generateUniverse, specialSystem } from '@/universe/generate';
 import { CampaignSession, type FlightHostScene } from '@/game/CampaignSession';
@@ -45,6 +46,7 @@ import { updateAI, issueOrder, setFormation, setAutopilot, brainOf } from '@/sim
 import { DockingController, berth, type Dockable } from '../Docking';
 import { stageReach } from '../ReachStage';
 import { Traffic, type TrafficEvent } from '../Traffic';
+import { hudLabels } from '@/ui/HudLabels';
 import { ReachHud } from '@/ui/ReachHud';
 import { ambushReward } from '@/universe/traffic';
 import { BLUEPRINTS } from '@/assets/blueprints';
@@ -53,6 +55,8 @@ import { HullCollisions } from '../HullCollisions';
 import { WingDocking } from '../WingDocking';
 import { PlanetaryPorts } from '../surface/PlanetaryPorts';
 import '@/ui/Concourse'; // registers the CONCOURSE dock tab (people, conversations)
+import { RivalDirector } from '@/game/rivals/RivalDirector';
+import { recordWorldChanges } from '@/game/npc/live';
 import { FlightRadio } from '@/dialog/FlightRadio';
 import { loadLedger, saveLedger } from '@/game/Profile';
 import { MISSILE_MAX, cargoUsed, dockingClearance, reputationForKill, type CommodityId, type EconFaction, type TradeLedger } from '@/game/economy';
@@ -68,6 +72,7 @@ import { ScheduleOverlay } from '@/ui/ScheduleOverlay';
 import { SignalCounter } from '@/ui/SignalCounter';
 import { GuildRuntime } from '@/game/guilds/GuildRuntime';
 import { sanitizeWorld, world } from '@/game/world/WorldState'; // guilds, arcs, outposts (+ the GUILD HALL / OUTPOST dock tabs)
+import '@/ui/ThreadsTab'; // registers the THREADS dock tab (NPC arcs, rivals) — last, so earlier tabs keep their digits
 
 /**
  * Milestones 4–6 + 10–11: one ship flying well, then shooting.
@@ -139,6 +144,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   readonly starMap: StarMap;
   private hyperspace = new Hyperspace();
   private dust = new SpaceDust();
+  /** `?dust=0` hides the space dust (captures: isolate what draws over a scene). */
+  private dustOn = new URLSearchParams(location.search).get('dust') !== '0';
   /** ?planes=N km strata (default 16, 0 = off). */
   private planes: MultiplaneSky | null = (() => {
     const n = Number(new URLSearchParams(location.search).get('planes') ?? 16);
@@ -202,6 +209,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   private wingDock = new WingDocking();
   /** Free-roam contracts: board, accepted jobs, live operations (src/game/contracts). */
   readonly contracts: ContractDesk;
+  /** Named aces and bounty targets who remember you (src/game/rivals). */
+  readonly rivals: RivalDirector;
   /** Guilds, their arcs, and your outpost (src/game/guilds, src/game/outposts). */
   readonly guilds: GuildRuntime;
   /** Shipyard & outfitting: owned hulls, fits, the active ship (src/game/outfitting). */
@@ -256,6 +265,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     // The world's readers go in before anything prices a market or lays a lane.
     this.worldRt = initWorld(this.universe);
     this.worldRt.here = () => this.systemId;
+    this.worldRt.adoptClock(this.ledger.clock);
     this.systemId = this.universe.start;
     this.view = new StarSystemView(this.universe.systems.get(this.systemId)!, this.scene, this.world.root);
     this.paintPlanes();
@@ -401,7 +411,10 @@ export class FlightScene implements GameScene, FlightHostScene {
     });
     this.signal = new SignalCounter(document.getElementById('ui-root')!);
     this.worldRt.on((e) => this.onWorldEvent(e));
+    this.rivals = new RivalDirector(this);
     this.guilds = new GuildRuntime(this);
+    // Conversations and the dock screen change the world outside a tick: on the replay tape.
+    recordWorldChanges((w) => this.replay.note('world', w));
     this.outfit.bind(this);
     bindOutfitter(this.outfit);
     this.outfit.settle(); // hold size, hangar complement
@@ -557,6 +570,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
     this.contracts.update(dt, time);
     this.guilds.update(dt, time);
+    this.rivals.update(dt);
 
     // 4b. Mission bookkeeping (kills by faction of the victim).
     for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship) this.kills.set(e.ship.faction, (this.kills.get(e.ship.faction) ?? 0) + 1);
@@ -692,8 +706,10 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.view.backdrop.follow(this.camera);
     this.view.update(time, this.world.eye);
     this.ports.update(time);
-    this.dust.update(this.world.eye, pf.velocity, dt);
-    this.dust.object.visible = this.jumpPhase !== 'tunnel' && !this.ports.active;
+    // No dust in a hangar: it fades out down the bay corridor and streaks in the host's frame (BayDust.ts).
+    this.dust.intensity = bayDust(this.world.eye, pf.velocity, [this.docking.target, this.docking.nearest], _dustVel);
+    this.dust.update(this.world.eye, _dustVel, dt);
+    this.dust.object.visible = this.jumpPhase !== 'tunnel' && !this.ports.active && this.dustOn;
     if (this.planes) {
       this.planes.update(this.world.eye, pf.speed);
       // A world filling the sky clears the km strata off its face.
@@ -721,6 +737,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       // Cutaway (docking, or the salvage tow after a free-flight death): the frame belongs to the cinematography.
       this.hud.clear();
       this.combatHud.clear();
+      hudLabels.discard();
       this.updateCinema();
       this.starMap.draw(time);
       return;
@@ -747,6 +764,8 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.hud.drawCampaign(`EP ${String(m.episode).padStart(2, '0')} · ${m.title}`, this.campaign.visibleObjectives(), this.campaign.runner.outcome, time);
       for (const d of this.campaign.runner.dwells) this.hud.drawDwell(d.position, d.radius, d.progress, this.camera, this.world);
     }
+    // World-space labels from every layer, decluttered in one pass (src/ui/HudLabels.ts).
+    hudLabels.flush(this.hud.context, window.innerWidth, window.innerHeight, time);
     this.starMap.draw(time);
   }
 
@@ -1141,6 +1160,19 @@ export class FlightScene implements GameScene, FlightHostScene {
   }
 
   /** True if any station in this system is within `r` metres of the player. */
+  /** A banner over the flight HUD (rivals, world events). */
+  flashBanner(text: string, sub: string, color: string, secs = 5): void {
+    this.reachHud.flash(text, sub, color, this.reachTime, secs);
+  }
+
+  /** Metres to the nearest station in this system. */
+  stationDistance(): number {
+    const p = this.player.flight.position;
+    let d = Infinity;
+    for (const st of this.view.stations) d = Math.min(d, st.center.distanceTo(p));
+    return d;
+  }
+
   private nearStation(r: number): boolean {
     const p = this.player.flight.position;
     return this.view.stations.some((st) => st.center.distanceTo(p) < r);
@@ -1292,6 +1324,7 @@ export class FlightScene implements GameScene, FlightHostScene {
 
   /** Traffic events → banners, and the standing reward hook for broken ambushes. */
   private onTrafficEvent(e: TrafficEvent): void {
+    this.rivals.onTraffic(e);
     const t = this.reachTime;
     if (e.kind === 'ambush') {
       const v = e.ambush.victim;
@@ -1738,7 +1771,7 @@ export class FlightScene implements GameScene, FlightHostScene {
         this.worldRt.episode(a as number);
         break;
       case 'world':
-        // Guild hall / outpost actions (src/game/guilds/GuildRuntime.setWorld).
+        // Guild hall / outpost actions (GuildRuntime.setWorld) and conversations (npc/live.ts recordWorldChanges).
         world().update(() => sanitizeWorld(a));
         break;
       default:
@@ -1767,6 +1800,7 @@ function copyFlight(from: FlightModel, to: FlightModel): void {
 
 const _v = new Vector3();
 const _to = new Vector3();
+const _dustVel = new Vector3();
 
 /**
  * Demo/capture mode: the AI flies the player (autopilot); this only adds a

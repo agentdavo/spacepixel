@@ -21,9 +21,10 @@ export type Cond =
   | { stationFaction: DFaction | DFaction[] }
   | { stationKind: DStationKind | DStationKind[] }
   | { seen: string; min?: number; max?: number }
-  /** A world fact (src/game/world/WorldState.ts: `bastion.fallen`, `continuity.hostile`, …); `is` matches a value. */
-  | { worldFact: string; is?: string | boolean }
-  | { notWorldFact: string }
+  /** A world fact (src/game/world/WorldState.ts): truthy, or equal to `is`. */
+  | { fact: string; is?: string | boolean }
+  /** A world counter in range. */
+  | { counter: string; min?: number; max?: number }
   | { all: Cond[] }
   | { any: Cond[] }
   | { not: Cond };
@@ -43,7 +44,9 @@ export type Effect =
   /** Hook for the contracts board: offer this contract id. */
   | { contract: string }
   /** Hook for recruitment / hiring (wingmen, crew). */
-  | { recruit: string };
+  | { recruit: string }
+  /** Set a world fact (NPC arcs and rivals read these; the concourse writes them to world()). */
+  | { fact: string; value?: string | boolean };
 
 export interface DialogChoice {
   /** What the Point says (the player is silent on the radio, not at the bar). */
@@ -110,6 +113,7 @@ export interface DialogWorld {
   episode: number;
   station?: { id: string; faction: DFaction; kind: DStationKind };
   vars?: Record<string, string>;
-  /** The Reach's facts (world state); missing = none known. */
-  facts?: Readonly<Record<string, string | boolean>>;
+  /** World facts / counters visible to conditions (and changed by `{ fact }` effects). */
+  facts?: Record<string, string | boolean>;
+  counters?: Record<string, number>;
 }

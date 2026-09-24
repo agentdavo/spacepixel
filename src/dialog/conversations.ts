@@ -427,14 +427,14 @@ export const CONVERSATIONS: Conversation[] = [
     id: 'pell-decisive',
     title: 'A Correction Will Be Scheduled',
     with: 'pell',
-    when: { worldFact: 'continuity.hostile' },
+    when: { fact: 'continuity.hostile' },
     priority: 5,
     entry: [{ node: 'hello' }],
     nodes: {
       hello: say('pell', 'Pilot. You made an engagement decisive. Do you know how many forms that generates? Neither do I. Nobody has ever had to fill them in.', 'two'),
       two: ask('pell', 'I am instructed to note your name. I have noted it. I am also instructed to feel something about it, and I find I do. I\'m not sure it\'s what they meant.', [
         ch('What happens now?', 'now'),
-        ch('It wasn\'t a war. It was a thermostat.', 'thermo', { if: { worldFact: 'schedule.known' } }),
+        ch('It wasn\'t a war. It was a thermostat.', 'thermo', { if: { fact: 'schedule.known' } }),
         LEAVE('Good day, Inspector.'),
       ]),
       now: say('pell', 'A correction. Next quarter\'s Schedule will carry your squadron by name — "costly and visible". The berths with Continuity desks will remember you. Ebon went up eleven percent in an hour.', 'now2'),
@@ -446,7 +446,7 @@ export const CONVERSATIONS: Conversation[] = [
     id: 'toma-breath',
     title: 'The Arithmetic',
     with: 'toma',
-    when: { all: [{ worldFact: 'oracle.heard' }, { notWorldFact: 'gates.aligned' }] },
+    when: { all: [{ fact: 'oracle.heard' }, { not: { fact: 'gates.aligned' } }] },
     priority: 4,
     entry: [{ node: 'hello' }],
     nodes: {
@@ -462,9 +462,9 @@ export const CONVERSATIONS: Conversation[] = [
     id: 'toma-counting-up',
     title: 'Two, Three',
     with: 'toma',
-    when: { worldFact: 'gates.aligned' },
+    when: { fact: 'gates.aligned' },
     priority: 4,
-    entry: [{ if: { worldFact: 'horizon.open' }, node: 'up' }, { node: 'stopped' }],
+    entry: [{ if: { fact: 'horizon.open' }, node: 'up' }, { node: 'stopped' }],
     nodes: {
       stopped: say('toma', 'It stopped at two. I sat with the headset on for a whole shift afterwards, in case. Then the Null Lantern lit. It doesn\'t go anywhere. It goes somewhere now.'),
       up: say('toma', 'It\'s counting up. Two, three, five. I asked the picket commander what we do now and he said "listen". First order I\'ve ever been glad of.', undefined, [{ rumour: 'The Null count is climbing: two, three, five. The pickets have stopped logging it as a threat.' }]),

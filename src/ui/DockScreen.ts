@@ -60,7 +60,7 @@ export interface DockContext {
 
 /**
  * Extra dock tabs (shipyard, outfitting, contracts, concourse …) register here
- * and appear after MARKET; digits 1–6 switch tabs. A tab owns its panel's DOM
+ * and appear after MARKET; digits 1–9 switch tabs. A tab owns its panel's DOM
  * and gets first refusal on keys while active (return true = handled).
  */
 export interface DockTabApi {

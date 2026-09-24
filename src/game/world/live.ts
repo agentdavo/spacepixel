@@ -169,6 +169,14 @@ export class WorldRuntime {
   engagement(id: string): Engagement | null {
     return engagementById(world().state, this.reach, id);
   }
+  /**
+   * Careers from before the world clock ran: adopt the play clock once (a
+   * world that has never ticked), so NPC arcs and rivals keep their times.
+   */
+  adoptClock(playClock: number): void {
+    if (world().state.clock === 0 && playClock > 0 && !isDevWorld()) world().update((w) => ({ ...w, clock: playClock }));
+  }
+
   /** An episode debriefed as a success. */
   episode(ep: number): void {
     this.apply((w) => completeEpisode(w, ep));

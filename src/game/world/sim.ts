@@ -421,11 +421,8 @@ export function actAmbush(w: WorldState, sysId: string, victim: EconFaction, rai
       n = setFact(n, `lane.${sysId}.safe`);
       n = record(n, 'lane.safe', s, { sys: sysId });
     }
-    n = record(n, 'lane.cleared', s, { sys: sysId, kills: raidersKilled, saved });
-  } else {
-    n = nudge(n, s, 'piracy', 0.02, 0.02, 0.5);
-    n = record(n, 'lane.lost', s, { sys: sysId });
-  }
+  } else n = nudge(n, s, 'piracy', 0.02, 0.02, 0.5);
+  // The ambush itself is logged by the rivals' director (`ambush.broken` / `ambush.lost`); only the lane's new standing is ours.
   return n;
 }
 

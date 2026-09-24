@@ -18,6 +18,7 @@
 import type { Character } from '../campaign/types';
 import type { EconFaction } from '../economy';
 import { ROSTER } from '../../dialog/people.ts';
+import { ARC_CONTRACT_IDS, arcContract, isArcContract, type ArcContractId } from '../npc/arcContracts.ts';
 import { BOARD_PERIOD, boardEpoch, contractFee, contractRep, findStation, hops, type Contract, type ContractOp, type ReachMap, type ReachStation, type ReachSystem, type Tier, type V3 } from './contracts.ts';
 
 export type NamedId = 'continuity-courier' | 'magpie-escort' | 'choir-line-escort';
@@ -58,13 +59,20 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-/** Is `id` one of the named contracts? */
-export function isNamed(id: string): id is NamedId {
+/** Is `id` one of the named contracts (including the jobs NPC arcs offer, src/game/npc/arcContracts.ts)? */
+export function isNamed(id: string): id is NamedId | ArcContractId {
+  return isStanding(id) || isArcContract(id);
+}
+
+function isStanding(id: string): id is NamedId {
   return (NAMED_IDS as readonly string[]).includes(id);
 }
 
+/** Every key `namedContract` can build (the three standing jobs + the arc jobs). */
+export const ALL_NAMED_IDS: readonly string[] = [...NAMED_IDS, ...ARC_CONTRACT_IDS];
+
 /** Named contracts carry their key in the id: `named:<key>@<board epoch>`. */
-export function namedKey(k: Pick<Contract, 'id'>): NamedId | null {
+export function namedKey(k: Pick<Contract, 'id'>): NamedId | ArcContractId | null {
   const m = /^named:([a-z-]+)@\d+$/.exec(k.id);
   return m && isNamed(m[1]) ? m[1] : null;
 }
@@ -121,7 +129,8 @@ function base(id: NamedId, inp: NamedInput, client: string, faction: EconFaction
  * Reach can't host it (no such station, no lane).
  */
 export function namedContract(id: string, inp: NamedInput): Contract | null {
-  if (!isNamed(id)) return null;
+  if (isArcContract(id)) return arcContract(id, inp);
+  if (!isStanding(id)) return null;
   const here = findStation(inp.reach, inp.station);
   if (!here) return null;
   const seed = hash(`${id}@${boardEpoch(inp.clock)}`);

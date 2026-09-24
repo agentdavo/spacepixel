@@ -66,7 +66,7 @@ export interface ShipEntity {
 export type HitEventKind = 'kill' | 'subsystem' | 'shield-down';
 
 /**
- * Anything that can be shot down (heavy torpedoes). Registered by the
+ * Anything that can be shot down (torpedoes, micro-missiles). Registered by the
  * missile system so gunfire and point defence can test against it.
  */
 export interface Shootables {

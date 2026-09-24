@@ -28,7 +28,8 @@ npm run ai-sim         # headless dogfight/formation/station sim with pass/fail 
 npm run econ-sim       # trade-route balance on the seeded Reach (profit per hold, pass/fail bands)
 npm run ai-sim         # headless dogfight/formation sim with pass/fail numbers
 npm run balance        # headless combat balance: time-to-kill bands, pass/fail
-npm run perf           # frame-time budgets (meaningful on real GPUs only)
+npm run career-check   # headless career loop: profile → dock → contract → hires → shipyard → reload
+npm run perf           # frame-time budgets (meaningful on real GPUs only; --no-demo --query … for A/B)
 npm run shot -- --jpg --shot 'hero:cam=0&t=3'   # headless screenshots
 ```
 
@@ -239,6 +240,61 @@ Listen: [docs/audio/voice-radio.wav](docs/audio/voice-radio.wav) ·
 
 ![Concourse](docs/screenshots/people-concourse-lucan.jpg)
 
+## Threads & rivals
+
+The Reach keeps living while you fly elsewhere. Both systems are pure data +
+functions over the shared world memory (`src/game/world/WorldState.ts`:
+facts `npc.<id>.*`, events in the log), wired in by `src/game/npc/live.ts`.
+
+**NPC arcs** (`src/game/npc/arcs.ts`, writing in `arcData.ts`,
+`tests/npc-arcs.test.ts`). Seven recurring people have multi-step stories:
+Odile's bar moves after the Bastion falls and needs a stake and her DELAYED
+board; Magpie's forty-gram clan debt is bought by Ninefingers Crane; Pell
+Varga re-audits the Schedule and needs a courier, then a witness; Nadia reads
+refugee lists station by station for her brother; Toma Kerrigan cracks under
+the Signal and takes a Kestrel out to answer it; Class Four's school tender
+loses its escort; Warden-Sister Maud wants to break the Sixth Keeping to ask a
+failing reactor why. Each step puts its person on a particular concourse
+(the arc overrides their usual wandering), has a status line, a voiced and
+subtitled conversation and often a named job (`arcContracts.ts`, flown by
+the ordinary contracts runtime). Steps move on world facts (your choices,
+your jobs' outcomes, story flags) or on elapsed play time — arcs catch up any
+number of steps at once while you're away, so ignored stories end without
+you: well, badly, or missed. The **THREADS** dock tab (`src/ui/ThreadsTab.ts`)
+lists open and closed threads with last-known whereabouts and the job on
+offer.
+
+**Rivals** (`src/game/rivals/rivals.ts`, `RivalDirector.ts`,
+`tests/rivals.test.ts`). Six named aces and bounty marks — Red Sabine (paints
+her kills on the hull), Ninefingers Crane (bought Magpie's paper), Unwitnessed
+Ismene (a Cantor who stopped singing), Corporal Skerry (deserted the Null
+picket), the Metronome (a Choir ace who counts your hits) and Vosk, the
+Knife (Continuity's interceptor). Each has a face and voice, a hull + wing +
+AI personality per tier, hunting grounds, a wake condition and a grudge meter
+fed by what you do (wingmen killed, ambushes broken, bounties taken, beating
+them). With cooldowns (per rival and global) they intercept on lanes or lead
+Rustwake traffic ambushes, taunt on the open band, break off below a third of
+their hull and come back upgraded — until their mortal tier, where going down
+is for good. Ismene and Skerry go to ground on a concourse after their first
+beating and can be talked onto your wing (Lucan's song; Kerrigan coming home).
+
+**Memory.** `src/game/npc/memory.ts` picks the most relevant event from the
+world log and phrases it — *"You were at Halaedon when the Kittiwake
+burned."*, *"You killed Tuck at Pelourin."*, *"You squared Magpie's paper."*
+— for `{memory}` in NPC lines and rival grudge lines (events naming the
+speaker first, then kinds they care about, then recency).
+
+Captures: `?npc=odile:shut,magpie:hunted` (arc steps), `?rivalstate=ismene:hiding:4[:tier[:met]]`,
+`?npcmemory=1` (seed a few remembered events), `?rival=<id>` (force an
+intercept), `?docktab=threads`. World changes made in conversation are
+recorded on the replay tape (`world` command); rivals and arcs ticking in
+flight are part of the fixed-step sim and replay by themselves.
+
+![Magpie's thread at Quilegard](docs/screenshots/npc-concourse-magpie.jpg)
+![THREADS tab](docs/screenshots/npc-threads.jpg)
+![Red Sabine intercepts](docs/screenshots/npc-rival-intercept.jpg)
+![Ismene gone to ground](docs/screenshots/npc-rival-ismene-ground.jpg)
+
 ## The living Reach
 
 **Planets.** Every system is surveyed on its own seeded stream *after* the
@@ -428,10 +484,23 @@ target when it is in arc, else (FREE) the best hostile they can reach. The
 T6 Valiant is commanded from the bridge (bridge camera); chase distance
 scales with hull length. Capital turrets now engage a player-flown capital.
 
+**Corvettes bite.** The Lantern Guard and the Vesper carry dual-purpose
+main batteries (`Loadout.battery`, `src/sim/Capitals.ts`): flak at fighters
+and ordnance, heavy rounds at anything gunship-sized and up — the shield
+breaker (Directorate heavy pulse / Choir hymn) while the facing in the way is
+up, the hull breaker (cannon) once it is down. Point defence tracks at a
+faster cadence with proximity-fused rounds, the Vesper carries a PD cluster
+(she is an escort), and micro-missiles have hit points (one flak or laser
+hit), so PD thins a swarm without stopping it.
+
 **Balance** (`npm run balance`, scenario *outfit*: scripted helm at 1.5 km,
-turrets live on both sides, mean of four seeds): a Mk III Resolute kills a
-Lantern Guard solo in ~83 s (band 60–120, stock ~94 s) and a Mk III Valiant
-beats a Vesper in ~32 s with ~85 % hull left (band 20–120). Pure + tested:
+turrets live on both sides, mean of six seeds): a Mk III Resolute kills a
+Lantern Guard solo in ~78 s with ~49 % hull left (bands 60–120 s, 30–80 %);
+a stock one loses — refit before taking a picket alone. A Mk III Valiant
+beats a Vesper in ~68 s with ~52 % hull left (bands 45–120 s, 30–80 %; stock
+~88 s, 18 %), six of its seven torpedoes shot down. Scenario *swarm*: three
+12-round swarms from 2.2 km — a Lantern Guard's PD takes ~25 %, a Mk III
+Resolute's PD turrets ~8 %, the rest hit. Pure + tested:
 `src/game/outfitting/{items,fit,hangar}.ts`, `tests/outfitting.test.ts`.
 Captures: `?scene=flight&dock=docked&station=meridian-bastion-2&docktab=shipyard|outfitting[&own=<hull id>]`
 (`&own=` gives you that hull, stock fit).

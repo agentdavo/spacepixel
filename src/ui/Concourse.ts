@@ -11,11 +11,11 @@ import { getAudio } from '@/audio';
 import { CAST_VOICES, getVoice, npcVoice, registerVoice } from '@/audio/voice';
 import { advance, begin, choicesAt, fill, offered, type ChoiceView } from '@/dialog/engine';
 import { conversationsWith } from '@/dialog/conversations';
-import { EXTRAS, hashStr, peopleAt, personById, type Person } from '@/dialog/people';
+import { EXTRAS, GUESTS, hashStr, peopleAt, personById, type Person } from '@/dialog/people';
+import { advanceNpcs, applyDialogFacts, dialogFacts, npcConversation, npcPlacement, npcVars } from '@/game/npc/live';
 import { smallTalk } from '@/dialog/smalltalk';
 import { dialogHooks, loadDialogState, saveDialogState } from '@/dialog/state';
 import type { Conversation, DialogWorld, DFaction, DStationKind, Effect } from '@/dialog/types';
-import { world } from '@/game/world/WorldState';
 
 /**
  * CONCOURSE — the people at a station (a dock tab). Two to four faces:
@@ -94,7 +94,10 @@ class ConcourseTab {
     const st = ctx.station;
     const stations = ctx.markets.map((m) => ({ id: m.id, faction: m.faction, kind: m.kind }));
     const episode = loadProfile().episode;
-    this.people = peopleAt({ id: st.id, faction: st.faction, kind: st.kind }, stations, l.clock, episode);
+    // NPC arcs catch up with the world first: they decide who is standing here.
+    advanceNpcs(l.clock, episode);
+    const placed = npcPlacement(stations);
+    this.people = peopleAt({ id: st.id, faction: st.faction, kind: st.kind }, stations, l.clock, episode, placed);
     // Captures / dev: ?talk=<id> brings a roster person here and opens the conversation.
     const q = new URLSearchParams(location.search);
     const want = q.get('talk');
@@ -102,7 +105,7 @@ class ConcourseTab {
       const p = personById(want);
       if (p) this.people.unshift(p);
     }
-    for (const p of [...this.people, ...EXTRAS]) if (!CAST_VOICES[p.id]) registerVoice(p.id, npcVoice(hashStr(p.id), { ...p.voice, faction: p.faction }));
+    for (const p of [...this.people, ...EXTRAS, ...GUESTS]) if (!CAST_VOICES[p.id]) registerVoice(p.id, npcVoice(hashStr(p.id), { ...p.voice, faction: p.faction }));
 
     panel.innerHTML = `
       <div class="cc">
@@ -129,7 +132,7 @@ class ConcourseTab {
       const card = document.createElement('button');
       card.className = 'cc-card';
       card.style.setProperty('--pc', p.color);
-      card.innerHTML = `<canvas width="72" height="72"></canvas><div><b>${esc(p.name)}</b><span>${esc(p.role)}</span><em>${FACTION_TAG[p.faction] ?? ''} · ${MOOD_LABEL[p.mood] ?? p.mood.toUpperCase()}${p.recurring ? ' · <i>REGULAR</i>' : ''}</em></div>`;
+      card.innerHTML = `<canvas width="72" height="72"></canvas><div><b>${esc(p.name)}</b><span>${esc(p.role)}</span><em>${FACTION_TAG[p.faction] ?? ''} · ${MOOD_LABEL[p.mood] ?? p.mood.toUpperCase()}${placed.get(p.id) === st.id ? ' · <i>THREAD</i>' : p.recurring ? ' · <i>REGULAR</i>' : ''}</em></div>`;
       card.addEventListener('click', () => {
         if (this.talk) return;
         this.select(i);
@@ -240,7 +243,7 @@ class ConcourseTab {
       episode: loadProfile().episode,
       station: { id: st.id, faction: st.faction as DFaction, kind: st.kind as DStationKind },
       vars: this.vars(),
-      facts: world().state.facts,
+      ...dialogFacts(),
     };
   }
 
@@ -252,10 +255,13 @@ class ConcourseTab {
     const pool = [...lines.filter((x) => !x.startsWith('BAND TALK') && !x.includes(' is long on ')), ...HEARSAY];
     const h = hashStr(`${p?.id ?? ''}:${Math.floor(l.clock / 300)}`);
     const rumour = pool[h % pool.length].replace(/^\(sung\)\s*/, '');
-    return { station: this.ctx.station.name, system: this.ctx.systemName, callsign: loadProfile().callsign, tip, rumour: rumour.charAt(0) + rumour.slice(1) };
+    return { station: this.ctx.station.name, system: this.ctx.systemName, callsign: loadProfile().callsign, tip, rumour: rumour.charAt(0) + rumour.slice(1), ...npcVars(p?.id ?? '', h) };
   }
 
   private conversationFor(p: Person, w: DialogWorld): Conversation {
+    // A story first: the step of their arc (or a rival gone to ground).
+    const story = npcConversation(p.id);
+    if (story && offered(story, w)) return story;
     const named = conversationsWith(p.id)
       .filter((c) => offered(c, w))
       .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
@@ -377,6 +383,13 @@ class ConcourseTab {
       this.api.refresh();
     }
     const stId = this.ctx.station.id;
+    // World facts from the conversation: arcs and rivals react at once.
+    const facts = applied.filter((e): e is Extract<Effect, { fact: string }> => 'fact' in e);
+    if (facts.length) {
+      const moves = applyDialogFacts(facts);
+      this.world = { ...w, ...dialogFacts() };
+      if (moves.length) this.api.say(`THREAD · ${moves[moves.length - 1].outcome ? 'CLOSED' : 'MOVED ON'} — SEE THREADS`, 'ok');
+    }
     const say = this.api.say;
     const log: string[] = [];
     this.api = { ...this.api, say: (t, c) => (log.push(t), say(t, c)) };
@@ -398,6 +411,8 @@ class ConcourseTab {
       }
     }
     void before;
+    // Jobs booked through hooks write world facts too (contract.<key>): conditions should see them.
+    if (applied.some((e) => 'contract' in e)) this.world = { ...this.world!, ...dialogFacts() };
     this.api = { ...this.api, say };
     if (log.length) this.root.querySelector('.cc-log')!.textContent = `› ${log.join(' · ')}`;
   }

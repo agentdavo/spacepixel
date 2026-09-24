@@ -51,6 +51,9 @@ import { RescueBeat } from '@/game/RescueBeat';
 import { worldRuntime } from '@/game/world/live';
 import { boardWeights, payMul } from '@/game/world/sim';
 import { scheduleContract, takeable, type Engagement } from '@/game/world/schedule';
+import { noteContract, type ContractNote } from '@/game/npc/live';
+import { ARC_CLIENTS } from '@/game/npc/people';
+import { tuneRivalMark } from '@/game/rivals/RivalDirector';
 import { GUILD_CAST } from '@/game/guilds/guilds';
 
 /**
@@ -191,6 +194,8 @@ class LiveOp {
     if (spec.tag === 'mark') {
       s.hullMax *= 1.5 + 0.5 * this.contract.tier;
       s.hull = s.hullMax;
+      // A mark who is also a rival flies like one (skill, tier, a voice on the band).
+      tuneRivalMark(s, spec.name ?? '');
     }
     if (spec.role === 'wing') issueOrder([s], 'engageAtWill', p);
     if (spec.role === 'static') this.statics.push(s);
@@ -314,7 +319,7 @@ export class ContractDesk {
   lastReceipts: { station: string; receipts: Receipt[] } | null = null;
   private stage: { kind: ContractKind; phase: string } | null = null;
   private readonly sysNames = new Map<string, string>();
-  private readonly cast: Character[] = [...CAST, ...CLIENTS, ...MARK_CAST, ...NAMED_CLIENTS, ...GUILD_CAST];
+  private readonly cast: Character[] = [...CAST, ...CLIENTS, ...MARK_CAST, ...NAMED_CLIENTS, ...GUILD_CAST, ...ARC_CLIENTS];
   /**
    * Every settled contract — paid, failed, lapsed or abandoned — with its
    * receipt (guilds pay merit, arcs advance, outposts hear about raids).
@@ -422,6 +427,7 @@ export class ContractDesk {
     if (r.error) return r.error;
     this.setBook(r.book);
     io.setLedger(r.ledger);
+    this.note(k, 'active');
     this.track(k.id);
     this.hud.toast(`CONTRACT ACCEPTED · ${k.title.toUpperCase()}`, '#ffb347');
     return null;
@@ -460,6 +466,7 @@ export class ContractDesk {
   abandon(k: Contract, io: LedgerIO): Receipt | null {
     const r = abandonContract(this.book, io.ledger(), k.id);
     if (r.error) return null;
+    this.note(k, 'abandoned');
     this.teardown(k.id);
     this.setBook(r.book);
     io.setLedger(r.ledger);
@@ -474,6 +481,10 @@ export class ContractDesk {
     const r = settleAt(this.book, io.ledger(), stationId, only);
     const receipts = r.receipts ?? [];
     if (!receipts.length) return [];
+    for (const x of receipts) {
+      const k = before.find((c) => c.id === x.id);
+      if (k) this.note(k, 'done');
+    }
     for (const x of receipts) this.teardown(x.id);
     // The station remembers who did the work.
     for (const x of receipts) if (x.result === 'paid') worldRuntime()?.contractPaid(stationId, x.faction);
@@ -499,6 +510,11 @@ export class ContractDesk {
       notes.push({ text: `PRIORITY ORDERS WAITING — EPISODE ${String(this.priority.episode).padStart(2, '0')}. SEE CONTRACTS.`, cls: 'ok' });
     if (this.stage?.phase === 'board' || this.stage?.phase === 'pay') window.setTimeout(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit2' })), 30);
     return notes;
+  }
+
+  /** Tell the world (NPC arcs wait on named jobs; rivals hear about bounties). */
+  private note(k: Contract, state: ContractNote): void {
+    noteContract(k, state, this.sysName, (id) => this.reach.systems.find((x) => x.id === id)?.faction ?? '');
   }
 
   private emit(from: readonly Contract[], receipts: readonly Receipt[] | undefined): void {
@@ -560,6 +576,10 @@ export class ContractDesk {
       const before = this.book.active;
       const r = tickBook(this.book, s.ledger, dt);
       if (r.receipts?.length) {
+        for (const x of r.receipts) {
+          const k = before.find((c) => c.id === x.id);
+          if (k) this.note(k, 'lapsed');
+        }
         s.ledger = r.ledger;
         saveLedger(r.ledger);
         this.setBook(r.book);
@@ -629,11 +649,13 @@ export class ContractDesk {
       } else if (op.runner.outcome === 'success') {
         if (op.build.completes) {
           this.setBook(markReady(this.book, id));
+          this.note(k, 'ready');
           this.hud.toast(`CONTRACT COMPLETE · RETURN TO ${k.payAtName.toUpperCase()} FOR PAYMENT`, '#7dffb2');
           if (this.tracked === id) this.track(id);
         }
       } else {
         const r = failContract(this.book, s.ledger, id);
+        this.note(k, 'failed');
         s.ledger = r.ledger;
         saveLedger(r.ledger);
         this.setBook(r.book);

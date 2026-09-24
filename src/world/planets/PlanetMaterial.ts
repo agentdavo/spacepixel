@@ -71,7 +71,29 @@ export interface SurfaceOptions {
   time: Node;
   ring?: RingShadow;
   inkId: number;
+  /**
+   * Detail level (Planet picks it from the disc's size on screen):
+   *   0 full — the painting as authored (big on screen);
+   *   1 mid  — one or two fewer octaves everywhere (≲ 1/3 of the screen);
+   *   2 far  — the impostor: two-octave height or bands, no Worley craters
+   *            or veins, clouds and city lights as flat tints (a few dozen px).
+   */
+  lod?: PlanetLod;
 }
+
+import type { PlanetLod } from './lod';
+export type { PlanetLod } from './lod';
+
+/** fBm octaves per detail level: [full, mid, far] (0 = skip the layer). */
+export const PLANET_OCTAVES = {
+  giantTurb: [4, 3, 2],
+  height: [5, 3, 2],
+  dunes: [3, 2, 0],
+  lava: [3, 2, 1],
+  veinWarp: [3, 2, 0],
+  clouds: [4, 2, 0],
+  cities: [3, 2, 0],
+} as const;
 
 const GIANTS = new Set(['gas', 'ice-giant']);
 const CRATERED = new Set(['rocky', 'ice', 'shattered']);
@@ -79,6 +101,8 @@ const CRATERED = new Set(['rocky', 'ice', 'shattered']);
 export function planetSurface(p: PlanetPreset, o: SurfaceOptions): MeshBasicNodeMaterial {
   const kind = p.kind ?? 'gas';
   const seed = p.seed ?? 0;
+  const lod = o.lod ?? 0;
+  const oct = (k: keyof typeof PLANET_OCTAVES): number => PLANET_OCTAVES[k][lod];
   const giant = GIANTS.has(kind);
   const palette = buildPalette(p.bands, 512, giant);
   const ramp = getRamp('dramatic');
@@ -89,7 +113,7 @@ export function planetSurface(p: PlanetPreset, o: SurfaceOptions): MeshBasicNode
   const off2 = vec3(seed * 0.389 + 11.3, seed * 0.911 + 2.9, seed * 0.157 + 7.7);
 
   const mat = new MeshBasicNodeMaterial();
-  mat.name = `planet:${p.name}`;
+  mat.name = `planet:${p.name}:lod${lod}`;
   mat.colorNode = Fn(() => {
     const P = normalize(positionLocal).toVar();
     let paint: Node;
@@ -99,7 +123,7 @@ export function planetSurface(p: PlanetPreset, o: SurfaceOptions): MeshBasicNode
     let cloud: Node = float(0);
 
     if (giant) {
-      const turb = mx_fractal_noise_float(P.mul(vec3(2.2, 7.0, 2.2)).add(off), 4, 2.0, 0.5);
+      const turb = mx_fractal_noise_float(P.mul(vec3(2.2, 7.0, 2.2)).add(off), oct('giantTurb'), 2.0, 0.5);
       const bandU = P.y.mul(p.bandScale).add(turb.mul(p.turbulence)).add(0.5);
       paint = pow(texture(palette, vec2(bandU, 0.5)).rgb, vec3(2.2)).toVar();
       if (p.storm) {
@@ -119,14 +143,14 @@ export function planetSurface(p: PlanetPreset, o: SurfaceOptions): MeshBasicNode
     } else {
       // Height: low continents + detail, contrast by `turbulence`.
       const f = p.bandScale;
-      const h0 = mx_fractal_noise_float(P.mul(f).add(off), 5, 2.0, 0.5);
+      const h0 = mx_fractal_noise_float(P.mul(f).add(off), oct('height'), 2.0, 0.5);
       const h = saturate(h0.mul(0.9 * p.turbulence).add(0.5)).toVar();
-      if (kind === 'desert') {
+      if (kind === 'desert' && oct('dunes') > 0) {
         // Dune seas: wind-combed streaks along the latitude lines, not blotches.
-        const streak = mx_fractal_noise_float(P.mul(vec3(f * 1.2, f * 9, f * 1.2)).add(off2), 3, 2.0, 0.5);
+        const streak = mx_fractal_noise_float(P.mul(vec3(f * 1.2, f * 9, f * 1.2)).add(off2), oct('dunes'), 2.0, 0.5);
         h.assign(saturate(h.mul(0.75).add(streak.mul(0.22)).add(0.12)));
       }
-      if (CRATERED.has(kind)) {
+      if (CRATERED.has(kind) && lod < 2) {
         const w = mx_worley_noise_vec2(P.mul(f * 3.2).add(off2), 0.9);
         const f1 = sqrt(w.x);
         const floor = float(1).sub(smoothstep(0.24, 0.28, f1));
@@ -142,24 +166,29 @@ export function planetSurface(p: PlanetPreset, o: SurfaceOptions): MeshBasicNode
         land = land.mul(float(1).sub(cap));
       }
       if (kind === 'volcanic' || kind === 'burning') {
-        const r = float(1).sub(abs(mx_fractal_noise_float(P.mul(f * 2.4).add(off2), 3, 2.0, 0.5)));
+        const r = float(1).sub(abs(mx_fractal_noise_float(P.mul(f * 2.4).add(off2), oct('lava'), 2.0, 0.5)));
         const cracks = smoothstep(kind === 'burning' ? 0.9 : 0.92, kind === 'burning' ? 0.93 : 0.95, r);
         const seas = kind === 'burning' ? float(1).sub(smoothstep(0.35, 0.37, h)) : float(0);
         lava = max(cracks, seas);
         paint.assign(mix(paint, vec3(glow).mul(0.55), lava));
       }
       if (kind === 'lantern') {
-        // Domain-warped cell edges: veins that wander like cracks in lacquer.
-        const q = P.mul(f * 2.2).add(off2);
-        const warp = mx_fractal_noise_vec3(q.mul(0.8), 3, 2.0, 0.5).mul(0.55);
-        const w = mx_worley_noise_vec2(q.add(warp), 1.0);
-        const edge = sqrt(w.y).sub(sqrt(w.x));
-        veins = float(1).sub(smoothstep(0.012, 0.035, edge));
+        if (lod < 2) {
+          // Domain-warped cell edges: veins that wander like cracks in lacquer.
+          const q = P.mul(f * 2.2).add(off2);
+          const warp = mx_fractal_noise_vec3(q.mul(0.8), oct('veinWarp'), 2.0, 0.5).mul(0.55);
+          const w = mx_worley_noise_vec2(q.add(warp), 1.0);
+          const edge = sqrt(w.y).sub(sqrt(w.x));
+          veins = float(1).sub(smoothstep(0.012, 0.035, edge));
+        } else veins = float(0.12); // far: the veins' average glow, as a tint
         paint.assign(mix(paint, vec3(glow).mul(0.6), veins));
       }
-      if (p.clouds) {
+      if (p.clouds && oct('clouds') === 0) {
+        // Far: the deck's average cover as a flat veil (keeps the disc's tone).
+        cloud = float(Math.min(0.6, p.clouds * 0.45));
+      } else if (p.clouds) {
         const t = o.time.mul(0.004);
-        const c = mx_fractal_noise_float(P.mul(vec3(2.4, 5.2, 2.4)).add(off2).add(vec3(t, 0, t.mul(0.6))), 4, 2.0, 0.5).mul(0.5).add(0.5);
+        const c = mx_fractal_noise_float(P.mul(vec3(2.4, 5.2, 2.4)).add(off2).add(vec3(t, 0, t.mul(0.6))), oct('clouds'), 2.0, 0.5).mul(0.5).add(0.5);
         const thr = 1 - p.clouds * 0.55;
         cloud = smoothstep(thr, thr + 0.02, c).mul(0.85).add(smoothstep(thr + 0.08, thr + 0.1, c).mul(0.15));
         if (p.storm && kind === 'ocean') {
@@ -211,11 +240,14 @@ export function planetSurface(p: PlanetPreset, o: SurfaceOptions): MeshBasicNode
 
     // ── emissive (night side reads hottest) ────────────────────────────
     const night = float(1).sub(smoothstep(-0.14, 0.06, ndl));
-    if (p.lights) {
-      const clusters = smoothstep(0.08, 0.3, mx_fractal_noise_float(P.mul(5.5).add(off2), 3, 2.0, 0.5));
+    if (p.lights && oct('cities') > 0) {
+      const clusters = smoothstep(0.08, 0.3, mx_fractal_noise_float(P.mul(5.5).add(off2), oct('cities'), 2.0, 0.5));
       const dots = step(0.7, mx_cell_noise_float(P.mul(70).add(off)));
       const cities = clusters.mul(dots.add(clusters.mul(0.25))).mul(land).mul(float(1).sub(cloud.mul(0.8)));
       col.addAssign(vec3(lightsCol).mul(cities).mul(night).mul(2.4 * p.lights));
+    } else if (p.lights) {
+      // Far: the night side's average city glow.
+      col.addAssign(vec3(lightsCol).mul(land).mul(night).mul(0.18 * p.lights));
     }
     if (kind === 'volcanic' || kind === 'burning') col.addAssign(vec3(glow).mul(lava).mul(night.mul(1.5).add(kind === 'burning' ? 0.45 : 0.2)));
     if (kind === 'lantern') col.addAssign(vec3(glow).mul(veins).mul(night.mul(2.2).add(0.6)));

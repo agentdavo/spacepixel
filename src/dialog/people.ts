@@ -473,13 +473,26 @@ export function whereIs(id: string, stations: readonly StationRef[], clock: numb
 /**
  * The 2–4 people at `station` right now: recurring people whose schedule puts
  * them here (at most two), then locals for this station and slot.
+ *
+ * `placed` overrides the schedule for people whose story says where they are
+ * (NPC arcs, rivals gone to ground — src/game/npc): id → station id, or null
+ * for "not on any concourse". Placed people here come first (up to three
+ * named faces in all); guests (non-roster people) are found via `GUESTS`.
  */
-export function peopleAt(station: StationRef, stations: readonly StationRef[], clock: number, episode: number): Person[] {
+export function peopleAt(station: StationRef, stations: readonly StationRef[], clock: number, episode: number, placed?: ReadonlyMap<string, string | null>): Person[] {
   const all = stations.some((s) => s.id === station.id) ? stations : [...stations, station];
   const slot = Math.floor(clock / PEOPLE_SLOT);
   const named: Person[] = [];
+  if (placed)
+    for (const [id, at] of placed) {
+      if (at !== station.id || named.length >= 3) continue;
+      const p = personById(id);
+      if (p) named.push(p);
+    }
+  const cap = Math.max(2, named.length);
   for (const p of ROSTER) {
-    if (named.length >= 2) break;
+    if (named.length >= cap) break;
+    if (placed?.has(p.id)) continue;
     const at = whereIs(p.id, all, clock, episode);
     if (at?.id === station.id) {
       const { haunt: _h, ...person } = p;
@@ -494,8 +507,19 @@ export function peopleAt(station: StationRef, stations: readonly StationRef[], c
   return out;
 }
 
+/**
+ * People who are not on the roster but can stand on a concourse when a story
+ * puts them there (arc-only characters, rivals gone to ground). Registered by
+ * src/game/npc/people.ts.
+ */
+export const GUESTS: Person[] = [];
+
+export function registerGuests(list: readonly Person[]): void {
+  for (const p of list) if (!GUESTS.some((g) => g.id === p.id)) GUESTS.push(p);
+}
+
 export function personById(id: string): Person | null {
-  const p = ROSTER.find((x) => x.id === id) ?? EXTRAS.find((x) => x.id === id);
+  const p = ROSTER.find((x) => x.id === id) ?? EXTRAS.find((x) => x.id === id) ?? GUESTS.find((x) => x.id === id);
   if (!p) return null;
   const { haunt: _h, ...rest } = p as Person & { haunt?: Haunt };
   void _h;
