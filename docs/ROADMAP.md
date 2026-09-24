@@ -129,6 +129,23 @@ buy the next hull, take on bigger adversaries.
 
 ![Shield facing collapse](screenshots/combat-shield.jpg)
 
+## Batch 5 — allegiance & a Reach that remembers (in progress)
+
+The sandbox and the story start talking to each other. One shared memory,
+`src/game/world/WorldState.ts` (facts, counters, decaying per-system/station
+modifiers, an event log), is read and written by everything below.
+
+| # | Milestone | Pass/fail | Status |
+|---|---|---|---|
+| 1 | Guilds: Order of the Keeping, Office of Continuity, Board of Allocation, Rustwake clans, Ascendant Houses — halls, ranks, quartermasters, guild contracts | a rank-up in ~45 min of guild work | 🔧 |
+| 2 | Guild arc missions (hand-written, 3–5 per guild) and conflicting loyalties | arcs complete end to end | 🔧 |
+| 3 | Outposts: restore a hulk as your guild's base | build → upgrade → defend | 🔧 |
+| 4 | World state driven by story flags and player actions: prices, traffic, patrols, station attitude | effects visible within one session | 🔧 |
+| 5 | The Schedule on the star map: fixed engagements to fly or break | breaking one has consequences | 🔧 |
+| 6 | The Signal countdown between chapters | visible, advances with the story | 🔧 |
+| 7 | Persistent NPC arcs that advance while you're away | ≥ 6 arcs | 🔧 |
+| 8 | Rivals: named aces and bounty targets that remember and escalate | ≥ 5 rivals | 🔧 |
+
 ## Known issues
 
 - WebGL2 fallback lines are softer than the WGSL path.
