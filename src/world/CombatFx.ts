@@ -386,14 +386,15 @@ export class CombatFx {
   /**
    * A shield facing (or a fighter's bubble) failing: a flash and a hard
    * ring at the hit, and the facing's lattice breaking into hexagon shards
-   * that tumble off the shell (the fold-in itself is the shell shader's).
+   * that tumble and burn out just off the shell (the fold-in itself is the shell shader's).
    */
   private shieldCollapse(s: ShipEntity, pos: Vector3, facing: number): void {
     const fx = this.fx;
     const cap = s.combat.dmg.capital;
     shellScale(s, _s);
     const big = Math.max(_s.x, _s.y, _s.z);
-    const size = cap ? Math.min(420, s.model.length * 0.14) : big * 1.4;
+    // Capitals: the burst marks the hit, it doesn't blank the facing (a 2 km hull's facing collapse stays a local event).
+    const size = cap ? Math.min(160, s.model.length * 0.06) : big * 1.4;
     const pal = shieldPalette(s);
     const v = s.flight.velocity;
     shellPoint(s, shellDir(s, pos, _d), _p, _n);
@@ -440,7 +441,7 @@ export class CombatFx {
       if (f >= 0) sampleFacing(s, f, this.randFn, _v);
       else _v.set(this.rand() - 0.5, this.rand() - 0.5, this.rand() - 0.5).multiplyScalar(1.2).add(_d).normalize();
       shellPoint(s, _v, _p, _n);
-      shard(fx, _p, _n, v, cell * (1.1 + this.rand() * 0.8), cell * (0.5 + this.rand() * 3), pal, 0.7 + this.rand() * 0.6);
+      shard(fx, _p, _n, v, cell * (0.9 + this.rand() * 0.6), cell * (0.4 + this.rand() * 1.2), pal, 0.35 + this.rand() * 0.3);
     }
   }
 

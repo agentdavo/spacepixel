@@ -339,6 +339,7 @@ export class WeaponVisuals {
       const acc = vec3(0, 0, 0).toVar();
 
       // ── hit ripples ──
+      const hitAcc = vec3(0, 0, 0).toVar();
       for (let i = 0; i < HITS; i++) {
         const h = uHits.element(i);
         const hb = uHitB.element(i);
@@ -362,8 +363,11 @@ export class WeaponVisuals {
         // Harmonic: arcs crawl along the cell borders around the hit, flickering.
         const harm = select(k.greaterThan(1.5).and(k.lessThan(2.5)), float(1), float(0));
         const crackle = select(edge.and(crackHash.greaterThan(0.62)).and(dC.lessThan(R.mul(1.25).add(w))), float(3.0), float(0)).mul(harm).mul(fadeT);
-        acc.addAssign(select(live, col.mul(lit).add(vec3(0.95, 0.9, 1.0).mul(crackle)).mul(hb.z), vec3(0)));
+        hitAcc.addAssign(select(live, col.mul(lit).add(vec3(0.95, 0.9, 1.0).mul(crackle)).mul(hb.z), vec3(0)));
       }
+      // A salvo landing at once overlaps its ripples; cap the pile-up so it reads as many hits, not one white-out of the facing.
+      const hitPeak = max(hitAcc.x, max(hitAcc.y, hitAcc.z));
+      acc.addAssign(hitAcc.mul(min(float(1), float(3.2).div(max(hitPeak, 1e-3)))));
 
       // ── beam contacts: a boiling splash where a beam grinds on the shield ──
       for (let j = 0; j < BEAM_CONTACTS; j++) {
@@ -394,11 +398,14 @@ export class WeaponVisuals {
       const cLive = cT.lessThan(1);
       const flashA = float(1).sub(smoothstep(0.0, 0.14, cT));
       const ringPos = float(1.05).sub(smoothstep(0.08, 0.75, cT).mul(1.05));
-      const foldRing = select(abs(fdist.sub(ringPos)).lessThan(0.09), float(2.6), float(0)).mul(float(1).sub(smoothstep(0.6, 0.8, cT)));
-      const shatter = select(fdist.greaterThan(ringPos).and(cellHash.lessThan(float(0.55).sub(cT.mul(0.6)))), select(edge, float(1.6), float(0.35)), float(0)).mul(float(1).sub(cT));
-      const implode = select(fdist.lessThan(0.12), float(1), float(0)).mul(smoothstep(0.6, 0.72, cT)).mul(float(1).sub(smoothstep(0.72, 0.95, cT))).mul(3.0);
-      const collapse = select(edge, float(2.6), float(0.9)).mul(flashA).add(foldRing).add(shatter).add(implode).mul(select(fdist.lessThan(1.02), float(1), float(0)));
-      acc.addAssign(select(cLive, mix(tintC, vec3(1, 1, 1), flashA.mul(0.6)).mul(collapse), vec3(0)));
+      const foldRing = select(abs(fdist.sub(ringPos)).lessThan(0.09), float(1.7), float(0)).mul(float(1).sub(smoothstep(0.6, 0.8, cT)));
+      // Shatter: the lattice the ring has passed breaks up cell by cell and is gone by a third of the way in
+      // (lingering cells read as tiles falling off the ship).
+      const shatter = select(fdist.greaterThan(ringPos).and(cellHash.lessThan(float(0.5).sub(cT.mul(1.6)))), select(edge, float(1.2), float(0.25)), float(0)).mul(float(1).sub(smoothstep(0.0, 0.3, cT)));
+      // The fold ends in a small pinch at the facing centre (lattice lines only: a filled disc there whites out half a capital).
+      const implode = select(fdist.lessThan(0.035), select(edge, float(1.8), float(0.2)), float(0)).mul(smoothstep(0.6, 0.72, cT)).mul(float(1).sub(smoothstep(0.72, 0.95, cT)));
+      const collapse = select(edge, float(1.3), float(0.15)).mul(flashA).add(foldRing).add(shatter).add(implode).mul(select(fdist.lessThan(1.02), float(1), float(0)));
+      acc.addAssign(select(cLive, mix(tintC, vec3(1, 1, 1), flashA.mul(0.4)).mul(collapse), vec3(0)));
 
       // ── regen: a sweep from the facing centre draws the lattice back in ──
       const rT = fs.y.div(REGEN_LIFE);

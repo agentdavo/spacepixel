@@ -346,10 +346,14 @@ export function beamBurn(fx: Particles, pos: Vector3, n: Vector3, vel: Vector3, 
 
 /** Shield shards: `count` flat hex tiles off a failing facing (one request per tile: each has its own plane). */
 export function shard(fx: Particles, pos: Vector3, n: Vector3, vel: Vector3, size: number, speed: number, palette: ParticlePalette, life: number): void {
-  begin(PK.SHARD, palette, pos, _v.copy(vel).addScaledVector(n, speed));
+  begin(PK.SHARD, palette, pos, vel);
   d.dir.copy(n);
+  d.spread = 0;
+  d.speedMin = d.speedMax = speed;
+  // Drag holds them to the shell: the lattice breaks up where it was, it doesn't come away as debris.
+  d.drag = 3.5;
   d.size0 = size;
-  d.size1 = size * 0.35;
+  d.size1 = size * 0.1;
   d.lifeMin = life * 0.7;
   d.lifeMax = life;
   fx.emit(d);
