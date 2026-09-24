@@ -428,8 +428,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.hyperspace.update(dt, this.jumpPhase === 'tunnel' ? Math.min(1, this.jumpT * 3, (TUNNEL - this.jumpT) * 3) : 0, 60, this.camera.quaternion);
     this.hud.navNoise = Math.max(postFx.navNoise, this.campaign?.mission.modifiers?.navDegraded ? 0.55 : 0);
     this.contracts.draw(time, !this.docking.busy && !this.tactical && this.jumpPhase === 'none');
-    if (this.docking.busy) {
-      // Cutaway: the frame belongs to the cinematography.
+    if (this.docking.busy || this.contracts.rescue.active) {
+      // Cutaway (docking, or the salvage tow after a free-flight death): the frame belongs to the cinematography.
       this.hud.clear();
       this.updateCinema();
       this.starMap.draw(time);

@@ -9,7 +9,7 @@ import { Comms } from '@/ui/Comms';
 import { ContractHud, type HudContract } from '@/ui/ContractHud';
 import { bindContractsTab } from '@/ui/ContractsTab';
 import { CAST } from '@/game/campaign/cast';
-import { COMMODITIES, type TradeLedger } from '@/game/economy';
+import { COMMODITIES, type CommodityId, type TradeLedger } from '@/game/economy';
 import { loadContracts, saveContracts, saveLedger } from '@/game/Profile';
 import type { Character, SpawnSpec } from '@/game/campaign/types';
 import { CampaignRunner, type CampaignHost } from '@/game/CampaignRunner';
@@ -47,6 +47,7 @@ import { buildOp, type OpBuild } from './ops';
 import { NAMED_CLIENTS, namedContract } from './named';
 import { HireDesk } from '@/game/HireDesk';
 import { dialogHooks } from '@/dialog/state';
+import { RescueBeat } from '@/game/RescueBeat';
 
 /**
  * Free-roam contracts at runtime: the board, the book, and the live
@@ -292,7 +293,6 @@ export class ContractDesk {
   private ops = new Map<string, LiveOp>();
   private comms: Comms | null = null;
   private hud: ContractHud;
-  private deadFor = 0;
   private saveT = 0;
   /** Receipts from the last docking, for the dock screen / contracts tab. */
   lastReceipts: { station: string; receipts: Receipt[] } | null = null;
@@ -301,6 +301,10 @@ export class ContractDesk {
   private readonly cast: Character[] = [...CAST, ...CLIENTS, ...MARK_CAST, ...NAMED_CLIENTS];
   /** People signed on from conversations (mechanic, Magpie's Due). */
   readonly hires: HireDesk;
+  /** Free-flight death: the salvage tow cutaway, its bill, the debrief. */
+  readonly rescue: RescueBeat;
+  private rescueNotes: { text: string; cls?: string }[] = [];
+  private stageRescue: number | null = new URLSearchParams(location.search).has('rescue') ? Number(new URLSearchParams(location.search).get('rescue')) || 0 : null;
 
   constructor(private scene: FlightScene) {
     this.reach = reachOf(scene.universe);
@@ -312,6 +316,17 @@ export class ContractDesk {
     window.addEventListener('pagehide', () => this.saveAll());
     scene.starMap.overlay = (c, at, time) => this.drawMap(c, at, time);
     this.hires = new HireDesk(scene);
+    this.rescue = new RescueBeat(document.getElementById('ui-root')!, {
+      scene,
+      home: () => (scene.ledger.lastDock && findStation(this.reach, scene.ledger.lastDock) ? scene.ledger.lastDock : this.homeStation()),
+      stationName: (id) => findStation(this.reach, id)?.station.name ?? id,
+      sealed: () => {
+        const out: Partial<Record<CommodityId, number>> = {};
+        for (const k of this.book.active) if (k.cargo && k.state === 'active') out[k.cargo.id] = (out[k.cargo.id] ?? 0) + k.cargo.units;
+        return out;
+      },
+      notices: this.rescueNotes,
+    });
     // Work and hires offered in conversation (the concourse).
     dialogHooks.onContract = (id, stationId) => this.acceptNamed(id, stationId);
     dialogHooks.onRecruit = (id) => this.hires.recruit(id);
@@ -428,7 +443,9 @@ export class ContractDesk {
     for (const [id, op] of this.ops) if (op.runner.outcome !== 'running') this.teardown(id);
     this.lastReceipts = null;
     const paid = this.turnIn(stationId, this.sceneLedger());
-    const notes = paid.map((r) => ({ text: `CONTRACT SETTLED · ${r.title.toUpperCase()} · +${r.amount.toLocaleString('en-US')} sh · STANDING +${r.rep}`, cls: 'ok' }));
+    // A salvage tow's debrief heads the log.
+    const notes: { text: string; cls?: string }[] = this.rescueNotes.splice(0);
+    for (const r of paid) notes.push({ text: `CONTRACT SETTLED · ${r.title.toUpperCase()} · +${r.amount.toLocaleString('en-US')} sh · STANDING +${r.rep}`, cls: 'ok' });
     const waiting = this.book.active.filter((k) => k.payAt === stationId && k.kind === 'haul' && k.state === 'active');
     for (const k of waiting) notes.push({ text: `CONSIGNMENT SHORT: ${k.cargo!.units} × ${k.cargo!.name.toUpperCase()} REQUIRED FOR ${k.title.toUpperCase()}`, cls: 'err' });
     if (this.onPriority && this.priority && findStation(this.reach, stationId)?.station.faction === 'concord')
@@ -460,6 +477,7 @@ export class ContractDesk {
   preStep(dt: number): void {
     if (this.scene.campaign) return;
     for (const op of this.ops.values()) op.preStep(dt);
+    this.rescue.preStep(dt);
   }
 
   update(dt: number, time: number): void {
@@ -489,19 +507,24 @@ export class ContractDesk {
       }
     }
 
-    // Free-roam death: a salvage tug tows airframe 0413 home.
+    // ?rescue=<t>: go down in free flight (with a hold full of cargo) and join the tow t seconds in.
+    if (this.stageRescue !== null && s.player.alive && s.ledger.clock > 0.3) {
+      s.ledger = { ...s.ledger, credits: Math.max(s.ledger.credits, 6400), cargo: { ebon: 3, rations: 4, medical: 2 } };
+      s.fleet.damage(s.player, 1e9);
+      this.rescue.begin();
+      this.rescue.skipTo(this.stageRescue);
+      this.stageRescue = null;
+    }
+    // Free-roam death: a salvage tug tows airframe 0413 home (RescueBeat: cutaway, bill, debrief).
     if (!s.player.alive) {
-      if (this.ops.size) for (const id of [...this.ops.keys()]) this.teardown(id);
-      this.deadFor += dt;
-      if (this.deadFor > 4) {
-        this.deadFor = 0;
-        const home = s.ledger.lastDock && findStation(this.reach, s.ledger.lastDock) ? s.ledger.lastDock : this.homeStation();
-        s.berthAt(home, 0.35);
-        this.hud.toast('AIRFRAME 0413 RECOVERED BY A SALVAGE TUG', '#ffb347');
+      if (this.ops.size) {
+        for (const id of [...this.ops.keys()]) this.teardown(id);
+        saveContracts(this.book);
       }
+      if (!this.rescue.active) this.rescue.begin();
+      this.rescue.update(dt);
       return;
     }
-    this.deadFor = 0;
 
     const sys = s.currentSystemId();
     let left = false;
