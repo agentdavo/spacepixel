@@ -40,6 +40,7 @@ import { BLUEPRINTS } from '@/assets/blueprints';
 import { DockScreen, DockCinema } from '@/ui/DockScreen';
 import { HullCollisions } from '../HullCollisions';
 import { WingDocking } from '../WingDocking';
+import { PlanetaryPorts } from '../surface/PlanetaryPorts';
 import '@/ui/Concourse'; // registers the CONCOURSE dock tab (people, conversations)
 import { FlightRadio } from '@/dialog/FlightRadio';
 import { loadLedger, saveLedger } from '@/game/Profile';
@@ -177,6 +178,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   readonly outfit = new Outfitter();
   /** Fitted turrets, point defence and hangar complements on non-capital hulls. */
   readonly turrets: ShipTurrets;
+  /** Planetary ports: landing corridors, the surface layer, pads (src/world/surface). */
+  readonly ports: PlanetaryPorts;
 
   constructor() {
     this.systemId = this.universe.start;
@@ -283,6 +286,24 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.cinema = new DockCinema(document.getElementById('ui-root')!);
     this.docking.onDocked = (d) => this.berthed(d);
     this.docking.attach(this.world.root);
+    this.ports = new PlanetaryPorts({
+      scene: this.scene,
+      root: this.world.root,
+      universe: this.universe,
+      docking: this.docking,
+      view: () => this.view,
+      player: () => this.player,
+      ships: () => this.fleet.ships,
+      warpTo: (id) => this.warpTo(id),
+      quiet: () => this.quiet(),
+      placePlayer: (p, d, s) => this.placePlayer(p, d, s),
+      closeDockScreen: () => this.dockScreen.close(),
+      setSpaceVisible: (v) => {
+        this.view.group.visible = v;
+        this.view.backdrop.group.visible = v;
+      },
+      systemLight: () => this.view.system.light,
+    });
     window.addEventListener('pagehide', () => saveLedger(this.ledger));
     this.docking.onLaunched = () => {
       this.hulls.fighters.immune(this.player); // off the catapult clean
@@ -304,6 +325,13 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.outfit.settle(); // hold size, hangar complement
     // ?dock=approach|auto|docked|launch [&station=<id|index>] [&cargo=demo]: docking captures.
     if (q.get('dock')) this.dockFlag(q.get('dock')!, q.get('station') ?? '', q.get('cargo') === 'demo');
+    // ?descent=corridor|entry|clouds|below|glide|final|pad|docked|liftoff|climb|orbit [&port=<id>] [&dockt=S]
+    if (q.get('descent')) {
+      setAutopilot(this.player, false);
+      input.override = null;
+      this.cinematic = false;
+      this.ports.stage(q.get('descent')!, q);
+    }
     // ?contract=<kind>&cphase=board|op|pay|map: contract captures.
     this.contracts.stageFromQuery();
     if (q.get('dockui') === '0') this.dockScreen.close();
@@ -378,7 +406,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       if (b.ship.alive || b.deadFor < 0) continue;
       b.deadFor += dt;
       // Station space is patrolled: reinforcements don't jump you on the approach.
-      if (b.deadFor > 6 && !this.nearStation(20_000)) this.respawn(b);
+      if (b.deadFor > 6 && !this.nearStation(20_000) && !this.ports.active) this.respawn(b);
     }
 
     // 2b. Lanterns: crossing a gate plane inside the ring starts a jump.
@@ -453,8 +481,9 @@ export class FlightScene implements GameScene, FlightHostScene {
 
     this.view.backdrop.follow(this.camera);
     this.view.update(time, this.world.eye);
+    this.ports.update(time);
     this.dust.update(this.world.eye, pf.velocity, dt);
-    this.dust.object.visible = this.jumpPhase !== 'tunnel';
+    this.dust.object.visible = this.jumpPhase !== 'tunnel' && !this.ports.active;
     if (this.planes) {
       this.planes.update(this.world.eye, pf.speed);
       // A world filling the sky clears the km strata off its face.
@@ -462,7 +491,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       const ang = nb ? Math.asin(Math.min(1, nb.body.radius / (nb.altitude + nb.body.radius))) : 0;
       const k = Math.min(1, Math.max(0, (ang - 0.05) / 0.3));
       this.planes.setDensity(this.planesBase * (1 - 0.8 * k * k * (3 - 2 * k)));
-      this.planes.mesh.visible = this.jumpPhase !== 'tunnel';
+      this.planes.mesh.visible = this.jumpPhase !== 'tunnel' && !this.ports.active;
     }
 
     // 6b. Audio: one frame of facts, read by the audio façade.
@@ -875,7 +904,7 @@ export class FlightScene implements GameScene, FlightHostScene {
 
   /** Every station in the Reach, for the ticker's price tips. */
   private allMarkets() {
-    return [...this.universe.systems.values()].flatMap((s) => s.stations);
+    return [...[...this.universe.systems.values()].flatMap((s) => s.stations), ...this.ports.markets()];
   }
 
   /** Berthed: save, notify hooks, open the dock screen. */
@@ -886,7 +915,9 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.onDocked?.(d.id);
     this.campaign?.runner.onDocked(d.id);
     const notices = this.campaign ? [] : this.contracts.onDocked(d.id);
-    if (d.cls === 'mooring') notices.unshift({ text: 'MOORED OFF THE PYLON · LIGHTER RUNNING THE CREW ACROSS', cls: 'ok' });
+    const port = d.cls === 'descent' ? this.ports.markets().find((p) => p.id === d.id) : undefined;
+    if (port) notices.unshift({ text: `${port.description.toUpperCase()}`, cls: '' });
+    else if (d.cls === 'mooring') notices.unshift({ text: 'MOORED OFF THE PYLON · LIGHTER RUNNING THE CREW ACROSS', cls: 'ok' });
     else if (d.cls === 'clamp') notices.unshift({ text: `${d.label ?? 'CLAMP BERTH'} · CLAMPS MADE FAST · UMBILICALS CONNECTED`, cls: 'ok' });
     this.lock.target = null;
     this.turrets.recall(this.player);
@@ -1128,6 +1159,17 @@ export class FlightScene implements GameScene, FlightHostScene {
    * at `hull` (0..1) and open the dock screen.
    */
   berthAt(stationId: string, hull = 1): boolean {
+    if (this.ports.markets().some((p) => p.id === stationId)) {
+      this.docking.reset();
+      this.dockScreen.close();
+      this.cinema.hide();
+      this.quiet();
+      const p = this.player;
+      p.alive = true;
+      p.hull = Math.max(0.05, Math.min(1, hull)) * p.hullMax;
+      p.shield = p.shieldMax;
+      return this.ports.berthAt(stationId);
+    }
     const owner = [...this.universe.systems.values()].find((s) => s.stations.some((st) => st.id === stationId));
     if (!owner) return false;
     this.docking.reset();
