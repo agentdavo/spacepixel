@@ -39,7 +39,7 @@ import { CombatHud } from '@/ui/CombatHud';
  *                   escort) · structural (the spine snaps, two burning halves
  *                   spin apart) · bridge (she strikes: the whole hull dark and
  *                   drifting) · hull (the rolling chain, then three sections).
- *                   &t=S seconds after the death at capture (default per path;
+ *                   &t=S (or &kt=S, for record.mjs which owns &t) seconds after the death at capture (default per path;
  *                   under 0.7 the death plays live, else it happens in the
  *                   fast-forward and the wreck burns live); &ship=<id>
  *                   (default choir-cathedral)
@@ -127,7 +127,7 @@ export class CombatTestScene implements GameScene {
     else if (this.stage === 'smoke') pre = this.setupSmoke();
     else if (this.stage === 'kill') {
       const path = (['reactor', 'structural', 'bridge', 'hull'] as const).find((x) => x === q.get('path')) ?? 'reactor';
-      pre = this.setupKill(path, Number(q.get('t') ?? KILL_T[path]), q.get('ship') ?? 'choir-cathedral');
+      pre = this.setupKill(path, Number(q.get('kt') ?? q.get('t') ?? KILL_T[path]), q.get('ship') ?? 'choir-cathedral');
     } else if (this.stage === 'impacts') pre = this.setupImpacts(q.get('side') ?? 'hull', Number(q.get('after') ?? 0.1), q.get('ship') ?? 'bb-indomitable', (q.get('faction') ?? 'concord') as FactionId);
     else pre = this.setupWeapons();
 
