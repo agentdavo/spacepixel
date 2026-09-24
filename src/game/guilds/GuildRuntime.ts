@@ -259,12 +259,12 @@ export class GuildRuntime {
       s.berthAt(outpostStationId(site.id), 0.8);
       return;
     }
-    // Fly past it: 2.6 km off its quarter, the hulk filling the right of frame.
+    // Fly past it on the bay side, 3 km out: the hulk (or the approach corridor) right of frame.
     const c = new Vector3(...site.pos).add(SYSTEM_OFFSET);
     const ax = new Vector3(...site.axis);
     const side = new Vector3(0, 1, 0).cross(ax).normalize();
-    const pos = c.clone().addScaledVector(ax, 2400).addScaledVector(side, -1500).add(new Vector3(0, 450, 0));
-    const aim = c.clone().addScaledVector(side, -700);
+    const pos = c.clone().addScaledVector(ax, 3000).addScaledVector(side, -1300).add(new Vector3(0, 380, 0));
+    const aim = c.clone().addScaledVector(side, -900).addScaledVector(ax, 400);
     s.placePlayer(pos, aim.sub(pos).normalize(), 40);
   }
 }

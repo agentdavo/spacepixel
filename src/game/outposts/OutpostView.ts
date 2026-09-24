@@ -1,4 +1,4 @@
-import { Color, Group, Matrix4, Mesh, Quaternion, Vector3, type BufferGeometry, type Material } from 'three';
+import { Color, Group, Matrix4, Mesh, Quaternion, Vector3, type BufferGeometry, type Material, type Object3D } from 'three';
 import { buildShip, type ShipModel } from '@/assets/ShipBuilder';
 import { stationBlueprint } from '@/assets/blueprints/stations';
 import { cylinder, box } from '@/assets/HullKit';
@@ -75,6 +75,11 @@ export class OutpostView {
       this.hulk = model;
       this.mats.push(ownHullMaterial(model.meshes, { ramp: 'dramatic', rimWidth: 0.6, haze: 0.6, inkId: 7700, weather: 1, weatherScale: 1 / 160 }));
       model.setChannel('spin', (look.seed % 97) / 97);
+      // No ring yet: it is refitted and spun up at stage 2.
+      const ring = model.articulations.get('spin');
+      if (ring) ring.node.visible = false;
+      // The dead hulk hangs askew; sealed, she is squared to her Lantern.
+      if (look.stage === 0) this.base.multiply(new Quaternion().setFromAxisAngle(new Vector3(0.6, 0.2, 0.77).normalize(), 0.55));
       this.group.position.copy(look.center);
       this.group.quaternion.copy(this.base);
       this.group.add(model.root);
@@ -204,7 +209,8 @@ function hubPoints(model: ShipModel, n = 18): Vector3[] {
   const out: Vector3[] = [];
   model.root.updateMatrixWorld(true);
   const inv = new Matrix4().copy(model.root.matrixWorld).invert();
-  const meshes = model.meshes.filter((m) => m.geometry.getAttribute('position'));
+  const shown = (o: Object3D | null): boolean => !o || (o.visible && shown(o.parent));
+  const meshes = model.meshes.filter((m) => m.geometry.getAttribute('position') && shown(m));
   let total = 0;
   for (const m of meshes) total += m.geometry.getAttribute('position').count;
   if (!total) return [new Vector3()];
