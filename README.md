@@ -302,6 +302,76 @@ Captures: `?scene=flight&dock=docked&station=meridian-bastion-2&docktab=shipyard
 ![Resolute, turrets free](docs/screenshots/outfit-resolute-turrets.jpg)
 ![Valiant from the bridge](docs/screenshots/outfit-valiant-bridge.jpg)
 
+## Guilds, arcs & outposts
+
+Five guilds out of the series bible keep halls around the Reach. Docked at a
+hall, tab **GUILD HALL**: the master (at the seat) or quartermaster on a CRT
+portrait, a voiced, subtitled greeting that knows your title, your rank on the
+guild's ladder and the merit bar to the next, dues, and four panels — **GUILD
+WORK**, **QUARTERMASTER**, **ARC**, **OUTPOST** (←→ switches).
+
+| Guild | Seat · halls | Ladder (ranks 1–6) | Rivals |
+|---|---|---|---|
+| **Order of the Keeping** — engine-wardens: relics, repair | Graveyard Breakers (Anchorage) · Anchorage Fleet Yards, Directorate breakers' yards | the Seven Keepings: Postulant of the Seal → Keeper of the Feed → Fire-Warden → Cold-Warden → Warden of the Old Words → Sealed Keeper | neutral-ish (wary of the Houses) |
+| **Office of Continuity** — couriers, audits, spying on your own side | Meridian Lantern Watch · Null Picket, Directorate bastions | Stringer → Courier of Record → Field Auditor → Case Officer → Controller → Principal | the clans, the Houses |
+| **Board of Allocation** — convoys, Ebon quotas | Castellan Highport (the Counting House) · Tey Refinery, Directorate refineries and orbital ports | Tally-Hand → Consignment Officer → Convoy Warden → Quota-Master → Deputy Allocator → Allocator of the Schedule | the Houses, the clans (wary) |
+| **Rustwake clans** — salvage, smuggling, raids; clan marks | The Moot-Hold · clan free ports and breakers | Hullrat → First Mark → Second Mark → Haul-Captain → Moot-Voice → Ember-Chief | the Office |
+| **Ascendant Houses of Hesper** — the Choir's honour path | The Spire Highport · Foundry-Garden Exchange, Hegemony orbital ports | Witnessed Guest → Postulant of the Measure → Cantor of the Lesser / Greater Measure → Knight-Cantor → Ascendant | the Office, the Board |
+
+**Merit** comes from guild work — the contract generator's kinds, re-voiced
+by the quartermaster, a little better paid, +24…70 merit each (the clans pay
+half the fee in Ebon grams) — and arc steps; a rank-up is ~45 minutes of
+guild work (ranks at 100 / 260 / 480 / 760 / 1100 merit), conferred in the
+hall with a line from the litany. Ranks also want standing with the guild's
+faction; ranks 5–6 need the guild's arc behind you and are **exclusive** (one
+guild only). Working for a rival drains merit there (Continuity ↔ clans
+50 %, Houses ↔ Continuity 50 %, Houses ↔ Board 35 %, Board ↔ clans 20 %,
+Houses ↔ Keeping 10 %); a guild whose merit you drive below zero expels you,
+and seniors (rank 4) of the Office are refused by the Moot and the Houses.
+Rank-ups cost standing with the guild's enemies. **Dues** fall due every two
+hours of world time (shares × rank, or one period in kind: a crate of spares,
+ten grams to the Moot, choir-glass for the Houses); two periods behind costs
+10 % merit a period, four expel you. Leaving is allowed (the Keeping calls it
+the Seventh Keeping); the expelled don't come back. **Rewards:** relic-grade
+**Mk V** quartermaster stock, rank-locked and discounted 5–25 % by rank,
+fitted on the spot (Sealed Heart reactor, Litany Ward, Relic Drive; Courier
+Drive, Auditor's Needle, Quiet Rail; Allocation Hold, Quota Plate; Clan
+Harpoon, Ember Scrap Pair, Graveyard Hulk Drive, Breakers' Plate; Chord of the
+House, Choral Ward, House Harmonic Core), arc access, and a title NPCs use.
+
+**Arcs** — four hand-written missions per guild, gated by rank and campaign
+episode, flown like contracts (spawns, set pieces, escorts, dwell zones,
+voiced chatter) and settled at the hall. Each finale ends in a choice made in
+the hall that writes a fact the world simulation, NPC arcs and rivals read:
+
+| Guild | Steps | The choice (fact) |
+|---|---|---|
+| Keeping | *The Seal Holds* (a school tender's sealed core from the Graveyard) · *The Fire Is Fed* (a stalled warden barge relit by litany) · *The Old Words* (dead cores in Lysowick recite a Schedule line) · *The Sixth Keeping* (the core wakes at the dead ring and asks for a destination) | seal it in the Cloister, or give it to the Office to be opened (`keeping.core`) |
+| Continuity | *Routine Traffic* (a dead drop and a frightened informant) · *Spying on Our Own* (a Board tender meets a Treasury tender inside the Meridian Lantern) · *The Deserter's Ledger* (Paymaster Crowe and the Board's books) · *Engagement 114* (the Choir arrives at the Null exactly on schedule) | file it, or leak it on channel nine (`continuity.ledger`, `schedule.leaked`) |
+| Board | *Every Gram Accounted* (a 40 kg Ebon tanker to the Lantern) · *Short Weight* (three "evaporated" flasks in the Belt) · *The Ration Line* (hold the Lysowick depot) · *Quota Night* (the quota's buyer flies Hegemony colours) | deliver the quota, or divert it to Anchorage's ration line (`allocation.quota`, `anchorage.fed`) |
+| Clans | *Hullrat's Errand* (beat the Breakers to a singing drive crystal) · *Haul-Song* (a tender past a customs picket) · *The Outlaw Queen* (Ottoline Gutter-Crown's court) · *The Ember's Last Skim* (guard the seam through a Treasury raid) | shout for Clan Tey or the Graveyard Breakers (`rustwake.seam`) |
+| Houses | *To Be Witnessed* (a pilgrim-barge to the gardens) · *Unwitnessed* (Ismene, who stopped singing) · *The Lesser Measure* (fly with a Choir Measure against Directorate Kestrels) · *What Is Lifted* (the Observance, broken by a provocateur) | take the Oath of House Casimir — defection (`houses.oath`, `player.defected`) — or stay unsworn |
+
+**Outposts** — at rank 3 in any guild, claim a dead hulk in a quiet system
+(2,500 sh) and restore it stage by stage with market goods, salvage and
+shares, delivered at any hall of your guild or at the outpost: **sealed**
+(running lights, tumble stopped · storage locker) → **ring spun, bay open**
+(dockable through the normal Docking system · repair) → **market deck,
+hangar racks** → **guild hall annex** (the guild's banner lights; the GUILD
+HALL tab opens there) → **guns on the rim**. Once the bay is open raiders
+come every hour or two of world time: a defence contract lands on your book —
+fly it or the hub is holed (services offline until patched); the rim guns
+hold two raids in three without you.
+
+Everything lives in the shared world state (`guild.<id>.merit / .rank /
+.title`, `arc.<guild>.<n>`, the choice facts, `outpost.*`; events scoped
+`guild:<id>` / `station:outpost-<site>`). Pure + tested:
+`src/game/guilds/`, `src/game/outposts/outposts.ts`, `tests/guilds.test.ts`
+(every arc mission is flown end to end in the real CampaignRunner against the
+seed-1994 Reach). Captures:
+`?scene=flight&dock=docked&station=anchorage-salvage-1&docktab=guild&guild=keeping:3[:merit][&gpanel=work|qm|arc|outpost][&choice=1]`,
+`?scene=flight&guild=keeping:3&outpost=<stage>[&osite=<system>][&ophase=docked]`.
+
 ## Scenes (`?scene=`)
 
 `flight` (default game) · `showcase` · `hangar` (model sheets) · `paint`

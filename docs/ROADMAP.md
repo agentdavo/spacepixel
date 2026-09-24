@@ -137,9 +137,9 @@ modifiers, an event log), is read and written by everything below.
 
 | # | Milestone | Pass/fail | Status |
 |---|---|---|---|
-| 1 | Guilds: Order of the Keeping, Office of Continuity, Board of Allocation, Rustwake clans, Ascendant Houses — halls, ranks, quartermasters, guild contracts | a rank-up in ~45 min of guild work | 🔧 |
-| 2 | Guild arc missions (hand-written, 3–5 per guild) and conflicting loyalties | arcs complete end to end | 🔧 |
-| 3 | Outposts: restore a hulk as your guild's base | build → upgrade → defend | 🔧 |
+| 1 | Guilds: Order of the Keeping, Office of Continuity, Board of Allocation, Rustwake clans, Ascendant Houses — halls, ranks, quartermasters, guild contracts | a rank-up in ~45 min of guild work | ✅ `src/game/guilds`, GUILD HALL dock tab, Mk V quartermaster stock, conflicts, dues (`tests/guilds.test.ts`) |
+| 2 | Guild arc missions (hand-written, 3–5 per guild) and conflicting loyalties | arcs complete end to end | ✅ 20 missions, each flown end to end in the runner; five finale choices write world facts |
+| 3 | Outposts: restore a hulk as your guild's base | build → upgrade → defend | ✅ `src/game/outposts`: six stages, dockable from stage 2, raids as defence contracts |
 | 4 | World state driven by story flags and player actions: prices, traffic, patrols, station attitude | effects visible within one session | 🔧 |
 | 5 | The Schedule on the star map: fixed engagements to fly or break | breaking one has consequences | 🔧 |
 | 6 | The Signal countdown between chapters | visible, advances with the story | 🔧 |
