@@ -220,7 +220,7 @@ export class GuildRuntime {
     if (gq) {
       let w: WorldState = world().state;
       for (const part of gq.split(',')) {
-        const [id, rk, mr] = part.split(':');
+        const [id, rk, mr] = part.split(/[:.]/); // ':' or '.' (screenshot specs split on ':')
         if (!(id in GUILDS)) continue;
         const g = id as GuildId;
         const rank = Math.max(1, Math.min(6, Number(rk) || 1));

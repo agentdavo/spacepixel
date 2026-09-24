@@ -16,7 +16,7 @@
 .gh .err { color: #ff5f7a; }
 
 /* ── the hall column ── */
-.gh-hall { display: flex; flex-direction: column; gap: 9px; min-height: 0; overflow: auto; padding-right: 4px; }
+.gh-hall { display: flex; flex-direction: column; gap: 7px; min-height: 0; overflow: auto; padding-right: 4px; }
 .gh-head { position: relative; padding: 2px 0 8px; border-bottom: 1px solid color-mix(in srgb, var(--gc) 35%, transparent); }
 .gh-stripe { width: 170px; height: 6px; margin-bottom: 7px; background: repeating-linear-gradient(90deg, var(--gc) 0 22px, transparent 22px 28px, #ff7a1c 28px 40px, transparent 40px 46px); }
 .gh-head small { display: block; font-size: 10px; letter-spacing: 0.3em; color: var(--gc); }
@@ -34,7 +34,7 @@
 .gh-head em { display: block; font-style: italic; font-size: 12px; color: rgba(230, 240, 255, 0.72); }
 .gh-master { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: end; }
 .gh-port {
-  width: clamp(96px, min(11vw, 18vh), 150px);
+  width: clamp(84px, min(10vw, 15vh), 150px);
   aspect-ratio: 1;
   border: 2px solid var(--gc);
   box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.6), 0 0 22px color-mix(in srgb, var(--gc) 25%, transparent);
@@ -45,7 +45,7 @@
 .gh-id small { display: block; font-size: 10px; letter-spacing: 0.3em; color: var(--gc); }
 .gh-id b { display: block; font-family: var(--font-display); font-weight: 800; font-size: clamp(15px, 1.4vw, 20px); color: #fff; letter-spacing: 0.03em; }
 .gh-id span { display: block; font-size: 11.5px; color: rgba(210, 255, 230, 0.75); line-height: 1.3; }
-.gh-subs { min-height: 48px; }
+.gh-subs { min-height: 30px; }
 .gh-rank { padding: 7px 9px; background: rgba(0, 16, 10, 0.5); border: 1px solid color-mix(in srgb, var(--gc) 30%, transparent); }
 .gh-rank .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .gh-rank .row b { font-family: var(--font-display); font-size: 14px; letter-spacing: 0.06em; color: #fff; }
@@ -55,8 +55,11 @@
 .gh-rank .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--gc), #fff); box-shadow: 0 0 10px var(--gc); }
 .gh-rank .line { margin-top: 5px; font-size: 11.5px; font-style: italic; color: rgba(230, 240, 255, 0.78); line-height: 1.4; }
 .gh-ladder { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.gh-ladder li, .gh-stages li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 0 8px; padding: 3px 6px; font-size: 11px; color: rgba(210, 255, 230, 0.5); border-left: 2px solid transparent; }
-.gh-ladder li em, .gh-stages li em { grid-row: span 2; font-style: normal; font-family: var(--font-display); font-weight: 800; font-size: 15px; color: rgba(255, 255, 255, 0.25); }
+.gh-ladder li { display: grid; grid-template-columns: 16px auto minmax(0, 1fr); gap: 0 8px; align-items: baseline; padding: 1px 6px; font-size: 11px; color: rgba(210, 255, 230, 0.5); border-left: 2px solid transparent; }
+.gh-ladder li span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gh-ladder li em { font-style: normal; font-family: var(--font-display); font-weight: 800; font-size: 12px; color: rgba(255, 255, 255, 0.25); }
+.gh-stages li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 0 8px; padding: 3px 6px; font-size: 11px; color: rgba(210, 255, 230, 0.5); border-left: 2px solid transparent; }
+.gh-stages li em { grid-row: span 2; font-style: normal; font-family: var(--font-display); font-weight: 800; font-size: 15px; color: rgba(255, 255, 255, 0.25); }
 .gh-ladder li b, .gh-stages li b { font-weight: normal; color: rgba(255, 255, 255, 0.6); letter-spacing: 0.04em; }
 .gh-ladder li span, .gh-stages li span { font-size: 10px; letter-spacing: 0.08em; }
 .gh-ladder li.past b, .gh-stages li.past b { color: rgba(255, 255, 255, 0.8); }

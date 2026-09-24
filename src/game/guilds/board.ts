@@ -51,31 +51,26 @@ export function workMerit(kind: ContractKind, tier: Tier): number {
 }
 
 /** Guild voices: how the quartermaster opens and closes a brief. */
-const VOICE: Record<GuildId, { open: string[]; close: string[]; title: Partial<Record<ContractKind, string>> }> = {
+const VOICE: Record<GuildId, { open: string[]; close: string[] }> = {
   keeping: {
     open: ['Chapter-house tasking. Count the Keepings before you light.', 'The wardens ask, pilot. They do not order. They rarely need to.'],
     close: ['Lit, and go.', 'What works is kept. Bring it back working.'],
-    title: { salvage: 'Recover a sealed core', courier: 'Carry a blessed core', patrol: 'Walk the wardens’ beat', escort: 'Guard a warden barge' },
   },
   continuity: {
     open: ['Office of Continuity. Purely routine.', 'This conversation is not taking place. The fee, however, is real.'],
     close: ['Everything continues. Everything is recorded.', 'You were never here. Sign on your way out.'],
-    title: { courier: 'Continuity post', recon: 'Quiet eyes', bounty: 'Close a file', escort: 'See a witness home' },
   },
   allocation: {
     open: ['By allocation of the Board:', 'The quota is set. The quota is always set. You make it true.'],
     close: ['Every gram accounted.', 'Expenditure within schedule, if you please.'],
-    title: { haul: 'Quota consignment', escort: 'Convoy duty', courier: 'Allocation dispatch', patrol: 'Lane audit' },
   },
   rustwake: {
     open: ['Moot business, flyer. Pay’s half in shares, half in grams.', 'Word from the clans, and the clans pay in gas.'],
     close: ['Nothing in the black is ever truly lost.', 'Do it clean and the Moot remembers your paint.'],
-    title: { salvage: 'Clan salvage', escort: 'Run the lane', bounty: 'Moot justice', haul: 'Clan haul' },
   },
   houses: {
     open: ['(sung) Be witnessed. The Houses ask a small work of you.', 'The Houses do not hire, pilot. They extend an honour. It happens to pay.'],
     close: ['Ascend.', 'Be witnessed — by us, and only by us.'],
-    title: { escort: 'Guard a House barge', bounty: 'End an unwitnessing', recon: 'Witness for the House', patrol: 'Walk the Measure’s line' },
   },
 };
 
@@ -123,7 +118,7 @@ export function dress(k: Contract, gid: GuildId, rnd: () => number = Math.random
     guild: gid,
     merit,
     client: g.quartermaster,
-    title: `${v.title[k.kind] ?? g.short.charAt(0) + g.short.slice(1).toLowerCase()} — ${k.title}`,
+    title: `${g.short.charAt(0) + g.short.slice(1).toLowerCase()} · ${k.title}`,
     brief: `${pick(v.open)}\n\n${body}\n\n${pick(v.close)}`,
     // Guild rates: a little better than the open board.
     reward: Math.round((k.reward * 1.1) / 50) * 50,
