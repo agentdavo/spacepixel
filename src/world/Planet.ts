@@ -110,7 +110,11 @@ const _c = new Vector3();
 const _e = new Vector3();
 const _px = new Vector2();
 
-const LOD_OFF = typeof location !== 'undefined' && new URLSearchParams(location.search).get('planetlod') === '0';
+/** `?planetlod=0|1|2` pins every body at one detail level (A/B: 0 = full detail, the pre-LOD shader). */
+const LOD_PIN: PlanetLod | null = (() => {
+  const v = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('planetlod') : null;
+  return v === '0' || v === '1' || v === '2' ? (Number(v) as PlanetLod) : null;
+})();
 
 /**
  * A painted body: the surface shader (`planets/PlanetMaterial.ts` — banded
@@ -128,7 +132,7 @@ export class Planet {
   /** Current surface detail level (0 full … 2 far impostor) and the disc radius it was picked at (px). */
   lod: PlanetLod = 0;
   pixelRadius = Infinity;
-  /** Force a detail level (the renderer re-picks it every frame unless `?planetlod=0`). */
+  /** Force a detail level (the renderer re-picks it every frame unless `?planetlod=` pins one). */
   readonly setLod: (lod: PlanetLod) => void;
 
   constructor(preset: PlanetPreset = PLANETS.castellan, opts: { segments?: number } = {}) {
@@ -165,7 +169,8 @@ export class Planet {
     };
     // Measured where it is drawn (every scene, every camera); the swap shows from the next frame.
     const lodCheck = (renderer: { getDrawingBufferSize?: (v: Vector2) => Vector2 }, camera: Camera) => {
-      if (LOD_OFF || !(camera as PerspectiveCamera).isPerspectiveCamera) return;
+      if (LOD_PIN !== null) return this.setLod(LOD_PIN);
+      if (!(camera as PerspectiveCamera).isPerspectiveCamera) return;
       const cam = camera as PerspectiveCamera;
       body.getWorldPosition(_c);
       cam.getWorldPosition(_e);
