@@ -9,7 +9,10 @@
  *
  * Frames are written as <dir>/f_<index>.jpg with index = round(time·fps), so
  * several processes can render disjoint time ranges into the same directory.
- * Encode with ffmpeg afterwards (see scripts/make-video.sh).
+ * Encode with ffmpeg afterwards (scripts/make-video.mjs). On a shared machine,
+ * VITE_CACHE_DIR=<dir> gives the render its own Vite dep-optimizer cache (no
+ * "Outdated Optimize Dep" reloads when other dev servers re-optimize); start
+ * parallel ranges a minute apart so the first one fills it.
  */
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
@@ -27,7 +30,7 @@ const port = Number(opt('port', 5270));
 const extra = opt('query', '');
 mkdirSync(out, { recursive: true });
 
-const server = await createServer({ server: { port, host: '127.0.0.1', strictPort: true, hmr: false }, logLevel: 'warn' });
+const server = await createServer({ cacheDir: process.env.VITE_CACHE_DIR || undefined, server: { port, host: '127.0.0.1', strictPort: true, hmr: false }, logLevel: 'warn' });
 await server.listen();
 const browser = await chromium.launch({
   args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--use-angle=swiftshader', '--ignore-gpu-blocklist'],
