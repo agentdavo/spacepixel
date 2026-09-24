@@ -16,7 +16,8 @@
     "flow-check": "node scripts/flow-check.mjs",
     "econ-sim": "node scripts/econ-sim.mjs",
     "record": "node scripts/record.mjs",
-    "make-video": "node scripts/make-video.mjs"
+    "make-video": "node scripts/make-video.mjs",
+    "balance": "node scripts/balance.mjs"
   },
   "dependencies": {
     "three": "^0.186.0"

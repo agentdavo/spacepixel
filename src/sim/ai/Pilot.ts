@@ -308,8 +308,8 @@ export function noseAngleTo(f: FlightModel, point: Vector3): number {
  * Trigger discipline: fire when the lead point sits inside a cone sized to the
  * target (plus `slack` radians of pilot sloppiness) and the target is in range.
  */
-export function inFiringSolution(f: FlightModel, aimPoint: Vector3, dist: number, targetRadius: number, slack: number): boolean {
-  if (dist > GUN.range) return false;
+export function inFiringSolution(f: FlightModel, aimPoint: Vector3, dist: number, targetRadius: number, slack: number, range = GUN.range): boolean {
+  if (dist > range) return false;
   const cone = Math.atan2(targetRadius * 1.1, Math.max(dist, 1)) + slack;
   return noseAngleTo(f, aimPoint) < cone;
 }

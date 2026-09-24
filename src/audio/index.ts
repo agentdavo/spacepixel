@@ -24,10 +24,12 @@ export interface AudioShip {
 }
 
 export interface AudioWeaponEvent {
-  readonly kind: 'hit' | 'shield' | 'kill' | 'fire' | 'beam-hit';
+  readonly kind: 'hit' | 'shield' | 'kill' | 'fire' | 'beam-hit' | 'subsystem' | 'shield-down' | 'shield-up';
   readonly position: Vec3Like;
   readonly ship: AudioShip | null;
   readonly shooter: AudioShip | null;
+  /** Weapon family voice (src/sim/Loadouts.ts GunSpec): 'laser' | 'cannon', with a faction timbre. */
+  readonly gun?: { readonly sfx: 'laser' | 'cannon'; readonly timbre: string } | null;
 }
 
 export interface AudioMissileEvent {
@@ -100,6 +102,12 @@ class TopK {
 function factionOf(s: AudioShip | null): Faction {
   const f = s?.faction;
   return f === 'choir' || f === 'rustwake' ? f : 'concord';
+}
+
+/** Gun timbre, else the shooter's faction. */
+function timbreOf(ev: AudioWeaponEvent): Faction {
+  const t = ev.gun?.timbre;
+  return t === 'choir' || t === 'rustwake' || t === 'concord' ? t : factionOf(ev.shooter);
 }
 
 export class GameAudio {
@@ -230,7 +238,7 @@ export class GameAudio {
             if (now - this.lastPlayerFire < 0.03) break;
             this.lastPlayerFire = now;
             this.fireSide = -this.fireSide;
-            sfx.playRaw('laser', 0.75, 0.12 * this.fireSide, factionOf(ev.shooter), 5);
+            sfx.playRaw(ev.gun?.sfx ?? 'laser', 0.75, 0.12 * this.fireSide, timbreOf(ev), 5);
           } else fire.consider(i, sfx.audibility('laser', ev.position, eye));
           break;
         case 'hit':
@@ -246,6 +254,12 @@ export class GameAudio {
           if (now - this.lastBeam < 0.09) break;
           this.lastBeam = now;
           sfx.playAtRaw('beamHit', ev.position, eye, 0.8);
+          break;
+        case 'subsystem':
+          sfx.playAtRaw('explosionLarge', ev.position, eye, 0.7);
+          break;
+        case 'shield-down':
+          sfx.playAtRaw('shieldDown', ev.position, eye, ev.ship?.isPlayer ? 1 : 0.8);
           break;
         case 'kill':
           if (ev.ship?.isPlayer) sfx.playAtRaw('explosionSmall', ev.position, eye, 1.2, 'concord', 8);
@@ -273,7 +287,7 @@ export class GameAudio {
       const i = fire.idx[k];
       if (i < 0) continue;
       this.lastRemoteFire = now;
-      sfx.playAtRaw('laser', events[i].position, eye, 0.6, factionOf(events[i].shooter));
+      sfx.playAtRaw(events[i].gun?.sfx ?? 'laser', events[i].position, eye, 0.6, timbreOf(events[i]));
     }
   }
 

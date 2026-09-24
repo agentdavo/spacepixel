@@ -1,6 +1,7 @@
 import { Vector3 } from 'three';
 import type { Fleet, ShipEntity } from '../Fleet';
 import { GUN } from './Pilot';
+import { leadSpeedOf } from '../Combat';
 
 /**
  * Minimal stand-in guns so the AI can be scored (headless sim) and seen
@@ -87,9 +88,11 @@ export class DebugGuns {
     const f = s.flight;
     f.forward(_fwd);
     b.pos.copy(f.position).addScaledVector(_fwd, s.radius + 2);
-    b.vel.copy(_fwd).multiplyScalar(GUN.boltSpeed);
+    // Same muzzle speed the AI leads for (the ship's selected gun).
+    const speed = leadSpeedOf(s);
+    b.vel.copy(_fwd).multiplyScalar(speed);
     if (GUN.inheritVelocity) b.vel.add(f.velocity);
-    b.life = (GUN.range / GUN.boltSpeed) * 1.15;
+    b.life = (GUN.range / speed) * 1.15;
     b.owner = s;
     b.active = true;
     this.shots++;

@@ -3,7 +3,7 @@ import type { FlightModel } from '@/sim/FlightModel';
 import type { WorldSpace } from '@/core/WorldSpace';
 import { hostile as isHostile, type Fleet, type ShipEntity } from '@/sim/Fleet';
 import type { LockState } from '@/sim/Missiles';
-import { LASER } from '@/sim/Weapons';
+import { leadSpeedOf } from '@/sim/Combat';
 import type { MissionRunner } from '@/game/Missions';
 
 /**
@@ -146,10 +146,10 @@ export class FlightHud {
           }
           c.stroke();
         }
-        // Gun lead pip: where to aim so 1600 m/s bolts intercept.
+        // Gun lead pip: where to aim so the selected gun's bolts intercept.
         _r.subVectors(s.flight.position, player.flight.position);
         _vt.subVectors(s.flight.velocity, player.flight.velocity);
-        const t = intercept(_r, _vt, LASER.speed);
+        const t = intercept(_r, _vt, leadSpeedOf(player));
         if (t > 0) {
           const lead = this.project(_d.copy(player.flight.position).add(_r).addScaledVector(_vt, t), world, cam);
           if (lead) {

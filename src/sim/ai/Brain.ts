@@ -1,6 +1,7 @@
 import { Vector3 } from 'three';
 import { hostile, type ShipEntity } from '../Fleet';
 import { GUN, inFiringSolution, leadPoint, noseAngleTo, setSpeed, steerToward } from './Pilot';
+import { gunOf, gunRange, leadSpeedOf } from '../Combat';
 import { avoidance, type Obstacle } from './Avoid';
 import { findChaser, flyFormation } from './Squadron';
 import { isCapital, rand, setManeuver, type Brain } from './state';
@@ -284,7 +285,11 @@ function attack(s: ShipEntity, b: Brain, ships: readonly ShipEntity[], dt: numbe
   _los.subVectors(b.pPos, f.position);
   const d = Math.max(1, _los.length());
 
-  const tof = leadPoint(f.position, f.velocity, b.pPos, b.pVel, p.skill > 0.5 ? _tmp.copy(b.pAcc).multiplyScalar(p.skill) : null, b.aim);
+  // Lead for the gun actually selected (hymn pulses are faster than autocannon slugs).
+  const gun = gunOf(s);
+  const boltSpeed = leadSpeedOf(s);
+  const range = gun ? Math.min(GUN.range, gunRange(gun)) : GUN.range;
+  const tof = leadPoint(f.position, f.velocity, b.pPos, b.pVel, p.skill > 0.5 ? _tmp.copy(b.pAcc).multiplyScalar(p.skill) : null, b.aim, boltSpeed);
   // Beyond gun range, lag toward pure pursuit so we don't cut across its bow early.
   if (tof < 0 || d > GUN.range * 1.4) b.aim.copy(b.pPos);
   // Pilot sloppiness: a smooth wobble on the aim point (even aces tremble a
@@ -317,7 +322,7 @@ function attack(s: ShipEntity, b: Brain, ships: readonly ShipEntity[], dt: numbe
   setSpeed(s.controls, f, spd, d > 900);
 
   const slack = (1 - p.skill) * 0.012;
-  if (urgency < 0.5 && inFiringSolution(f, b.aim, d, t.radius, slack) && !friendlyInLine(s, d, ships)) s.controls.fire = true;
+  if (urgency < 0.5 && inFiringSolution(f, b.aim, d, t.radius, slack, range) && !friendlyInLine(s, d, ships)) s.controls.fire = true;
 }
 
 /** Roll so the target sits in the lift plane (for pulls in reversals). */

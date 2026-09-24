@@ -20,6 +20,8 @@ import { Rng, Smooth, adsr, driveCurve, mtof, perc, sweep } from './dsp';
 export type Faction = 'concord' | 'choir' | 'rustwake';
 export type SfxKind =
   | 'laser'
+  | 'cannon'
+  | 'shieldDown'
   | 'hullHit'
   | 'shieldHit'
   | 'beamHit'
@@ -71,6 +73,8 @@ interface KindSpec {
 
 const KIND: Record<SfxKind, KindSpec> = {
   laser: { dur: 0.5, prio: 2, ref: 60 },
+  cannon: { dur: 0.3, prio: 2, ref: 60 },
+  shieldDown: { dur: 0.9, prio: 5, ref: 300 },
   hullHit: { dur: 0.5, prio: 3, ref: 80 },
   shieldHit: { dur: 0.5, prio: 3, ref: 80 },
   beamHit: { dur: 0.2, prio: 2, ref: 120 },
@@ -246,6 +250,12 @@ export class Sfx {
       case 'laser':
         this.laser(slot, t, gain, faction, v);
         break;
+      case 'cannon':
+        this.cannon(slot, t, gain, faction, v);
+        break;
+      case 'shieldDown':
+        this.shieldDown(slot, t, gain, v);
+        break;
       case 'hullHit':
         this.hullHit(slot, t, gain, v, false);
         break;
@@ -419,6 +429,58 @@ export class Sfx {
       perc(ne.gain, t, 0.16 * g, 0.001, 0.02);
       n.connect(hp).connect(ne).connect(out);
     }
+  }
+
+  // ── kinetic guns ─────────────────────────────────────────────────────
+  /**
+   * Autocannon / scattergun / flak: a dry mechanical thump — short bandpassed
+   * noise crack over a pitched-down sine kick. Rustwake: lower, dirtier, with
+   * a rattle; Directorate: tight and clean.
+   */
+  private cannon(slot: VoiceSlot, t: number, g: number, faction: Faction, v: number): void {
+    const out = slot.input;
+    const rust = faction === 'rustwake';
+    const end = t + (rust ? 0.28 : 0.18);
+    const n = this.noise(slot, t, end);
+    const bp = this.filter('bandpass', (rust ? 900 : 1700) * v, rust ? 0.9 : 1.4);
+    sweep(bp.frequency, t, (rust ? 1300 : 2600) * v, (rust ? 380 : 700) * v, 0.08);
+    const ne = this.gain();
+    perc(ne.gain, t, (rust ? 0.34 : 0.28) * g, 0.001, rust ? 0.12 : 0.06);
+    n.connect(bp).connect(ne).connect(out);
+    const kick = this.osc(slot, 'sine', (rust ? 160 : 220) * v, t, end);
+    sweep(kick.frequency, t, (rust ? 160 : 220) * v, 55, rust ? 0.1 : 0.06);
+    const ke = this.gain();
+    perc(ke.gain, t, 0.4 * g, 0.001, rust ? 0.14 : 0.07);
+    kick.connect(ke).connect(out);
+    if (rust) {
+      // Loose bolts: a rattle chopped at 70 Hz through the waveshaper.
+      const r = this.osc(slot, 'square', 70, t, end);
+      const ws = this.ctx().createWaveShaper();
+      ws.curve = this.drive;
+      const re = this.gain();
+      perc(re.gain, t, 0.06 * g, 0.002, 0.16);
+      r.connect(ws).connect(re).connect(out);
+    }
+  }
+
+  /** A shield facing collapsing: glassy descending chord that breaks into noise. */
+  private shieldDown(slot: VoiceSlot, t: number, g: number, v: number): void {
+    const out = slot.input;
+    const end = t + 0.85;
+    const env = this.gain();
+    perc(env.gain, t, 0.22 * g, 0.004, 0.7);
+    for (const f of [2385, 1590, 1190]) {
+      const o = this.osc(slot, 'triangle', f * v, t, end);
+      sweep(o.frequency, t, f * v, f * v * 0.35, 0.7);
+      o.connect(env);
+    }
+    env.connect(out);
+    this.send(env, 0.6);
+    const n = this.noise(slot, t + 0.05, end);
+    const hp = this.filter('highpass', 3000);
+    const ne = this.gain();
+    perc(ne.gain, t + 0.05, 0.2 * g, 0.004, 0.45);
+    n.connect(hp).connect(ne).connect(out);
   }
 
   // ── impacts ──────────────────────────────────────────────────────────

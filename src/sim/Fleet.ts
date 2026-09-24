@@ -3,8 +3,10 @@ import type { ControlState } from '@/core/Input';
 import type { FactionId, Livery } from '@/assets/Blueprint';
 import type { ShipModel } from '@/assets/ShipBuilder';
 import { assets } from '@/assets/AssetLibrary';
-import { FlightModel, KESTREL_SPEC, type FlightSpec } from './FlightModel';
-import { shipyardFlightSpec } from '@/game/shipyard/flight';
+import { FlightModel } from './FlightModel';
+import { createCombat, damageShip, stepCombat, type CombatState } from './Combat';
+import type { DamageType } from './Loadouts';
+import type { HitResult, Subsystem } from './Damage';
 
 /**
  * Every ship in a battle — player, wingmen, bandits — is a ShipEntity driven
@@ -53,6 +55,22 @@ export interface ShipEntity {
   sweep: number;
   /** Story characters: damage can't take hull below 15% (the script decides). */
   plotArmour: boolean;
+  /** Stats, loadout, damage state (shield facings, subsystems, zones) — src/sim/Combat.ts. */
+  combat: CombatState;
+}
+
+/** Consequences of a hit that FX / audio / HUD care about (emitted through `Fleet.onEvent`). */
+export type HitEventKind = 'kill' | 'subsystem' | 'shield-down';
+
+/**
+ * Anything that can be shot down (heavy torpedoes). Registered by the
+ * missile system so gunfire and point defence can test against it.
+ */
+export interface Shootables {
+  /** Swept test of a hostile bolt; applies damage and returns true on a hit. */
+  shoot(ax: number, ay: number, az: number, dx: number, dy: number, dz: number, team: Team, damage: number): boolean;
+  /** Nearest live shootable hostile to `team` within `range` of `from`, or −1. Writes its position/velocity. */
+  nearestThreat(from: Vector3, team: Team, range: number, pos: Vector3, vel: Vector3): number;
 }
 
 export function emptyControls(): ControlState {
@@ -68,24 +86,6 @@ export function emptyControls(): ControlState {
   };
 }
 
-const SPECS: Record<string, FlightSpec> = {
-  'vf27-kestrel': KESTREL_SPEC,
-  'choir-cantor': { ...KESTREL_SPEC, maxSpeed: 235, boostSpeed: 440, pitchRate: 2.3, yawRate: 1.4, rollRate: 4.0 },
-};
-
-/** Capital ships: slow, stately, barely turn. */
-const CAPITAL_SPEC: FlightSpec = {
-  ...KESTREL_SPEC,
-  maxSpeed: 45,
-  boostSpeed: 60,
-  mainAccel: 6,
-  boostAccel: 8,
-  lateralAccel: 4,
-  pitchRate: 0.05,
-  yawRate: 0.05,
-  rollRate: 0.05,
-};
-
 const _m = new Matrix4();
 const _o = new Vector3();
 const _up = new Vector3(0, 1, 0);
@@ -93,19 +93,24 @@ const _up = new Vector3(0, 1, 0);
 export class Fleet {
   readonly ships: ShipEntity[] = [];
   private nextId = 1;
+  /** Hit consequences (kills, subsystems destroyed, shield facings down) — the weapons system listens. */
+  onEvent: ((kind: HitEventKind, ship: ShipEntity, point: Vector3, normal: Vector3, shooter: ShipEntity | null, sub: Subsystem | null, facing: number) => void) | null = null;
+  /** Shoot-down-able ordnance (set by Missiles). */
+  ordnance: Shootables | null = null;
 
   constructor(private root: Group) {}
 
   spawn(blueprintId: string, faction: FactionId, position: Vector3, facing: Vector3, opts: Partial<ShipEntity> = {}, livery?: Partial<Livery>): ShipEntity {
     const model = assets.ship(blueprintId, livery);
     this.root.add(model.root);
-    const flight = new FlightModel(SPECS[blueprintId] ?? shipyardFlightSpec(blueprintId, KESTREL_SPEC) ?? (model.radius > 200 ? CAPITAL_SPEC : KESTREL_SPEC));
+    const combat = createCombat(blueprintId, model, faction);
+    const flight = new FlightModel({ ...combat.baseSpec }); // own copy: damage scales it
     flight.position.copy(position);
     flight.orientation.setFromRotationMatrix(_m.lookAt(facing, _o.set(0, 0, 0), _up));
     flight.velocity.copy(facing).normalize().multiplyScalar(flight.spec.maxSpeed * 0.6);
-    const isCapital = model.radius > 200;
-    const hullMax = isCapital ? 20000 : 100;
-    const shieldMax = isCapital ? 8000 : 60;
+    const isCapital = model.radius > 200; // flight / AI / collision class (corvettes fly like big fighters)
+    const hullMax = combat.stats.hull;
+    const shieldMax = combat.stats.shield;
     const e: ShipEntity = {
       id: this.nextId++,
       name: `${model.blueprint.name}-${this.nextId}`,
@@ -126,6 +131,7 @@ export class Fleet {
       sinceHit: 99,
       sweep: 0.3,
       plotArmour: false,
+      combat,
       ...opts,
     };
     this.ships.push(e);
@@ -148,9 +154,9 @@ export class Fleet {
         s.model.setWingSweep(s.sweep);
         s.model.setChannel('radar', (this.clock * 0.15) % 1);
       }
+      stepCombat(s, dt);
       s.flight.step(s.controls, dt);
       s.sinceHit += dt;
-      if (s.sinceHit > 3 && s.shield < s.shieldMax) s.shield = Math.min(s.shieldMax, s.shield + s.shieldMax * 0.15 * dt);
       s.model.root.position.copy(s.flight.position);
       s.model.root.quaternion.copy(s.flight.orientation);
       s.model.setThrottle(s.flight.boosting ? 1.55 : 0.25 + s.flight.throttle * 0.9);
@@ -165,22 +171,32 @@ export class Fleet {
     return this.ships.filter((o) => o.alive && o.team === s.team && o !== s);
   }
 
-  /** Apply damage; shields absorb first. Returns true if this killed the ship. */
-  damage(s: ShipEntity, amount: number): boolean {
-    if (!s.alive) return false;
-    s.sinceHit = 0;
-    const absorbed = Math.min(s.shield, amount);
-    s.shield -= absorbed;
-    s.hull -= amount - absorbed;
-    if (s.plotArmour) s.hull = Math.max(s.hull, s.hullMax * 0.15);
-    if (s.hull <= 0) {
-      s.alive = false;
-      s.model.root.visible = false;
-      return true;
+  /** Untargeted damage (legacy / collisions); shields absorb first. Returns true if this killed the ship. */
+  damage(s: ShipEntity, amount: number, type: DamageType = 'laser'): boolean {
+    const r = this.hit(s, amount, type, null, null, null);
+    return r.killed;
+  }
+
+  /**
+   * Located damage: `point` (universe) picks the shield facing, subsystem or
+   * zone (see Damage.ts). Emits kill / subsystem / shield-down through
+   * `onEvent`. The result is shared scratch — read it immediately.
+   */
+  hit(s: ShipEntity, amount: number, type: DamageType, point: Vector3 | null, normal: Vector3 | null, shooter: ShipEntity | null): HitResult & { killed: boolean } {
+    const r = damageShip(s, amount, type, point);
+    const ev = this.onEvent;
+    if (ev) {
+      const p = point ?? s.flight.position;
+      const n = normal ?? _n.set(0, 1, 0);
+      if (r.facingCollapsed) ev('shield-down', s, p, n, shooter, null, r.facing);
+      if (r.subsystemDestroyed && r.subsystem) ev('subsystem', s, p, n, shooter, r.subsystem, r.facing);
+      if (r.killed) ev('kill', s, s.flight.position, n, shooter, null, -1);
     }
-    return false;
+    return r;
   }
 }
+
+const _n = new Vector3();
 
 export function faceAlong(q: Quaternion, dir: Vector3): Quaternion {
   return q.setFromRotationMatrix(_m.lookAt(dir, _o.set(0, 0, 0), _up));

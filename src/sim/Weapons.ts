@@ -1,30 +1,51 @@
 import { Vector3 } from 'three';
-import type { Fleet, ShipEntity, Team } from './Fleet';
+import type { Fleet, HitEventKind, ShipEntity, Team } from './Fleet';
 import type { FactionId } from '@/assets/Blueprint';
+import { GUNS, GUN_INDEX, GUN_LIST, type DamageType, type GunSpec } from './Loadouts';
+import type { Subsystem } from './Damage';
+import { chooseGun, createRayHit, cycleSubsystem, gunOf, raycastShip } from './Combat';
+
+export type { GunSpec } from './Loadouts';
+export { segmentSphere } from './Combat';
 
 /**
  * Milestone 10 — weapons simulation (no rendering here).
  *
  * Bolts: fixed pool of projectiles in flat Float64Arrays (universe space).
- * Each step they move and are tested as swept segments against every living
- * enemy ship's bounding sphere — exact enough at 1600 m/s, no tunnelling.
+ * Each step they move and are tested as swept segments against every enemy:
+ * fighters are spheres (their shield bubble), capitals are a shield shell
+ * (four facings) around a voxel hull (Combat.raycastShip) so hits land on the
+ * plating and route to the subsystem under them. Heavy torpedoes in the way
+ * can be shot down.
  *
- * Beams: continuous rays with a lifetime and damage-per-second, hit-tested
- * against spheres each step (capital lances, the Kestrel's charged cannon).
+ * Guns come from the ship's loadout (Loadouts.ts): lasers, autocannon, the
+ * Choir hymn pulse and beam-lance, the Rustwake scattergun. Damage types
+ * scale against shields and hull (Damage.ts).
+ *
+ * Beams: continuous rays with a lifetime and damage-per-second (capital
+ * lances, fighter beam-lances), hit-tested the same way each step.
  *
  * Results are pushed to `events` for FX, HUD and cameras to consume and
  * clear each frame. One array, read by whoever cares — no callbacks.
  */
 export const BOLT_CAPACITY = 4096;
 
+export type WeaponEventKind = 'hit' | 'shield' | 'kill' | 'fire' | 'beam-hit' | HitEventKind | 'shield-up';
+
 export interface WeaponEvent {
-  kind: 'hit' | 'shield' | 'kill' | 'fire' | 'beam-hit';
+  kind: WeaponEventKind;
   position: Vector3;
   /** Surface normal at impact (points out of the ship). */
   normal: Vector3;
   velocity: Vector3;
   ship: ShipEntity | null;
   shooter: ShipEntity | null;
+  /** Gun that fired / hit (fire, hit, shield); null for beams from capitals and hit consequences. */
+  gun: GunSpec | null;
+  /** Destroyed subsystem ('subsystem'). */
+  sub: Subsystem | null;
+  /** Capital shield facing (shield, shield-down, shield-up); −1 = fighter bubble / n/a. */
+  facing: number;
 }
 
 export interface Beam {
@@ -38,29 +59,29 @@ export interface Beam {
   life: number;
   maxLife: number;
   dps: number;
+  type: DamageType;
   faction: FactionId;
   team: Team;
   /** Where the beam currently terminates (hit point or full length). */
   end: Vector3;
   /** Track this ship (sweeping lance) instead of firing along the owner's nose. */
   aimTarget: ShipEntity | null;
+  /** Fired by a fighter gun (beam-lance). */
+  gun: GunSpec | null;
 }
 
-export interface GunSpec {
-  rate: number; // shots/s (alternating between sockets)
-  speed: number; // m/s muzzle velocity (added to ship velocity)
-  life: number; // s
-  damage: number;
-}
+/** The Directorate pulse laser (kept for callers that want "the" default gun). */
+export const LASER: GunSpec = GUNS.laser;
 
-export const LASER: GunSpec = { rate: 12, speed: 1600, life: 1.15, damage: 6 };
-
-const EVENT_POOL = 256;
+const EVENT_POOL = 384;
 const _a = new Vector3();
 const _b = new Vector3();
 const _d = new Vector3();
 const _c = new Vector3();
 const _f = new Vector3();
+const _s = new Vector3();
+const _u = new Vector3();
+const _hit = createRayHit();
 
 export class Weapons {
   // Bolt pool (structure of arrays).
@@ -72,8 +93,10 @@ export class Weapons {
   readonly vz = new Float32Array(BOLT_CAPACITY);
   readonly life = new Float32Array(BOLT_CAPACITY);
   readonly damage = new Float32Array(BOLT_CAPACITY);
-  readonly faction = new Uint8Array(BOLT_CAPACITY); // index into FACTION_INDEX (colour)
+  readonly faction = new Uint8Array(BOLT_CAPACITY); // index into FACTION_INDEX
   readonly team = new Uint8Array(BOLT_CAPACITY); // index into TEAM_INDEX (who it can hit)
+  /** Index into GUN_LIST: damage type, visual style, sound. */
+  readonly gun = new Uint8Array(BOLT_CAPACITY);
   readonly owner = new Int32Array(BOLT_CAPACITY);
   private head = 0;
 
@@ -82,15 +105,28 @@ export class Weapons {
   private eventPool: WeaponEvent[] = [];
   private cooldown = new Map<number, number>();
   private gunSide = new Map<number, number>();
+  private rng = 4242;
 
-  constructor(private fleet: Fleet) {
+  constructor(readonly fleet: Fleet) {
     for (let i = 0; i < EVENT_POOL; i++) {
-      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null });
+      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1 });
     }
+    fleet.onEvent = (kind, ship, point, normal, shooter, sub, facing) => {
+      const e = this.emit(kind, point, normal, ship.flight.velocity, ship, shooter);
+      if (e) {
+        e.sub = sub;
+        e.facing = facing;
+      }
+    };
   }
 
-  private emit(kind: WeaponEvent['kind'], pos: Vector3, normal: Vector3, vel: Vector3, ship: ShipEntity | null, shooter: ShipEntity | null): void {
-    if (this.events.length >= EVENT_POOL) return;
+  private rand(): number {
+    this.rng = (this.rng * 16807) % 2147483647;
+    return (this.rng - 1) / 2147483646;
+  }
+
+  private emit(kind: WeaponEventKind, pos: Vector3, normal: Vector3, vel: Vector3, ship: ShipEntity | null, shooter: ShipEntity | null, gun: GunSpec | null = null): WeaponEvent | null {
+    if (this.events.length >= EVENT_POOL) return null;
     const e = this.eventPool[this.events.length];
     e.kind = kind;
     e.position.copy(pos);
@@ -98,7 +134,11 @@ export class Weapons {
     e.velocity.copy(vel);
     e.ship = ship;
     e.shooter = shooter;
+    e.gun = gun;
+    e.sub = null;
+    e.facing = -1;
     this.events.push(e);
+    return e;
   }
 
   /** Universe position of a named socket on a ship. */
@@ -111,10 +151,22 @@ export class Weapons {
     return out.applyQuaternion(s.flight.orientation).add(s.flight.position);
   }
 
-  /** Fire the ship's guns if its controls say so and it's off cooldown. */
-  private fireGuns(s: ShipEntity, dt: number, gun: GunSpec): void {
+  /** Weapon-select edges (R guns · Y missiles · B subsystem) and the AI's gun choice. */
+  private arms(s: ShipEntity): void {
+    const c = s.controls;
+    const cs = s.combat;
+    if (c.cycleGun && cs.loadout.guns.length) cs.gun = (cs.gun + 1) % cs.loadout.guns.length;
+    if (c.cycleMissile && cs.loadout.missiles.length) cs.missile = (cs.missile + 1) % cs.loadout.missiles.length;
+    if (c.cycleSub) cycleSubsystem(s);
+    const auto = !s.isPlayer || (s.brain as { autopilot?: boolean } | null)?.autopilot === true;
+    if (auto && !cs.dmg.capital) chooseGun(s, s.target);
+  }
+
+  /** Fire the ship's selected gun if its controls say so and it's off cooldown. */
+  private fireGuns(s: ShipEntity, dt: number): void {
+    const gun = gunOf(s);
     const cd = (this.cooldown.get(s.id) ?? 0) - dt;
-    if (!s.controls.fire || cd > 0) {
+    if (!gun || !s.controls.fire || cd > 0) {
       this.cooldown.set(s.id, Math.max(cd, 0));
       return;
     }
@@ -125,13 +177,30 @@ export class Weapons {
     if (name) this.socketPosition(s, name, _a);
     else _a.copy(s.flight.position);
     s.flight.forward(_f);
-    _d.copy(_f).multiplyScalar(gun.speed).add(s.flight.velocity);
-    this.spawnBolt(_a, _d, gun.life, gun.damage, s);
-    this.emit('fire', _a, _f, _d, null, s);
+    if (gun.beam) {
+      const sock = ['lance', 'harp'].find((n) => s.model.sockets.has(n)) ?? name;
+      const b = this.fireBeam(s, sock, gun.beam.length, gun.beam.width, gun.beam.duration, gun.beam.dps, gun.type);
+      b.gun = gun;
+      this.emit('fire', _a, _f, s.flight.velocity, null, s, gun);
+      this.cooldown.set(s.id, Math.max(cd, 0) + 1 / gun.rate);
+      return;
+    }
+    const spread = gun.spread + s.combat.fx.gunSpread;
+    for (let k = 0; k < gun.pellets; k++) {
+      _u.copy(_f);
+      if (spread > 0) {
+        // Uniform-ish cone: two random perpendicular offsets.
+        _s.set(this.rand() - 0.5, this.rand() - 0.5, this.rand() - 0.5).cross(_f).normalize();
+        _u.addScaledVector(_s, Math.tan(spread) * Math.sqrt(this.rand())).normalize();
+      }
+      _d.copy(_u).multiplyScalar(gun.speed * (gun.pellets > 1 ? 0.94 + this.rand() * 0.12 : 1)).add(s.flight.velocity);
+      this.spawnBolt(_a, _d, gun.life, gun.damage, s, gun);
+    }
+    this.emit('fire', _a, _f, _d, null, s, gun);
     this.cooldown.set(s.id, cd + 1 / gun.rate);
   }
 
-  spawnBolt(pos: Vector3, vel: Vector3, life: number, damage: number, owner: ShipEntity): void {
+  spawnBolt(pos: Vector3, vel: Vector3, life: number, damage: number, owner: ShipEntity, gun: GunSpec = GUNS.laser): void {
     const i = this.head;
     this.head = (this.head + 1) % BOLT_CAPACITY;
     this.px[i] = pos.x;
@@ -144,16 +213,22 @@ export class Weapons {
     this.damage[i] = damage;
     this.faction[i] = FACTION_INDEX[owner.faction];
     this.team[i] = TEAM_INDEX[owner.team];
+    this.gun[i] = GUN_INDEX[gun.id];
     this.owner[i] = owner.id;
   }
 
-  fireBeam(owner: ShipEntity, socket: string | null, length: number, width: number, duration: number, dps: number): Beam {
+  fireBeam(owner: ShipEntity, socket: string | null, length: number, width: number, duration: number, dps: number, type: DamageType = 'harmonic'): Beam {
     let b = this.beams.find((x) => !x.active);
     if (!b) {
-      b = { active: false, owner, socket, origin: new Vector3(), dir: new Vector3(), length, width, life: 0, maxLife: duration, dps, faction: owner.faction, team: owner.team, end: new Vector3(), aimTarget: null };
+      b = { active: false, owner, socket, origin: new Vector3(), dir: new Vector3(), length, width, life: 0, maxLife: duration, dps, type, faction: owner.faction, team: owner.team, end: new Vector3(), aimTarget: null, gun: null };
       this.beams.push(b);
     }
-    Object.assign(b, { active: true, owner, socket, length, width, life: duration, maxLife: duration, dps, faction: owner.faction, team: owner.team, aimTarget: null });
+    Object.assign(b, { active: true, owner, socket, length, width, life: duration, maxLife: duration, dps, type, faction: owner.faction, team: owner.team, aimTarget: null, gun: null });
+    // Place it now so a beam fired this frame draws from the right spot.
+    if (socket) this.socketPosition(owner, socket, b.origin);
+    else b.origin.copy(owner.flight.position);
+    owner.flight.forward(b.dir);
+    b.end.copy(b.origin);
     return b;
   }
 
@@ -161,9 +236,25 @@ export class Weapons {
     this.events.length = 0;
     const ships = this.fleet.ships;
 
-    for (const s of ships) if (s.alive) this.fireGuns(s, dt, LASER);
+    for (const s of ships) {
+      if (!s.alive) continue;
+      this.arms(s);
+      this.fireGuns(s, dt);
+      // Shield regeneration shimmer (flags set by the damage model during Fleet.step).
+      const st = s.combat.dmg;
+      if (st.regenStarted) {
+        for (let f = 0; f < Math.max(1, st.facings.length); f++) {
+          if (!(st.regenStarted & (1 << f))) continue;
+          const e = this.emit('shield-up', s.flight.position, _c.set(0, 1, 0), s.flight.velocity, s, null);
+          if (e) e.facing = st.capital ? f : -1;
+        }
+        st.regenStarted = 0;
+      }
+      st.collapsed = 0;
+    }
 
     // ── bolts ────────────────────────────────────────────────────────
+    const ord = this.fleet.ordnance;
     for (let i = 0; i < BOLT_CAPACITY; i++) {
       if (this.life[i] <= 0) continue;
       this.life[i] -= dt;
@@ -175,22 +266,25 @@ export class Weapons {
       for (const s of ships) {
         // Bolts hit anyone not on the shooter's team (neutrals included — shooting them provokes them).
         if (!s.alive || TEAM_INDEX[s.team] === tm || s.id === this.owner[i]) continue;
-        const t = segmentSphere(_a, _d, s.flight.position, s.radius);
-        if (t < hitT) {
-          hitT = t;
+        if (raycastShip(s, _a, _d, 0, _hit) && _hit.t < hitT) {
+          hitT = _hit.t;
           hitShip = s;
+          _b.copy(_hit.point);
+          _c.copy(_hit.normal);
         }
       }
+      const gun = GUN_LIST[this.gun[i]];
       if (hitShip) {
-        _b.copy(_a).addScaledVector(_d, hitT);
-        _c.subVectors(_b, hitShip.flight.position).normalize();
         _f.set(this.vx[i], this.vy[i], this.vz[i]);
-        const shielded = hitShip.shield > 0;
         const shooter = ships.find((x) => x.id === this.owner[i]) ?? null;
         if (shooter) provoke(hitShip, shooter);
-        const killed = this.fleet.damage(hitShip, this.damage[i]);
-        this.emit(shielded ? 'shield' : 'hit', _b, _c, _f, hitShip, shooter);
-        if (killed) this.emit('kill', hitShip.flight.position, _c, hitShip.flight.velocity, hitShip, shooter);
+        const r = this.fleet.hit(hitShip, this.damage[i], gun.type, _b, _c, shooter);
+        const e = this.emit(r.shielded ? 'shield' : 'hit', _b, _c, _f, hitShip, shooter, gun);
+        if (e) e.facing = r.facing;
+        this.life[i] = 0;
+        continue;
+      }
+      if (ord && ord.shoot(_a.x, _a.y, _a.z, _d.x, _d.y, _d.z, TEAM_LIST[tm], this.damage[i])) {
         this.life[i] = 0;
         continue;
       }
@@ -219,19 +313,22 @@ export class Weapons {
       let hitT = 1;
       let hitShip: ShipEntity | null = null;
       for (const s of ships) {
-        if (!s.alive || s.team === b.team) continue;
-        const t = segmentSphere(b.origin, _d, s.flight.position, s.radius + b.width * 0.5);
-        if (t < hitT) {
-          hitT = t;
+        if (!s.alive || s.team === b.team || s === b.owner) continue;
+        if (raycastShip(s, b.origin, _d, b.width * 0.5, _hit) && _hit.t < hitT) {
+          hitT = _hit.t;
           hitShip = s;
+          _c.copy(_hit.normal);
         }
       }
       b.end.copy(b.origin).addScaledVector(_d, Math.min(hitT, 1));
       if (hitShip) {
-        _c.subVectors(b.end, hitShip.flight.position).normalize();
-        const killed = this.fleet.damage(hitShip, b.dps * dt);
-        this.emit('beam-hit', b.end, _c, hitShip.flight.velocity, hitShip, b.owner);
-        if (killed) this.emit('kill', hitShip.flight.position, _c, hitShip.flight.velocity, hitShip, b.owner);
+        const r = this.fleet.hit(hitShip, b.dps * dt, b.type, b.end, _c, b.owner);
+        const e = this.emit(r.shielded ? 'shield' : 'beam-hit', b.end, _c, hitShip.flight.velocity, hitShip, b.owner, b.gun);
+        if (e) {
+          e.facing = r.facing;
+          // Beam shield contact is continuous: only flash the ripple now and then.
+          if (r.shielded && this.rand() > 0.12) e.kind = 'beam-hit';
+        }
       }
     }
   }
@@ -239,28 +336,10 @@ export class Weapons {
 
 export const FACTION_INDEX: Record<FactionId, number> = { concord: 0, choir: 1, rustwake: 2 };
 export const TEAM_INDEX: Record<Team, number> = { concord: 0, choir: 1, rustwake: 2, renegade: 3, neutral: 4 };
+const TEAM_LIST: Team[] = ['concord', 'choir', 'rustwake', 'renegade', 'neutral'];
 
 /** A neutral that gets shot turns on its attacker's side. */
 export function provoke(victim: ShipEntity, attacker: ShipEntity): void {
   if (victim.team !== 'neutral' || attacker.team === 'neutral') return;
   victim.team = victim.faction !== attacker.team ? victim.faction : 'renegade';
-}
-
-/**
- * Earliest t in [0,1] where segment p + t·d enters the sphere, or 2 if none.
- * (Starting inside counts as t = 0.)
- */
-export function segmentSphere(p: Vector3, d: Vector3, c: Vector3, r: number): number {
-  const mx = p.x - c.x;
-  const my = p.y - c.y;
-  const mz = p.z - c.z;
-  const cc = mx * mx + my * my + mz * mz - r * r;
-  if (cc <= 0) return 0;
-  const a = d.x * d.x + d.y * d.y + d.z * d.z;
-  const bb = mx * d.x + my * d.y + mz * d.z;
-  if (bb > 0 || a < 1e-12) return 2;
-  const disc = bb * bb - a * cc;
-  if (disc < 0) return 2;
-  const t = (-bb - Math.sqrt(disc)) / a;
-  return t >= 0 && t <= 1 ? t : 2;
 }
