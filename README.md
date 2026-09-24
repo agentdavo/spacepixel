@@ -54,8 +54,9 @@ still runs (TSL ink twin), but compute particles are disabled there.
 | F / RMB | missile salvo (needs lock) |
 | Y | next missile type (micro swarm · heavy torpedo · harpoon) |
 | T | next target |
-| B | next subsystem on the target (turrets, lances, hangars, engines, shield generator, bridge) |
-| 1–4 | wing orders: form up · attack my target · engage at will · cover me |
+| B · Shift+B | next · previous subsystem on the target (turrets, lances, hangars, engines, shield generator, bridge): exposed ones first |
+| I / MMB | the target's subsystem nearest the crosshair |
+| 1–4 | wing orders: form up · attack my target (and your selected subsystem) · engage at will · cover me |
 | Tab | tactical view (battle at ¼ speed) |
 | V · K | camera shots · cinematic auto-cutaways |
 | M | star map (click a system to plot a route) |
@@ -713,7 +714,14 @@ defence can shoot down, harpoons. Damage types scale against shields and
 hull. Capitals carry four shield facings and a voxel hull, so fire lands on
 the plating and wrecks the subsystem under it — turrets, lances, hangars,
 engines (she drifts), the shield generator (shields gone for good), the bridge
-(fire control lost). Fighters take damage by zone: engines lose thrust, a
+(fire control lost). Once the facing over a mount is down it is *exposed*:
+it can be selected (B, exposed ones first; I for the one under the
+crosshair), shot through its own hit sphere, and knocked out. Torpedoes
+splash every mount near the burst, a wrecked hangar cooks off, and damage
+control slowly patches what is left (`src/sim/Subsystems.ts`). Wingmen told
+to attack your target go for the mount you picked; AI wings on a capital
+work a facing down, then strafe its exposed turrets and lances (bombers:
+the shield generator and engines). Fighters take damage by zone: engines lose thrust, a
 shot-up wing rolls, a dying ship trails black smoke. Damage is painted on the
 cel hull: scorched patches, screentone hatching, glowing craters.
 `npm run balance` holds the numbers (Kestrel vs Cantor 3–8 s, a turret to a

@@ -3,7 +3,7 @@ import type { FlightModel } from '@/sim/FlightModel';
 import type { WorldSpace } from '@/core/WorldSpace';
 import { hostile as isHostile, type Fleet, type ShipEntity } from '@/sim/Fleet';
 import type { LockState } from '@/sim/Missiles';
-import { leadSpeedOf } from '@/sim/Combat';
+import { leadSpeedOf, selectedSubsystem, subsystemPosition } from '@/sim/Combat';
 import type { MissionRunner } from '@/game/Missions';
 import { HUD, centerBand, corridorY, fitText, freeSpan, objectivesX, placeIn, promptY } from './hudLayout';
 import { LABEL_PRIORITY, hudLabels } from './HudLabels';
@@ -168,8 +168,9 @@ export class FlightHud {
           }
           c.stroke();
         }
-        // Gun lead pip: where to aim so the selected gun's bolts intercept.
-        _r.subVectors(s.flight.position, player.flight.position);
+        // Gun lead pip: where to aim so the selected gun's bolts intercept (the B-selected subsystem, if any).
+        const sub = selectedSubsystem(player, s);
+        _r.subVectors(sub ? subsystemPosition(s, sub, _r) : s.flight.position, player.flight.position);
         _vt.subVectors(s.flight.velocity, player.flight.velocity);
         const t = intercept(_r, _vt, leadSpeedOf(player));
         if (t > 0) {
