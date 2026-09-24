@@ -144,30 +144,42 @@ try {
   });
   check('Magpie flies in formation (worst gap after 10 s < 600 m)', form.alive && form.worst < 600, `(mean ${form.mean.toFixed(0)} m, worst ${form.worst.toFixed(0)} m)`);
 
-  // 7. …and fights: a hostile Cantor 1.6 km ahead, wing order ENGAGE AT WILL (key 3).
+  // 7. …and fights: hostile Cantors 1.6 km ahead (a fresh one whenever the wing splashes it), wing order ENGAGE AT WILL (key 3).
   const fight = await page.evaluate(() => {
     const { S, sim, magpie } = window.__cc;
     const m = magpie();
-    const pf = S.player.flight;
-    const fwd = pf.forward(pf.position.clone().set(0, 0, 0));
-    const pos = pf.position.clone().addScaledVector(fwd, 1600);
-    const bandit = S.fleet.spawn('choir-cantor', 'choir', pos, fwd.clone().negate(), { name: 'Check Cantor' });
+    let bandit = null;
+    let spawned = 0;
+    const spawn = () => {
+      const pf = m.flight;
+      const fwd = pf.forward(pf.position.clone().set(0, 0, 0));
+      bandit = S.fleet.spawn('choir-cantor', 'choir', pf.position.clone().addScaledVector(fwd, 1600), fwd.clone().negate(), { name: `Check Cantor ${++spawned}` });
+    };
+    spawn();
     S.onKey('Digit3');
     let shots = 0;
     let hits = 0;
-    sim(40, () => {
+    sim(60, () => {
       for (const e of S.weapons.events) {
         if (e.shooter !== m) continue;
         if (e.kind === 'fire') shots++;
         if (e.kind === 'hit' || e.kind === 'shield' || e.kind === 'beam-hit') hits++;
       }
-      for (const e of S.missiles.events) if (e.shooter === m && e.kind === 'launch') shots++;
-      return !bandit.alive && shots > 0;
+      for (const e of S.missiles.events) {
+        if (e.shooter !== m) continue;
+        if (e.kind === 'launch') shots++;
+        if (e.kind === 'detonate' && !e.intercepted) hits++;
+      }
+      if (!bandit.alive && spawned < 5) spawn();
+      return hits > 0;
     });
     S.onKey('Digit1');
-    return { shots, hits, banditAlive: bandit.alive, alive: m.alive };
+    // Clear the range (a live hostile within 10 km blocks docking).
+    for (const x of S.fleet.ships) if (x.name.startsWith('Check Cantor') && x.alive) S.fleet.damage(x, 1e6, 'explosive');
+    sim(1);
+    return { shots, hits, spawned, alive: m.alive };
   });
-  check('Magpie engages: fires on a hostile and lands hits', fight.shots > 0 && fight.hits > 0, `(${fight.shots} shots, ${fight.hits} hits, bandit ${fight.banditAlive ? 'alive' : 'down'}, Magpie ${fight.alive ? 'alive' : 'lost'})`);
+  check('Magpie engages: fires on hostiles and lands hits', fight.shots > 0 && fight.hits > 0, `(${fight.shots} shots, ${fight.hits} hits, ${fight.spawned} bandit(s), Magpie ${fight.alive ? 'alive' : 'lost'})`);
 
   // 8. Dock (auto-guidance) with a damaged hull.
   const docked = await page.evaluate((st) => {
