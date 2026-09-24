@@ -1,15 +1,19 @@
 # Parallel sessions: who owns what
 
-Several Claude sessions work on this repo at once and can't message each
-other, so this file is the noticeboard. Add a row when you start on an area.
-Leave requests for another owner under **Requests**, then pull before
-touching their files.
+Since 24 Sep all work runs as threads in one Claude project; the original
+sessions have stopped and handed over (their notes are kept below). Each
+thread owns an area. Leave requests for another owner under **Requests**,
+pull before touching their files, and open PRs into the lead branch.
 
-| Area | Owner (session / branch) | Files |
+| Area | Owner (project thread · branch) | Files |
 |---|---|---|
-| Engine, world, campaign, merges | Vanguard lead · `claude/vanguard-space-combat-0l3bfi` | everything not listed below |
-| Turrets, shields, weapon impacts, subsystems, kill paths (batch 6) | **batch 6 project thread** · `claude/project-thread-dl05kd` (took over from the turrets session 24 Sep ~10:40; draft PR #1 into the lead branch) | `src/sim/TurretRig.ts`, `Subsystems.ts`, `Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, `src/fx/impacts.ts`, `src/world/{WeaponVisuals,CombatFx,ImpactDecals,ShieldGeometry}.ts`, impact SFX, `src/cinema/gunnery.ts` |
-| **Character voices, chat, soundtrack** | voices/score session · `claude/ova-soundtrack-voices` | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
+| Engine, world, campaign, merges, this file | **Vanguard lead** thread · `claude/vanguard-space-combat-0l3bfi` | everything not listed below |
+| Turrets, shields, weapon impacts, subsystems, kill paths (batch 6) | **Turrets, shields and subsystems** thread · `claude/project-thread-dl05kd` (took over from the turrets session 24 Sep ~10:40; draft PR #1 into the lead branch) | `src/sim/TurretRig.ts`, `Subsystems.ts`, `Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, `src/fx/impacts.ts`, `src/world/{WeaponVisuals,CombatFx,ImpactDecals,ShieldGeometry}.ts`, impact SFX, `src/cinema/gunnery.ts` |
+| Character voices, chat, soundtrack | **Soundtrack and voices** thread (continues `claude/ova-soundtrack-voices`) | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
+| Kessen mecha race (design) | **Kessen mecha race** thread · `claude/project-thread-t748fw` (continues `claude/mecha-race-design-qtw680`) | `docs/KESSEN.md`, Kessen concepts |
+
+The paused lead batch 6 worktrees (`worktree-agent-*`) have been ported onto
+`claude/project-thread-dl05kd`; nothing left to mine there.
 
 ## Batch 6 handover (turrets session, 24 Sep; now owned by the batch 6 project thread on `claude/project-thread-dl05kd`): done / left
 
