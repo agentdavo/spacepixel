@@ -28,7 +28,8 @@ npm run ai-sim         # headless dogfight/formation/station sim with pass/fail 
 npm run econ-sim       # trade-route balance on the seeded Reach (profit per hold, pass/fail bands)
 npm run ai-sim         # headless dogfight/formation sim with pass/fail numbers
 npm run balance        # headless combat balance: time-to-kill bands, pass/fail
-npm run perf           # frame-time budgets (meaningful on real GPUs only)
+npm run career-check   # headless career loop: profile → dock → contract → hires → shipyard → reload
+npm run perf           # frame-time budgets (meaningful on real GPUs only; --no-demo --query … for A/B)
 npm run shot -- --jpg --shot 'hero:cam=0&t=3'   # headless screenshots
 ```
 
@@ -289,10 +290,23 @@ target when it is in arc, else (FREE) the best hostile they can reach. The
 T6 Valiant is commanded from the bridge (bridge camera); chase distance
 scales with hull length. Capital turrets now engage a player-flown capital.
 
+**Corvettes bite.** The Lantern Guard and the Vesper carry dual-purpose
+main batteries (`Loadout.battery`, `src/sim/Capitals.ts`): flak at fighters
+and ordnance, heavy rounds at anything gunship-sized and up — the shield
+breaker (Directorate heavy pulse / Choir hymn) while the facing in the way is
+up, the hull breaker (cannon) once it is down. Point defence tracks at a
+faster cadence with proximity-fused rounds, the Vesper carries a PD cluster
+(she is an escort), and micro-missiles have hit points (one flak or laser
+hit), so PD thins a swarm without stopping it.
+
 **Balance** (`npm run balance`, scenario *outfit*: scripted helm at 1.5 km,
-turrets live on both sides, mean of four seeds): a Mk III Resolute kills a
-Lantern Guard solo in ~83 s (band 60–120, stock ~94 s) and a Mk III Valiant
-beats a Vesper in ~32 s with ~85 % hull left (band 20–120). Pure + tested:
+turrets live on both sides, mean of six seeds): a Mk III Resolute kills a
+Lantern Guard solo in ~74 s with ~56 % hull left (bands 60–120 s, 30–80 %);
+a stock one loses — refit before taking a picket alone. A Mk III Valiant
+beats a Vesper in ~65 s with ~56 % hull left (bands 45–120 s, 30–80 %),
+most of its torpedoes shot down. Scenario *swarm*: three 12-round swarms from
+2.2 km — a Lantern Guard's PD takes 20–30 %, a Mk III Resolute's PD turrets
+~11 %, the rest hit. Pure + tested:
 `src/game/outfitting/{items,fit,hangar}.ts`, `tests/outfitting.test.ts`.
 Captures: `?scene=flight&dock=docked&station=meridian-bastion-2&docktab=shipyard|outfitting[&own=<hull id>]`
 (`&own=` gives you that hull, stock fit).

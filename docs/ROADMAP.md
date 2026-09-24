@@ -125,7 +125,7 @@ buy the next hull, take on bigger adversaries.
 | Capital subsystems with effects; B sub-targets | turret to a wing of 4: 5–15 s | `src/sim/Damage.ts`, `Combat.ts`, `Capitals.ts` |
 | Fighter damage zones (thrust, roll drift, smoke) | unit-tested routing | `Damage.ts`, `src/world/DamageFx.ts` |
 | Directional capital shields, collapse / regen visuals | facing routing unit-tested | `WeaponVisuals.ts`, `CombatFx.ts` |
-| Balance | Kestrel vs Cantor 3–8 s · capital to a squadron 60–180 s | `npm run balance` |
+| Balance | Kestrel vs Cantor 3–8 s · capital to a squadron 60–180 s · Mk III Resolute vs Lantern Guard 60–120 s / 30–80 % hull · Mk III Valiant vs Vesper 45–120 s / 30–80 % hull · PD thins swarms | `npm run balance` |
 
 ![Shield facing collapse](screenshots/combat-shield.jpg)
 
@@ -134,4 +134,49 @@ buy the next hull, take on bigger adversaries.
 - WebGL2 fallback lines are softer than the WGSL path.
 - Large flat hulls (carrier deck) catch the rim light at grazing angles;
   a screen-space silhouette rim would fix it.
-- SwiftShader timings are meaningless: run `npm run perf` on real hardware.
+- SwiftShader timings are meaningless in absolute terms: run `npm run perf`
+  on real hardware. Relative A/B on one machine is fine
+  (`npm run perf -- --no-demo --query 'dynres=0&…'`).
+- Planet LOD savings are unmeasured on real hardware (the shared SwiftShader
+  box's load swamps the A/B); run the `--stepped` A/B above on a GPU.
+- Planet LOD switches compile the mid / far surface pipeline the first time a
+  body crosses a threshold (a one-off hitch per body kind); prewarming them
+  with `compileAsync` at system load would hide it.
+- Label declutter hides low-priority labels when the screen is crowded; the
+  arrivals board can end up two rings out from the Lantern on a leader line.
+  Off-screen edge arrows (target, nav, contracts, distress) are not packed yet.
+- The bridge camera rides high over a forward battery; turrets training up at
+  a target overhead still poke their barrels into the bottom of the frame
+  (by design — it's the Yamato shot — but a bow-view toggle would help).
+- Bay dust fades only for the docking target / nearest bay: a camera parked
+  in another ship's hangar (cutaways of wingmen) still sees streaks.
+- A stock (unfitted) Resolute loses a solo duel with a Lantern Guard and a
+  stock Valiant a duel with a Vesper (`npm run balance` INFO lines): fitting
+  out is the intended answer, but the first T5/T6 sortie can surprise.
+
+Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
+
+- **Hangar bays** — streaks across bay interiors were the space dust (motes
+  between the camera and the dark liners, streaked by the host's cruise);
+  it now fades out down the corridor and inside the bay (`src/world/BayDust.ts`).
+  The bright collar / deck near the carrier mouth was bloom from the lip,
+  door outline and the curtain's wide edge glow; all three toned down.
+- **Label declutter** — one placement pass for every world-space label
+  (`src/ui/HudLabels.ts`, pure packer `src/ui/labelPlacement.ts`, tested).
+- **Planet shader LOD** — full / mid / far impostor by disc size
+  (`src/world/planets/lod.ts`, tested). Per pixel, a terrestrial world with
+  clouds and cities drops from 16 fBm octaves (+ cell noise; + Worley on
+  cratered / Lantern kinds) at full detail to 10 at mid and 2 in the far
+  impostor (40×20 sphere instead of 128×64). Measured with
+  `npm run perf -- --stepped --query 'planetlod=N&reach=body&dist=12'` on
+  the shared SwiftShader box (load ≈ 45): disc filling a 640×360 frame,
+  full 6.1 / 6.3 / 4.6 s per frame over three runs, mid 5.2, far 5.0 — the
+  run-to-run drift (±25 %) swamps the difference; needs a real GPU.
+- **Balance** — corvette main batteries, PD cadence and clusters, shootable
+  micro-missiles; Resolute Mk III vs Lantern Guard ~74 s / 56 % hull, Valiant
+  Mk III vs Vesper ~65 s / 56 % hull, swarm vs PD bands (`npm run balance`).
+- **Valiant bridge camera** — eye 0.16 L above / 0.08 L behind the bridge over
+  a forward battery; the mounts sit in the bottom sixth (tested).
+- **Hires** — Magpie (wing) and Brennick (−30 % repairs) verified end to end
+  by `npm run career-check` (new profile → free flight → hires → contract →
+  launch → formation + fight → dock → repair → shipyard → reload).
