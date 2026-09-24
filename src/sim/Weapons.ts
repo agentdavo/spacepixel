@@ -71,6 +71,12 @@ export interface WeaponEvent {
   strength: number;
   /** Fraction of the hit (0..Damage.BLEED_MAX) that bled through to the hull (shield, shield-bleed, beam-hit); 0 = none. */
   bleed: number;
+  /** Damage type of the impact (hit, shield, beam-hit). Presentation only (FX tint, impact sound). */
+  type?: DamageType;
+  /** Raw damage of the impact (per tick for beams). Presentation only (FX scale). */
+  amount?: number;
+  /** beam-hit: the contact point is on a shield (a beam's shield contact is mostly reported as beam-hit). */
+  shielded?: boolean;
 }
 
 export interface Beam {
@@ -143,7 +149,7 @@ export class Weapons {
   constructor(readonly fleet: Fleet) {
     this.rng = fleet.rng.fork('weapons');
     for (let i = 0; i < EVENT_POOL; i++) {
-      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, subHp: -1, facing: -1, strength: -1, bleed: 0 });
+      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, subHp: -1, facing: -1, strength: -1, bleed: 0, type: undefined, amount: 0, shielded: false });
     }
     for (let i = 0; i < 128; i++) {
       this.flashes.push({ kind: 'fire', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1, strength: -1, bleed: 0 });
@@ -181,6 +187,9 @@ export class Weapons {
     e.facing = -1;
     e.strength = -1;
     e.bleed = 0;
+    e.type = gun?.type;
+    e.amount = 0;
+    e.shielded = false;
     this.events.push(e);
     return e;
   }
@@ -366,6 +375,8 @@ export class Weapons {
           e.facing = r.facing;
           e.strength = r.strength;
           e.bleed = r.bleed;
+          e.amount = this.damage[i];
+          e.shielded = shielded;
           subOnEvent(e, r.subsystem);
         }
         // Explosive rounds splash the mounts around the burst (Subsystems.splashSubsystems).
@@ -420,6 +431,9 @@ export class Weapons {
           e.facing = r.facing;
           e.strength = r.strength;
           e.bleed = r.bleed;
+          e.type = b.type;
+          e.amount = b.dps * dt;
+          e.shielded = r.shielded;
           subOnEvent(e, r.subsystem);
           // Beam shield contact is continuous: only flash the ripple now and then.
           if (r.shielded && this.rand() > 0.12) e.kind = 'beam-hit';
