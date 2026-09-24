@@ -4,7 +4,7 @@ import { drawPortrait } from './Portrait';
 import { Subtitles } from './Subtitles';
 import { getAudio } from '@/audio';
 import { getVoice } from '@/audio/voice';
-import { COMMODITY, cargoUsed, type CommodityId, type TradeLedger } from '@/game/economy';
+import { COMMODITY, cargoUsed, repairCost, type CommodityId, type TradeLedger } from '@/game/economy';
 import { KIND_LABEL, TIER_LABEL, hops, type Contract } from '@/game/contracts/contracts';
 import { world } from '@/game/world/WorldState';
 import { outfitter } from '@/game/outfitting/Outfitter';
@@ -240,6 +240,9 @@ class GuildTab {
           bits.push(btn('dues', `${gd.dues.label} — ${sh(dues)}`, this.l().credits >= dues));
           if (gd.dues.alt) bits.push(btn('dueskind', `PAY IN KIND (${gd.dues.alt.label.toUpperCase()})`, (this.l().cargo[gd.dues.alt.cid] ?? 0) >= gd.dues.alt.units));
         } else bits.push(`<span class="ok">${gd.dues.label} PAID · ${gd.dues.perRank * rankOf(w, g)} sh A PERIOD</span>`);
+        // Keeping perk: the wardens patch your hull at a tithe.
+        const wr = this.wardenRepair();
+        if (wr) bits.push(btn('repair', `WARDENS’ REPAIR — ${sh(wr)}`, this.l().credits >= wr));
         bits.push(btn('leave', this.armLeave ? 'CONFIRM — LEAVE THE GUILD' : 'LEAVE', true, this.armLeave ? 'warn' : 'quiet'));
       }
       actions.innerHTML = bits.join('');
@@ -420,6 +423,14 @@ class GuildTab {
       <div class="gh-note">${o.stage >= 2 ? `Raiders know she is worth taking. ${o.stage >= 5 ? 'The rim guns hold two raids in three without you.' : 'Nothing defends her but you.'}` : 'Nobody raids a dead hulk. Yet.'}</div>`;
   }
 
+  /** Keeping rank ≥ 2: hull repair at 85 % of the yard price (0 = not offered). */
+  private wardenRepair(): number {
+    if (this.guild !== 'keeping' || rankOf(world().state, 'keeping') < 2) return 0;
+    const hull = this.ctx.hull();
+    if (hull >= 1) return 0;
+    return Math.ceil(repairCost(this.ctx.station, this.l(), hull, this.ctx.hullSize?.() ?? 1) * 0.85);
+  }
+
   // ── actions ───────────────────────────────────────────────────────
 
   private act(a: string, arg?: string): void {
@@ -456,6 +467,18 @@ class GuildTab {
           const rk = GUILDS[g].ranks[rankOf(world().state, g) - 1];
           this.speak(this.speaker, `${rk.line} Rise, ${rk.title}.`);
         }
+        break;
+      }
+      case 'repair': {
+        const cost = this.wardenRepair();
+        if (!cost || this.l().credits < cost) {
+          bad();
+          break;
+        }
+        ok();
+        this.setL({ ...this.l(), credits: this.l().credits - cost });
+        this.ctx.setHull(1);
+        this.say(`HULL WHOLE — ${sh(cost)}. THE WARDENS SAID THE WORDS.`, 'ok');
         break;
       }
       case 'dues':
