@@ -372,6 +372,12 @@ seed-1994 Reach). Captures:
 `?scene=flight&dock=docked&station=anchorage-salvage-1&docktab=guild&guild=keeping.3[.merit][&gpanel=work|qm|arc|outpost][&choice=1]`,
 `?scene=flight&guild=keeping.3&outpost=<stage>[&osite=<system>][&ophase=docked]`.
 
+![Guild hall: the Keeping's chapter-house](docs/screenshots/guild-hall.jpg)
+![The Houses' last question](docs/screenshots/guild-choice.jpg)
+![A claimed hulk, dark and askew](docs/screenshots/guild-outpost-hulk.jpg)
+![The same hulk restored: ring spun, bay open, guns on the rim](docs/screenshots/guild-outpost-restored.jpg)
+![Outpost tab: stages, deliveries, storage](docs/screenshots/guild-outpost-tab.jpg)
+
 ## Scenes (`?scene=`)
 
 `flight` (default game) · `showcase` · `hangar` (model sheets) · `paint`
