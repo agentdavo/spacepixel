@@ -1,13 +1,21 @@
 import type { Character, ChatterBeat, ChatterLine } from '@/game/campaign/types';
 import { drawPortrait, portraitKind, type PortraitKind } from './Portrait';
+import { getVoice, type Utterance } from '@/audio/voice';
+import { installSettingsKeys } from '@/game/Settings';
+import { lineHold, typeDuration } from './subtitleTiming';
 import './campaign.css';
+import './subtitles.css';
 
 /**
  * Radio chatter panel (bottom-left, above the flight readouts): portrait,
  * callsign plate, typewriter text and a signal meter. Driven entirely by
  * `update(dt)` so it pauses with the game and captures deterministically.
  *
- * Timing: a line types at CPS, stays up for its reading time, and the next
+ * Every line is voiced (src/audio/voice: procedural radio voice, or system
+ * speech, per Settings) and the typewriter follows the voice; hold times
+ * come from the shared subtitle timing (≤ 15 chars/s reading speed).
+ *
+ * Timing: a line types with its voice, stays up for its reading time, and the next
  * line of the beat starts after `next.delay` seconds (default: the reading
  * time). A short delay never cuts a line before it has finished typing; a
  * long one leaves a pause of dead air. A beat with a higher `priority`
@@ -33,8 +41,8 @@ interface Queued {
 }
 
 /** Reading time for a line (seconds from line start until it can go). */
-export function readingTime(text: string): number {
-  return Math.min(9, Math.max(2.4, 1.5 + text.length * 0.052));
+export function readingTime(text: string, voiceDur = 0): number {
+  return Math.max(2.4, lineHold(text, voiceDur));
 }
 
 export class Comms {
@@ -45,6 +53,8 @@ export class Comms {
   private readonly nameEl: HTMLElement;
   private readonly roleEl: HTMLElement;
   private readonly typedEl: HTMLElement;
+  private readonly jpEl: HTMLElement;
+  private utter: Utterance | null = null;
   private readonly bars: HTMLElement[];
   private readonly cast = new Map<string, Character>();
 
@@ -87,6 +97,7 @@ export class Comms {
           <span class="comms-name"></span>
           <span class="comms-sig"><i></i><i></i><i></i><i></i><i></i></span>
         </div>
+        <div class="comms-jp" hidden></div>
         <div class="comms-text"><span class="comms-typed"></span><span class="comms-caret"></span></div>
         <div class="comms-foot"><span class="comms-role"></span><span class="comms-freq"></span></div>
       </div>`;
@@ -97,9 +108,21 @@ export class Comms {
     this.nameEl = this.el.querySelector('.comms-name')!;
     this.roleEl = this.el.querySelector('.comms-role')!;
     this.typedEl = this.el.querySelector('.comms-typed')!;
+    this.jpEl = this.el.querySelector('.comms-jp')!;
     this.bars = [...this.el.querySelectorAll<HTMLElement>('.comms-sig i')];
     window.addEventListener('resize', this.onResize);
     armAudioUnlock();
+    installSettingsKeys();
+  }
+
+  /** Add speakers at runtime (station people, bark callsigns). */
+  addCast(chars: readonly Character[]): void {
+    for (const c of chars) this.cast.set(c.id, c);
+  }
+
+  /** Is this speaker known (cast or added)? */
+  hasSpeaker(id: string): boolean {
+    return this.cast.has(id);
   }
 
   /** True while a line is up or anything is queued. */
@@ -121,6 +144,7 @@ export class Comms {
     if (pr > this.priority) {
       // Cut the current transmission mid-word.
       if (this.phase === 'line') radioClick('cut');
+      this.stopVoice();
       this.startBeat(beat, true);
       return;
     }
@@ -137,6 +161,7 @@ export class Comms {
 
   /** Stop everything and hide the panel. */
   clear(): void {
+    this.stopVoice();
     this.pending.length = 0;
     this.beat = null;
     this.line = null;
@@ -191,8 +216,13 @@ export class Comms {
     this.line = line;
     this.phase = 'line';
     this.lineT = 0;
-    this.typeDur = line.text.length / CPS;
-    const read = readingTime(line.text);
+    // Voice first: its length times the typewriter and the hold.
+    this.stopVoice();
+    const kind = portraitKind(line.who, this.cast.get(line.who));
+    this.utter = this.muted ? null : getVoice().speak({ who: line.who, text: line.text, channel: line.static ? 'intercept' : kind === 'oracle' || kind === 'system' ? 'clean' : 'radio' });
+    const vd = this.utter?.dur ?? 0;
+    this.typeDur = vd > 0 ? typeDuration(line.text, vd) : line.text.length / CPS;
+    const read = readingTime(line.text, vd);
     const next = beat.lines[this.idx + 1];
     const d = next?.delay;
     // Next line starts at `d` after this one (default: reading time), but
@@ -208,6 +238,8 @@ export class Comms {
     this.callsignEl.textContent = ch.callsign.toUpperCase();
     this.nameEl.textContent = ch.name;
     this.roleEl.textContent = ch.role.toUpperCase();
+    this.jpEl.textContent = line.jp ?? '';
+    this.jpEl.hidden = !line.jp;
     const freq = this.el.querySelector('.comms-freq');
     if (freq) freq.textContent = line.static ? 'INTERCEPT · ??? MHz' : this.kind === 'system' ? 'INTERNAL' : `CH ${String((hashStr(ch.id) % 12) + 1).padStart(2, '0')} · ${(240 + (hashStr(ch.id) % 90) / 10).toFixed(1)}`;
     this.el.classList.toggle('is-static', !!line.static);
@@ -253,6 +285,11 @@ export class Comms {
     this.setShown(false);
   }
 
+  private stopVoice(): void {
+    this.utter?.stop();
+    this.utter = null;
+  }
+
   private setShown(v: boolean): void {
     this.shown = v;
     this.el.classList.toggle('show', v);
@@ -274,7 +311,7 @@ export class Comms {
     const line = this.line;
     if (!line) return;
     const text = line.text;
-    const n = Math.min(text.length, Math.floor(this.lineT * CPS));
+    const n = this.lineT >= this.typeDur ? text.length : this.utter ? Math.min(text.length, this.utter.reveal(this.lineT)) : Math.min(text.length, Math.floor(this.lineT * CPS));
     const tick = line.static ? Math.floor(this.time * 18) : 0;
     if (n === this.lastChars && tick === this.lastTick) return;
     this.lastChars = n;

@@ -45,6 +45,18 @@ function saveSet(key: string, s: Set<string>): void {
   }
 }
 
+/**
+ * Unlock a codex entry from outside a mission (station conversations): writes
+ * the same persisted set the archive reads. Returns true if newly unlocked.
+ */
+export function unlockCodexEntry(id: string): boolean {
+  const s = loadSet(STORE_UNLOCKED);
+  if (s.has(id)) return false;
+  s.add(id);
+  saveSet(STORE_UNLOCKED, s);
+  return true;
+}
+
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 }

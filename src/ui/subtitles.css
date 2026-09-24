@@ -1,0 +1,138 @@
+/* ══ Subtitles: one system for comms, narration, stations and cutscenes ══
+   VHS-yellow outlined lines (the prologue's look), a speaker plate in the
+   speaker's comms colour, optional Japanese line above. Size / on-off /
+   second line come from Settings (F8 / F9) through --sub-scale and root
+   classes .subs-off / .subs-mono.                                         */
+
+:root { --sub-scale: 1; }
+
+.subs {
+  --sc: #fff6d8;
+  position: absolute;
+  left: 50%;
+  bottom: 13vh;
+  width: min(84vw, 1100px);
+  transform: translateX(-50%);
+  z-index: 26;
+  pointer-events: none;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.18s steps(3);
+}
+.subs.show { opacity: 1; }
+/* Cutaways: inside the bottom letterbox bar, clear of the caption plate. */
+.subs-cut { bottom: 1.6vh; width: min(70vw, 900px); }
+.subs-dock {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  width: auto;
+  transform: none;
+  text-align: left;
+  min-height: 4.2em;
+}
+.sub-kicker {
+  display: inline-block;
+  margin-bottom: 0.5em;
+  padding: 1px 9px 1px 11px;
+  font-family: var(--font-mono);
+  font-size: calc(12px * var(--sub-scale));
+  letter-spacing: 0.3em;
+  color: #0d0a12;
+  background: var(--crt-amber, #ffc46b);
+  box-shadow: 3px 3px 0 #2b4ea8;
+}
+.sub-kicker[hidden], .sub-jp[hidden], .sub-who[hidden] { display: none; }
+.sub-jp {
+  font-family: 'Hiragino Kaku Gothic Pro', 'Noto Sans JP', 'Yu Gothic', 'WenQuanYi Zen Hei', var(--font-display), sans-serif;
+  font-weight: 700;
+  font-size: calc(clamp(12px, 1.2vw, 17px) * var(--sub-scale));
+  letter-spacing: 0.12em;
+  color: #cfe8ff;
+  margin-bottom: 0.25em;
+  text-shadow: 1.5px 0 0 #000, -1.5px 0 0 #000, 0 1.5px 0 #000, 0 -1.5px 0 #000, 0 0 10px rgba(0, 0, 0, 0.9);
+}
+.sub-en {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: calc(clamp(16px, 1.75vw, 26px) * var(--sub-scale));
+  line-height: 1.28;
+  letter-spacing: 0.02em;
+  color: #fff6d8;
+  text-shadow:
+    2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000,
+    1.5px 1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px -1.5px 0 #000,
+    0 0 14px rgba(0, 0, 0, 0.85);
+}
+.sub-who {
+  display: inline-block;
+  margin-right: 0.6em;
+  padding: 0 0.45em;
+  font-family: var(--font-mono);
+  font-size: 0.72em;
+  letter-spacing: 0.18em;
+  vertical-align: 0.12em;
+  color: #0a0710;
+  background: var(--sc);
+  text-shadow: none;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.8);
+  transform: skewX(-10deg);
+}
+.subs.sung .sub-typed { font-style: italic; }
+.subs.sung .sub-typed::before { content: '♪ '; color: var(--sc); }
+.sub-caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.9em;
+  margin-right: -0.5em;
+  vertical-align: -0.08em;
+  background: var(--sc);
+  opacity: 0;
+}
+.subs.typing .sub-caret { opacity: 0.85; }
+.subs-dock .sub-en { font-size: calc(clamp(14px, 1.25vw, 20px) * var(--sub-scale)); }
+
+/* Settings: off hides the bar (comms keep their panel text); mono drops the second line. */
+.subs-off .subs:not(.subs-dock) { display: none; }
+.subs-off .cn-narration .cn-en,
+.subs-off .cn-narration .cn-jp { visibility: hidden; }
+.subs-mono .sub-jp,
+.subs-mono .cn-jp,
+.subs-mono .comms-jp { display: none !important; }
+.cn-en { font-size: calc(clamp(17px, 2.35vw, 34px) * var(--sub-scale)) !important; }
+.cn-jp { font-size: calc(clamp(12px, 1.35vw, 19px) * var(--sub-scale)) !important; }
+
+/* Settings toast (F7–F9). */
+.settings-toast {
+  position: absolute;
+  top: 3vh;
+  left: 50%;
+  transform: translate(-50%, -8px);
+  z-index: 60;
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: #061012;
+  background: #7dffc8;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s steps(3), transform 0.2s;
+}
+.settings-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Comms panel: the radio's subtitle view shares size + second line. */
+.comms .comms-text { font-size: calc(14.5px * var(--sub-scale)); }
+.comms-jp {
+  padding-top: 5px;
+  font-family: 'Hiragino Kaku Gothic Pro', 'Noto Sans JP', 'Yu Gothic', 'WenQuanYi Zen Hei', var(--font-display), sans-serif;
+  font-size: calc(11.5px * var(--sub-scale));
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--cc) 70%, #fff);
+  opacity: 0.85;
+}
+.comms-jp[hidden] { display: none; }
+
+/* Typewriter ghosts: the untyped rest keeps its space so centred lines never shift. */
+.cn-ghost, .sub-rest { color: transparent !important; text-shadow: none !important; }

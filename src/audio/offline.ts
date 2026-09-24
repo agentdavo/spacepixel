@@ -1,5 +1,7 @@
 import { PROLOGUE } from '@/cinema/prologue';
+import { narrationCues } from '@/cinema/narration';
 import { GameAudio, type AudioFrame, type AudioMissileEvent, type AudioShip, type AudioWeaponEvent, type Mood } from './index';
+import { VoiceBox, planFor, type VoiceChannel } from './voice';
 
 /**
  * Headless renders for scripts/audio-render.mjs. Each scenario runs the real
@@ -48,6 +50,7 @@ interface Sim {
   w: Ev[];
   m: MEv[];
   audio: GameAudio;
+  voice: VoiceBox;
   /** Did something cross time `x` during this frame? */
   at(x: number): boolean;
   every(period: number, from?: number, to?: number): boolean;
@@ -99,8 +102,100 @@ const prologue = (): Scenario => {
   };
 };
 
+/** A run of voiced lines, each starting `gap` s after the previous one ends. */
+type VLine = [who: string, text: string, channel?: VoiceChannel];
+const voices = (lines: VLine[], gap = 0.6, setup?: (s: Sim) => void, extra?: (s: Sim) => void): Scenario => {
+  let t = 0.3;
+  const at: number[] = [];
+  for (const [who, text] of lines) {
+    at.push(t);
+    t += planFor({ who, text }).plan.dur + gap;
+  }
+  return {
+    seconds: t + 0.8,
+    setup: (s) => {
+      s.frame.player.alive = false;
+      s.frame.player.throttle = 0;
+      setup?.(s);
+    },
+    tick: (s) => {
+      lines.forEach(([who, text, channel], i) => {
+        if (s.at(at[i])) s.voice.speak({ who, text, channel: channel ?? 'radio' });
+      });
+      extra?.(s);
+    },
+  };
+};
+
 export const SCENARIOS: Record<string, Scenario> = {
+  'voice-radio': voices([
+    ['kade', 'Vanguard, form on me. Nobody breaks formation until I say the word.'],
+    ['jackpot', 'Pool is open, people! Two shares says I splash the first Cantor.'],
+    ['candle', 'First keeping: the seal holds. Second keeping: the feed runs clean.'],
+    ['sparrow', 'Is that a Cathedral? Abbess, is that really a Cathedral?'],
+    ['salt', 'Every gram on that barge is somebody\'s winter. Keep it moving.'],
+    ['magpie', 'Triple for the Directorate, double for the Hegemony, and for you, love? A favour.'],
+    ['psalm', 'Be witnessed, Vanguard. Break the Observance and I will break you.'],
+    ['system', 'SERVICE WILL RESUME SHORTLY. THANK YOU FOR YOUR PATIENCE.'],
+  ]),
+  'voice-cast': voices(
+    [
+      ['oyelaran', 'Tell her the lines go somewhere. Go where the light is. Keep the light.'],
+      ['zenith', 'A cradle is a safe place to be a child. Forever, if need be.'],
+      ['ledger', 'Engagement one-fourteen. Expected expenditure: eleven fighters.'],
+      ['pryce', 'You think it is a key. It is a lever.'],
+      ['psalm', '(sung) Out of the dust we were lifted. Out of the dark we were shown.'],
+      ['oracle', 'WE ARE NOT GONE. WE ARE AHEAD.'],
+    ].map(([w, t]) => [w, t, 'clean'] as VLine),
+    0.7,
+  ),
+  'voice-intercept': voices([
+    ['system', 'NULL BURST: 1,009 PULSES. DESTINATION FIELD EMPTY.', 'intercept'],
+    ['quillon', 'The floor holds at eighty-eight. Nobody need know why.', 'intercept'],
+  ]),
+  'voice-narrator': voices(
+    [
+      ['narrator', 'Once, the stars were joined.', 'narrator'],
+      ['narrator', 'Four hundred years ago, the gates sang.', 'narrator'],
+      ['narrator', 'Then, in a single day, every Lantern went dark.', 'narrator'],
+      ['narrator', 'Everything that flies is a fossil — kept running, never understood.', 'narrator'],
+    ],
+    0.8,
+  ),
+  // Radio over a dogfight: the voice must sit on top of guns + combat score.
+  'voice-mix': voices(
+    [
+      ['kade', 'Break left, Point! Two on your six!'],
+      ['jackpot', 'Splash one! That is mine, write it down!'],
+      ['sparrow', 'I am hit, I am hit — still flying!'],
+    ],
+    0.5,
+    (s) => {
+      s.audio.music.setMood('combat', 0.1);
+      s.frame.combatIntensity = 0.85;
+      s.frame.player.alive = true;
+      s.frame.player.throttle = 0.8;
+    },
+    (s) => {
+      if (s.t > 0.5 && s.t < 7 && s.every(1 / 12, 0.5, 1.6)) s.fire('fire', 0, 0, 0, PLAYER);
+      if (s.every(0.13, 2.5, 3.6)) s.fire('fire', 150 * Math.sin(s.t), 20, -300, CANTOR);
+      if (s.at(4.2)) s.fire('kill', 300, 40, -700, PLAYER, CANTOR);
+    },
+  ),
+
   prologue: prologue(),
+  // The prologue soundtrack with its narration voice track (what the cold open sounds like now).
+  'voice-prologue': (() => {
+    const base = prologue();
+    const cues = narrationCues(PROLOGUE);
+    return {
+      ...base,
+      tick: (s: Sim) => {
+        base.tick!(s);
+        for (const c of cues) if (s.at(c.at)) s.voice.speak({ who: c.who, text: c.caption.text, channel: c.channel, maxDur: c.maxDur, maxSqueeze: c.maxSqueeze });
+      },
+    };
+  })(),
   'music-title': music('title', 48, 0.5),
   'music-briefing': music('briefing', 20, 0.2),
   'music-cruise': music('cruise', 24, 0.1),
@@ -283,10 +378,13 @@ export async function renderScenario(name: string, sampleRate = 44100): Promise<
   const ctx = new OfflineAudioContext({ numberOfChannels: 2, length, sampleRate });
   const audio = new GameAudio({ context: ctx });
   audio.autoMood = false;
+  const voice = new VoiceBox(audio);
+  voice.modeOverride = 'synth';
   const zero = { x: 0, y: 0, z: 0 };
   const sim: Sim = {
     t: 0,
     audio,
+    voice,
     w: [],
     m: [],
     frame: {

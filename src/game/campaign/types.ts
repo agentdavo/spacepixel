@@ -20,7 +20,7 @@ export interface PortraitSpec {
   suit: string;
   hairStyle: 'short' | 'long' | 'spiky' | 'bob' | 'shaved' | 'ponytail' | 'swept';
   /** Helmet visor down (face partly hidden), eyepatch, scar etc. */
-  accessory?: 'visor' | 'eyepatch' | 'scar' | 'glasses' | 'headset' | 'none';
+  accessory?: 'visor' | 'eyepatch' | 'scar' | 'glasses' | 'headset' | 'none' | 'beard' | 'cap' | 'hood' | 'goggles';
   /** Deterministic variation seed. */
   seed: number;
 }
@@ -48,6 +48,8 @@ export interface ChatterLine {
   delay?: number;
   /** Render as a garbled intercept / static-laced transmission. */
   static?: boolean;
+  /** Optional second-language (Japanese flavour) subtitle line. */
+  jp?: string;
 }
 
 export type ChatterTrigger =

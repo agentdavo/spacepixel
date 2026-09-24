@@ -137,6 +137,10 @@ export class DockScreen {
     this.tab = null;
     this.renderTabs();
     this.render();
+    // ?docktab=<id>: open on a registered tab (captures).
+    const want = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('docktab') : null;
+    const wi = want ? this.tabs.findIndex((t) => t.id === want) : -1;
+    if (wi >= 0) this.switchTab(wi + 1);
   }
 
   private renderTabs(): void {

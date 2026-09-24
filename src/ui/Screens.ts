@@ -1,6 +1,7 @@
 import type { MissionDef } from '@/game/Missions';
 import { loadContracts, loadLedger, loadProfile } from '@/game/Profile';
 import { getAudio } from '@/audio';
+import { describeSettings, installSettingsKeys, onSettings } from '@/game/Settings';
 
 /**
  * Milestone 19 — title card and mission briefing. Plain DOM, styled in
@@ -33,8 +34,13 @@ export function titleScreen(root: HTMLElement, opts: TitleOptions = {}): Promise
     <h1>PROJECT<br/>VANGUARD</h1>
     <div class="episode">The Lantern Sings</div>
     <ul>${items.map((it, i) => `<li data-i="${i}" class="${i === 0 ? 'active' : ''}">${it.label}</li>`).join('')}</ul>
-    <div class="foot">↑↓ SELECT · ENTER CONFIRM · TERRAN DIRECTORATE // 13TH INDEPENDENT SQUADRON "VANGUARD"</div>`;
+    <div class="foot">↑↓ SELECT · ENTER CONFIRM · TERRAN DIRECTORATE // 13TH INDEPENDENT SQUADRON "VANGUARD"<br/><span class="settings-line"></span></div>`;
   root.append(el);
+  // Voice / subtitle settings live on F7–F9 everywhere; the title shows where they stand.
+  installSettingsKeys();
+  const line = el.querySelector('.settings-line')!;
+  line.textContent = describeSettings();
+  const off = onSettings(() => (line.textContent = describeSettings()));
   let sel = 0;
   const lis = [...el.querySelectorAll('li')];
   const paint = () => {
@@ -47,6 +53,7 @@ export function titleScreen(root: HTMLElement, opts: TitleOptions = {}): Promise
       window.clearTimeout(idle);
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('pointermove', poke);
+      off();
       el.remove();
       resolve(v);
     };

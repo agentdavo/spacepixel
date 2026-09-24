@@ -1,0 +1,96 @@
+/* ══ Concourse dock tab: people at the station, conversations ═══════════ */
+.cc {
+  --pc: #7dffb2;
+  display: grid;
+  grid-template-columns: minmax(270px, 0.95fr) minmax(0, 1.35fr);
+  gap: 22px;
+  height: 100%;
+  min-height: 0;
+}
+.cc h3 { margin: 0 0 8px; font-family: var(--font-display); font-size: 13px; letter-spacing: 0.3em; color: var(--fc); font-weight: 700; }
+.cc-people { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: auto; }
+.cc-list { display: flex; flex-direction: column; gap: 7px; }
+.cc-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 11px;
+  align-items: center;
+  padding: 6px 8px 6px 6px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: rgba(0, 16, 10, 0.55);
+  border: 1px solid rgba(125, 255, 178, 0.18);
+  cursor: pointer;
+  text-shadow: inherit;
+}
+.cc-card canvas { width: 72px; height: 72px; display: block; border: 1px solid color-mix(in srgb, var(--pc) 50%, #000); background: #05040c; image-rendering: auto; }
+.cc-card b { display: block; color: #fff; font-family: var(--font-display); font-size: 15px; letter-spacing: 0.04em; }
+.cc-card span { display: block; font-size: 11.5px; color: rgba(210, 255, 230, 0.78); margin-top: 1px; line-height: 1.3; }
+.cc-card em { display: block; font-style: normal; font-size: 10.5px; letter-spacing: 0.16em; color: var(--pc); margin-top: 3px; }
+.cc-card em i { font-style: normal; color: #fff; background: color-mix(in srgb, var(--pc) 45%, transparent); padding: 0 4px; }
+.cc-card.on { background: color-mix(in srgb, var(--pc) 14%, rgba(0, 16, 10, 0.7)); border-color: var(--pc); box-shadow: inset 4px 0 0 var(--pc); }
+.cc-card:hover { border-color: color-mix(in srgb, var(--pc) 70%, transparent); }
+.cc-note { margin-top: auto; padding: 8px 10px; border: 1px dashed rgba(125, 255, 178, 0.25); font-size: 11.5px; line-height: 1.45; color: rgba(210, 255, 230, 0.8); }
+.cc-note h4 { margin: 0 0 4px; font-size: 11px; letter-spacing: 0.3em; color: var(--crt-amber); font-weight: normal; }
+.cc-note em { font-style: normal; font-size: 10px; letter-spacing: 0.18em; color: var(--crt-amber); margin-right: 4px; }
+.cc-note div + div { margin-top: 4px; }
+.cc-note .dim { opacity: 0.55; }
+
+.cc-talk { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; }
+.cc-stage { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: end; }
+.cc-port {
+  width: clamp(104px, min(14vw, 21vh), 190px);
+  aspect-ratio: 1;
+  border: 2px solid var(--pc);
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.6), 0 0 22px color-mix(in srgb, var(--pc) 25%, transparent);
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+  background: #05040c;
+}
+.cc-port canvas { width: 100%; height: 100%; display: block; }
+.cc-id { display: flex; flex-direction: column; gap: 3px; padding-bottom: 6px; }
+.cc-id small { font-size: 10.5px; letter-spacing: 0.3em; color: var(--pc); }
+.cc-id b {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(18px, 2vw, 28px);
+  color: #fff;
+  letter-spacing: 0.04em;
+  transform: skewX(-8deg);
+  transform-origin: left bottom;
+  text-shadow: 2px 2px 0 color-mix(in srgb, var(--pc) 70%, #000), 4px 4px 0 rgba(0, 0, 0, 0.6);
+}
+.cc-id span { font-size: 12px; color: rgba(210, 255, 230, 0.8); }
+.cc-id .cc-mood { font-size: 10.5px; letter-spacing: 0.24em; color: var(--crt-amber); }
+.cc-subs { min-height: 4.6em; padding: 8px 14px; background: rgba(0, 0, 0, 0.45); border-left: 3px solid var(--pc); }
+.cc-subs .subs { opacity: 0.35; }
+.cc-subs .subs.show { opacity: 1; }
+.cc-choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; min-height: 2em; }
+.cc-choices li {
+  padding: 3px 10px;
+  font-family: var(--font-display);
+  font-size: calc(14px * var(--sub-scale, 1));
+  letter-spacing: 0.02em;
+  color: rgba(230, 255, 240, 0.85);
+  border: 1px solid transparent;
+  cursor: pointer;
+  animation: cc-in 0.22s steps(3) both;
+}
+.cc-choices li b { display: inline-block; width: 1.2em; color: var(--pc); }
+.cc-choices li.on { color: #fff; background: color-mix(in srgb, var(--pc) 16%, rgba(0, 0, 0, 0.4)); border-color: color-mix(in srgb, var(--pc) 60%, transparent); }
+.cc-choices li.locked { color: rgba(200, 220, 210, 0.38); cursor: default; }
+.cc-choices li small { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; color: #ff8a9a; }
+.cc-choices li.idle { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.28em; }
+.cc-choices li:nth-child(2) { animation-delay: 0.04s; }
+.cc-choices li:nth-child(3) { animation-delay: 0.08s; }
+.cc-choices li:nth-child(4) { animation-delay: 0.12s; }
+.cc-choices li:nth-child(5) { animation-delay: 0.16s; }
+@keyframes cc-in { from { opacity: 0; transform: translateX(-8px); } }
+.cc-keys { margin-top: auto; font-size: 10.5px; line-height: 1.6; color: rgba(125, 255, 178, 0.5); letter-spacing: 0.12em; }
+@media (max-width: 900px) {
+  .cc { grid-template-columns: 1fr; }
+}
+
+/* The dock screen gained a tab row: head · tabs · panel/body · ticker. */
+.dock-screen { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.cc-log { min-height: 1.3em; font-size: 11.5px; letter-spacing: 0.1em; color: #fff; opacity: 0.85; }
