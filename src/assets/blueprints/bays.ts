@@ -42,11 +42,11 @@ export interface BaySpec {
  * Enclosure (Part.shade) for the bay's surfaces: the cel shader casts no
  * shadows, so without it the liners took full sun and the grazing rim light
  * turned a dark recess bright teal. Liners sit nearly in the dark, ribs and
- * the deck stripe catch a little, the collar is half in its own shadow.
+ * the deck stripe catch a little, the collar is mostly in its own shadow.
  */
 export const LINER_SHADE = 0.9;
 const RIB_SHADE = 0.75;
-const COLLAR_SHADE = 0.35;
+const COLLAR_SHADE = 0.6;
 
 /** Interior half-extents in metres at `scale` (for cameras / docking depth). */
 export function bayInterior(s: BaySpec, scale: number): { hw: number; hh: number; depth: number } {
