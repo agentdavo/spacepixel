@@ -115,8 +115,9 @@ The lead session is stopping here; a project thread continues from this file.
   `worktree-agent-a9181dba8d1e07ff0` (turret rigs + muzzles, 6 commits),
   `worktree-agent-ad2e6ed36bfec934d` (shields v2 + impact decals, 2 commits),
   `worktree-agent-a936121b44b53858f` (subsystems v2 + kill paths: structural
-  break-up, reactor, bridge kill, wrecks/salvage, 14 commits). Ask the lead
-  session (via the user) to push any of them if you want to mine them.
+  break-up, reactor, bridge kill, wrecks/salvage, 14 commits). Mine what fits;
+  they'll need a merge with the current turrets/shields code and a full
+  re-verify (`tsc`, `npm test`, `ai-sim`, `balance`, `determinism`).
 
 - **Voices → batch 6 owner (turrets session):** once shields v2, subsystems and kill paths emit
   events, list their `WeaponEvent.kind` names here (e.g. `facing-down`,
