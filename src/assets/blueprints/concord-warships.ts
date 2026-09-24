@@ -1,6 +1,6 @@
 import type { Blueprint, Part, Station } from '../Blueprint';
 import { sideX, topAt } from './kit';
-import { bd, bell, bx, cyl, hp, lf, post, turret, turrets, windows } from './yard';
+import { bd, bell, bx, cyl, hp, lf, post, turret, windows } from './yard';
 
 // ═════════════════════════════════════════════════════════════════════════
 // DDG-40 ARBITER — Directorate fork-bow destroyer, ~620 m (modelled 1:30)
@@ -25,12 +25,13 @@ const prTop = (z: number) => topAt(AR_PRONG, z);
 const TOWER_Z = -2.6;
 const TY = arTop(TOWER_Z);
 const MAIN = { radius: 0.42, height: 0.42, barrels: 2, barrelLength: 1.4, barrelRadius: 0.05, housing: [0.8, 0.28, 0.95] as [number, number, number] };
-const AR_GUNS = turrets([
-  turret('prong-a', [0.95, prTop(6.4) - 0.02, 6.4], { ...MAIN, mirror: true, joint: 'prong-a' }),
-  turret('prong-b', [0.95, prTop(3.9) - 0.02, 3.9], { ...MAIN, mirror: true, joint: 'prong-b' }),
-  turret('main-x', [0, arTop(-6.4) - 0.02, -6.4], { ...MAIN, radius: 0.5, housing: [0.95, 0.3, 1.1], barrels: 3, yaw: 180, joint: 'main-x' }),
-  turret('ventral', [0, -1.12, -4.0], { ...MAIN, ventral: true, paint: 'secondary', joint: 'ventral' }),
-]);
+/** Prong battery (clear forward, masked inboard by the other prong), aft X (masked forward by the tower), keel mount. */
+const AR_GUNS = [
+  turret('prong-a', [0.95, prTop(6.4) - 0.02, 6.4], { ...MAIN, mirror: true, traverse: [-80, 160] }),
+  turret('prong-b', [0.95, prTop(3.9) - 0.02, 3.9], { ...MAIN, mirror: true, traverse: [-90, 165] }),
+  turret('main-x', [0, arTop(-6.4) - 0.02, -6.4], { ...MAIN, radius: 0.5, housing: [0.95, 0.3, 1.1], barrels: 3, yaw: 180, traverse: [-150, 150], elevation: [-10, 70] }),
+  turret('ventral', [0, -1.12, -4.0], { ...MAIN, ventral: true, paint: 'secondary' }),
+];
 
 export const ARBITER: Blueprint = {
   id: 'ddg40-arbiter',
@@ -85,7 +86,7 @@ export const ARBITER: Blueprint = {
       { name: `vls-${r}`, paint: 'dark', pos: [-0.75, arTop(z) + 0.02, z], repeat: { count: 6, step: [0.3, 0, 0] }, shape: { kind: 'box', w: 0.22, h: 0.04, d: 0.22 } },
     ]),
     bx('vls-frame', 'secondary', [0, arTop(-0.8) - 0.01, -0.8], [1.9, 0.05, 0.8]),
-    ...AR_GUNS.parts,
+    ...AR_GUNS,
     post('barbette-x', 'secondary', [0, arTop(-6.4) - 0.1, -6.4], 0.5, 0.48, 0.12, 10),
     // Radiator wings + fins.
     { name: 'radiator', paint: 'secondary', mirror: true, pos: [1.4, 0.2, -5.0], rot: [0, 0, -8], shape: { kind: 'wing', root: 3.2, tip: 1.6, span: 1.8, sweep: 1.4, thickness: 0.12, tipThickness: 0.1 } },
@@ -114,7 +115,6 @@ export const ARBITER: Blueprint = {
     { pos: [0, -0.52, -11.6], radius: 0.32, plume: 3.6 },
   ],
   articulations: [
-    ...AR_GUNS.joints,
     { id: 'radar', pivot: [0, TY + 3.0, TOWER_Z - 0.1], axis: [0, 1, 0], range: [0, 360], channel: 'radar', mirror: false },
   ],
   hardpoints: [

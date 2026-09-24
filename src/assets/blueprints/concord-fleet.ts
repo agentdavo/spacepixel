@@ -114,6 +114,7 @@ export const LANTERN_GUARD: Blueprint = {
       trim: 'metal',
       pos: [0, lgTop(4.3) - 0.02, 4.3],
       socket: { id: 'main-a', kind: 'turret' },
+      rig: { traverse: [-150, 150], elevation: [-10, 75] }, // B's barbette aft
       shape: { kind: 'turret', radius: 0.5, height: 0.55, barrels: 2, barrelLength: 1.4, barrelRadius: 0.07 },
     },
     post('barbette-b', 'secondary', [0, lgTop(2.7) - 0.05, 2.7], 0.46, 0.42, 0.45, 8),
@@ -123,6 +124,7 @@ export const LANTERN_GUARD: Blueprint = {
       trim: 'metal',
       pos: [0, lgTop(2.7) + 0.4, 2.7],
       socket: { id: 'main-b', kind: 'turret' },
+      rig: { traverse: [-150, 150], elevation: [-10, 75] }, // the bridge aft
       shape: { kind: 'turret', radius: 0.5, height: 0.55, barrels: 2, barrelLength: 1.4, barrelRadius: 0.07 },
     },
     {
@@ -132,6 +134,7 @@ export const LANTERN_GUARD: Blueprint = {
       pos: [0, lgTop(-4.4) - 0.02, -4.4],
       rot: [0, 180, 0],
       socket: { id: 'main-c', kind: 'turret' },
+      rig: { traverse: [-150, 150], elevation: [-10, 75] }, // the deckhouse forward
       shape: { kind: 'turret', radius: 0.5, height: 0.55, barrels: 2, barrelLength: 1.4, barrelRadius: 0.07 },
     },
     // Missile cells.
@@ -167,6 +170,7 @@ export const LANTERN_GUARD: Blueprint = {
       pos: [sideX(LG_HULL, 0.9, 0.55) + 0.2, 0.77, 0.9],
       rot: [0, 35, 0],
       socket: { id: 'pd', kind: 'turret' },
+      rig: { traverse: [-130, 145] }, // across the forecastle, not through the deckhouse
       shape: { kind: 'turret', radius: 0.2, height: 0.22, barrels: 1, barrelLength: 0.55, barrelRadius: 0.04 },
     },
     // Radiators, fins, drive.
@@ -383,6 +387,7 @@ export const HESPERUS_DAWN: Blueprint = {
       rot: [0, 30, 0],
       repeat: { count: 4, step: [0, 0, -2.4] },
       socket: { id: 'pd', kind: 'turret' },
+      rig: { traverse: [-50, 160] }, // the hull and flight deck inboard
       shape: { kind: 'turret', radius: 0.14, height: 0.14, barrels: 2, barrelLength: 0.36, barrelRadius: 0.02 },
     },
     {
@@ -453,7 +458,7 @@ const BB_HULL: Station[] = [
 const bbTop = (z: number) => topAt(BB_HULL, z);
 
 /** Triple-gun main battery turret. */
-function mainTurret(id: string, z: number, lift: number, aft: boolean): Part[] {
+function mainTurret(id: string, z: number, lift: number, aft: boolean, traverse = 150): Part[] {
   const y = bbTop(z) - 0.03;
   const parts: Part[] = [];
   if (lift > 0) parts.push(post(`${id}-barbette`, 'secondary', [0, y, z], 0.84, 0.8, lift + 0.05, 10));
@@ -464,6 +469,7 @@ function mainTurret(id: string, z: number, lift: number, aft: boolean): Part[] {
     pos: [0, y + lift, z],
     rot: aft ? [0, 180, 0] : [0, 0, 0],
     socket: { id, kind: 'turret' },
+    rig: { traverse: [-traverse, traverse], elevation: [-8, 60] },
     shape: { kind: 'turret', radius: 0.88, height: 0.85, barrels: 3, barrelLength: 2.8, barrelRadius: 0.1, housing: [1.85, 0.58, 2.1] },
   });
   parts.push({ name: `${id}-roof`, paint: 'accent', pos: [0, y + lift + 0.87, z + (aft ? 0.35 : -0.35)], shape: { kind: 'box', w: 0.7, h: 0.04, d: 0.6 } });
@@ -523,10 +529,10 @@ export const INDOMITABLE: Blueprint = {
       }),
     ),
     // Main battery: A, B (superfiring) forward; X (superfiring), Y aft.
-    ...mainTurret('main-a', 5.9, 0, false),
+    ...mainTurret('main-a', 5.9, 0, false, 145), // masked aft by superfiring B
     ...mainTurret('main-b', 3.6, 0.55, false),
     ...mainTurret('main-x', -4.2, 0.55, true),
-    ...mainTurret('main-y', -6.6, 0, true),
+    ...mainTurret('main-y', -6.6, 0, true, 145), // masked forward by superfiring X
     // Pagoda tower.
     { name: 'tower-base', paint: 'primary', pos: [0, TOWER_Y + 0.55, TOWER_Z], shape: { kind: 'box', w: 1.9, h: 1.2, d: 2.8, c: 0.22 } },
     { name: 'tower-stripe', paint: 'accent', pos: [0, TOWER_Y + 0.75, TOWER_Z + 1.41], shape: { kind: 'box', w: 1.92, h: 0.16, d: 0.04 } },
@@ -582,6 +588,7 @@ export const INDOMITABLE: Blueprint = {
       rot: [0, 28, 0],
       repeat: { count: 4, step: [0, 0, -1.75] },
       socket: { id: 'secondary', kind: 'turret' },
+      rig: { traverse: [-55, 150] }, // the hull and tower inboard
       shape: { kind: 'turret', radius: 0.24, height: 0.26, barrels: 2, barrelLength: 0.8, barrelRadius: 0.035 },
     },
     // Ventral turrets.
@@ -593,6 +600,7 @@ export const INDOMITABLE: Blueprint = {
       rot: [0, 0, 180],
       repeat: { count: 2, step: [0, 0, -6.5] },
       socket: { id: 'ventral', kind: 'turret' },
+      rig: { elevation: [-5, 80] },
       shape: { kind: 'turret', radius: 0.4, height: 0.4, barrels: 2, barrelLength: 1.2, barrelRadius: 0.05 },
     },
     // Deck machinery.

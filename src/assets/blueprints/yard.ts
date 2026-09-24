@@ -1,4 +1,4 @@
-import type { Articulation, Hardpoint, Paint, Part, Station, Vec3 } from '../Blueprint';
+import type { Hardpoint, Paint, Part, Station, TurretRigDef, Vec3 } from '../Blueprint';
 import { band } from './kit';
 
 /**
@@ -99,27 +99,42 @@ export interface TurretOpts {
   yaw?: number;
   /** Mounted upside down under the hull. */
   ventral?: boolean;
+  /** Roll of the mount in degrees (a turret on a sloped shoulder or a hull side). */
+  tilt?: number;
   paint?: Paint;
   trim?: Paint;
-  /** Drive the turret with a joint (channel 'turret'), so it can train. */
-  joint?: string;
   mirror?: boolean;
+  /**
+   * Traverse limits in degrees relative to the rest yaw, + toward the part's
+   * own +X (outboard on a starboard mount; mirrored copies mirror it).
+   * Default all round. Keep it off the ship's own superstructure.
+   */
+  traverse?: [number, number];
+  /** Elevation limits above the mount plane, degrees (default −8…80). */
+  elevation?: [number, number];
 }
 
 /**
- * A gun turret with an optional training joint and a turret socket at its
- * trunnion. Returns the part plus (if `joint`) the articulation to register.
+ * A gun turret with a turret socket at its base. The builder rigs it
+ * (ShipBuilder `TurretRigInfo`): the base and housing train on a traverse
+ * joint named `id`, the mantlet and barrels elevate on `${id}/el` about the
+ * trunnion, within `traverse` / `elevation`.
  */
-export function turret(id: string, pos: Vec3, o: TurretOpts): { parts: Part[]; joint?: Articulation } {
+export function turret(id: string, pos: Vec3, o: TurretOpts): Part {
   const yaw = o.yaw ?? 0;
-  const part: Part = {
+  const roll = (o.ventral ? 180 : 0) + (o.tilt ?? 0);
+  const rig: TurretRigDef = {};
+  if (o.traverse) rig.traverse = o.traverse;
+  if (o.elevation) rig.elevation = o.elevation;
+  return {
     name: id,
     paint: o.paint ?? 'primary',
     trim: o.trim ?? 'metal',
     pos,
-    rot: o.ventral ? [0, yaw, 180] : [0, yaw, 0],
+    rot: [0, yaw, roll],
     mirror: o.mirror,
     socket: { id, kind: 'turret' },
+    rig,
     shape: {
       kind: 'turret',
       radius: o.radius,
@@ -129,25 +144,6 @@ export function turret(id: string, pos: Vec3, o: TurretOpts): { parts: Part[]; j
       barrelRadius: o.barrelRadius,
       housing: o.housing,
     },
-  };
-  if (!o.joint) return { parts: [part] };
-  part.articulation = o.joint;
-  const joint: Articulation = {
-    id: o.joint,
-    pivot: pos,
-    axis: [0, o.ventral ? -1 : 1, 0],
-    range: [-180, 180],
-    channel: 'turret',
-    mirror: o.mirror ? undefined : false,
-  };
-  return { parts: [part], joint };
-}
-
-/** Collect turret() results into parts + joints. */
-export function turrets(list: { parts: Part[]; joint?: Articulation }[]): { parts: Part[]; joints: Articulation[] } {
-  return {
-    parts: list.flatMap((t) => t.parts),
-    joints: list.flatMap((t) => (t.joint ? [t.joint] : [])),
   };
 }
 
