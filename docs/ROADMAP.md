@@ -150,7 +150,7 @@ modifiers, an event log), is read and written by everything below.
 | 7 | Persistent NPC arcs that advance while you're away | ≥ 6 arcs | ✅ 7 arcs (Odile, Magpie, Pell, Nadia, Toma, Dalca & Pieter, Maud), 7 arc jobs, THREADS tab |
 | 8 | Rivals: named aces and bounty targets that remember and escalate | ≥ 5 rivals | ✅ 6 rivals (2 can be turned), grudge meters, tiers, world-log memory in their lines |
 
-## Batch 6 — guns you can see, shields you can break, ships that die well (in progress)
+## Batch 6 — guns you can see, shields you can break, ships that die well (carried by the turrets session on `claude/ship-turrets-shields-weapons-8lz4su`; see docs/SESSIONS.md)
 
 | # | Milestone | Pass/fail | Status |
 |---|---|---|---|
