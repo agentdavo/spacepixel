@@ -1,5 +1,5 @@
 import { flags } from '@/core/Flags';
-import { Engine } from '@/core/Engine';
+import { Engine, type Updatable } from '@/core/Engine';
 import { input } from '@/core/Input';
 import { createRenderer } from '@/render/RendererFactory';
 import { InkPipeline } from '@/render/post/InkPipeline';
@@ -108,8 +108,12 @@ async function boot(): Promise<void> {
     ink.setView(flags.view);
     engine.onResize(ink);
     const pipeline = ink;
-    // Photo mode (F10) freezes the scene and flies the lens itself.
+    const sim = game as GameScene & Pick<Updatable, 'fixedUpdate' | 'timeScale'>;
+    // Photo mode (F10) freezes the scene and flies the lens itself. The
+    // wrapper must pass the fixed step through, or the flight sim never ticks.
     engine.addSystem({
+      fixedUpdate: sim.fixedUpdate ? (t) => sim.fixedUpdate!(t) : undefined,
+      timeScale: sim.fixedUpdate ? () => (photo.active ? 0 : (sim.timeScale?.() ?? 1)) : undefined,
       update: (ctx) => {
         if (photo.request) {
           photo.request = false;

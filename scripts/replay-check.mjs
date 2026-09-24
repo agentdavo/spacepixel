@@ -12,11 +12,13 @@
  *    (unrendered fast-forward) through the first half and plays the rest
  *    through the engine's fixed-step loop, rendering, to the end.
  * Pass: every checkpoint of the playback matches the recording bit-for-bit
- * (the deck's SYNC count), no desync.
+ * (the deck's SYNC count), no desync, and the Reach's WorldState (guilds,
+ * outposts, conversations: the tape's 'world-patch' commands) ends the same.
  *
  * --dock starts berthed (`dock=docked&cargo=demo`) and works the dock screen
  * first — buy, sell, repair, rearm, launch — so the tape carries dock-screen
- * commands (ledger, hull, launch) before the flying.
+ * commands (ledger, hull, launch) before the flying. Either way the take
+ * starts with a world change made outside a tick (as a conversation makes one).
  */
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
@@ -32,7 +34,7 @@ const [width, height] = opt('size', '640x360').split('x').map(Number);
 const server = await createServer({ server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: null }, logLevel: 'warn' });
 await server.listen();
 const browser = await chromium.launch({
-  args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--ignore-gpu-blocklist'],
+  args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--use-angle=swiftshader', '--ignore-gpu-blocklist'],
 });
 let code = 0;
 const t0 = Date.now();
@@ -51,6 +53,14 @@ try {
     }
     await page.waitForFunction(() => window.__VANGUARD__.hooks.replay.state().tick > 240, null, { timeout: 600_000, polling: 250 });
   }
+  // A conversation's world change, made outside a tick: the tape's 'world-patch'.
+  await page.waitForFunction(() => window.__VANGUARD__.hooks.replay.state().tick > 30, null, { timeout: 600_000, polling: 250 });
+  await page.evaluate(() =>
+    import('/src/game/world/WorldState.ts').then((m) => {
+      m.world().update((w) => m.bump(m.setFact(w, 'replay-check.spoke', 'dockmaster'), 'replay-check.visits'));
+      m.world().event('replay-check.spoke', 'station:replay-check', { n: 1 });
+    }),
+  );
   // Scripted flying: hold keys for spans of ticks.
   const plan = [
     ['ArrowUp', 1.0],
@@ -99,11 +109,12 @@ try {
   }
   await until(seconds * 60);
   if (stalled) console.log(`  sim paused at tick ${await tick()} (berthed / shot down) — checking the take up to there`);
-  const rec = await page.evaluate(() => {
+  const rec = await page.evaluate(async () => {
+    const { world } = await import('/src/game/world/WorldState.ts');
     const r = window.__VANGUARD__.hooks.replay;
     const f = r.clip(1e9);
     f.view = undefined;
-    return { file: JSON.stringify(f), state: r.state(), err: window.__VANGUARD__.error };
+    return { file: JSON.stringify(f), state: r.state(), err: window.__VANGUARD__.error, world: JSON.stringify(world().state) };
   });
   if (rec.err) throw new Error(rec.err);
   const file = JSON.parse(rec.file);
@@ -116,10 +127,16 @@ try {
     { timeout: 900_000, polling: 500 },
   );
   await page.waitForTimeout(300);
-  const play = await page.evaluate(() => ({ state: window.__VANGUARD__.hooks.replay.state(), err: window.__VANGUARD__.error }));
+  const play = await page.evaluate(async () => {
+    const { world } = await import('/src/game/world/WorldState.ts');
+    return { state: window.__VANGUARD__.hooks.replay.state(), err: window.__VANGUARD__.error, world: JSON.stringify(world().state) };
+  });
   if (play.err) throw new Error(play.err);
   const s = play.state;
-  const pass = s.mode === 'play' && s.desyncAt < 0 && s.checksOk === file.checks.length;
+  const worldSame = play.world === rec.world;
+  const patches = file.commands.filter((c) => c.c === 'world-patch' || c.c === 'world');
+  console.log(`world: ${worldSame ? 'same' : 'DIFFERENT'} at the end · ${patches.length} world commands, ${JSON.stringify(patches).length} B`);
+  const pass = s.mode === 'play' && s.desyncAt < 0 && s.checksOk === file.checks.length && worldSame;
   console.log(`playback: mode ${s.mode}, ${s.tick}/${s.ticks} ticks, checkpoints matched ${s.checksOk}/${file.checks.length}, desync ${s.desyncAt < 0 ? 'none' : `at tick ${s.desyncAt}`}`);
   console.log(`${pass ? 'PASS' : 'FAIL'} · ${((Date.now() - t0) / 1000).toFixed(0)} s`);
   const bad = logs.filter((l) => /pageerror|\[error\]|desync/i.test(l) && !/Device Lost|popErrorScope|mapAsync/.test(l));

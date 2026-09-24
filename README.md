@@ -482,7 +482,9 @@ opened core, the Ember seam to Tey or the Breakers, and a defector
 guilds, NPC arcs and rivals read `world().state.clock`; every roll
 is a hash of seed and clock slot, so a replay rebuilds it bit for bit. Changes
 made outside a tick go on the tape (`world-trade`, `world-take`,
-`world-episode`); a dock trade shows its world mark beside the price (▲/▼).
+`world-episode`; guild hall, outpost and conversation changes as a
+`world-patch` holding only what changed, `src/game/world/diff.ts`); a dock
+trade shows its world mark beside the price (▲/▼).
 
 Captures: `?world=ep<N>` fast-forwards the story (never saved)
 `[&wclock=<s>] [&wbreak=1] [&wclear=<system>] [&wop=line|map]`.

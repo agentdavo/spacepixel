@@ -23,6 +23,7 @@ import { ARCS, arcConversationFor, arcKey, arcPlacement, resolveAt, tickArcs, ty
 import { memoryLine } from './memory';
 import { RIVALS, bountyTaken, grudgeFromEvent, markDown, rivalByMark, rivalByPerson, rivalConversationFor, rivalHideouts, rk, setStatus, tickRivals, type RivalStatus } from '../rivals/rivals';
 import { persistWorld } from '../world/live';
+import { diffWorld, isEmptyDiff, type WorldDiff } from '../world/diff';
 import './people'; // registers arc guests and rivals gone to ground with the concourse
 
 /**
@@ -190,18 +191,25 @@ function stageOnce(): void {
 
 // ── replays (MP-0) ────────────────────────────────────────────────────
 
-let recorder: ((w: WorldState) => void) | null = null;
+let recorder: ((d: WorldDiff) => void) | null = null;
+let recorded: WorldState | null = null;
 
 /**
- * Every world change reaches `fn` (the flight scene hands it to the replay
- * recorder, which keeps only changes made outside a sim tick: conversations,
- * the dock screen). In-tick changes (rivals, arcs ticking in flight) replay
- * by themselves.
+ * Every world change reaches `fn` as a diff against the one before (the
+ * flight scene hands it to the replay recorder, which keeps only changes
+ * made outside a sim tick: conversations, the dock screen). In-tick changes
+ * (rivals, arcs ticking in flight) replay by themselves.
  */
-export function recordWorldChanges(fn: (w: WorldState) => void): void {
+export function recordWorldChanges(fn: (d: WorldDiff) => void): void {
   const first = !recorder;
   recorder = fn;
-  if (first) world().on((w) => recorder?.(w));
+  recorded = world().state;
+  if (first)
+    world().on((w) => {
+      const d = diffWorld(recorded ?? w, w);
+      recorded = w;
+      if (!isEmptyDiff(d)) recorder?.(d);
+    });
 }
 
 /** A replay tape's world change (the same one the live session made from a conversation). */
