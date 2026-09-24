@@ -20,7 +20,7 @@ export type BarkKind =
   | 'order-no-target'; // "attack my target" with nothing locked
 
 /** Lines by kind and voice group. {name} = the other party's callsign. */
-const LINES: Record<BarkKind, Partial<Record<string, string[]>> & { any: string[] }> = {
+export const BARK_LINES: Record<BarkKind, Partial<Record<string, string[]>> & { any: string[] }> = {
   engage: {
     kade: ['Bandits. Vanguard, weapons free. Pick your targets and don\'t get clever.', 'Contacts, closing fast. Break by pairs on my mark — mark.'],
     jackpot: ['Pool is open, people! Two shares on the first splash!', 'Here they come. Oh, I hate it when they sing.'],
@@ -142,7 +142,7 @@ function hash(s: string): number {
 
 /** A bark line for `kind` spoken by voice group `group` (cast id or faction). `n` varies the pick. */
 export function barkLine(kind: BarkKind, group: string, n: number, vars: Record<string, string> = {}): string {
-  const table = LINES[kind];
+  const table = BARK_LINES[kind];
   const list = table[group] ?? table.any;
   const line = list[hash(`${kind}:${group}:${n}`) % list.length];
   return line.replace(/\{(\w+)\}/g, (m, k: string) => vars[k] ?? m);
@@ -284,3 +284,29 @@ export function trafficCargo(name: string, faction: string): string {
   const l = c[faction] ?? c.concord;
   return l[hash(name) % l.length];
 }
+
+// ── station control ────────────────────────────────────────────────
+
+/** Docking control lines by faction (and the carrier); {name} = station, {berth}. */
+export const DOCK_LINES: Record<string, { cleared: string; auto: string; launch: string }> = {
+  concord: {
+    cleared: '{name} Control. Vanguard, you are cleared to berth {berth}. Corridor is lit. Keep the light.',
+    auto: 'Guidance has you, Vanguard. Hands off the stick. Seals standing by.',
+    launch: 'Catapult hot. Good hunting, Vanguard.',
+  },
+  choir: {
+    cleared: 'Be witnessed, Directorate. {name} grants you berth {berth}. Fly the corridor exactly.',
+    auto: 'Our guidance holds you now. Be still, and be welcome.',
+    launch: 'Ascend, pilot. The Line is watching.',
+  },
+  rustwake: {
+    cleared: '{name}. Berth {berth}\'s yours. Don\'t scratch anything you can\'t pay for.',
+    auto: 'Tractor\'s got you, love. Don\'t touch anything shiny.',
+    launch: 'Off you go. Bring us back something worth breaking.',
+  },
+  carrier: {
+    cleared: 'Dawn Control, Vanguard One: you are cleared to the bow hangar. Deck is green.',
+    auto: 'Guidance has you. Deck is green. Welcome home, Point.',
+    launch: 'Catapult hot. Deck is green. Good hunting, Vanguard.',
+  },
+};

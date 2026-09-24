@@ -4,6 +4,7 @@ import { narrationCues } from '@/cinema/narration';
 import { intensityAt, soundTimes, type Shot } from '@/cinema/timeline';
 import { hashStr, personById } from '@/dialog/people';
 import { GameAudio, SCORE_IDS, type AudioFrame, type AudioMissileEvent, type AudioShip, type AudioWeaponEvent, type Mood, type ScoreId } from './index';
+import { clipsSettled, loadClips } from './voice/Recorded';
 import { BANTER, barkLine } from '@/dialog/barks';
 import { CAST_VOICES, VoiceBox, npcVoice, planFor, registerVoice, type VoiceChannel } from './voice';
 
@@ -299,6 +300,11 @@ export const SCENARIOS: Record<string, Scenario> = {
 
   prologue: prologue(),
   trailer: trailer(),
+  // The trailer under Symphony of Gates instead of the Original Score (render it as trailer-ova+cast).
+  'trailer-ova': (() => {
+    const t = trailer();
+    return { ...t, setup: (s) => (t.setup!(s), s.audio.setScore('nexus', 0, 0.1)) };
+  })(),
   // The prologue soundtrack with its narration voice track (what the cold open sounds like now).
   'voice-prologue': (() => {
     const base = prologue();
@@ -486,7 +492,9 @@ export const SCENARIOS: Record<string, Scenario> = {
 };
 
 export async function renderScenario(name: string, sampleRate = 44100): Promise<RenderStats> {
-  const sc = SCENARIOS[name];
+  // "<scenario>+cast": the same scenario with the recorded voices.
+  const cast = name.endsWith('+cast');
+  const sc = SCENARIOS[cast ? name.slice(0, -5) : name];
   if (!sc) throw new Error(`unknown scenario ${name}`);
   const seconds = sc.seconds;
   const length = Math.ceil(seconds * sampleRate);
@@ -494,7 +502,8 @@ export async function renderScenario(name: string, sampleRate = 44100): Promise<
   const audio = new GameAudio({ context: ctx });
   audio.autoMood = false;
   const voice = new VoiceBox(audio);
-  voice.modeOverride = 'synth';
+  voice.modeOverride = cast ? 'cast' : 'synth';
+  if (cast) await loadClips();
   const zero = { x: 0, y: 0, z: 0 };
   const sim: Sim = {
     t: 0,
@@ -546,7 +555,9 @@ export async function renderScenario(name: string, sampleRate = 44100): Promise<
     ctx.suspend(when).then(() => {
       sim.t = when;
       step();
-      ctx.resume();
+      // Recorded lines fetch their clip on first use: hold the render until it lands.
+      if (cast) void clipsSettled().then(() => ctx.resume());
+      else ctx.resume();
     });
   }
   const buf = await ctx.startRendering();

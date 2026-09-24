@@ -3,6 +3,7 @@ import { settings, type VoiceMode } from '@/game/Settings';
 import { planUtterance, revealAt, type VoicePlan, type VoiceProfile } from './plan';
 import { renderVoice, type VoiceChannel, type VoiceHandle } from './VoiceSynth';
 import { speak as speakReal, speechAvailable, stopSpeech } from './Speech';
+import { clipFor, loadClips, playClip } from './Recorded';
 import { voiceFor } from './voices';
 
 export { planUtterance, revealAt, renderVoice, voiceFor };
@@ -48,13 +49,17 @@ export function planFor(req: Pick<SpeakRequest, 'who' | 'text' | 'maxDur' | 'max
 }
 
 const CHANNEL_LEVEL: Record<VoiceChannel, number> = { radio: 0.3, intercept: 0.27, clean: 0.4, narrator: 0.38 };
+/** Recorded clips are peak-normalised; these sit them at the synth's loudness. */
+const CLIP_LEVEL: Record<VoiceChannel, number> = { radio: 0.3, intercept: 0.27, clean: 0.4, narrator: 0.38 };
 
 export class VoiceBox {
   /** Force a mode (offline renders); null = follow settings. */
   modeOverride: VoiceMode | null = null;
   private live = new Map<{ stop(): void }, number>();
 
-  constructor(private readonly audio: GameAudio) {}
+  constructor(private readonly audio: GameAudio) {
+    void loadClips();
+  }
 
   get mode(): VoiceMode {
     return this.modeOverride ?? settings.voice;
@@ -75,6 +80,23 @@ export class VoiceBox {
       if (h) {
         dur = Math.max(plan.dur * 0.8, h.dur);
         handle = h;
+      }
+    }
+    if (mode === 'cast' && !this.audio.muted) {
+      const clip = clipFor(req.who, req.text, profile);
+      const e = this.audio.engine;
+      if (clip && e.ctx && e.voice && e.running) {
+        // Squeeze into maxDur a little by playing faster (pitch rises with it, so not much).
+        const rate = req.maxDur && clip.dur > req.maxDur ? Math.min(req.maxSqueeze ?? 1.25, 1.25, clip.dur / req.maxDur) : 1;
+        const delay = req.delay ?? 0;
+        const radio = channel === 'radio' || channel === 'intercept';
+        try {
+          handle = playClip(e.ctx, e.voice, clip, e.ctx.currentTime + (radio ? 0.08 : 0.02) + delay, channel, (req.level ?? 1) * CLIP_LEVEL[channel] * (profile.gain ?? 1), rate, profile.rasp);
+          dur = clip.dur / rate + (radio ? 0.06 : 0);
+          e.duckMusic(channel === 'narrator' ? -5 : -7, delay + dur + 0.25, 0.9);
+        } catch (err) {
+          console.warn('[voice] clip failed', err);
+        }
       }
     }
     if (!handle && mode !== 'off') handle = this.synth(plan, profile, channel, req.level ?? 1, req.delay ?? 0);

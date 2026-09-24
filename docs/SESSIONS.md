@@ -111,6 +111,17 @@ The lead session is stopping here; a project thread continues from this file.
 - Batch 3 items still open: attract/trailer "10 min unattended" is verified
   (3 cycles); photo mode exists; planetary ports have no contract kinds.
 
+## Recorded voices (voices session)
+
+- Every written line is pre-recorded with Piper neural voices into
+  `public/voice/` (clips + `manifest.json`); `VoiceBox` plays the clip in the
+  new default voice mode `cast` and falls back to the synth for lines without
+  one. **After adding or changing spoken lines, run `npm run voices`** (see
+  README, *People, voices & subtitles*) or they stay on the synth.
+- Touches outside this area: `VoiceMode` gained `'cast'` in
+  `src/game/Settings.ts` (old saves move to it once); `DOCK_LINES` moved from
+  `FlightRadio.ts` into `barks.ts`; `package.json` has a `voices` script.
+
 ## Wing chat (voices session)
 
 - Wing orders (keys 1–4) get a spoken answer from the lead wingman, in
