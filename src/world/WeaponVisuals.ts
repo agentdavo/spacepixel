@@ -52,7 +52,9 @@ export type MissileSource = Pick<Missiles, 'alive' | 'pos' | 'vel' | 'spec' | 'e
  * Shields are drawn on the shell they really are (ShieldGeometry): the sim's
  * ellipsoid on capitals, a tight skin on fighters. One shell mesh per ship
  * under fire carries up to six live hits at once: cel hexagon cells light
- * in rings spreading from each impact over the curved shell, tinted by
+ * in rings spreading from each impact over the curved shell (Concord hex
+ * cells; Choir long crystal facets shading magenta to violet-white; Rustwake
+ * bent, holed scrap plates in amber and sulphur), tinted by
  * faction and damage type (harmonic crackles along the cell borders), and
  * brighter — and broken, cells dropping out — the weaker the facing. The
  * facing that took the hit glows faintly to its borders so a pilot can read
@@ -120,6 +122,8 @@ interface ShieldFx {
   gain: ShaderNode;
   /** Bubble collapse / regen origin (shell-sphere direction). */
   origin: ShaderNode;
+  /** Shell style by faction: 0 Concord hex lattice, 1 Choir crystal facets, 2 Rustwake patched scrap. */
+  style: ShaderNode;
   next: number;
 }
 
@@ -262,6 +266,7 @@ export class WeaponVisuals {
     const gain: ShaderNode = uniform(1);
     const origin: ShaderNode = uniform(new Vector3(0, 0, 1));
     const beamHarm: ShaderNode = uniform(new Vector3(0, 0, 0));
+    const style: ShaderNode = uniform(0);
 
     const mat = new MeshBasicNodeMaterial();
     mat.transparent = true;
@@ -299,12 +304,23 @@ export class WeaponVisuals {
       const an = abs(n);
       const zDom = an.z.greaterThanEqual(max(an.x, an.y));
       const xDom = an.x.greaterThanEqual(an.y);
-      const p2 = select(zDom, pm.xy, select(xDom, pm.zy, pm.xz)).div(cell).toVar();
+      const crystal = style.equal(1);
+      const scrap = style.equal(2);
+      const pr = select(zDom, pm.xy, select(xDom, pm.zy, pm.xz)).div(cell).toVar();
+      // Choir: the lattice turned 30° and stretched 2.4× into long crystal facets.
+      // Rustwake: the lattice bent into uneven, patched plates.
+      const pc = vec2(pr.x.mul(0.866).sub(pr.y.mul(0.5)), pr.x.mul(0.5).add(pr.y.mul(0.866)).div(2.4));
+      const ps = pr.add(vec2(sin(pr.y.mul(0.9)).add(sin(pr.x.mul(0.31)).mul(0.6)), sin(pr.x.mul(0.83).add(1.3)).add(sin(pr.y.mul(0.27)).mul(0.6))).mul(0.5));
+      const p2 = select(crystal, pc, select(scrap, ps, pr)).toVar();
       const hx = fxHex({ p: p2 }).toVar();
-      const off = vec2(hx.y, hx.z).sub(p2).mul(cell);
+      const d2 = vec2(hx.y, hx.z).sub(p2).toVar();
+      // Back to the projection plane (crystal: undo the stretch, then the turn).
+      const dy = d2.y.mul(2.4);
+      const dc = vec2(d2.x.mul(0.866).add(dy.mul(0.5)), d2.x.mul(-0.5).add(dy.mul(0.866)));
+      const off = select(crystal, dc, d2).mul(cell);
       // Cell centre back in 3D (the projection plane's two axes).
       const cellC = pm.add(select(zDom, vec3(off.x, off.y, 0), select(xDom, vec3(0, off.y, off.x), vec3(off.x, 0, off.y)))).toVar();
-      const edge = hx.x.greaterThan(0.4);
+      const edge = hx.x.greaterThan(select(crystal, float(0.42), select(scrap, float(0.3), float(0.4))));
       const axisK = select(zDom, float(0.37), select(xDom, float(0.71), float(0.13)));
       const cellHash = fract(sin(dot(vec2(hx.y, hx.z), vec2(12.9898, 78.233)).add(axisK.mul(91.1))).mul(43758.5453)).toVar();
       const beat = floor(time.mul(24)); // crackle re-drawn on twos (at 24 fps)
@@ -313,9 +329,13 @@ export class WeaponVisuals {
       // Weak facings break up: cells drop out of every ripple.
       const strength = fs.z;
       const intact = select(cellHash.greaterThan(strength.mul(1.9).add(0.18)), float(0.15), float(1)).toVar();
+      // Rustwake plates have holes: a few cells never light.
+      intact.mulAssign(select(scrap.and(cellHash.lessThan(0.1)), float(0), float(1)));
+      // Per-cell colour: Choir facets shade from magenta to violet-white, Rustwake plates from amber to sulphur.
+      const tintC = mix(vec3(tint), select(crystal, vec3(0.85, 0.75, 1.0), vec3(1.0, 0.9, 0.35)), select(style.greaterThan(0.5), cellHash.mul(0.65), float(0))).toVar();
 
       const typeCol = (k: ShaderNode): ShaderNode =>
-        select(k.lessThan(0.5), vec3(1.0, 0.86, 0.55), select(k.lessThan(1.5), vec3(tint), select(k.lessThan(2.5), vec3(0.92, 0.72, 1.0), vec3(1.0, 0.55, 0.22))));
+        select(k.lessThan(0.5), vec3(1.0, 0.86, 0.55), select(k.lessThan(1.5), tintC, select(k.lessThan(2.5), vec3(0.92, 0.72, 1.0), vec3(1.0, 0.55, 0.22))));
       const acc = vec3(0, 0, 0).toVar();
 
       // ── hit ripples ──
@@ -337,7 +357,7 @@ export class WeaponVisuals {
         const core = select(dC.lessThan(size.mul(0.22).mul(float(1).sub(tt.mul(2.5)))), float(2.2), float(0));
         const lines = select(edge, inside.mul(0.9), inside.mul(0.12)).mul(intact);
         const soft = exp(dF.div(size.mul(0.3)).negate()).mul(fadeT.mul(fadeT).mul(fadeT)).mul(1.4);
-        const col = mix(vec3(tint), typeCol(k), select(k.equal(1), float(0), float(0.55)));
+        const col = mix(tintC, typeCol(k), select(k.equal(1), float(0), float(0.55)));
         const lit = band.mul(select(edge, float(2.4), float(0.8))).add(core).add(lines).add(soft);
         // Harmonic: arcs crawl along the cell borders around the hit, flickering.
         const harm = select(k.greaterThan(1.5).and(k.lessThan(2.5)), float(1), float(0));
@@ -357,7 +377,7 @@ export class WeaponVisuals {
         const hot = exp(dB.div(bs.mul(0.45)).negate()).mul(3.5);
         const harmB = (j === 0 ? beamHarm.x : beamHarm.y).greaterThan(0.5);
         const arcs = select(edge.and(crackHash.greaterThan(0.55)).and(dBc.lessThan(bs.mul(2.2))).and(harmB), float(2.5), float(0));
-        acc.addAssign(vec3(tint).mul(cells.add(hot)).add(vec3(0.95, 0.9, 1.0).mul(arcs)).mul(b.w));
+        acc.addAssign(tintC.mul(cells.add(hot)).add(vec3(0.95, 0.9, 1.0).mul(arcs)).mul(b.w));
       }
 
       // ── facing outline: which facing is taking fire, to its borders ──
@@ -367,7 +387,7 @@ export class WeaponVisuals {
       const unstable = mix(float(1), flick.mul(1.6).add(0.1), low);
       const pops = select(crackHash.greaterThan(0.94), float(1.6), float(0)).mul(low);
       const faceGlow = select(edge, float(0.13), float(0.012)).mul(intact).add(border.mul(1.3)).add(pops).mul(outline).mul(unstable);
-      acc.addAssign(vec3(tint).mul(faceGlow));
+      acc.addAssign(tintC.mul(faceGlow));
 
       // ── collapse: white-hot flash, then a ring folds in from the edge while the lattice shatters ──
       const cT = fs.x.div(COLLAPSE_LIFE);
@@ -378,7 +398,7 @@ export class WeaponVisuals {
       const shatter = select(fdist.greaterThan(ringPos).and(cellHash.lessThan(float(0.55).sub(cT.mul(0.6)))), select(edge, float(1.6), float(0.35)), float(0)).mul(float(1).sub(cT));
       const implode = select(fdist.lessThan(0.12), float(1), float(0)).mul(smoothstep(0.6, 0.72, cT)).mul(float(1).sub(smoothstep(0.72, 0.95, cT))).mul(3.0);
       const collapse = select(edge, float(2.6), float(0.9)).mul(flashA).add(foldRing).add(shatter).add(implode).mul(select(fdist.lessThan(1.02), float(1), float(0)));
-      acc.addAssign(select(cLive, mix(vec3(tint), vec3(1, 1, 1), flashA.mul(0.6)).mul(collapse), vec3(0)));
+      acc.addAssign(select(cLive, mix(tintC, vec3(1, 1, 1), flashA.mul(0.6)).mul(collapse), vec3(0)));
 
       // ── regen: a sweep from the facing centre draws the lattice back in ──
       const rT = fs.y.div(REGEN_LIFE);
@@ -387,7 +407,7 @@ export class WeaponVisuals {
       const sweep = select(abs(fdist.sub(front)).lessThan(0.06), float(2.2), float(0));
       const rebuilt = select(fdist.lessThan(front), select(edge, float(0.7), float(0.05)), float(0)).mul(float(1).sub(rT));
       const regen = sweep.mul(float(1).sub(smoothstep(0.8, 1.0, rT))).add(rebuilt).mul(select(fdist.lessThan(1.02), float(1), float(0)));
-      acc.addAssign(select(rLive, vec3(tint).mul(regen), vec3(0)));
+      acc.addAssign(select(rLive, tintC.mul(regen), vec3(0)));
 
       return min(acc.mul(gain), vec3(8));
     })();
@@ -397,7 +417,7 @@ export class WeaponVisuals {
     mesh.renderOrder = 22;
     mesh.frustumCulled = false;
     this.group.add(mesh);
-    return { mesh, ship: null, hits, hitB, face, faceDir, beams, beamType: beamHarm.value as Vector3, nf, scale, warp, tint, cell, gain, origin, next: 0 };
+    return { mesh, ship: null, hits, hitB, face, faceDir, beams, beamType: beamHarm.value as Vector3, nf, scale, warp, tint, cell, gain, origin, style, next: 0 };
   }
 
   /** The shell slot lit for `ship` (claims a free one, else the quietest). */
@@ -441,6 +461,7 @@ export class WeaponVisuals {
     s.cell.value = Math.max(sc.x, sc.y, sc.z) * (cap ? 0.02 : 0.085);
     s.gain.value = cap ? 0.8 : 1.2;
     (s.tint.value as Color).set(ship.faction === 'choir' ? '#ff6fd0' : ship.faction === 'rustwake' ? '#ffc070' : '#5fd8ff');
+    s.style.value = ship.faction === 'choir' ? 1 : ship.faction === 'rustwake' ? 2 : 0;
     s.mesh.visible = true;
   }
 

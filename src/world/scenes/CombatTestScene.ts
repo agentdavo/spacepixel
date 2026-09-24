@@ -1,3 +1,4 @@
+import type { FactionId } from '@/assets/Blueprint';
 import { PerspectiveCamera, Scene, Vector3 } from 'three';
 import type { FrameContext } from '@/core/Engine';
 import type { GameScene } from '../GameScene';
@@ -33,7 +34,9 @@ import { CombatHud } from '@/ui/CombatHud';
  *                   (port facing weak: ripples, facing outline, flicker) · collapse
  *                   (the facing fails; freezes &after=S later) · regen (a collapsed
  *                   facing comes back) · subsystem (a hangar and an engine blow)
- *   &ship=<id>      capital for stage=capital (default choir-cathedral)
+ *   &ship=<id>      capital for stage=capital (default choir-cathedral) or
+ *                   stage=impacts (default bb-indomitable; &faction=choir|rustwake
+ *                   picks the shield shell style)
  *   &freeze=S       stop the sim S seconds into the live section (screenshots)
  *   &cam=0..2       alternate framings
  *
@@ -106,7 +109,7 @@ export class CombatTestScene implements GameScene {
     if (this.stage === 'capital') pre = this.setupCapital(q.get('ship') ?? 'choir-cathedral');
     else if (this.stage === 'shield') pre = this.setupShield();
     else if (this.stage === 'smoke') pre = this.setupSmoke();
-    else if (this.stage === 'impacts') pre = this.setupImpacts(q.get('side') ?? 'hull', Number(q.get('after') ?? 0.1));
+    else if (this.stage === 'impacts') pre = this.setupImpacts(q.get('side') ?? 'hull', Number(q.get('after') ?? 0.1), q.get('ship') ?? 'bb-indomitable', (q.get('faction') ?? 'concord') as FactionId);
     else pre = this.setupWeapons();
 
     // Fast-forward (no FX): the fight settles into shape.
@@ -291,8 +294,8 @@ export class CombatTestScene implements GameScene {
     return 0.9;
   }
 
-  private setupImpacts(side: string, after: number): number {
-    const cap = this.fleet.spawn('bb-indomitable', 'concord', ORIGIN.clone(), new Vector3(0, 0, 1), { name: 'Indomitable' });
+  private setupImpacts(side: string, after: number, id: string, faction: FactionId): number {
+    const cap = this.fleet.spawn(id, faction, ORIGIN.clone(), new Vector3(0, 0, 1), { name: 'Target' });
     cap.team = 'renegade';
     cap.flight.velocity.set(0, 0, 0);
     cap.plotArmour = true;
