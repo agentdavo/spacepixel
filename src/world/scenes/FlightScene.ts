@@ -383,7 +383,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (this.killCam?.active) return 0;
     const base = this.docking.frozen ? 0 : this.tactical ? 0.25 : 1;
     // ?killcam= captures run the sim ahead to the kill at ?warp=N× (1 frame = N ticks).
-    const warp = this.stageKillCam && this.stageKillCam.fired < 0 ? this.stageKillCam.warp : 1;
+    const kc = this.stageKillCam;
+    const warp = kc && (kc.fired < 0 || this.simTick < kc.fired + 45) ? kc.warp : 1;
     return base * warp * this.replay.timeScale();
   }
 
