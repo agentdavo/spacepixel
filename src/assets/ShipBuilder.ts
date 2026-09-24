@@ -250,13 +250,13 @@ export function buildShip(bp: Blueprint, liveryOverride?: Partial<Livery>): Ship
       const main = shape.main.clone();
       main.applyMatrix4(m);
       if (flip) flipWinding(main);
-      paintGeometry(main, mainColor, [region, part.emissive ?? emDefault, part.gloss ?? glossDefault, 0]);
+      paintGeometry(main, mainColor, [region, part.emissive ?? emDefault, part.gloss ?? glossDefault, part.shade ?? 0]);
       pieces.push(normaliseAttributes(main));
       if (shape.trim) {
         const t = shape.trim.clone();
         t.applyMatrix4(m);
         if (flip) flipWinding(t);
-        paintGeometry(t, trimColor, [trimRegion, trimEm, trimGloss, 0]);
+        paintGeometry(t, trimColor, [trimRegion, trimEm, trimGloss, part.shade ?? 0]);
         pieces.push(normaliseAttributes(t));
       }
       bucket(joint).push(...pieces);

@@ -117,6 +117,13 @@ export interface Part {
   livery?: FactionId;
   /** Explicit colour, overriding the paint slot's colour (surface preset still follows `paint`). */
   color?: string;
+  /**
+   * 0..1 enclosure (hangar interiors): the cel shader has no shadows, so a
+   * bay's inner faces would take full sun and a grazing rim light. Shade
+   * mutes rim and glints and pulls direct light toward a dim shadow tint.
+   * Emissives (deck lights) are unaffected.
+   */
+  shade?: number;
   /** Hinge this part moves with: a joint id from `Blueprint.articulations`, or an inline definition. */
   articulation?: string | Articulation;
   /**

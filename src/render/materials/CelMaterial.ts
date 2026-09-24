@@ -144,6 +144,8 @@ export class CelMaterial extends MeshBasicNodeMaterial {
       opts.regionNode ?? (surface ? surface.x.add(opts.inkId ?? 0) : float(opts.inkId ?? 0));
     const emissiveAmt: Node = surface ? surface.y : float(0);
     const glossAmt: Node = surface ? surface.z.mul(this.gloss) : this.gloss;
+    // Enclosure (Part.shade): hangar interiors get no sun, rim or glints.
+    const open: Node = surface ? float(1).sub(surface.w) : float(1);
 
     // Battle damage: per-object uniforms, so one shared material shows each ship's own scars.
     const dmg = opts.damage
@@ -168,13 +170,14 @@ export class CelMaterial extends MeshBasicNodeMaterial {
       // Banded diffuse via ramp lookup on half-lambert.
       const halfLambert = dot(N, L).mul(0.5).add(0.5);
       const light = texture(ramp, vec2(halfLambert, 0.5)).r;
-      const lightColor = mix(LightRig.shadowTint, LightRig.keyColor, light);
+      const lit = mix(LightRig.shadowTint, LightRig.keyColor, light);
+      const lightColor = mix(LightRig.shadowTint.mul(0.4), lit, open);
       const col = vec3(paint).mul(lightColor).toVar();
 
       // Hard specular glint — only where the ramp says we're lit.
       const H = normalize(L.add(V));
       const spec = pow(max(dot(N, H), 0.0), this.shininess);
-      const glint = smoothstep(0.55, 0.6, spec).mul(glossAmt).mul(smoothstep(0.6, 0.7, light));
+      const glint = smoothstep(0.55, 0.6, spec).mul(glossAmt).mul(smoothstep(0.6, 0.7, light)).mul(open);
       col.addAssign(LightRig.specColor.mul(glint));
 
       // Canopy streak: a diagonal white band in view space on very glossy parts.
@@ -186,7 +189,7 @@ export class CelMaterial extends MeshBasicNodeMaterial {
       // Stark rim light, carved on the side facing the rim source.
       const fres = float(1.0).sub(saturate(dot(N, V)));
       const rimMask = smoothstep(-0.05, 0.25, dot(N, LightRig.rimDirection));
-      const rim = smoothstep(this.rimWidth, this.rimWidth.add(0.04), fres).mul(rimMask);
+      const rim = smoothstep(this.rimWidth, this.rimWidth.add(0.04), fres).mul(rimMask).mul(open);
       col.addAssign(LightRig.rimColor.mul(rim));
 
       // Battle damage (OVA style): scorched cel patches with hard edges, a

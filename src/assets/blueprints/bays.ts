@@ -38,6 +38,16 @@ export interface BaySpec {
   id?: string;
 }
 
+/**
+ * Enclosure (Part.shade) for the bay's surfaces: the cel shader casts no
+ * shadows, so without it the liners took full sun and the grazing rim light
+ * turned a dark recess bright teal. Liners sit nearly in the dark, ribs and
+ * the deck stripe catch a little, the collar is half in its own shadow.
+ */
+export const LINER_SHADE = 0.9;
+const RIB_SHADE = 0.75;
+const COLLAR_SHADE = 0.35;
+
 /** Interior half-extents in metres at `scale` (for cameras / docking depth). */
 export function bayInterior(s: BaySpec, scale: number): { hw: number; hh: number; depth: number } {
   return { hw: (s.w / 2) * scale, hh: (s.h / 2) * scale, depth: (s.mouth - s.back) * scale };
@@ -65,18 +75,19 @@ export function hollowBay(s: BaySpec): Part[] {
   const c = Math.min(0.12, Math.min(top - mTop, mBot - bottom, sideW) * 0.4);
   const parts: Part[] = [
     // Collar: the structure around the hole.
-    { name: `${id}-collar-top`, paint, pos: [x, (top + mTop) / 2, zc], shape: { kind: 'box', w: s.outerW, h: top - mTop, d: depth, c } },
-    { name: `${id}-collar-bottom`, paint, pos: [x, (bottom + mBot) / 2, zc], shape: { kind: 'box', w: s.outerW, h: mBot - bottom, d: depth, c } },
-    { name: `${id}-collar-side`, paint, mirror: x === 0, pos: [x + (s.w + sideW) / 2, s.y, zc], shape: { kind: 'box', w: sideW, h: s.h + 0.02, d: depth, c: c * 0.5 } },
+    { name: `${id}-collar-top`, paint, shade: COLLAR_SHADE, pos: [x, (top + mTop) / 2, zc], shape: { kind: 'box', w: s.outerW, h: top - mTop, d: depth, c } },
+    { name: `${id}-collar-bottom`, paint, shade: COLLAR_SHADE, pos: [x, (bottom + mBot) / 2, zc], shape: { kind: 'box', w: s.outerW, h: mBot - bottom, d: depth, c } },
+    { name: `${id}-collar-side`, paint, shade: COLLAR_SHADE, mirror: x === 0, pos: [x + (s.w + sideW) / 2, s.y, zc], shape: { kind: 'box', w: sideW, h: s.h + 0.02, d: depth, c: c * 0.5 } },
     // Dark liners (inside faces of the bay).
-    { name: `${id}-floor`, paint: 'dark', pos: [x, mBot + liner / 2, zi], shape: { kind: 'box', w: s.w, h: liner, d: inD } },
-    { name: `${id}-ceiling`, paint: 'dark', pos: [x, mTop - liner / 2, zi], shape: { kind: 'box', w: s.w, h: liner, d: inD } },
-    { name: `${id}-wall`, paint: 'dark', mirror: x === 0, pos: [x + s.w / 2 - liner / 2, s.y, zi], shape: { kind: 'box', w: liner, h: s.h, d: inD } },
-    { name: `${id}-back`, paint: 'dark', pos: [x, s.y, s.back + liner], shape: { kind: 'box', w: s.w, h: s.h, d: liner * 2 } },
+    { name: `${id}-floor`, paint: 'dark', shade: LINER_SHADE, pos: [x, mBot + liner / 2, zi], shape: { kind: 'box', w: s.w, h: liner, d: inD } },
+    { name: `${id}-ceiling`, paint: 'dark', shade: LINER_SHADE, pos: [x, mTop - liner / 2, zi], shape: { kind: 'box', w: s.w, h: liner, d: inD } },
+    { name: `${id}-wall`, paint: 'dark', shade: LINER_SHADE, mirror: x === 0, pos: [x + s.w / 2 - liner / 2, s.y, zi], shape: { kind: 'box', w: liner, h: s.h, d: inD } },
+    { name: `${id}-back`, paint: 'dark', shade: LINER_SHADE, pos: [x, s.y, s.back + liner], shape: { kind: 'box', w: s.w, h: s.h, d: liner * 2 } },
     // Frame ribs: a hoop every ~30 m, so the eye (and the ink) reads depth.
     {
       name: `${id}-rib-wall`,
       paint: 'metal',
+      shade: RIB_SHADE,
       mirror: x === 0,
       pos: [x + s.w / 2 - liner - 0.02, s.y, s.mouth - ribStep * 0.5],
       repeat: { count: ribs, step: [0, 0, -ribStep] },
@@ -85,12 +96,13 @@ export function hollowBay(s: BaySpec): Part[] {
     {
       name: `${id}-rib-ceiling`,
       paint: 'metal',
+      shade: RIB_SHADE,
       pos: [x, mTop - liner - 0.02, s.mouth - ribStep * 0.5],
       repeat: { count: ribs, step: [0, 0, -ribStep] },
       shape: { kind: 'box', w: s.w - liner * 2, h: 0.04, d: 0.05 },
     },
     // Deck: guide stripes and two rows of lights running inward.
-    { name: `${id}-deck-stripe`, paint: 'accent', mirror: x === 0, pos: [x + s.w * 0.18, mBot + liner + 0.003, zi], shape: { kind: 'box', w: 0.025, h: 0.006, d: inD - 0.06 } },
+    { name: `${id}-deck-stripe`, paint: 'accent', shade: RIB_SHADE, mirror: x === 0, pos: [x + s.w * 0.18, mBot + liner + 0.003, zi], shape: { kind: 'box', w: 0.025, h: 0.006, d: inD - 0.06 } },
     {
       name: `${id}-deck-light`,
       paint: 'glow',
