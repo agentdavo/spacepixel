@@ -28,6 +28,11 @@ import { hudLabels } from './HudLabels';
  *   health bar), corner brackets on the target's other exposed mounts, dim
  *   pips on shielded ones, crosses on destroyed ones.
  * - Own hardware lost (player-flown warships): a red line in the weapons block.
+ * - Kill paths (Structure.ts): the target's keel sections (bow / midships /
+ *   stern) and a critical reactor's fuse and venting under its hull bar;
+ *   callouts under the reticle when a capital near you goes critical, vents,
+ *   strikes, breaks up or detonates; a white-out on a reactor detonation
+ *   (`flash`, fed from DestructionFx); the salvage prompt near a wreck.
  */
 const GREEN = '#7dffb2';
 const AMBER = '#ffc46b';
@@ -65,6 +70,12 @@ export class CombatHud {
   turrets: { mounts: number; engaged: number; mode: 'free' | 'target' | 'hold'; pd: boolean } | null = null;
   /** Hangar complement launched / total; null = no hangar. */
   hangar: { up: number; total: number } | null = null;
+  /** 0..1 white-out (a reactor detonation in view); set each frame by the flight scene. */
+  flash = 0;
+  /** Wreck salvage in reach (src/game/salvage.ts), null = none; set each frame by the flight scene. */
+  salvage: { label: string; lots: string; progress: number; working: boolean; hint: string } | null = null;
+  /** Kill-path callout under the reticle ("CATHEDRAL-12 · REACTOR CRITICAL"). */
+  private callout: FeedLine | null = null;
   /** Subsystem kill feed (newest first) and the player's own last hardware loss. */
   private feed: FeedLine[] = [];
   private ownLoss: FeedLine | null = null;
@@ -113,6 +124,7 @@ export class CombatHud {
     for (const e of events) {
       const s = e.ship;
       const sub = e.sub;
+      if (s && s !== player && s.combat.dmg.capital) this.killPathCallout(e, s, player, time);
       if (!s || !sub) continue;
       if (e.kind !== 'subsystem') {
         if (e.shooter === player) this.struck.set(sub, time);
@@ -129,6 +141,24 @@ export class CombatHud {
     if (this.struck.size > 64) for (const [k, t] of this.struck) if (time - t > 1) this.struck.delete(k);
   }
 
+  /** Capital crises worth a line under the reticle: a core going critical / vented, and how she died. */
+  private killPathCallout(e: WeaponEvent, s: ShipEntity, player: ShipEntity, time: number): void {
+    if (s.flight.position.distanceTo(player.flight.position) > 12000) return;
+    const name = s.name.toUpperCase();
+    let text = '';
+    let color = AMBER;
+    if (e.kind === 'reactor-critical') {
+      text = `${name} · REACTOR CRITICAL`;
+      color = RED;
+    } else if (e.kind === 'reactor-vented') text = `${name} · REACTOR VENTED`;
+    else if (e.kind === 'kill') {
+      const how = e.cause === 'reactor' ? 'REACTOR DETONATION' : e.cause === 'structural' ? 'BROKEN IN TWO' : e.cause === 'bridge' ? 'STRUCK · DRIFTING DEAD' : 'DESTROYED';
+      text = `${name} · ${how}`;
+      color = e.cause === 'reactor' ? RED : e.cause === 'bridge' ? CYAN : AMBER;
+    }
+    if (text) this.callout = { text, color, t: time, ship: s };
+  }
+
   /** Call once per frame (after the camera is final). `target` = the player's lock target. */
   draw(player: ShipEntity, target: ShipEntity | null, cam: PerspectiveCamera, world: WorldSpace, time: number, showTarget = true): void {
     const c = this.ctx;
@@ -138,12 +168,45 @@ export class CombatHud {
     c.shadowColor = 'rgba(125,255,178,0.6)';
     c.shadowBlur = 6;
     c.lineWidth = 1.5;
+    if (this.flash > 0.01) {
+      c.fillStyle = `rgba(255,255,255,${Math.min(0.85, this.flash).toFixed(3)})`;
+      c.fillRect(0, 0, this.w, this.h);
+    }
     if (!player.alive) return;
     this.weapons(player, time);
     if (showTarget && target && target.alive) {
       this.targetPanel(player, target, time);
       this.subBrackets(player, target, cam, world, time);
     }
+    this.killPathLines(time);
+  }
+
+  /** The kill-path callout and the salvage prompt, centred under the reticle. */
+  private killPathLines(time: number): void {
+    const c = this.ctx;
+    const x = this.w / 2;
+    let y = this.h / 2 + 96;
+    c.textAlign = 'center';
+    const k = this.callout;
+    if (k && this.clock - k.t < FEED_TIME) {
+      c.globalAlpha = Math.min(1, (FEED_TIME - (this.clock - k.t)) * 1.5);
+      c.fillStyle = k.color === RED && (time * 3) % 1 > 0.6 ? AMBER : k.color;
+      c.fillText(k.text, x, y);
+      c.globalAlpha = 1;
+      y += 20;
+    }
+    const sv = this.salvage;
+    if (sv) {
+      c.fillStyle = sv.working ? GREEN : DIM;
+      c.fillText(`SALVAGE · ${sv.label}`, x, y);
+      c.fillStyle = DIM;
+      c.fillText(sv.hint || sv.lots, x, y + 16);
+      c.fillStyle = 'rgba(0,0,0,0.5)';
+      c.fillRect(x - 80, y + 23, 160, 4);
+      c.fillStyle = GREEN;
+      c.fillRect(x - 80, y + 23, 160 * Math.max(0, Math.min(1, sv.progress)), 4);
+    }
+    c.textAlign = 'left';
   }
 
   private weapons(p: ShipEntity, time: number): void {
@@ -258,6 +321,36 @@ export class CombatHud {
       c.fillStyle = (time * 4) % 1 < 0.6 ? RED : AMBER;
       c.fillText(loss.text, x, y + (st.capital ? 22 : 40));
     }
+  }
+
+  /** Capitals: keel sections (B M S, red when failing) or, while critical, the reactor's fuse and the crew's venting. */
+  private keelLine(x: number, y: number, st: DamageState, time: number): void {
+    const S = st.structure;
+    if (!st.capital || !S.sections.length) return;
+    const c = this.ctx;
+    c.font = '11px "Share Tech Mono", monospace';
+    const R = S.reactor;
+    if (R.phase === 'critical') {
+      c.fillStyle = (time * 3) % 1 < 0.6 ? RED : '#ffffff';
+      c.fillText(`CORE CRITICAL ${R.t.toFixed(1)}s · VENT ${Math.round(R.vent * 100)}%`, x, y);
+    } else {
+      c.fillStyle = DIM;
+      c.fillText('KEEL', x, y);
+      let px = x + 30;
+      for (let i = 0; i < S.sections.length; i++) {
+        const sec = S.sections[i];
+        const k = sec.hp / sec.hpMax;
+        c.fillStyle = k < 0.25 ? RED : k < 0.6 ? AMBER : GREEN;
+        c.fillText('BMS'[i], px, y);
+        c.fillRect(px + 9, y - 6, 20 * Math.max(0, k), 4);
+        px += 36;
+      }
+      if (R.phase === 'vented') {
+        c.fillStyle = AMBER;
+        c.fillText('VNT', px, y);
+      }
+    }
+    c.font = '13px "Share Tech Mono", monospace';
   }
 
   private bar(x: number, y: number, label: string, v: number, color: string): void {
@@ -394,6 +487,7 @@ export class CombatHud {
     c.fill();
     this.facingBar(x + 80, cy - 8, 'SHD', st, time, true);
     this.bar(x + 80, cy + 10, 'HUL', t.hull / t.hullMax, t.hull / t.hullMax < 0.3 ? RED : AMBER);
+    this.keelLine(x + 80, cy + 27, st, time);
     y = cy + 44;
 
     if (!subs.length) {

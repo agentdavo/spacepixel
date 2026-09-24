@@ -86,6 +86,10 @@ export function hashShip(H: StateHasher, s: ShipEntity): void {
   for (const x of d.heat) H.f64(x);
   for (const x of d.zones) H.f64(x);
   for (const sub of d.subsystems) H.f64(sub.hp);
+  // Kill paths: section integrity, the reactor's fuse and venting.
+  const S = d.structure;
+  for (const sec of S.sections) H.f64(sec.hp);
+  H.str(S.reactor.phase).f64(S.reactor.t).f64(S.reactor.vent).u32(S.lastBy);
   const b = s.brain as { rng?: number; maneuver?: string; nextThink?: number } | null;
   if (b && typeof b.rng === 'number') H.u32(b.rng).str(b.maneuver ?? '').f64(b.nextThink ?? 0);
 }
@@ -95,6 +99,11 @@ export function hashWorld(fleet: Fleet, weapons?: Weapons | null, missiles?: Mis
   H.reset();
   H.u32(fleet.ships.length).u32(fleet.nextEntityId).u32(fleet.rng.state);
   for (const s of fleet.ships) hashShip(H, s);
+  // Kill-path aftermath: wreck pieces (salvage) and live reactor shockwaves.
+  const D = fleet.destruction;
+  H.u32(D.wrecks.length).u32(D.shockwaves.length);
+  for (const w of D.wrecks) H.u32(w.id).vec(w.position).quat(w.orientation).vec(w.spin).f64(w.salvaged).bool(w.taken);
+  for (const w of D.shockwaves) H.u32(w.source.id).f64(w.r);
   if (weapons) {
     H.u32(weapons.rng.state);
     let n = 0;

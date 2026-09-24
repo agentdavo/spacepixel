@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FACING, addSubsystem, applyHit, createDamageState, facingOf, hitSubsystem, type DamageState, type Pools, type Subsystem } from '../src/sim/Damage.ts';
+import { FACING, SENSORS_LOST, addSubsystem, applyHit, capitalEffects, createDamageState, facingOf, hitSubsystem, powerLevel, regenShields, type DamageState, type Pools, type Subsystem } from '../src/sim/Damage.ts';
+import { stepReactor } from '../src/sim/Structure.ts';
 import {
   AIM_SPHERE,
   BOMBER_PREFS,
+  CITADELS,
   FIGHTER_PREFS,
   REPAIR,
   SPLASH_CAP,
@@ -247,4 +249,98 @@ test('a shield emitter shot off drops its own facing; bombers want emitters most
   assert.equal(st.facings[FACING.PORT], 0);
   assert.ok(st.facings[FACING.FORE] > 0, 'the other facings hold');
   assert.ok(!subs.gen.destroyed);
+});
+
+// ── reactor, sensors, launchers (ported from the lead's subsystems v2) ──
+
+/** The test hull plus a keel reactor, a sensor mast, a launcher and the bridge. */
+function withCore() {
+  const c = capital();
+  const add = (id: string, kind: Subsystem['kind'], x: number, y: number, z: number, hpMax: number) => addSubsystem(c.st, { id, kind, label: id.toUpperCase(), x, y, z, radius: 12, hpMax });
+  return {
+    ...c,
+    reactor: add('reactor', 'reactor', 0, -30, -100, 1200),
+    sensors: add('sensors', 'sensors', 0, 30, 150, 150),
+    launcher: add('tube', 'launcher', 20, 30, 120, 200),
+    bridge: add('bridge', 'bridge', 0, 30, 100, 600),
+  };
+}
+const at = (s: Subsystem) => ({ x: s.x, y: s.y, z: s.z });
+
+test('reactor: hurt → brownout; destroyed → critical (whoever hit her last lit it); left alone the crew vents it', () => {
+  const c = withCore();
+  c.st.facings.fill(0);
+  assert.equal(powerLevel(c.st), 1);
+  applyHit(c.st, c.pools, { amount: c.reactor.hpMax * 0.6, type: 'laser', local: at(c.reactor) });
+  assert.equal(powerLevel(c.st), 0.75, 'badly hit: brownout');
+  assert.equal(capitalEffects(c.st).power, 0.75);
+  // Brownout slows shield regeneration.
+  const fresh = withCore();
+  for (const x of [fresh, c]) {
+    x.st.facings.fill(0);
+    x.st.cooldown.fill(0);
+    regenShields(x.st, x.pools, 99, 1);
+  }
+  assert.ok(Math.abs(c.st.facings[0] - fresh.st.facings[0] * 0.75) < 1e-6);
+  c.st.structure.lastBy = 42;
+  applyHit(c.st, c.pools, { amount: c.reactor.hpMax, type: 'explosive', local: at(c.reactor) });
+  const R = c.st.structure.reactor;
+  assert.ok(c.reactor.destroyed);
+  assert.equal(R.phase, 'critical');
+  assert.equal(R.by, 42);
+  assert.equal(powerLevel(c.st), 0.5);
+  let out: string | null = null;
+  for (let t = 0; t < R.fuse && !out; t += 0.1) out = stepReactor(c.st.structure, 0.1);
+  assert.equal(out, 'vented');
+  assert.equal(c.st.structure.pending, null);
+});
+
+test('a critical core kept under fire detonates: the kill path is pending', () => {
+  const c = withCore();
+  c.st.facings.fill(0);
+  applyHit(c.st, c.pools, { amount: c.reactor.hpMax, type: 'explosive', local: at(c.reactor) });
+  const S = c.st.structure;
+  let out: string | null = null;
+  for (let t = 0; t < 60 && !out; t += 0.1) {
+    // A wing keeps hammering the plating over the core: every hit knocks the venting back.
+    applyHit(c.st, c.pools, { amount: 20, type: 'kinetic', local: { x: 4, y: -30, z: -100 } });
+    out = stepReactor(S, 0.1);
+  }
+  assert.equal(out, 'detonated');
+  assert.equal(S.pending, 'reactor');
+});
+
+test('mount effects: sensors → shorter locks and worse aim, launchers → no salvos', () => {
+  const c = withCore();
+  let e = capitalEffects(c.st);
+  assert.deepEqual([e.sensors, e.launchers], [1, true]);
+  hitSubsystem(c.st, c.pools, c.sensors, 1e6);
+  hitSubsystem(c.st, c.pools, c.launcher, 1e6);
+  e = capitalEffects(c.st);
+  assert.equal(e.sensors, SENSORS_LOST);
+  assert.equal(e.launchers, false);
+  assert.equal(capitalEffects(capital().st).launchers, true, 'a hull without launchers modelled is not disarmed');
+});
+
+test('citadels (bridge, reactor) are out of blast splash reach; a mount remembers how it died', () => {
+  const c = withCore();
+  const out: Subsystem[] = [];
+  splashSubsystems(c.st, c.pools, c.reactor.x, c.reactor.y, c.reactor.z + 100, 250, 1e5, 'explosive', null, out);
+  assert.ok(CITADELS.has('reactor') && CITADELS.has('bridge'));
+  assert.equal(c.reactor.hp, c.reactor.hpMax, 'the core is untouched');
+  assert.equal(c.bridge.hp, c.bridge.hpMax, 'the command deck is untouched');
+  assert.ok(c.subs.t0.hp < c.subs.t0.hpMax, 'the mounts around them are not');
+  const d = withCore();
+  hitSubsystem(d.st, d.pools, d.subs.t0, 1e5, 'explosive');
+  assert.equal(d.subs.t0.wreck, 'blown', 'an overkill throws the gun house off');
+  for (let i = 0; i < 400 && !d.subs.t3.destroyed; i++) hitSubsystem(d.st, d.pools, d.subs.t3, 6, 'laser');
+  assert.equal(d.subs.t3.wreck, 'droop', 'chip damage leaves the barrels drooping');
+});
+
+test('AI prefs weigh every kind: fighters go for launchers before the reactor; bombers the reactor before the guns', () => {
+  for (const k of ['turret', 'launcher', 'lance', 'hangar', 'engine', 'shieldGen', 'shieldEmitter', 'bridge', 'sensors', 'reactor'] as const) {
+    assert.ok(FIGHTER_PREFS[k] > 0 && BOMBER_PREFS[k] > 0, k);
+  }
+  assert.ok(FIGHTER_PREFS.launcher < FIGHTER_PREFS.reactor);
+  assert.ok(BOMBER_PREFS.reactor < BOMBER_PREFS.turret);
 });

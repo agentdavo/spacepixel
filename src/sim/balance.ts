@@ -290,7 +290,7 @@ export function turretScenario(): ScenarioResult {
  * torpedoes in whenever they reload. Point defence is off: this is the DPS
  * budget, not a survival test.
  */
-export function capitalKill(capBp: string, maxT = 400): { t: number; torps: number; subsKilled: number } {
+export function capitalKill(capBp: string, maxT = 400): { t: number; torps: number; subsKilled: number; cause: string; wrecks: number } {
   seed = 23;
   const w = world();
   const cap = w.fleet.spawn(capBp, 'choir', ORIGIN.clone(), new Vector3(0, 0, 1));
@@ -328,7 +328,8 @@ export function capitalKill(capBp: string, maxT = 400): { t: number; torps: numb
     w.weapons.step(DT);
     w.missiles.step(DT);
   }
-  return { t: cap.alive ? Infinity : t, torps, subsKilled: st.subsystems.filter((s) => s.destroyed).length };
+  const wrecks = w.fleet.destruction.wrecks.filter((x) => x.ship === cap).length;
+  return { t: cap.alive ? Infinity : t, torps, subsKilled: st.subsystems.filter((s) => s.destroyed).length, cause: st.structure.death ?? 'alive', wrecks };
 }
 
 export function capitalScenario(): ScenarioResult {
@@ -821,6 +822,152 @@ export function subsystemScenario(): ScenarioResult {
   };
 }
 
+// ── kill paths ───────────────────────────────────────────────────────
+
+export type KillPath = 'structural' | 'reactor' | 'bridge';
+
+export interface KillPathResult {
+  t: number;
+  cause: string;
+  torps: number;
+  subsKilled: number;
+  /** Reactor: when the core went critical (s), −1 never. */
+  criticalAt: number;
+  /** Damage the escort parked alongside took after the kill (the reactor's shockwave). */
+  escortDamage: number;
+  wrecks: number;
+  salvage: number;
+}
+
+/**
+ * The squadron (4 Kestrels + 2 Warhorses with torpedoes, like `capitalKill`)
+ * goes for one kill path instead of raking the hull, from the side that path
+ * is reached from (point defence off: the DPS budget):
+ *
+ *   structural  walk fire along the midships only (the spine), torpedoes into it
+ *   reactor     from the core's side (under the keel on the big hulls): drop that
+ *               facing, core the reactor (B-selected: torpedoes too) and keep it
+ *               under fire until the fuse runs out; `vent` = cease fire once it
+ *               goes critical (the crew should vent it)
+ *   bridge      over the command deck: drop the facing, destroy the bridge, keep
+ *               pounding the bow until she strikes
+ *
+ * An escort corvette holds station alongside so a reactor's shockwave has
+ * someone to hit.
+ */
+export function killPath(capBp: string, path: KillPath, maxT = 400, vent = false): KillPathResult {
+  seed = 29;
+  const w = world();
+  const cap = w.fleet.spawn(capBp, 'choir', ORIGIN.clone(), new Vector3(0, 0, 1));
+  cap.flight.velocity.set(0, 0, 0);
+  cap.controls.throttleSet = 0;
+  const st = cap.combat.dmg;
+  const sub = path === 'structural' ? null : (st.subsystems.find((s) => s.kind === path) ?? null);
+  // Where the squadron comes from (ship-local): the core's side of the hull, above the deck for the bridge, abeam for the spine.
+  const dir = new Vector3(1, 0.35, 0).normalize();
+  if (sub) dir.set(0.35, sub.y < st.cy - st.halfH * 0.3 ? -1 : 1, 0).normalize();
+  const R = Math.max(900, Math.min(1500, st.halfW * 3 + 600));
+  const anchor = sub ? new Vector3(sub.x, sub.y, sub.z) : new Vector3(st.cx, st.cy, st.cz);
+  const escort = w.fleet.spawn('ffc-lantern-guard', 'choir', toUniverse(cap, st.cx - st.halfW - 450, st.cy, st.cz, new Vector3()), new Vector3(0, 0, 1));
+  escort.flight.velocity.set(0, 0, 0);
+  const squad: ShipEntity[] = [];
+  ['vf27-kestrel', 'vf27-kestrel', 'vf27-kestrel', 'vf27-kestrel', 'sb9-warhorse', 'sb9-warhorse'].forEach((bp) => {
+    // Scripted (player-flagged): the torpedo work is the Warhorses' alone, on their reload.
+    const s = w.fleet.spawn(bp, 'concord', ORIGIN.clone(), new Vector3(0, 0, 1), { isPlayer: true });
+    s.target = cap;
+    if (bp === 'sb9-warhorse') s.combat.missile = 0; // torpedoes
+    // B on the path's subsystem: torpedoes guide onto it once the facing over it is down.
+    if (sub) selectSubsystem(s, cap, st.subsystems.indexOf(sub));
+    squad.push(s);
+  });
+  const aims = squad.map(() => new Vector3());
+  const zero = new Vector3();
+  let torps = 0;
+  let t = 0;
+  let criticalAt = -1;
+  for (; t < maxT && cap.alive; t += DT) {
+    cap.flight.velocity.set(0, 0, 0);
+    escort.flight.velocity.set(0, 0, 0);
+    if (st.structure.reactor.phase === 'critical' && criticalAt < 0) criticalAt = t;
+    const holdFire = vent && criticalAt >= 0;
+    squad.forEach((s, i) => {
+      // A loose arc on the attack side, drifting slowly.
+      const a = (i / squad.length - 0.5) * 0.9 + Math.sin(t * 0.05) * 0.2;
+      _a.copy(dir).applyAxisAngle(_b.set(0, 0, 1), a * 0.5).add(_e.set(0, 0, Math.sin(a) * 0.6)).normalize();
+      toUniverse(cap, anchor.x + _a.x * R, anchor.y + _a.y * R, anchor.z + _a.z * R, s.flight.position);
+      hold(s, zero);
+      if (Math.floor(t) !== Math.floor(t - DT) || t === 0) {
+        if (sub) toUniverse(cap, sub.x, sub.y, sub.z, aims[i]);
+        // The spine: anywhere along the midships third, on the side facing the squadron.
+        else toUniverse(cap, st.cx + dir.x * st.halfW * 0.6, st.cy + (rand() - 0.3) * st.halfH, st.cz + (rand() - 0.5) * (st.halfL / 1.6), aims[i]);
+      }
+      if (holdFire) {
+        s.controls.fire = false;
+        return;
+      }
+      chooseGun(s, cap);
+      aimAndFire(s, aims[i], zero, sub ? 4 : 8);
+      if (s.combat.loadout.missiles[s.combat.missile] === 'torpedo' && s.combat.missileReload <= 0 && w.missiles.salvo(s, cap)) torps++;
+    });
+    w.fleet.step(DT);
+    w.weapons.step(DT);
+    w.missiles.step(DT);
+    if (vent && st.structure.reactor.phase === 'vented') break;
+  }
+  const cause = !cap.alive ? (st.structure.death ?? 'hull') : st.structure.reactor.phase === 'vented' ? 'vented' : 'alive';
+  // Let a shockwave finish crossing the escort (fire has stopped: the target is gone).
+  const e0 = escort.hull + escort.shield;
+  for (const s of squad) s.controls.fire = false;
+  for (let k = 0; k < 180; k++) {
+    w.fleet.step(DT);
+    w.weapons.step(DT);
+  }
+  const D = w.fleet.destruction;
+  const mine = D.wrecks.filter((x) => x.ship === cap);
+  return {
+    t: cause === 'alive' ? Infinity : t,
+    cause,
+    torps,
+    subsKilled: st.subsystems.filter((s) => s.destroyed).length,
+    criticalAt,
+    escortDamage: Math.max(0, e0 - (escort.alive ? escort.hull + escort.shield : 0)),
+    wrecks: mine.length,
+    salvage: mine.reduce((n, x) => n + x.salvage.relics + x.salvage.cores + x.salvage.spares, 0),
+  };
+}
+
+export function killPathScenario(): ScenarioResult {
+  const caps = ['choir-cathedral', 'bb-indomitable', 'cvs07-hesperus-dawn'];
+  const paths: KillPath[] = ['structural', 'reactor', 'bridge'];
+  const metrics: Record<string, string> = {};
+  const checks: Check[] = [];
+  const fmt = (r: KillPathResult) =>
+    `${r.t.toFixed(0)} s · ${r.cause}${r.criticalAt >= 0 ? ` (critical at ${r.criticalAt.toFixed(0)} s)` : ''} · ${r.torps} torpedoes · ${r.subsKilled} subsystems down · ${r.wrecks} wreck pieces, ${r.salvage} salvage lots${r.escortDamage ? ` · escort took ${r.escortDamage.toFixed(0)}` : ''}`;
+  const pieces: Record<string, number> = { structural: 2, reactor: 1, bridge: 1 };
+  for (const bp of caps) {
+    for (const p of paths) {
+      const r = killPath(bp, p);
+      metrics[`${short(bp)} ${p}`] = fmt(r);
+      checks.push(check(`${short(bp)} ${p} kill (s)`, r.t, `30..150 by that path, ${pieces[p]} wreck piece(s)`, r.t >= 30 && r.t <= 150 && r.cause === p && r.wrecks === pieces[p]));
+      if (p === 'reactor') checks.push(check(`${short(bp)} reactor shockwave hits the escort`, r.escortDamage, '> 0', r.escortDamage > 0));
+    }
+    // Hull depletion: the squadron rakes the whole hull (capitalKill): the rolling chain, three sections.
+    const h = capitalKill(bp);
+    metrics[`${short(bp)} hull`] = `${h.t.toFixed(0)} s · ${h.cause} · ${h.wrecks} wreck pieces`;
+    checks.push(check(`${short(bp)} hull depletion (s)`, h.t, '60..180 by the hull, 3 sections', h.t >= 60 && h.t <= 180 && h.cause === 'hull' && h.wrecks === 3));
+  }
+  const lg = paths.map((p) => killPath('ffc-lantern-guard', p));
+  lg.forEach((r, i) => {
+    metrics[`lanternGuard ${paths[i]}`] = fmt(r);
+    checks.push(check(`Lantern Guard ${paths[i]} kill (s)`, r.t, '8..60 by that path', r.t >= 8 && r.t <= 60 && r.cause === paths[i]));
+  });
+  // Stop shooting a critical core and the crew vents it: she lives, browned out.
+  const vented = killPath('choir-cathedral', 'reactor', 400, true);
+  metrics['cathedral reactor, fire lifted at critical'] = `${vented.cause} ${vented.t.toFixed(0)} s after the start`;
+  checks.push(check('lift fire from a critical core → the crew vents it', vented.cause === 'vented' ? 1 : 0, '== 1', vented.cause === 'vented'));
+  return { name: 'kill paths (squadron: 4 Kestrels + 2 Warhorses, going for one way to kill her)', metrics, checks };
+}
+
 const SCENARIOS: [string, () => ScenarioResult][] = [
   ['damage types', damageTypeScenario],
   ['fighter', fighterScenario],
@@ -830,6 +977,7 @@ const SCENARIOS: [string, () => ScenarioResult][] = [
   ['swarm', swarmScenario],
   ['outfit', outfitScenario],
   ['subsystem', subsystemScenario],
+  ['killpath', killPathScenario],
 ];
 
 export function runAll(filter = ''): ScenarioResult[] {

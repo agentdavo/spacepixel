@@ -54,7 +54,7 @@ still runs (TSL ink twin), but compute particles are disabled there.
 | F / RMB | missile salvo (needs lock) |
 | Y | next missile type (micro swarm · heavy torpedo · harpoon) |
 | T | next target |
-| B · Shift+B | next · previous subsystem on the target (turrets, lances, hangars, engines, shield generator, bridge): exposed ones first |
+| B · Shift+B | next · previous subsystem on the target (turrets, launchers, lances, hangars, engines, shield generator, sensors, bridge, reactor): exposed ones first |
 | I / MMB | the target's subsystem nearest the crosshair |
 | 1–4 | wing orders: form up · attack my target (and your selected subsystem) · engage at will · cover me |
 | Tab | tactical view (battle at ¼ speed) |
@@ -643,8 +643,8 @@ seed-1994 Reach). Captures:
 
 `flight` (default game) · `showcase` · `hangar` (model sheets) · `paint`
 (livery editor) · `spatial` (depth cues) · `dogfight` (AI demo) ·
-`combat&stage=capital|shield|smoke|weapons` (damage / shields / weapon
-families, `&freeze=S` holds a frame) · `fx`
+`combat&stage=capital|shield|smoke|weapons|kill` (damage / shields / weapon
+families / kill paths with `&path=reactor|structural|bridge|hull`, `&freeze=S` holds a frame) · `fx`
 (particles) · `setpieces&piece=monolith|megagate|derelict|nebula|bastion|pilgrimage|…`
 · `comms` · `audio` · `prologue` (the ~60 s cold open; `&t=SECONDS` seeks,
 loops as an attract reel) · `trailer` (the 90 s gameplay trailer; `&t=`
@@ -757,7 +757,8 @@ defence can shoot down, harpoons. Damage types scale against shields and
 hull. Capitals carry four shield facings and a voxel hull, so fire lands on
 the plating and wrecks the subsystem under it — turrets, lances, hangars,
 engines (she drifts), the shield generator (shields gone for good), the bridge
-(fire control lost). Once the facing over a mount is down it is *exposed*:
+(fire control lost), sensors (short locks, loose fire control), launchers (no
+salvoes) and the reactor (a hit one browns her out). Once the facing over a mount is down it is *exposed*:
 it can be selected (B, exposed ones first; I for the one under the
 crosshair), shot through its own hit sphere, and knocked out. Torpedoes
 splash every mount near the burst, a wrecked hangar cooks off, and damage
@@ -767,8 +768,16 @@ work a facing down, then strafe its exposed turrets and lances (bombers:
 the shield generator and engines). Fighters take damage by zone: engines lose thrust, a
 shot-up wing rolls, a dying ship trails black smoke. Damage is painted on the
 cel hull: scorched patches, screentone hatching, glowing craters.
-`npm run balance` holds the numbers (Kestrel vs Cantor 3–8 s, a turret to a
-wing of four 5–15 s, a capital to a squadron 60–180 s).
+A capital dies by how you hurt her (`src/sim/Structure.ts`,
+`src/sim/Destruction.ts`): rake the midships and her spine snaps into two
+burning halves; kill the reactor and she goes critical — keep shooting the
+core before the crew vents it and she detonates in a flash, a shockwave that
+hurts every ship it crosses and one charred piece; take the bridge once the
+hull is under a third and she strikes, drifting dark and whole; or grind the
+hull down to a rolling chain of blasts and three sections. Wrecks stay put as
+salvage (match drift within 450 m and hold; `src/game/salvage.ts`) until you
+jump. `npm run balance` holds the numbers (Kestrel vs Cantor 3–8 s, a turret to a
+wing of four 5–15 s, a capital to a squadron 60–180 s, each kill path 30–150 s).
 
 ![Capital damage](docs/screenshots/combat-capital.jpg)
 

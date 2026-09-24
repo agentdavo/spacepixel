@@ -28,6 +28,7 @@ import {
   adoptShield,
   applyHit,
   capitalEffects,
+  createCapitalEffects,
   createDamageState,
   createHitResult,
   facingOf,
@@ -48,6 +49,9 @@ import { CATALOG_BY_ID } from '@/game/shipyard/catalog';
 import { statsFromCatalog } from '@/game/shipyard/combatStats';
 import { flightSpecFor as yardFlightSpec } from '@/game/shipyard/flight';
 import { hullGridFor, raycastGrid, surfaceTop, type GridHit, type HullGrid } from './HullGrid';
+import { settleDeath, stepReactor } from './Structure';
+
+export { settleDeath };
 import { nextSubsystem, repairSubsystems, segmentSubsystem, subsystemExposed, subsystemNearestRay, type SegmentSubHit } from './Subsystems';
 
 /**
@@ -93,6 +97,8 @@ export interface CombatState {
   damaged: boolean;
   fx: FighterEffects;
   cap: CapitalEffects;
+  /** Reactor crisis resolved this step ('vented' / 'detonated') for Fleet to announce; null otherwise. */
+  reactorEvent: 'vented' | 'detonated' | null;
 }
 
 const _m = new Matrix4();
@@ -176,7 +182,8 @@ export function createCombat(blueprintId: string, model: ShipModel, faction: Fac
     missileReload: 0,
     damaged: false,
     fx: fighterEffects(dmg, 1),
-    cap: capitalEffects(dmg),
+    cap: capitalEffects(dmg, createCapitalEffects()),
+    reactorEvent: null,
   };
 }
 
@@ -188,7 +195,7 @@ function addCapitalSubsystems(dmg: DamageState, model: ShipModel, id: string, gr
   const add = (kind: SubsystemKind, sid: string, p: Vector3, radius?: number) => {
     const t = SUBSYSTEM_TUNING[kind];
     const n = (counts[kind] = (counts[kind] ?? 0) + 1);
-    const single = kind === 'shieldGen' || kind === 'bridge';
+    const single = kind === 'shieldGen' || kind === 'bridge' || kind === 'sensors' || kind === 'reactor';
     addSubsystem(dmg, {
       id: sid,
       kind,
@@ -202,7 +209,7 @@ function addCapitalSubsystems(dmg: DamageState, model: ShipModel, id: string, gr
       hpMax: Math.max(40, hullMax * t.hp),
     });
   };
-  const kinds: Record<string, SubsystemKind> = { turret: 'turret', beam: 'lance', hangar: 'hangar' };
+  const kinds: Record<string, SubsystemKind> = { turret: 'turret', beam: 'lance', hangar: 'hangar', missile: 'launcher' };
   const layout = CAPITAL_LAYOUT[id] ?? DEFAULT_LAYOUT;
   for (const [sid, o] of model.sockets) {
     const kind = kinds[o.userData.kind as string];
@@ -220,7 +227,22 @@ function addCapitalSubsystems(dmg: DamageState, model: ShipModel, id: string, gr
   if (bridgeSocket) add('bridge', 'bridge', _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, bridgeSocket.matrixWorld)));
   else add('bridge', 'bridge', onTop(layout.bridge.x, layout.bridge.z));
   add('shieldGen', 'shield-gen', onTop(layout.shieldGen.x, layout.shieldGen.z));
+  // Sensors: the radar joint when the model has one, else a mast on the spine.
+  const radar = model.articulations.get('radar');
+  const sn = layout.sensors ?? DEFAULT_LAYOUT.sensors!;
+  add('sensors', 'sensors', radar ? _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, radar.node.matrixWorld)) : onTop(sn.x, sn.z));
+  // The reactor core, on the deck or (big hulls) the keel.
+  const rc = layout.reactor ?? DEFAULT_LAYOUT.reactor!;
+  add('reactor', 'reactor', rc.below ? onKeel(grid, (b.minX + b.maxX) / 2 + rc.x * (b.maxX - b.minX) * 0.5, (b.minZ + b.maxZ) / 2 + rc.z * (b.maxZ - b.minZ) * 0.5, _w) : onTop(rc.x, rc.z));
   addShieldEmitters(dmg, grid, len, hullMax);
+}
+
+/** The hull's underside at (x, z) (ship-local): a grid ray straight up from below the keel. */
+function onKeel(grid: HullGrid, x: number, z: number, out: Vector3): Vector3 {
+  const b = grid.box;
+  const bottom = b.minY - grid.cell * 2;
+  const span = b.maxY + grid.cell - bottom;
+  return raycastGrid(grid, x, bottom, z, 0, span, 0, _eh) ? out.set(x, bottom + span * _eh.t, z) : out.set(x, b.minY, z);
 }
 
 const _eh: GridHit = { t: 0, nx: 0, ny: 0, nz: 0 };
@@ -405,11 +427,16 @@ export function stepCombat(s: ShipEntity, dt: number): void {
   if (st.subsystems.length) repairSubsystems(st, s.sinceHit, dt);
   if (st.tether > 0) st.tether = Math.max(0, st.tether - dt);
   if (c.missileReload > 0) c.missileReload = Math.max(0, c.missileReload - dt);
+  // Reactor crisis: the crew vents a critical core, or the fuse runs out (Fleet settles the kill).
+  c.reactorEvent = stepReactor(st.structure, dt);
+  if (c.reactorEvent) st.version++;
 
   const spec = s.flight.spec;
   const base = c.baseSpec;
   if (st.capital) {
     capitalEffects(st, c.cap);
+    // Sensors shot away: locks take longer (Missiles reads range from cap.sensors).
+    c.fx.lockMul = 1 / c.cap.sensors;
     return;
   }
   const fx = fighterEffects(st, s.hull / s.hullMax, c.fx);
@@ -623,7 +650,7 @@ const _hit = createHitResult();
  * zone; null spreads it generically. `sub` = an aimed hit's subsystem (raycastShip). Handles plot armour and death. The
  * returned result is shared scratch — read it before the next call.
  */
-export function damageShip(s: ShipEntity, amount: number, type: DamageType, point: Vector3 | null, sub: Subsystem | null = null): HitResult & { killed: boolean } {
+export function damageShip(s: ShipEntity, amount: number, type: DamageType, point: Vector3 | null, sub: Subsystem | null = null, by: ShipEntity | null = null): HitResult & { killed: boolean } {
   const r = _hit as HitResult & { killed: boolean };
   r.killed = false;
   if (!s.alive) {
@@ -637,15 +664,10 @@ export function damageShip(s: ShipEntity, amount: number, type: DamageType, poin
   }
   s.sinceHit = 0;
   const local = point ? toLocal(s, point, _lo) : null;
+  if (by && by !== s) s.combat.dmg.structure.lastBy = by.id;
   applyHit(s.combat.dmg, s, { amount, type, local, sub }, r);
   if (r.hullDamage > 0 || r.subsystem) s.combat.damaged = true;
-  if (s.plotArmour) s.hull = Math.max(s.hull, s.hullMax * 0.15);
-  if (s.hull <= 0) {
-    s.hull = 0;
-    s.alive = false;
-    s.model.root.visible = false;
-    r.killed = true;
-  }
+  r.killed = settleDeath(s);
   return r;
 }
 

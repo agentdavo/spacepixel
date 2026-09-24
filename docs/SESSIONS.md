@@ -11,7 +11,7 @@ touching their files.
 | Turrets, shields, weapon impacts, subsystems, kill paths (batch 6) | **batch 6 project thread** · `claude/project-thread-dl05kd` (took over from the turrets session 24 Sep ~10:40; draft PR #1 into the lead branch) | `src/sim/TurretRig.ts`, `Subsystems.ts`, `Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, `src/fx/impacts.ts`, `src/world/{WeaponVisuals,CombatFx,ImpactDecals,ShieldGeometry}.ts`, impact SFX, `src/cinema/gunnery.ts` |
 | **Character voices, chat, soundtrack** | voices/score session · `claude/ova-soundtrack-voices` | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
 
-## Batch 6 handover (turrets session, 24 Sep): done / left
+## Batch 6 handover (turrets session, 24 Sep; now owned by the batch 6 project thread on `claude/project-thread-dl05kd`): done / left
 
 Everything below is merged on `claude/ship-turrets-shields-weapons-8lz4su`,
 which also carries `claude/vanguard-space-combat-0l3bfi` up to b917a5d.
@@ -44,16 +44,33 @@ pass (4v4 sweep 51 % Concord). Milestone status is in ROADMAP *Batch 6*.
 - Trailer / prologue broadsides fire from barrel tips (`src/cinema/gunnery.ts`).
 - Faction shield shells: Choir crystal facets, Rustwake bent / holed scrap
   plates (`WeaponVisuals` `style` uniform; `?scene=combat&stage=impacts&side=shield&faction=choir`).
+- Subsystems v2 finished: `reactor` (brownout below half hp: regen, fire
+  rate and lance cooldown scale by `powerLevel`; destroyed → CRITICAL),
+  `sensors` (lock range and AI coordination × `CapitalEffects.sensors`),
+  `launcher` (was `missile`; all gone → no salvoes). Bridge / reactor are
+  citadels (no torpedo splash). Knocked-out mounts carry `sub.wreck`
+  `'droop' | 'blown'` (explosive or >30 % of hp in one hit blows the house off).
+- Kill paths (ported from the lead's `worktree-agent-a936121b44b53858f` onto
+  our Damage / Fleet model): `src/sim/Structure.ts` (pure: sections, reactor
+  fuse vs vent, shockwave, `settleDeath`), `src/sim/Destruction.ts` (wreck
+  pieces, shockwave damage), `src/game/salvage.ts` (wrecks as salvage, cleared
+  on jumps), `src/world/DestructionFx.ts` + `src/world/destruction/`
+  (HullSplit, DebrisField, MountWrecks; rigged turrets droop by
+  `TurretRig.wreckDrive`, blown ones throw a merged gun house). HUD keel bars
+  and callouts. `npm run balance` killpath, `tests/destruction.test.ts`,
+  test stage `?scene=combat&stage=kill&path=reactor|structural|bridge|hull`
+  (`&t=` seconds after the kill, `&ship=`, `&cam=`). Structure state is in
+  `StateHash`.
 
 **Left**
 - Screenshot-verify and tune: hull marks (`ImpactDecals`, TSL instanced
   shader rewritten, final look unconfirmed), capital facing outline / low-cell
   density, collapse, regen, fire columns, beam cut lines. Faction shell
   styles (crystal Choir, scrap Rustwake). Run `npm run perf` on a GPU.
-- Subsystems not yet modelled: sensors, reactor, missile launchers; station
-  batteries (bastion turrets are visual-only `scanPose`).
-- Kill paths (milestone 6) not started: mine the lead's paused
-  `worktree-agent-a936121b44b53858f`.
+- Station batteries (bastion turrets are visual-only `scanPose`; the lead's
+  `StationDefence` is an unwired pure model and was not ported).
+- Kill paths: wreck pieces only for capitals (fighters / gunships keep the
+  wing-shear death); pieces do not collide; launchers only on capitals.
 - Balance watch: stock Valiant vs Vesper now loses ~1–2 / 10 seeds (INFO);
   Cantor shield 110 + 1.5× transfer offsets fore/aft halves.
 - Turret drive state is not in `StateHash` (it reaches the world via bolts).
@@ -66,6 +83,16 @@ pass (4v4 sweep 51 % Concord). Milestone status is in ROADMAP *Batch 6*.
   shieldEmitter | bridge (+ `sub.facing` on emitters); also fired for splash
   and cook-off kills. `hit` / `beam-hit` carry the struck `sub` and optional
   `subHp`, `type`, `amount`, `shielded`.
+- `subsystem` also for `sub.kind` launcher | sensors | reactor, with
+  `sub.wreck` 'droop' | 'blown' on mounts.
+- `reactor-critical` (core breached, fuse lit; `shooter` did it) and
+  `reactor-vented` (crew vented in time). Current audio: critical →
+  shieldDown + mountBlast; vented → shieldUp.
+- `kill` carries `cause` hull | structural | reactor | bridge. Audio:
+  reactor → two explosionLarge + shieldDown, structural → hullCrunch +
+  explosionLarge, bridge → a lone mountBlast (she goes dark), hull → as before.
+  Suggested barks: "her core's going critical", "she's venting", "she's
+  broken her back", "she's struck — drifting dead".
 - Existing barks: `mount-player`, `mount-wing` (`src/dialog/barks.ts`).
   Suggested: `shield-down` on the player → wingman "your shields are down",
   shieldGen destroyed on a capital → "their shields are gone", hangar
