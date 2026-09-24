@@ -217,7 +217,9 @@ Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
   by `npm run career-check` (new profile → free flight → hires → contract →
   launch → formation + fight → dock → repair → shipyard → reload).
 
-- Replay tapes carry two kinds of out-of-tick world change: the world sim's
-  small commands (`world-trade`, `world-take`, `world-episode`) and the
-  guilds' `world` command, which snapshots the whole WorldState (a few KB
-  per guild/outpost action). Migrate guild actions to small commands.
+- **Replay tapes** — guild hall, outpost and conversation changes used to
+  put the whole WorldState on the tape (a few KB each); they are now a
+  `world-patch` with only what changed (facts, counters, mods, clock, the
+  log's new tail; `src/game/world/diff.ts`, tested). Older tapes' `world`
+  commands still play. `node scripts/replay-check.mjs --dock` compares the world
+  at the end of record and playback.

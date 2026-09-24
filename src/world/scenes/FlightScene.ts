@@ -72,6 +72,7 @@ import { ScheduleOverlay } from '@/ui/ScheduleOverlay';
 import { SignalCounter } from '@/ui/SignalCounter';
 import { GuildRuntime } from '@/game/guilds/GuildRuntime';
 import { sanitizeWorld, world } from '@/game/world/WorldState'; // guilds, arcs, outposts (+ the GUILD HALL / OUTPOST dock tabs)
+import { applyWorldDiff } from '@/game/world/diff';
 import '@/ui/ThreadsTab'; // registers the THREADS dock tab (NPC arcs, rivals) — last, so earlier tabs keep their digits
 
 /**
@@ -414,7 +415,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.rivals = new RivalDirector(this);
     this.guilds = new GuildRuntime(this);
     // Conversations and the dock screen change the world outside a tick: on the replay tape.
-    recordWorldChanges((w) => this.replay.note('world', w));
+    recordWorldChanges((d) => this.replay.note('world-patch', d));
     this.outfit.bind(this);
     bindOutfitter(this.outfit);
     this.outfit.settle(); // hold size, hangar complement
@@ -1772,8 +1773,12 @@ export class FlightScene implements GameScene, FlightHostScene {
       case 'world-episode':
         this.worldRt.episode(a as number);
         break;
-      case 'world':
+      case 'world-patch':
         // Guild hall / outpost actions (GuildRuntime.setWorld) and conversations (npc/live.ts recordWorldChanges).
+        world().update((w) => applyWorldDiff(w, a));
+        break;
+      case 'world':
+        // Older tapes: a whole WorldState per change.
         world().update(() => sanitizeWorld(a));
         break;
       default:

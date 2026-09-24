@@ -3,6 +3,7 @@ import type { FlightScene } from '@/world/scenes/FlightScene';
 import { COMMODITIES, cargoUsed, type EconFaction, type TradeLedger } from '@/game/economy';
 import { loadProfile, saveContracts, saveLedger } from '@/game/Profile';
 import { loadWorld, world, type WorldState } from '@/game/world/WorldState';
+import { diffWorld, isEmptyDiff } from '@/game/world/diff';
 import { persistWorld } from '@/game/world/live';
 import { registerVoice, npcVoice, CAST_VOICES } from '@/audio/voice';
 import { findStation, type Contract, type Receipt } from '@/game/contracts/contracts';
@@ -56,12 +57,15 @@ export class GuildRuntime {
 
   /**
    * A world change made from the dock screen (outside a sim tick): recorded on
-   * the replay tape as a 'world' command so playback rebuilds it at its tick.
+   * the replay tape as a 'world-patch' command (only what changed) so
+   * playback rebuilds it at its tick.
    * Sim-side changes (receipts, arrears, raids) happen inside ticks and replay
    * by themselves.
    */
   setWorld(w: WorldState): void {
-    this.scene.replay.external('world', w, () => world().update(() => w));
+    const d = diffWorld(world().state, w);
+    if (isEmptyDiff(d)) return;
+    this.scene.replay.external('world-patch', d, () => world().update(() => w));
   }
 
   /** Apply a membership result: world, standing, notes (`fromUI`: a dock-screen action). */
