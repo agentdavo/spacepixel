@@ -9,6 +9,7 @@ import { CameraDirector, type Subject } from '@/sim/CameraDirector';
 import { Fleet, faceAlong, type ShipEntity } from '@/sim/Fleet';
 import { FlightModel } from '@/sim/FlightModel';
 import { DEFAULT_WORLD_SEED } from '@/sim/Rng';
+import { stepTrim, trimLabel } from '@/sim/Damage';
 import { hashWorld, StateHasher } from '@/sim/StateHash';
 import type { ReplayCommand } from '@/sim/Replay';
 import { ReplayDirector, worldSeedFor } from '@/game/ReplayDirector';
@@ -1583,8 +1584,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     return `${this.director.label()} · ${f.flightAssist ? 'FA ON' : 'FA OFF'}${this.cinematic ? ' · CINEMATIC' : ''}`;
   }
 
-  /** Keys that change the world (dock request, turret mode, tactical slow-mo, wing orders): recorded on the tape. */
-  private static readonly SIM_KEYS = new Set(['KeyG', 'KeyU', 'Tab', 'Digit1', 'Digit2', 'Digit3', 'Digit4']);
+  /** Keys that change the world (dock request, turret mode, tactical slow-mo, wing orders, shield trim): recorded on the tape. */
+  private static readonly SIM_KEYS = new Set(['KeyG', 'KeyU', 'Tab', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Comma', 'Period', 'Slash']);
 
   /** V: cycle camera · K: cinematic auto-cutaways. (T / F go through input.) */
   private onKey(code: string): void {
@@ -1620,6 +1621,15 @@ export class FlightScene implements GameScene, FlightHostScene {
         const m = this.turrets.cycleMode();
         this.docking.say(`TURRETS: ${m === 'free' ? 'FREE — ENGAGE ANY HOSTILE IN ARC' : m === 'target' ? 'MY TARGET ONLY' : 'HOLD FIRE'}`, m === 'hold' ? '#ffc46b' : '#7dffb2', 2.5);
       }
+    } else if (code === 'Comma' || code === 'Period' || code === 'Slash') {
+      // Shield trim: . forward / next facing · , aft / previous facing · / the shield officer (AUTO) on / off.
+      const st = this.player.combat.dmg;
+      if (code === 'Slash') {
+        const auto = !st.trimAuto;
+        stepTrim(st, 0);
+        st.trimAuto = auto;
+      } else stepTrim(st, code === 'Period' ? 1 : -1);
+      this.docking.say(`SHIELDS: ${trimLabel(st)}`, '#6fe6ff', 2);
     } else if (code === 'KeyK') {
       this.cinematic = !this.cinematic;
     } else if (code === 'KeyM') {

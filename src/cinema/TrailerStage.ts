@@ -368,6 +368,7 @@ export class TrailerStage implements CinemaStage {
     st.facings.fill(st.facingMax * 0.7);
     st.facings[2] = 0;
     st.down = 0b0100;
+    st.cooldown[2] = 1e3; // stays down: no regen, no charge shunted back in (Damage.ts)
     console.info(`[trailer] battle: indomitable ${I.model.length.toFixed(0)} m (half ${st.halfL.toFixed(0)}), cathedral ${C.model.length.toFixed(0)} m, subsystems ${st.subsystems.map((s) => s.id).join(',')}`);
   }
 

@@ -12,7 +12,8 @@ import { copyControls, quantizeControls } from '@/sim/Replay';
  * command (with deadzone). Keyboard: W/S throttle, A/D yaw, arrows pitch/yaw,
  * Q/E roll, Shift afterburner, X kill throttle, Z flight-assist toggle,
  * Space/LMB guns, F/RMB missile salvo, T next target, J cruise drive,
- * R next gun, Y next missile type, B next target subsystem.
+ * R next gun, Y next missile type, B next target subsystem. (Shield trim —
+ * . forward, , aft, / AUTO — goes through FlightScene's recorded sim keys.)
  * Gamepad: left stick pitch/yaw, right stick X roll, triggers throttle,
  * A/south = afterburner.
  *

@@ -2,7 +2,7 @@ import { Vector3, type PerspectiveCamera } from 'three';
 import type { WorldSpace } from '@/core/WorldSpace';
 import type { ShipEntity } from '@/sim/Fleet';
 import { gunOf, missileOf, selectedSubsystem, subsystemPosition } from '@/sim/Combat';
-import { FACING_NAMES, ZONE_NAMES } from '@/sim/Damage';
+import { BLEED_AT, FACING, FACING_NAMES, ZONE_NAMES, isOnline, type DamageState } from '@/sim/Damage';
 import { HUD, claimRect, targetBottom, weaponsRect } from './hudLayout';
 import { hudLabels } from './HudLabels';
 
@@ -10,11 +10,15 @@ import { hudLabels } from './HudLabels';
  * Combat readouts on their own canvas (layered over FlightHud):
  *
  * - Weapons block (bottom right): selected gun and damage type [R], missile
- *   type and reload [Y], own shield / hull bars and a four-zone damage
- *   silhouette (nose, wings, engines).
- * - Target panel (left): name, role, range; shield facings (a four-segment
- *   diamond for capitals, a ring for fighters), hull, and the subsystem list
- *   with the B-selected one highlighted.
+ *   type and reload [Y], own shield (one segment per facing, widths following
+ *   the trim) and hull bars, the shield trim line [, . /] with transfer and
+ *   emitter status, and a four-zone damage silhouette (nose, wings, engines)
+ *   ringed by the fore / aft shield arcs (capitals: the facing glyph).
+ * - Target panel (left): name, role, range; shield facings (the glyph: fore /
+ *   aft arcs for fighters, four arcs for corvettes plus an inner dorsal /
+ *   ventral ring for big capitals; a lettered segment bar under it with lost
+ *   emitters crossed out), hull, and the subsystem list with the B-selected
+ *   one highlighted.
  * - Sub-target bracket on the selected subsystem in the view, and pips on
  *   the target's other subsystems (crossed out when destroyed).
  */
@@ -25,6 +29,9 @@ const CYAN = '#6fe6ff';
 const PINK = '#ff5fb4';
 const DIM = 'rgba(125,255,178,0.35)';
 const TYPE_COLOR: Record<string, string> = { kinetic: AMBER, laser: CYAN, harmonic: PINK, explosive: '#ff9a4a' };
+
+/** Glyph angle of each outer facing (canvas: FORE up, AFT down, PORT left, STBD right). */
+const GLYPH_ANGLE = [-Math.PI / 2, Math.PI / 2, Math.PI, 0];
 
 const _p = new Vector3();
 const _w = new Vector3();
@@ -129,15 +136,35 @@ export class CombatHud {
       c.fillStyle = k >= 1 ? GREEN : AMBER;
       c.fillRect(x + 4, y + 5, 150 * Math.max(0, Math.min(1, k)), 3);
     }
-    y += 24;
-    this.bar(x, y, 'SHD', p.shield / p.shieldMax, p.shield > 0 ? CYAN : (time * 3) % 1 < 0.5 ? RED : 'rgba(255,95,122,0.4)');
+    y += 20;
+    const st = cs.dmg;
+    this.facingBar(x, y, 'SHD', st, time, false);
     y += 16;
     this.bar(x, y, 'HUL', p.hull / p.hullMax, p.hull / p.hullMax < 0.3 ? RED : AMBER);
-    // Zone silhouette: a little plan view of the fighter.
-    const st = cs.dmg;
+    // Shield trim [, . /], charge moving between facings, emitters.
+    const genUp = isOnline(st, 'shieldGen');
+    let em = 0;
+    let emN = 0;
+    for (const s of st.subsystems) {
+      if (s.kind !== 'shieldEmitter') continue;
+      emN++;
+      if (!s.destroyed) em++;
+    }
+    c.fillStyle = !genUp ? ((time * 3) % 1 < 0.6 ? RED : AMBER) : st.trim >= 0 ? '#ffffff' : CYAN;
+    c.font = '11px "Share Tech Mono", monospace';
+    // Compact: [,./] AUTO FWD ⇄ · E 5/6 (trimLabel spells it out for comms).
+    const n = st.facings.length;
+    const set = st.trim < 0 ? (n < 2 ? 'BUBBLE' : 'BAL') : n === 2 ? (st.trim === FACING.FORE ? 'FWD' : 'AFT') : `+${FACING_NAMES[st.trim]}`;
+    const trim = !genUp ? 'SHIELD GEN DOWN' : `[,./] ${st.trimAuto ? 'AUTO ' : ''}${set}${st.flow > 0 ? ' ⇄' : ''}${emN ? ` · E ${em}/${emN}` : ''}`;
+    c.fillText(trim, x, y + 16);
+    c.font = '13px "Share Tech Mono", monospace';
+    y += 16;
+    const cx = x + 196;
+    const cy = y - 6;
+    if (st.capital) this.facingGlyph(cx, cy, 24, st, time);
+    // Zone silhouette: a little plan view of the fighter, inside its shield arcs.
     if (!st.capital) {
-      const cx = x + 196;
-      const cy = y + 12;
+      this.facingGlyph(cx, cy - 7, 32, st, time);
       const col = (v: number) => (v > 0.75 ? RED : v > 0.35 ? AMBER : v > 0.02 ? '#d8ff9a' : DIM);
       c.lineWidth = 3;
       // Nose
@@ -167,11 +194,11 @@ export class CombatHud {
       const worst = st.zones.indexOf(Math.max(...st.zones));
       if (st.zones[worst] > 0.35) {
         c.fillStyle = st.zones[worst] > 0.75 ? RED : AMBER;
-        c.fillText(`${ZONE_NAMES[worst]} ${st.zones[worst] > 0.75 ? 'CRITICAL' : 'DAMAGED'}`, x, y + 22);
+        c.fillText(`${ZONE_NAMES[worst]} ${st.zones[worst] > 0.75 ? 'CRITICAL' : 'DAMAGED'}`, x, y + 18);
       }
       if (st.tether > 0) {
         c.fillStyle = (time * 4) % 1 < 0.6 ? RED : AMBER;
-        c.fillText('HARPOONED — THRUST 50%', x, y + 40);
+        c.fillText('HARPOONED — THRUST 50%', x, y + 34);
       }
     }
   }
@@ -184,6 +211,94 @@ export class CombatHud {
     c.strokeRect(x + 34, y - 9, 120, 9);
     c.fillStyle = color;
     c.fillRect(x + 34, y - 9, 120 * Math.max(0, Math.min(1, v)), 9);
+  }
+
+  /** Colour of a facing at charge fraction `k` (blinks red when down, amber while it bleeds through). */
+  private facingColor(k: number, time: number): string {
+    return k <= 0 ? ((time * 3) % 1 < 0.5 ? RED : 'rgba(255,95,122,0.3)') : k < BLEED_AT ? AMBER : CYAN;
+  }
+
+  /**
+   * Shield bar split into one segment per facing, each as wide as its share
+   * of capacity (so the trim shows as a wide segment, outlined white) and
+   * filled by its charge. A facing without an emitter keeps a crossed-out
+   * sliver. `letters`: facing initials above the segments (target panel).
+   */
+  private facingBar(x: number, y: number, label: string, st: DamageState, time: number, letters: boolean): void {
+    const c = this.ctx;
+    const n = st.facings.length;
+    c.fillStyle = GREEN;
+    c.fillText(label, x, y);
+    if (!n) return;
+    const W = 120;
+    const gap = n > 1 ? 2 : 0;
+    const min = 6;
+    let sum = 0;
+    for (let f = 0; f < n; f++) sum += Math.max(st.facingCap[f], 1e-6);
+    const free = W - gap * (n - 1) - min * n;
+    let px = x + 34;
+    if (letters) c.font = '9px "Share Tech Mono", monospace';
+    for (let f = 0; f < n; f++) {
+      const cap = st.facingCap[f];
+      const w = min + (free * Math.max(cap, 1e-6)) / sum;
+      const k = cap > 0 ? Math.min(1, st.facings[f] / cap) : 0;
+      const col = this.facingColor(k, time);
+      c.strokeStyle = f === st.trim ? '#ffffff' : col;
+      c.strokeRect(px, y - 9, w, 9);
+      c.fillStyle = col;
+      if (cap > 0) c.fillRect(px, y - 9, w * k, 9);
+      else {
+        c.beginPath();
+        c.moveTo(px, y - 9);
+        c.lineTo(px + w, y);
+        c.moveTo(px + w, y - 9);
+        c.lineTo(px, y);
+        c.stroke();
+      }
+      if (letters && n > 1) {
+        c.fillStyle = cap <= 0 ? RED : f === st.trim ? '#ffffff' : DIM;
+        c.fillText(FACING_NAMES[f][0], px + w / 2 - 3, y - 12);
+      }
+      px += w + gap;
+    }
+    if (letters) c.font = '13px "Share Tech Mono", monospace';
+  }
+
+  /**
+   * Plan-view facing glyph (nose up): one bubble ring; fore / aft half arcs;
+   * four arcs (+ port left, starboard right); six adds an inner ring,
+   * dorsal upper half / ventral lower. Brightness is charge, the trimmed
+   * facing is drawn heavier, a lost emitter's arc is a dark stub.
+   */
+  private facingGlyph(cx: number, cy: number, R: number, st: DamageState, time: number, labels = false): void {
+    const c = this.ctx;
+    const n = st.facings.length;
+    if (!n) return;
+    const span = n === 1 ? Math.PI : n === 2 ? 1.15 : 0.72;
+    for (let f = 0; f < n; f++) {
+      const cap = st.facingCap[f];
+      const k = cap > 0 ? Math.min(1, st.facings[f] / cap) : 0;
+      const inner = f >= FACING.DORSAL;
+      const r = inner ? R * 0.5 : R;
+      const a = inner ? (f === FACING.DORSAL ? -Math.PI / 2 : Math.PI / 2) : GLYPH_ANGLE[f];
+      const s = inner ? 1.35 : span;
+      c.lineWidth = (inner ? 3 : 4) + (f === st.trim ? 2 : 0);
+      c.strokeStyle = cap <= 0 ? 'rgba(255,95,122,0.35)' : this.facingColor(k, time);
+      c.globalAlpha = cap <= 0 || k <= 0 ? 1 : 0.35 + 0.65 * k;
+      c.beginPath();
+      c.arc(cx, cy, r, a - s, a + s);
+      c.stroke();
+    }
+    c.globalAlpha = 1;
+    c.lineWidth = 1.5;
+    if (!labels) return;
+    c.font = '10px "Share Tech Mono", monospace';
+    for (let f = 0; f < Math.min(n, 4); f++) {
+      const a = GLYPH_ANGLE[f];
+      c.fillStyle = st.facingCap[f] <= 0 || st.facings[f] <= 0 ? RED : f === st.trim ? '#ffffff' : CYAN;
+      c.fillText(FACING_NAMES[f][0], cx + Math.cos(a) * (R + 10) - 3, cy + Math.sin(a) * (R + 10) + 4);
+    }
+    c.font = '13px "Share Tech Mono", monospace';
   }
 
   private targetPanel(player: ShipEntity, t: ShipEntity, time: number): void {
@@ -207,52 +322,17 @@ export class CombatHud {
     c.fillText(`${t.model.blueprint.designation} ${t.combat.stats.role.toUpperCase()} · ${(dist / 1000).toFixed(2)} km`, x, y);
     y += 14;
 
-    // Shield facings: diamond of four segments (capitals) or a ring (fighters).
+    // Shield facings: the plan-view glyph, then one lettered segment per facing.
     const cx = x + 34;
     const cy = y + 30;
     const R = 24;
-    c.lineWidth = 5;
-    if (st.capital) {
-      // FORE up, AFT down, PORT left, STBD right (plan view, nose up).
-      const ang = [-Math.PI / 2, Math.PI / 2, Math.PI, 0];
-      for (let f = 0; f < 4; f++) {
-        const k = st.facings[f] / Math.max(st.facingMax, 1);
-        c.strokeStyle = k <= 0 ? ((time * 3) % 1 < 0.5 ? RED : 'rgba(255,95,122,0.3)') : k < 0.35 ? AMBER : CYAN;
-        c.globalAlpha = k <= 0 ? 1 : 0.35 + 0.65 * k;
-        c.beginPath();
-        c.arc(cx, cy, R, ang[f] - 0.72, ang[f] + 0.72);
-        c.stroke();
-      }
-      c.globalAlpha = 1;
-      c.lineWidth = 1.5;
-      c.fillStyle = CYAN;
-      c.font = '10px "Share Tech Mono", monospace';
-      for (let f = 0; f < 4; f++) {
-        const k = st.facings[f] / Math.max(st.facingMax, 1);
-        const a = [-Math.PI / 2, Math.PI / 2, Math.PI, 0][f];
-        c.fillStyle = k <= 0 ? RED : CYAN;
-        c.fillText(FACING_NAMES[f][0], cx + Math.cos(a) * (R + 10) - 3, cy + Math.sin(a) * (R + 10) + 4);
-      }
-      c.font = '13px "Share Tech Mono", monospace';
-    } else {
-      const k = t.shield / t.shieldMax;
-      c.strokeStyle = k <= 0 ? RED : CYAN;
-      c.globalAlpha = 0.3;
-      c.beginPath();
-      c.arc(cx, cy, R, 0, Math.PI * 2);
-      c.stroke();
-      c.globalAlpha = 1;
-      c.beginPath();
-      c.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k);
-      c.stroke();
-      c.lineWidth = 1.5;
-    }
+    this.facingGlyph(cx, cy, R, st, time, st.facings.length >= 4);
     // Hull silhouette dot (red when low).
     c.fillStyle = t.hull / t.hullMax < 0.3 ? RED : AMBER;
     c.beginPath();
-    c.arc(cx, cy, 6, 0, Math.PI * 2);
+    c.arc(cx, cy, st.facings.length > 4 ? 4 : 6, 0, Math.PI * 2);
     c.fill();
-    this.bar(x + 80, cy - 8, 'SHD', t.shield / Math.max(1, t.shieldMax), CYAN);
+    this.facingBar(x + 80, cy - 8, 'SHD', st, time, true);
     this.bar(x + 80, cy + 10, 'HUL', t.hull / t.hullMax, t.hull / t.hullMax < 0.3 ? RED : AMBER);
     y = cy + 44;
 
