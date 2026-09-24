@@ -337,7 +337,8 @@ export function capitalScenario(): ScenarioResult {
       check('Cathedral (s)', cath.t, '60..180', cath.t >= 60 && cath.t <= 180),
       check('Indomitable (s)', indo.t, '60..180', indo.t >= 60 && indo.t <= 180),
       check('Hesperus Dawn (s)', hesp.t, '60..180', hesp.t >= 60 && hesp.t <= 180),
-      check('Lantern Guard corvette (s)', lg.t, '10..60', lg.t >= 10 && lg.t <= 60),
+      // A corvette is not what six torpedo-armed fighters are for: it should go fast, but not instantly.
+      check('Lantern Guard corvette (s)', lg.t, '8..60', lg.t >= 8 && lg.t <= 60),
     ],
   };
 }

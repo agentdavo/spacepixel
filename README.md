@@ -25,6 +25,7 @@ npm run dev            # http://localhost:5173 — title card → campaign
 npm run build          # typecheck + production bundle
 npm test               # campaign runner + all 20 missions (node:test)
 npm run ai-sim         # headless dogfight/formation sim with pass/fail numbers
+npm run balance        # headless combat balance: time-to-kill bands, pass/fail
 npm run perf           # frame-time budgets (meaningful on real GPUs only)
 npm run shot -- --jpg --shot 'hero:cam=0&t=3'   # headless screenshots
 ```
@@ -43,8 +44,11 @@ still runs (TSL ink twin), but compute particles are disabled there.
 | J | cruise drive (3 km/s) |
 | Z | flight assist on/off (Newtonian) |
 | Space / LMB | guns |
-| F / RMB | micro-missile salvo (needs lock) |
+| R | next gun (e.g. Kestrel: pulse laser ↔ autocannon) |
+| F / RMB | missile salvo (needs lock) |
+| Y | next missile type (micro swarm · heavy torpedo · harpoon) |
 | T | next target |
+| B | next subsystem on the target (turrets, lances, hangars, engines, shield generator, bridge) |
 | 1–4 | wing orders: form up · attack my target · engage at will · cover me |
 | Tab | tactical view (battle at ¼ speed) |
 | V · K | camera shots · cinematic auto-cutaways |
@@ -56,7 +60,9 @@ still runs (TSL ink twin), but compute particles are disabled there.
 ## Scenes (`?scene=`)
 
 `flight` (default game) · `showcase` · `hangar` (model sheets) · `paint`
-(livery editor) · `spatial` (depth cues) · `dogfight` (AI demo) · `fx`
+(livery editor) · `spatial` (depth cues) · `dogfight` (AI demo) ·
+`combat&stage=capital|shield|smoke|weapons` (damage / shields / weapon
+families, `&freeze=S` holds a frame) · `fx`
 (particles) · `setpieces&piece=monolith|megagate|derelict|nebula|bastion|pilgrimage|…`
 · `comms` · `audio` · `prologue` (the ~60 s cold open; `&t=SECONDS` seeks,
 loops as an attract reel). Add `&episode=N` to `flight` to jump into a
@@ -93,6 +99,22 @@ camera lags. Plain arrays and functions: `Fleet`, `Weapons` (swept-sphere
 bolts, tracking beams), `Missiles` (proportional navigation + Itano
 spirals), `Capitals` (flak, lances, hangars), `ai/*` (behaviour selection,
 maneuvers, formations, turrets).
+
+**Combat.** Every design has stats (hull, shields, regen, mass, agility,
+speed, signature) and a loadout (`src/sim/Loadouts.ts`): Directorate pulse
+lasers and kinetic autocannon, the Choir's hymn pulse and beam-lance, the
+Rustwake scattergun; micro-missile swarms, slow heavy torpedoes that point
+defence can shoot down, harpoons. Damage types scale against shields and
+hull. Capitals carry four shield facings and a voxel hull, so fire lands on
+the plating and wrecks the subsystem under it — turrets, lances, hangars,
+engines (she drifts), the shield generator (shields gone for good), the bridge
+(fire control lost). Fighters take damage by zone: engines lose thrust, a
+shot-up wing rolls, a dying ship trails black smoke. Damage is painted on the
+cel hull: scorched patches, screentone hatching, glowing craters.
+`npm run balance` holds the numbers (Kestrel vs Cantor 3–8 s, a turret to a
+wing of four 5–15 s, a capital to a squadron 60–180 s).
+
+![Capital damage](docs/screenshots/combat-capital.jpg)
 
 **Story.** Missions are data (`src/game/campaign`), run by
 `CampaignRunner` (tested) through a small host adapter: story roles →

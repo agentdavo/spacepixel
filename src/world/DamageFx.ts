@@ -65,7 +65,7 @@ export class DamageFx {
     if (f) return f;
     const st = s.combat.dmg;
     const size = st.capital ? Math.max(st.halfL, st.halfW) : Math.max(st.halfL, st.halfW, 3);
-    f = { marks: createDamageMarks(st.capital ? 5 / size : 0.9), version: -1, trail: -1, trailHeavy: false, sparkT: 0, fireT: 0 };
+    f = { marks: createDamageMarks(st.capital ? 60 / size : 0.9), version: -1, trail: -1, trailHeavy: false, sparkT: 0, fireT: 0 };
     // Share the marks with every hull mesh; joint meshes also need their rest offset from the root.
     s.model.root.updateMatrixWorld(true);
     _inv.copy(s.model.root.matrixWorld).invert();
@@ -78,6 +78,23 @@ export class DamageFx {
     return f;
   }
 
+  /** Hull paint: refresh each damaged ship's scorch marks (cheap; call every frame, FX or not). */
+  paint(): void {
+    for (const s of this.fleet.ships) {
+      if (!s.alive) continue;
+      const st = s.combat.dmg;
+      const f = this.ships.get(s.id);
+      if (!f && !s.combat.damaged) continue;
+      const fx = f ?? this.state(s);
+      if (fx.version !== st.version || (!s.combat.damaged && fx.marks.any)) {
+        fx.version = st.version;
+        if (st.capital) this.capitalMarks(st, fx.marks);
+        else this.fighterMarks(st, fx.marks);
+      }
+    }
+  }
+
+  /** Particles: smoke trails, sparks, burning craters. */
   update(dt: number): void {
     this.clock += dt;
     for (const s of this.fleet.ships) {
@@ -92,11 +109,6 @@ export class DamageFx {
       }
       if (!f && !s.combat.damaged) continue;
       const fx = f ?? this.state(s);
-      if (fx.version !== st.version || (!s.combat.damaged && fx.marks.any)) {
-        fx.version = st.version;
-        if (st.capital) this.capitalMarks(st, fx.marks);
-        else this.fighterMarks(st, fx.marks);
-      }
       if (st.capital) this.capitalFx(s, st, fx, dt);
       else this.fighterFx(s, st, fx, dt);
     }
@@ -125,7 +137,7 @@ export class DamageFx {
     for (const sub of subs) {
       if (k >= DAMAGE_MARKS - 3) break;
       const frac = 1 - sub.hp / sub.hpMax;
-      m.marks[k].set(sub.x, sub.y, sub.z, sub.radius * (sub.destroyed ? 1.7 : 1.1));
+      m.marks[k].set(sub.x, sub.y, sub.z, sub.radius * (sub.destroyed ? 1.45 : 1.1));
       setLevel(m, k, sub.destroyed ? 2 : 0.25 + frac * 0.75);
       k++;
     }
@@ -229,13 +241,14 @@ export class DamageFx {
     d.baseVel.copy(v);
     d.dir.copy(_n);
     d.spread = 0.35;
-    d.count = sub.destroyed ? 3 : 6;
-    d.jitter = r * 0.35;
+    d.count = sub.destroyed ? 2 : 6;
+    d.jitter = r * 0.25;
     d.speedMin = r * 0.3;
-    d.speedMax = r * (sub.destroyed ? 0.9 : 2.2);
+    d.speedMax = r * (sub.destroyed ? 0.8 : 2.2);
     d.drag = 1.5;
-    d.size0 = sub.destroyed ? r * 0.28 : r * 0.02;
-    d.size1 = sub.destroyed ? r * 0.55 : r * 0.02;
+    // Licks of flame, not a bonfire: the crater's glow is in the hull paint.
+    d.size0 = sub.destroyed ? r * 0.09 : r * 0.02;
+    d.size1 = sub.destroyed ? r * 0.2 : r * 0.02;
     d.sizeJitter = 0.4;
     d.lifeMin = 0.4;
     d.lifeMax = 0.8;
@@ -253,8 +266,8 @@ export class DamageFx {
     d.speedMin = r * 0.15;
     d.speedMax = r * 0.4;
     d.drag = 0.6;
-    d.size0 = r * 0.3;
-    d.size1 = r * 0.9;
+    d.size0 = r * 0.2;
+    d.size1 = r * 0.65;
     d.sizeJitter = 0.3;
     d.lifeMin = 1.8;
     d.lifeMax = 3.0;

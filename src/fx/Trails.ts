@@ -72,8 +72,9 @@ export const TRAIL_DAMAGE_LIGHT: TrailStyle = {
 export const TRAIL_DAMAGE_HEAVY: TrailStyle = {
   size0: 0.9,
   size1: 4.2,
-  lifeMin: 1.6,
-  lifeMax: 2.6,
+  // Short-lived: red-hot at the root, black within a few metres.
+  lifeMin: 0.9,
+  lifeMax: 1.5,
   spacing: 2.4,
   jitter: 0.6,
   drift: 2.0,

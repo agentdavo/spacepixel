@@ -60,8 +60,8 @@ export const SHIP_STATS: Record<string, ShipStats> = {
   'choir-psalter': { role: 'torpedo bomber', hull: 170, shield: 150, shieldRegen: 0.15, shieldDelay: 3.5, facings: 1, mass: 1.4, agility: 0.7, speed: 0.86, signature: 1.5 },
   'rw-scrapjack': { role: 'brawler', hull: 200, shield: 30, shieldRegen: 0.08, shieldDelay: 5, facings: 1, mass: 1.35, agility: 0.8, speed: 0.85, signature: 1.25 },
   // Corvettes fly on the fighter base spec (escort routes and the AI were tuned on it), just heavier.
-  'ffc-lantern-guard': { role: 'picket corvette', hull: 8000, shield: 3200, shieldRegen: 0.04, shieldDelay: 6, facings: 4, mass: 1.25, agility: 0.8, speed: 0.9, signature: 6 },
-  'choir-vesper': { role: 'escort corvette', hull: 7000, shield: 4400, shieldRegen: 0.05, shieldDelay: 5, facings: 4, mass: 1.2, agility: 0.85, speed: 0.95, signature: 6 },
+  'ffc-lantern-guard': { role: 'picket corvette', hull: 6000, shield: 2400, shieldRegen: 0.04, shieldDelay: 6, facings: 4, mass: 1.25, agility: 0.8, speed: 0.9, signature: 6 },
+  'choir-vesper': { role: 'escort corvette', hull: 5000, shield: 3200, shieldRegen: 0.05, shieldDelay: 5, facings: 4, mass: 1.2, agility: 0.85, speed: 0.95, signature: 6 },
   'cvs07-hesperus-dawn': { role: 'carrier', hull: 36000, shield: 7000, shieldRegen: 0.03, shieldDelay: 8, facings: 4, mass: 1, agility: 1, speed: 1, signature: 20 },
   'bb-indomitable': { role: 'dreadnought', hull: 48000, shield: 9000, shieldRegen: 0.03, shieldDelay: 8, facings: 4, mass: 1, agility: 0.8, speed: 0.9, signature: 25 },
   'choir-cathedral': { role: 'dreadnought', hull: 40000, shield: 9000, shieldRegen: 0.04, shieldDelay: 7, facings: 4, mass: 1, agility: 1, speed: 1, signature: 25 },

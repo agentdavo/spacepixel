@@ -86,6 +86,19 @@ opens the Reach up around them and gets the game in front of players.
 
 Design for 13–20: [docs/MULTIPLAYER.md](MULTIPLAYER.md).
 
+### Combat depth ✅
+
+| Piece | Pass/fail | Where |
+|---|---|---|
+| Ship stats per design (hull, shields, regen/delay, mass, agility, speed, signature) | table covers all 11 designs (`npm test`) | `src/sim/Loadouts.ts` |
+| Weapon families + loadouts; R / Y cycle guns and missiles | damage-type ratios (`npm run balance`) | `Loadouts.ts`, `Weapons.ts`, `Missiles.ts` |
+| Capital subsystems with effects; B sub-targets | turret to a wing of 4: 5–15 s | `src/sim/Damage.ts`, `Combat.ts`, `Capitals.ts` |
+| Fighter damage zones (thrust, roll drift, smoke) | unit-tested routing | `Damage.ts`, `src/world/DamageFx.ts` |
+| Directional capital shields, collapse / regen visuals | facing routing unit-tested | `WeaponVisuals.ts`, `CombatFx.ts` |
+| Balance | Kestrel vs Cantor 3–8 s · capital to a squadron 60–180 s | `npm run balance` |
+
+![Shield facing collapse](screenshots/combat-shield.jpg)
+
 ## Known issues
 
 - WebGL2 fallback lines are softer than the WGSL path.

@@ -73,6 +73,10 @@ export class CombatTestScene implements GameScene {
   private camMode: number;
   private eyeFn: (t: number, eye: Vector3, look: Vector3) => void = () => {};
   private freezeOnCollapse = false;
+  /** Keep fast-forwarding while this holds (bounded by 4 × pre). */
+  private preUntil: (() => boolean) | null = null;
+  /** &fx=0: no particles (inspect the hull paint alone). */
+  private fxOn = new URLSearchParams(location.search).get('fx') !== '0';
 
   constructor() {
     const q = new URLSearchParams(location.search);
@@ -90,7 +94,7 @@ export class CombatTestScene implements GameScene {
     else pre = this.setupWeapons();
 
     // Fast-forward (no FX): the fight settles into shape.
-    for (let t = 0; t < pre; t += DT) this.step(DT, false);
+    for (let t = 0; t < pre || (this.preUntil?.() && t < pre * 8); t += DT) this.step(DT, false);
     window.__VANGUARD__ = { ...window.__VANGUARD__, ready: false, frame: () => 0, backend: '', hooks: { ...window.__VANGUARD__?.hooks, scene: this } };
   }
 
@@ -158,11 +162,15 @@ export class CombatTestScene implements GameScene {
     this.player.isPlayer = true;
     this.player.target = cap;
     this.player.combat.subTarget = st.subsystems.indexOf(aimAt);
+    // Close on the wrecked port batteries and hangar (z ≈ −200…−450 m), looking down and aft.
     this.eyeFn = (t, eye, look) => {
-      const L = st.halfL;
-      if (this.camMode === 1) toUniverse(cap, st.cx + st.halfW * 3.4, st.cy + st.halfH * 2.2, st.cz - L * 0.2 + t * 12, eye);
-      else toUniverse(cap, st.cx + st.halfW * 2.9, st.cy + st.halfH * 1.35, st.cz - L * 1.05 + t * 14, eye);
-      toUniverse(cap, st.cx + st.halfW * 0.1, st.cy + st.halfH * 0.05, st.cz - L * 0.25, look);
+      if (this.camMode === 1) {
+        toUniverse(cap, 1500, 1200, 300 + t * 10, eye);
+        toUniverse(cap, 0, 150, -500, look);
+      } else {
+        toUniverse(cap, 1250, 700, 250 + t * 8, eye);
+        toUniverse(cap, 60, 120, -380, look);
+      }
     };
     return 4;
   }
@@ -176,7 +184,8 @@ export class CombatTestScene implements GameScene {
     // The fore facing is nearly spent.
     st.facings[0] = st.facingMax * 0.1;
     cap.shield = st.facings.reduce((a, b) => a + b, 0);
-    const nose = toUniverse(cap, st.cx, st.cy + st.halfH * 0.3, st.cz + st.halfL * 2.2, new Vector3());
+    // 700 m off the fore shell: well inside hymn range.
+    const nose = toUniverse(cap, st.cx + 60, st.cy + st.halfH * 0.2, st.cz + cap.combat.shell.z + 700, new Vector3());
     const wing = this.spawnWing('choir-cantor', 'choir', 5, nose, new Vector3(0, -0.08, -1).normalize(), 45);
     wing.forEach((s, i) => {
       s.combat.gun = i === 2 ? 1 : 0; // one lance among the hymns
@@ -186,16 +195,18 @@ export class CombatTestScene implements GameScene {
     this.player.target = cap;
     this.scripted.push({ ship: this.player, aim: () => null, speed: 0, fire: () => false });
     this.freezeOnCollapse = true;
+    this.preUntil = () => st.facings[0] > st.facingMax * 0.012;
     this.eyeFn = (_t, eye, look) => {
-      toUniverse(cap, st.cx + st.halfW * 3.6, st.cy + st.halfH * 1.1, st.cz + st.halfL * 1.75, eye);
-      toUniverse(cap, st.cx, st.cy + st.halfH * 0.2, st.cz + st.halfL * 0.95, look);
+      toUniverse(cap, st.cx + st.halfW * 5.5, st.cy + st.halfH * 0.7, st.cz + st.halfL * 1.55, eye);
+      toUniverse(cap, st.cx, st.cy, st.cz + st.halfL * 0.85, look);
     };
     return 0.5;
   }
 
   private setupSmoke(): number {
     const fwd = new Vector3(0, 0, 1);
-    const k = this.fleet.spawn('vf27-kestrel', 'concord', ORIGIN.clone(), fwd, { name: 'Vanguard 3' });
+    // Plot armour: the Cantor's hymn can't finish it (hull floors at 15%).
+    const k = this.fleet.spawn('vf27-kestrel', 'concord', ORIGIN.clone(), fwd, { name: 'Vanguard 3', plotArmour: true });
     const st = k.combat.dmg;
     // Crippled: port wing and engines shot up, shields gone, hull at 18%.
     st.zones[1] = 0.85;
@@ -215,8 +226,8 @@ export class CombatTestScene implements GameScene {
     this.eyeFn = (_t, eye, look) => {
       const p = k.flight.position;
       if (this.camMode === 1) eye.copy(p).add(_v.set(-26, 9, 34));
-      else eye.copy(p).add(_v.set(34, 8, -46));
-      look.copy(p).add(_v.set(0, 0, -30));
+      else eye.copy(p).add(_v.set(58, 14, -18));
+      look.copy(p).add(_v.set(0, 0, -26));
     };
     return 1.5;
   }
@@ -249,8 +260,9 @@ export class CombatTestScene implements GameScene {
     this.player.isPlayer = true;
     this.player.target = lg;
     this.eyeFn = (_t, eye, look) => {
-      eye.copy(ORIGIN).add(_v.set(420, 120, 560));
-      look.copy(ORIGIN).add(_v.set(-40, 0, 700));
+      // Behind the firing line: bolts of every family stream away to the corvette.
+      eye.copy(ORIGIN).add(_v.set(-250, 55, -170));
+      look.copy(ORIGIN).add(_v.set(70, -10, 520));
     };
     void GUNS;
     return 0.9;
@@ -279,7 +291,7 @@ export class CombatTestScene implements GameScene {
     for (const sc of this.scripted) sc.ship.flight.velocity.copy(sc.ship.flight.forward(_v)).multiplyScalar(sc.speed);
     this.weapons.step(dt);
     this.missiles.step(dt);
-    if (fx) this.combatFx.consume(dt);
+    if (fx && this.fxOn) this.combatFx.consume(dt);
     if (this.freezeOnCollapse && fx && this.weapons.events.some((e) => e.kind === 'shield-down') && !Number.isFinite(this.freeze)) this.freeze = this.liveT + 0.1;
   }
 

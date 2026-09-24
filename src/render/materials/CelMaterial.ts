@@ -205,7 +205,9 @@ export class CelMaterial extends MeshBasicNodeMaterial {
             const d = length(p.sub(m.xyz)).div(max(m.w, 0.001));
             const f = saturate(float(1).sub(d).mul(1.6).add(n.mul(0.45))).mul(step(0.001, m.w));
             scorchV.assign(max(scorchV, f.mul(min(lev, 1.0))));
-            burn.assign(max(burn, f.mul(step(1.5, lev))));
+            // Burning core: a tighter disc inside the scorch.
+            const core = saturate(float(1).sub(d.mul(1.8)).add(n.mul(0.3)));
+            burn.assign(max(burn, core.mul(step(1.5, lev)).mul(step(0.001, m.w))));
           }
           const scorch = smoothstep(0.42, 0.46, scorchV);
           const band = smoothstep(0.16, 0.2, scorchV).mul(float(1).sub(scorch));
@@ -217,9 +219,10 @@ export class CelMaterial extends MeshBasicNodeMaterial {
           const deep = smoothstep(0.78, 0.82, scorchV);
           col.assign(mix(col, soot, scorch));
           col.assign(mix(col, soot.mul(0.45), deep));
-          // Craters: molten cracks where the noise ridges, flickering.
-          const ridge = float(1).sub(n.abs().mul(3.2));
-          crack.assign(smoothstep(0.35, 0.5, burn).mul(smoothstep(0.2, 0.45, ridge.add(burn.mul(0.35)))));
+          // Craters: thin molten cracks along the noise ridges, a glowing pit at the heart.
+          const ridge = float(1).sub(n.abs().mul(7.0));
+          const pit = smoothstep(0.82, 0.9, burn);
+          crack.assign(max(smoothstep(0.3, 0.45, burn).mul(smoothstep(0.35, 0.6, ridge)), pit.mul(0.6)));
         });
       }
 
@@ -227,7 +230,7 @@ export class CelMaterial extends MeshBasicNodeMaterial {
       col.assign(min(col, vec3(0.97)));
       if (dmg) {
         const flick = sin(time.mul(23.0).add(positionLocal.x.mul(0.07))).mul(0.25).add(0.85);
-        col.addAssign(vec3(1.0, 0.42, 0.1).mul(crack).mul(flick).mul(2.6));
+        col.addAssign(vec3(1.0, 0.38, 0.08).mul(crack).mul(flick).mul(2.2));
       }
 
       // Emissive (vertex-driven for ship lights / glass, uniform for whole-material glow).

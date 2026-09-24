@@ -207,6 +207,7 @@ export class CombatFx {
 
   /** Once per frame after the eye is final. */
   update(dt: number, eye: Vector3): void {
+    this.damage.paint();
     this.fx.update(dt, eye);
   }
 }
