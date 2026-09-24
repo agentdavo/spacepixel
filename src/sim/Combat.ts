@@ -198,7 +198,7 @@ function addCapitalSubsystems(dmg: DamageState, model: ShipModel, id: string, gr
   for (const [sid, o] of model.sockets) {
     const kind = kinds[o.userData.kind as string];
     if (!kind) continue;
-    _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, o.matrixWorld));
+    mountCentre(model, sid, _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, o.matrixWorld)));
     add(kind, sid, _v);
   }
   model.engines.forEach((e, i) => {
@@ -211,6 +211,18 @@ function addCapitalSubsystems(dmg: DamageState, model: ShipModel, id: string, gr
   if (bridgeSocket) add('bridge', 'bridge', _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, bridgeSocket.matrixWorld)));
   else add('bridge', 'bridge', onTop(layout.bridge.x, layout.bridge.z));
   add('shieldGen', 'shield-gen', onTop(layout.shieldGen.x, layout.shieldGen.z));
+}
+
+/**
+ * A rigged turret's subsystem sits at the centre of the mount on its turning
+ * axis (as TurretRig.turretWorldPosition reports it), not on the deck plate
+ * under it, so its hit sphere wraps the gun house. Others keep the socket.
+ */
+function mountCentre(model: ShipModel, sid: string, p: Vector3): Vector3 {
+  const t = model.turrets.get(sid);
+  if (!t) return p;
+  const lift = _w.subVectors(t.pivot, t.base).dot(t.up) * 0.8;
+  return p.copy(t.base).addScaledVector(t.up, lift);
 }
 
 /** Non-capital hulls at least this big (model radius, m: gunships and up) get their turret / beam / hangar mounts as subsystems. */
@@ -233,7 +245,7 @@ function addMountSubsystems(dmg: DamageState, model: ShipModel, hullMax: number)
     if (!kind) continue;
     const t = SUBSYSTEM_TUNING[kind];
     const n = (counts[kind] = (counts[kind] ?? 0) + 1);
-    _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, o.matrixWorld));
+    mountCentre(model, sid, _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, o.matrixWorld)));
     addSubsystem(dmg, { id: sid, kind, label: `${t.label} ${n}`, x: _v.x, y: _v.y, z: _v.z, radius: Math.max(t.radius * len * 1.6, 2.5), hpMax: Math.max(40, hullMax * t.hp) });
   }
 }

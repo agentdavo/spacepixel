@@ -1,12 +1,11 @@
-import { Matrix4, Quaternion, Vector3 } from 'three';
+import { Quaternion, Vector3 } from 'three';
 import { hostile, type Fleet, type ShipEntity } from '@/sim/Fleet';
 import type { Weapons, Beam } from '@/sim/Weapons';
 import type { Capitals } from '@/sim/Capitals';
 import type { Rng } from '@/sim/Rng';
 import { GUNS, type GunSpec, type Loadout, type MountSpec } from '@/sim/Loadouts';
-import type { Subsystem } from '@/sim/Damage';
 import { createTurretSolution, issueOrder, leadPoint, turretAim, turretCanPoint, turretSelectTarget, TURRET_DEFAULTS, type TurretMount, type TurretSolution } from '@/sim/ai';
-import type { ArticulationNode } from '@/assets/ShipBuilder';
+import { PD_TOL, createDrive, gateTolerance, mountFromRig, muzzleLocal, nextMuzzle, poseTurret, restoreDrive, rigFor, stepDrive, wreckDrive, type TurretDrive, type TurretRig } from '@/sim/TurretRig';
 import { CATALOG_BY_ID } from '@/game/shipyard/catalog';
 import { computeFit, stockFit } from './fit';
 
@@ -19,7 +18,13 @@ import { computeFit, stockFit } from './fit';
  *
  * Player turrets are *assisted*: they engage the selected target when it is
  * in their arc, else (FREE) the best hostile they can reach. U cycles
- * FREE → TARGET ONLY → HOLD. Turret barbettes on a joint visibly train.
+ * FREE → TARGET ONLY → HOLD.
+ *
+ * Mounts are physical (src/sim/TurretRig.ts, shared with Capitals): they
+ * train and elevate at their size's slew rate within the arcs the hull
+ * allows, fire only with the barrels on the solution, from each barrel's
+ * muzzle in turn (beams from the emitter tip), idle home / scan, and freeze
+ * wrecked while their subsystem is destroyed (capital-grade hulls).
  */
 export type TurretMode = 'free' | 'target' | 'hold';
 
@@ -27,22 +32,16 @@ interface MountRt {
   spec: MountSpec;
   gun: GunSpec;
   socket: string;
-  local: Vector3;
-  localUp: Vector3;
-  /** Centre of the arc, ship frame. */
-  localFwd: Vector3;
-  /** Barrel direction at joint angle 0, ship frame. */
-  restFwd: Vector3;
-  joint: ArticulationNode | null;
-  slew: number;
+  rig: TurretRig;
+  drive: TurretDrive;
+  /** Emitter muzzle, ship frame (beam mounts: the beam's origin rides it). */
+  muzzle: Vector3;
   mount: TurretMount;
   sol: TurretSolution;
   cooldown: number;
   burst: number;
   beam: Beam | null;
   engaged: boolean;
-  /** The mount as a subsystem (Combat: capitals and gunships); destroyed = silent. */
-  sub: Subsystem | null;
 }
 
 interface ShipRt {
@@ -58,22 +57,18 @@ interface HangarRt {
   cooldown: number;
 }
 
-const ARC_TRAVERSE: Record<MountSpec['arc'], number> = { dorsal: Math.PI, ventral: Math.PI, bow: Math.PI * 0.75, aft: Math.PI * 0.75, broadside: Math.PI * 0.6 };
-const SLEW: Record<MountSpec['size'], number> = { S: 3, M: 1.6, L: 0.9 };
 const PD_RANGE = 1400;
 const PD_GUNS = new Set(['flak', 'rustflak', 'flakcannon']);
 const LAUNCH_RANGE = 6000;
 
-const _m = new Matrix4();
-const _inv = new Matrix4();
-const _q = new Quaternion();
 const _qi = new Quaternion();
 const _v = new Vector3();
 const _w = new Vector3();
 const _tp = new Vector3();
 const _tv = new Vector3();
 const _a = new Vector3();
-const _c = new Vector3();
+const _mz = new Vector3();
+const _dl = new Vector3();
 
 export class ShipTurrets {
   /** The player's turret discipline (U). */
@@ -161,40 +156,24 @@ export class ShipTurrets {
   }
 
   private buildMounts(s: ShipEntity, specs: MountSpec[]): MountRt[] {
-    const model = s.model;
-    // Measure at rest: turret joints back to 0.
-    for (const sp of specs) if (model.articulations.has(sp.socket)) model.setArticulation(sp.socket, 0);
-    model.root.updateMatrixWorld(true);
-    _inv.copy(model.root.matrixWorld).invert();
     const out: MountRt[] = [];
     for (const sp of specs) {
       const gun = GUNS[sp.gun];
       for (const name of sp.mirror ? [sp.socket, `${sp.socket}.L`] : [sp.socket]) {
-        const o = model.sockets.get(name);
-        if (!o) continue;
-        _m.multiplyMatrices(_inv, o.matrixWorld);
-        const local = new Vector3().setFromMatrixPosition(_m);
-        _q.setFromRotationMatrix(_m);
-        const up = new Vector3(0, 1, 0).applyQuaternion(_q);
-        const rest = new Vector3(0, 0, 1).applyQuaternion(_q);
-        const fwd =
-          sp.arc === 'bow' ? new Vector3(0, 0, 1) : sp.arc === 'aft' ? new Vector3(0, 0, -1) : sp.arc === 'broadside' ? new Vector3(Math.sign(local.x) || 1, 0, 0) : rest.clone();
+        const rig = rigFor(s.model, name);
+        if (!rig) continue;
         const range = Math.min(gun.beam ? gun.beam.length : gun.speed * gun.life, 3200);
+        const drive = createDrive();
+        const muzzle = muzzleLocal(rig, 0, 0, 0, new Vector3());
         out.push({
           spec: sp,
           gun,
           socket: name,
-          local,
-          localUp: up,
-          localFwd: fwd,
-          restFwd: rest,
-          joint: name.endsWith('.L') ? null : (model.articulations.get(name) ?? null),
-          slew: SLEW[sp.size],
+          rig,
+          drive,
+          muzzle,
           mount: {
             ...TURRET_DEFAULTS,
-            traverse: ARC_TRAVERSE[sp.arc],
-            minElevation: -0.15,
-            maxElevation: 1.45,
             position: new Vector3(),
             forward: new Vector3(),
             up: new Vector3(),
@@ -207,7 +186,6 @@ export class ShipTurrets {
           burst: 0,
           beam: null,
           engaged: false,
-          sub: s.combat.dmg.subsystems.find((x) => x.id === name) ?? null,
         });
       }
     }
@@ -253,28 +231,38 @@ export class ShipTurrets {
     const onlyTarget = s.isPlayer && this.mode === 'target';
     const ord = this.fleet.ordnance;
     const team = s.team;
+    const subs = s.combat.dmg.subsystems;
+    _qi.copy(f.orientation).invert();
     for (const g of r.mounts) {
-      if (g.sub?.destroyed) {
-        // Shot off the hull: no fire, no tracking (the wreck pose is the model's).
+      const d = g.drive;
+      const rig = g.rig;
+      // Capital-grade hulls carry turret subsystems: a destroyed mount is a wreck.
+      const sub = subs.length ? subs.find((x) => x.id === g.socket) : undefined;
+      if (sub?.destroyed) {
+        if (!d.wrecked) {
+          wreckDrive(rig, d);
+          poseTurret(s.model, rig, d);
+          if (g.beam?.active && g.beam.muzzle === g.muzzle) g.beam.active = false;
+        }
         g.engaged = false;
-        if (g.beam?.active) g.beam.active = false;
         continue;
       }
+      if (d.wrecked) restoreDrive(d);
       const m = g.mount;
-      m.position.copy(g.local).applyQuaternion(f.orientation).add(f.position);
-      m.up.copy(g.localUp).applyQuaternion(f.orientation);
-      m.forward.copy(g.localFwd).applyQuaternion(f.orientation);
-      m.velocity.copy(f.velocity);
+      mountFromRig(rig, m, f.position, f.orientation, f.velocity);
       g.cooldown -= dt;
       let aimed = false;
+      let pd = false;
       g.engaged = false;
       if (!hold) {
         // Flak mounts break off for inbound torpedoes.
         if (ord && PD_GUNS.has(g.gun.id) && ord.nearestThreat(m.position, team, PD_RANGE, _tp, _tv) >= 0) {
           if (leadPoint(m.position, m.velocity, _tp, _tv, null, _w, g.gun.speed) > 0 && turretCanPoint(m, _v.subVectors(_w, m.position).normalize())) {
             g.sol.aimDir.copy(_v);
+            g.sol.aimPoint.copy(_w);
+            g.sol.distance = _tp.distanceTo(m.position);
             g.sol.target = null;
-            aimed = true;
+            aimed = pd = true;
           }
         }
         const pref = preferred && preferred.alive && hostile(preferred, s) ? preferred : null;
@@ -284,13 +272,21 @@ export class ShipTurrets {
           aimed = (cur && turretAim(m, cur, g.sol)) || turretSelectTarget(m, team, this.fleet.ships, cur, g.sol, s.isPlayer || g.spec.size === 'L');
         }
       }
-      this.train(s, g, aimed, dt);
+      const err = stepDrive(rig, d, aimed ? _dl.copy(g.sol.aimDir).applyQuaternion(_qi) : null, dt);
+      poseTurret(s.model, rig, d);
+      muzzleLocal(rig, d.yaw, d.pitch, 0, g.muzzle);
       if (!aimed) {
         if (g.cooldown < 0) g.cooldown = 0;
         continue;
       }
       g.engaged = true;
       if (g.cooldown > 0) continue;
+      // Fire gate: the barrels must be on the solution.
+      const tgt = pd ? null : g.sol.target;
+      if (err > (pd ? PD_TOL : gateTolerance(tgt ? tgt.radius : 0, g.sol.distance))) {
+        if (g.cooldown < 0) g.cooldown = 0;
+        continue;
+      }
       const gun = g.gun;
       const sp = g.spec;
       if (gun.beam) {
@@ -298,19 +294,27 @@ export class ShipTurrets {
         const b = this.weapons.fireBeam(s, g.socket, gun.beam.length, gun.beam.width, gun.beam.duration, gun.beam.dps * sp.dmgMul, gun.type);
         b.aimTarget = g.sol.target;
         b.gun = gun;
+        b.muzzle = g.muzzle;
+        b.origin.copy(g.muzzle).applyQuaternion(f.orientation).add(f.position);
+        b.dir.copy(g.sol.aimDir);
+        this.weapons.muzzleFlash(b.origin, g.sol.aimDir, f.velocity, s, gun);
+        d.recoil = 0.5;
         g.beam = b;
         g.cooldown = 1 / (gun.rate * sp.rateMul);
         continue;
       }
+      nextMuzzle(rig, d, _mz).applyQuaternion(f.orientation).add(f.position);
+      _tp.subVectors(g.sol.aimPoint, _mz).normalize();
       const scatter = sp.scatter + (gun.burst?.scatter ?? 0) * 0.5;
       for (let k = 0; k < gun.pellets; k++) {
-        _v.copy(g.sol.aimDir)
+        _v.copy(_tp)
           .add(_a.set(this.rand() - 0.5, this.rand() - 0.5, this.rand() - 0.5).multiplyScalar(2 * (scatter + gun.spread)))
           .normalize()
           .multiplyScalar(gun.speed)
           .add(f.velocity);
-        this.weapons.spawnBolt(m.position, _v, gun.life, gun.damage * sp.dmgMul, s, gun);
+        this.weapons.spawnBolt(_mz, _v, gun.life, gun.damage * sp.dmgMul, s, gun);
       }
+      this.weapons.muzzleFlash(_mz, _tp, f.velocity, s, gun);
       if (gun.burst) {
         g.burst++;
         if (g.burst >= gun.burst.count) {
@@ -319,29 +323,6 @@ export class ShipTurrets {
         } else g.cooldown = gun.burst.gap;
       } else g.cooldown += 1 / (gun.rate * sp.rateMul);
     }
-  }
-
-  /** Swing a jointed barbette toward the aim (or home when idle). Visual only. */
-  private train(s: ShipEntity, g: MountRt, aimed: boolean, dt: number): void {
-    const j = g.joint;
-    if (!j) return;
-    let want = 0;
-    if (aimed) {
-      _qi.copy(s.flight.orientation).invert();
-      _c.copy(g.sol.aimDir).applyQuaternion(_qi); // ship frame
-      const ax = j.axis;
-      _c.addScaledVector(ax, -_c.dot(ax));
-      _w.copy(g.restFwd).addScaledVector(ax, -g.restFwd.dot(ax));
-      if (_c.lengthSq() > 1e-6 && _w.lengthSq() > 1e-6) {
-        _c.normalize();
-        _w.normalize();
-        want = Math.atan2(_v.crossVectors(_w, _c).dot(ax), _w.dot(_c));
-      }
-    }
-    let d = want - j.angle;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    const step = g.slew * dt;
-    s.model.setArticulation(j.id, j.angle + Math.max(-step, Math.min(step, d)));
   }
 
   private stepHangar(s: ShipEntity, h: HangarRt, dt: number): void {

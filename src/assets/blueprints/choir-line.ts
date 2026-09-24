@@ -1,6 +1,6 @@
 import type { Blueprint, Part, Station } from '../Blueprint';
 import { ribsAlong, shoulderY, topAt, wingSlice, type WingSpec } from './kit';
-import { bd, crystal, cyl, hp, lf, post, turret, turrets } from './yard';
+import { bd, crystal, cyl, hp, lf, post, turret } from './yard';
 
 /**
  * Zenith Hegemony designs for the shipyard: the Seraph crystal interceptor
@@ -144,7 +144,8 @@ const PIPES: [number, number, number][] = [
   [-2.3, 2.6, 0.24],
   [-1.55, 1.9, 0.2],
 ];
-const CN_EMIT = turrets([
+/** Shoulder emitters: arcs keep them off the organ pipes on the spine. */
+const CN_EMIT = [
   turret('emitter-f', [0.78, shoulderY(CN_HULL, 3.4, 0.78) - 0.05, 3.4], {
     radius: 0.3,
     height: 0.3,
@@ -154,7 +155,7 @@ const CN_EMIT = turrets([
     paint: 'secondary',
     trim: 'glass',
     mirror: true,
-    joint: 'emitter-f',
+    traverse: [-100, 170],
   }),
   turret('emitter-a', [0.9, shoulderY(CN_HULL, -7.4, 0.6) - 0.05, -7.4], {
     radius: 0.26,
@@ -166,9 +167,9 @@ const CN_EMIT = turrets([
     paint: 'secondary',
     trim: 'glass',
     mirror: true,
-    joint: 'emitter-a',
+    traverse: [-140, 90],
   }),
-]);
+];
 
 export const CANTICLE: Blueprint = {
   id: 'choir-canticle',
@@ -238,7 +239,7 @@ export const CANTICLE: Blueprint = {
       shape: { kind: 'wing', root: 2.8, tip: 0.8, span: 2.4, sweep: 2.0, thickness: 0.2, bevel: 1 },
     },
     // Emitter turrets on the shoulders.
-    ...CN_EMIT.parts,
+    ...CN_EMIT,
     // Gallery windows.
     {
       name: 'gallery',
@@ -274,6 +275,5 @@ export const CANTICLE: Blueprint = {
     { pos: [0, 0.1, -11.1], radius: 0.62, plume: 5 },
     { pos: [0.9, -0.7, -10.15], radius: 0.36, plume: 3.4, mirror: true },
   ],
-  articulations: CN_EMIT.joints,
   hardpoints: [hp('lance', 'beam', [0, -1.35, 12.2]), hp('bridge', 'gun', [0, cnTop(6.0), 6.4])],
 };

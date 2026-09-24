@@ -68,6 +68,32 @@ const _aim = new Vector3();
 const _seg = new Vector3();
 const _hit = createRayHit();
 
+/** Heavy single launches (torpedo, harpoon) prefer the heavy tubes. */
+const HEAVY_TUBE = /torpedo|harpoon|tube|vls/;
+/** Missile launchers ('missile' sockets) per built model, in blueprint order: every rail, and the heavy tubes. */
+const launcherCache = new WeakMap<ShipEntity['model'], { all: string[]; heavy: string[] }>();
+function launchersOf(model: ShipEntity['model']): { all: string[]; heavy: string[] } {
+  let l = launcherCache.get(model);
+  if (!l) {
+    const all = [...model.sockets.entries()].filter(([, o]) => o.userData.kind === 'missile').map(([k]) => k);
+    l = { all, heavy: all.filter((n) => HEAVY_TUBE.test(n)) };
+    launcherCache.set(model, l);
+  }
+  return l;
+}
+
+/**
+ * Ship-frame position of a socket: composes each joint's own position /
+ * rotation / scale up to the root (never `matrix`, which only the renderer
+ * refreshes) — a rail on a folding wing launches from the wing.
+ */
+function socketLocal(model: ShipEntity['model'], name: string, out: Vector3): Vector3 {
+  const o = model.sockets.get(name)!;
+  out.copy(o.position);
+  for (let p = o.parent; p && p !== model.root; p = p.parent) out.multiply(p.scale).applyQuaternion(p.quaternion).add(p.position);
+  return out;
+}
+
 export class Missiles implements Shootables {
   readonly pos: Vector3[] = [];
   readonly vel: Vector3[] = [];
@@ -155,13 +181,18 @@ export class Missiles implements Shootables {
     this.head = (this.head + 1) % MISSILE_CAPACITY;
     if (this.alive[i]) this.kill(i);
     const f = shooter.flight;
-    const rails = spec.salvo === 1 ? ['torpedo', 'rail', 'rockets'] : ['rail', 'rail.L', 'pod', 'pod.L'];
-    const railName = rails.filter((n) => shooter.model.sockets.has(n))[k % 2] ?? rails.find((n) => shooter.model.sockets.has(n));
-    const rail = railName ? shooter.model.sockets.get(railName) : undefined;
-    this.pos[i].copy(rail ? rail.position : _r.set(0, -1, 0)).applyQuaternion(f.orientation).add(f.position);
-    // Fan out: sideways + down/up kick with some randomness, then boost forward.
+    // Launch from a launcher: heavy tubes for single heavies, else ripple through every rail.
+    const { all, heavy } = launchersOf(shooter.model);
+    let rail: string | null = null;
+    // Heavies alternate between a pair of tubes (pool slot parity: deterministic, no extra state).
+    if (spec.salvo === 1 && heavy.length) rail = heavy[i % heavy.length];
+    else if (all.length) rail = all[k % all.length];
+    if (rail) socketLocal(shooter.model, rail, _r);
+    else _r.set(0, -1, 0);
+    this.pos[i].copy(_r).applyQuaternion(f.orientation).add(f.position);
+    // Fan out: sideways (off the launcher's side) + down/up kick with some randomness, then boost forward.
     f.forward(_fwd);
-    _side.set(k % 2 ? 1 : -1, 0, 0).applyQuaternion(f.orientation);
+    _side.set(rail && Math.abs(_r.x) > 1e-3 ? Math.sign(_r.x) : k % 2 ? 1 : -1, 0, 0).applyQuaternion(f.orientation);
     _up.set(0, 1, 0).applyQuaternion(f.orientation);
     this.vel[i]
       .copy(f.velocity)
