@@ -418,7 +418,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       events: this.weapons.events,
       missileIncoming: this.audioFrame.player.incomingMissile,
       story: this.campaign?.comms ?? null,
-      quiet: this.docking.busy || this.jumpPhase !== 'none',
+      quiet: this.docking.busy || this.jumpPhase !== 'none' || this.contracts.rescue.active,
       systemName: this.view.system.name,
     });
     const dk = this.docking.target;
@@ -479,6 +479,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (this.docking.busy || this.contracts.rescue.active) {
       // Cutaway (docking, or the salvage tow after a free-flight death): the frame belongs to the cinematography.
       this.hud.clear();
+      this.combatHud.clear();
       this.updateCinema();
       this.starMap.draw(time);
       return;

@@ -521,7 +521,10 @@ export class ContractDesk {
         for (const id of [...this.ops.keys()]) this.teardown(id);
         saveContracts(this.book);
       }
-      if (!this.rescue.active) this.rescue.begin();
+      if (!this.rescue.active) {
+        this.rescue.begin();
+        this.comms?.clear();
+      }
       this.rescue.update(dt);
       return;
     }

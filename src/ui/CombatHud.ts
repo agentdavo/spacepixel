@@ -54,6 +54,12 @@ export class CombatHud {
     this.canvas.height = Math.round(h * this.dpr);
   }
 
+  /** Blank the layer (cutaways). */
+  clear(): void {
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.ctx.clearRect(0, 0, this.w, this.h);
+  }
+
   set visible(v: boolean) {
     this.canvas.style.display = v ? '' : 'none';
   }
