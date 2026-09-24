@@ -140,3 +140,76 @@ test('bridge camera looks over the bow: the forward battery sits in the bottom s
     assert.ok(hullTop < 720 * 0.75, `${e.id}: the hull reads below the horizon (top at y=${hullTop.toFixed(0)})`);
   }
 });
+
+test('bow camera clears the bow battery: every mount, at any bearing, sits behind the eye', { timeout: 240_000 }, async () => {
+  server ??= await createServer({
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    logLevel: 'error',
+    appType: 'custom',
+    server: { middlewareMode: true, hmr: false, watch: null },
+  });
+  const THREE = await server.ssrLoadModule('three');
+  const { buildShip } = await server.ssrLoadModule('/src/assets/ShipBuilder.ts');
+  const { BLUEPRINTS } = await server.ssrLoadModule('/src/assets/blueprints/index.ts');
+  const { framingFor, hasBowBattery } = await server.ssrLoadModule('/src/game/shipyard/flight.ts');
+  const hulls = CATALOG.filter((x) => x.camera === 'bridge' && hasBowBattery(x));
+  assert.ok(hulls.length > 0, 'a bridge hull with a bow battery to test');
+  for (const e of hulls) {
+    const model = buildShip(BLUEPRINTS[e.blueprint]);
+    const f = framingFor(model, e, 'bow');
+    const eye = new THREE.Vector3(...f.offset);
+    const cam = new THREE.PerspectiveCamera(58, 16 / 9, f.near, 1e6);
+    cam.position.copy(eye);
+    cam.lookAt(0, 0, f.lookAhead);
+    cam.updateMatrixWorld(true);
+
+    // Forward of the bridge, on the deck: a ray up from the eye leaves the hull, one down lands close by.
+    assert.ok(eye.z > model.sockets.get('bridge').position.z, `${e.id}: bow eye forward of the bridge`);
+    const probe = new THREE.Mesh(model.hull.geometry);
+    const ray = new THREE.Raycaster();
+    ray.set(eye, new THREE.Vector3(0, 1, 0));
+    assert.equal(ray.intersectObject(probe).length, 0, `${e.id}: bow eye is outside the hull`);
+    ray.set(eye, new THREE.Vector3(0, -1, 0));
+    const deck = ray.intersectObject(probe)[0];
+    assert.ok(deck && deck.distance < model.length * 0.05, `${e.id}: bow eye sits on the deck (${deck?.distance.toFixed(1)} m up)`);
+
+    // Train every bow mount right round: no vertex may come in front of the near plane.
+    const bow = e.hardpoints.turrets.filter((t) => t.arc === 'bow').flatMap((t) => (t.mirror ? [t.socket, `${t.socket}.L`] : [t.socket]));
+    const v = new THREE.Vector3();
+    for (let deg = 0; deg < 360; deg += 15) {
+      for (const id of bow) model.setArticulation(id, (deg * Math.PI) / 180);
+      model.root.updateMatrixWorld(true);
+      for (const id of bow) {
+        const mesh = model.articulations.get(id)?.mesh;
+        assert.ok(mesh, `${e.id}: bow mount ${id} has a turret mesh`);
+        const pos = mesh.geometry.getAttribute('position');
+        let nearest = -Infinity;
+        for (let i = 0; i < pos.count; i++) nearest = Math.max(nearest, v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).applyMatrix4(cam.matrixWorldInverse).z);
+        assert.ok(nearest > -f.near, `${e.id}: ${id} trained ${deg}° reaches ${(-nearest).toFixed(1)} m in front of the bow eye`);
+      }
+    }
+  }
+});
+
+test('framingFor keeps every hull on the camera it rode before; the bow view is for bridge hulls only', { timeout: 240_000 }, async () => {
+  server ??= await createServer({
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    logLevel: 'error',
+    appType: 'custom',
+    server: { middlewareMode: true, hmr: false, watch: null },
+  });
+  const { buildShip } = await server.ssrLoadModule('/src/assets/ShipBuilder.ts');
+  const { BLUEPRINTS } = await server.ssrLoadModule('/src/assets/blueprints/index.ts');
+  const { framingFor, viewFor, bridgeFraming, chaseFraming, hasBowBattery } = await server.ssrLoadModule('/src/game/shipyard/flight.ts');
+  for (const e of CATALOG) {
+    const model = buildShip(BLUEPRINTS[e.blueprint]);
+    const sock = model.sockets.get('bridge');
+    const bridge = e.camera === 'bridge' && !!sock;
+    const view = viewFor(model, e);
+    assert.equal(view, bridge ? 'bridge' : 'chase', `${e.id}: default view`);
+    const was = bridge ? bridgeFraming([sock.position.x, sock.position.y, sock.position.z], model.length, hasBowBattery(e)) : model.length > 20 ? chaseFraming(model.length) : null;
+    assert.deepEqual(framingFor(model, e, view), was, `${e.id}: framing unchanged`);
+    assert.equal(viewFor(model, e, true), bridge ? 'bow' : 'chase', `${e.id}: bow view only on bridge hulls`);
+    assert.equal(viewFor(model, e, true, '0'), 'chase', `${e.id}: ?bridge=0 forces the chase cam`);
+  }
+});

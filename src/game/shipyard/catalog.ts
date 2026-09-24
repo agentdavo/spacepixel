@@ -306,7 +306,7 @@ export const CATALOG: CatalogEntry[] = [
       ],
       utility: util(4, 4, 4, 4, 4),
     },
-    stats: { hull: 3000, shield: 1400, speed: 110, boost: 190, accel: 14, turn: 22, roll: 32, agility: 0.16, cargo: 600 },
+    stats: { hull: 4500, shield: 1400, speed: 110, boost: 190, accel: 14, turn: 22, roll: 32, agility: 0.16, cargo: 600 },
     blurb: 'Fast attack corvette. Twenty crew, three twin mounts and a spinal mass-driver you aim with the whole ship.',
   },
   {

@@ -8,6 +8,7 @@ import {
   SIZE_RANK,
   item,
   itemId,
+  itemKey,
   rawGunDps,
   type ArmourItem,
   type BayItem,
@@ -28,9 +29,11 @@ import {
  * live ShipEntity.
  *
  * Base numbers (the catalogue's stat hints, or the legacy combat table for
- * the Kestrel line) are what the *stock* fit gives; every other item is a
- * ratio against the stock item in that slot. A stock legacy hull therefore
- * flies and fights exactly as before.
+ * the Kestrel line) are what the *baseline* fit gives — the stock fit at
+ * Mk I (see baselineFit); every other item is a ratio against the baseline
+ * item in that slot. A stock legacy hull therefore flies and fights exactly
+ * as before, and a hull that leaves the yard with some Mk II kit (the
+ * Resolute, the Valiant: STOCK_OVERRIDE) really gets the upgrade.
  */
 
 export interface Slot {
@@ -144,6 +147,27 @@ const STOCK_OVERRIDE: Record<string, Fit> = {
   'vf31-harrier': { 'gun:gun': itemId('g-twin'), 'msl:wing-rail': itemId('m-micro') },
   'rw-scrapjack': { 'gun:gun': itemId('g-scrap'), 'gun:claw': itemId('g-auto') },
   'sb9-warhorse': { 'msl:torpedo': itemId('m-torp') },
+  // Warships leave the yard fitted to fight what their tier meets. All Mk I,
+  // a stock Resolute lost a solo duel with a Lantern Guard and a stock
+  // Valiant barely scraped past a Vesper (npm run balance, outfit scenario).
+  // The Resolute: Mk II throughout (mounts, driver, torpedoes, shield, plate);
+  // with its catalogue hull (4500) that is a narrow win over a picket.
+  'cr5-resolute': {
+    'gun:driver': itemId('g-driver', 2),
+    'msl:vls': itemId('m-torp', 2),
+    'tur:main-a': itemId('t-heavy', 2),
+    'tur:main-b': itemId('t-heavy', 2),
+    'tur:main-v': itemId('t-heavy', 2),
+    shield: itemId('shield-c4-aegis', 2),
+    armour: itemId('armour-c4-castellan', 2),
+  },
+  // The Valiant: Mk II rail mounts and shield.
+  'ffl3-valiant': {
+    'tur:main-a': itemId('t-rail', 2),
+    'tur:main-b': itemId('t-rail', 2),
+    'tur:main-x': itemId('t-rail', 2),
+    shield: itemId('shield-c5-aegis', 2),
+  },
 };
 
 function stockGun(slot: Slot, y: Yard): string {
@@ -206,6 +230,17 @@ export function stockFit(e: CatalogEntry): Fit {
   return fit;
 }
 
+/**
+ * The stock fit with every item at Mk I: what the hull's base numbers (its
+ * catalogue stats, its rated reactor output) assume. Equal to stockFit for
+ * every hull whose stock kit is all Mk I.
+ */
+export function baselineFit(e: CatalogEntry): Fit {
+  const fit: Fit = {};
+  for (const [k, id] of Object.entries(stockFit(e))) fit[k] = id && item(itemId(itemKey(id))) ? itemId(itemKey(id)) : id;
+  return fit;
+}
+
 export function sameFit(a: Fit, b: Fit): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const k of keys) if ((a[k] ?? null) !== (b[k] ?? null)) return false;
@@ -241,13 +276,13 @@ export function fitDraw(e: CatalogEntry, fit: Fit): number {
   return Math.round(n * 10) / 10;
 }
 
-/** Rated reactor output of the hull (MW) with its stock reactor: stock load + 20 % headroom. */
+/** Rated reactor output of the hull (MW) with a Mk I reactor: Mk I stock load + 20 % headroom. */
 export function ratedPower(e: CatalogEntry): number {
-  return Math.ceil(fitDraw(e, stockFit(e)) * 1.2 + 1);
+  return Math.ceil(fitDraw(e, baselineFit(e)) * 1.2 + 1);
 }
 
 export function fitOutput(e: CatalogEntry, fit: Fit): number {
-  const stock = item(stockFit(e).reactor) as ReactorItem | undefined;
+  const stock = item(baselineFit(e).reactor) as ReactorItem | undefined;
   const cur = item(fit.reactor) as ReactorItem | undefined;
   if (!stock) return ratedPower(e);
   return Math.round(ratedPower(e) * ((cur?.output ?? 0) / stock.output) * 10) / 10;
@@ -309,9 +344,10 @@ export function slotSockets(s: Slot): string[] {
 export function computeFit(e: CatalogEntry, fit: Fit): FitResult {
   const slots = slotsFor(e);
   const stock = stockFit(e);
+  const baseline = baselineFit(e);
   const base = baseStats(e);
   const at = <T extends Item>(id: string) => item(fit[id]) as T | undefined;
-  const st = <T extends Item>(id: string) => item(stock[id]) as T | undefined;
+  const st = <T extends Item>(id: string) => item(baseline[id]) as T | undefined;
 
   const sh = at<ShieldItem>('shield');
   const sh0 = st<ShieldItem>('shield');
