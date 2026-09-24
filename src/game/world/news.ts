@@ -5,7 +5,7 @@
  * economy.rumours() as `news`.
  */
 import { fact, type WorldEvent, type WorldState } from './WorldState.ts';
-import { STORY_RULES, hashStr, lastEpisode, type ReachInfo } from './sim.ts';
+import { STORY_RULES, factRulesInForce, hashStr, lastEpisode, type ReachInfo } from './sim.ts';
 import { currentSchedule, engagementStatus, FLOOR } from './schedule.ts';
 import { fmtCount, signalState } from './signal.ts';
 
@@ -113,6 +113,8 @@ export function worldNews(w: WorldState, reach: ReachInfo, at: NewsAt, n = 3): s
   const out: string[] = [];
   const head = chapterLine(w);
   if (head) out.push(head);
+  // Guild choices that changed the Reach (the latest two).
+  for (const r of factRulesInForce(w).slice(-2)) out.push(r.news);
   const sig = signalState(w);
   if (sig.count !== null) {
     out.push(

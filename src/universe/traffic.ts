@@ -223,10 +223,16 @@ export interface TrafficWorld {
   volume(sysId: string): number;
   piracy(sysId: string): number;
   patrol(sysId: string): number;
+  /** Patrols of this flag hunt the pilot (a defector): they fly as renegades. */
+  hostilePatrol?(flag: EconFaction): boolean;
 }
 let trafficWorld: TrafficWorld | null = null;
 export function setTrafficWorld(w: TrafficWorld | null): void {
   trafficWorld = w;
+}
+/** Does the world set this flag's patrols against the pilot? (false in the default Reach) */
+export function patrolHostile(flag: EconFaction): boolean {
+  return !!trafficWorld?.hostilePatrol?.(flag);
 }
 
 type SysLike = Pick<StarSystem, 'faction' | 'threat'> & { id?: string };

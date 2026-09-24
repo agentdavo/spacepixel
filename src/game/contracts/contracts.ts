@@ -154,6 +154,14 @@ export interface Contract {
   named?: string;
   /** A Schedule engagement taken as ordered (src/game/world/schedule.ts): the sortie op flies it staged. */
   schedule?: { id: string; number: number; quota: number; protectedName: string; correction?: boolean };
+  /** Guild work (src/game/guilds): merit paid on settlement, and Ebon grams for clan jobs. */
+  guild?: string;
+  merit?: number;
+  grams?: number;
+  /** A hand-written guild arc mission (src/game/guilds/arcs.ts builds its operation). */
+  arc?: string;
+  /** An outpost's defence (src/game/outposts). */
+  outpost?: string;
 }
 
 export interface Receipt {
@@ -544,6 +552,20 @@ export function generateBoard(input: BoardInput): Contract[] {
     if (kind === 'sortie') delete weights.sortie; // one per board at most
   }
   return out;
+}
+
+/**
+ * One offer of `kind` at `input.station`, seeded by `key` (the same key always
+ * makes the same job). Guild boards compose their own boards from this.
+ */
+export function makeOffer(input: BoardInput, kind: ContractKind, tier: Tier, key: string): Contract | null {
+  const found = findStation(input.reach, input.station);
+  if (!found) return null;
+  const { station, system } = found;
+  const rep = input.rep[station.faction] ?? 0;
+  const rnd = mulberry32(hashStr(key));
+  const ctx: GenCtx = { input, station, system, rep, rnd, hops: hops(input.reach, system.id), idx: systemIndex(input.reach), epoch: boardEpoch(input.clock) };
+  return makeContract(ctx, kind, tier, key);
 }
 
 interface GenCtx {

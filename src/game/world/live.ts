@@ -14,7 +14,7 @@ import type { Universe } from '@/universe/Universe';
 import { setTrafficWorld } from '@/universe/traffic';
 import { setMarketWorld, type CommodityId, type EconFaction, type MarketSpec } from '../economy';
 import { saveWorld, setFact, world, type WorldEvent, type WorldState } from './WorldState';
-import { actAmbush, actContract, actKill, actTrade, attitude, backfillStory, completeEpisode, fastForward, patrolOffset, piracyOffset, priceOffset, since, trafficOffset, type ReachInfo } from './sim';
+import { actAmbush, actContract, actKill, actTrade, attitude, backfillStory, completeEpisode, fastForward, hostilePatrol, patrolOffset, piracyOffset, priceOffset, since, trafficOffset, type ReachInfo } from './sim';
 import { stepWorld } from './step';
 import { breakEngagement, currentSchedule, flyAsOrdered, engagementById, type Engagement } from './schedule';
 import { worldNews } from './news';
@@ -94,6 +94,7 @@ export class WorldRuntime {
       volume: (id) => trafficOffset(read(), id),
       piracy: (id) => piracyOffset(read(), id),
       patrol: (id) => patrolOffset(read(), id),
+      hostilePatrol: (flag) => hostilePatrol(read(), flag),
     });
     this.captureFlags();
     if (typeof window !== 'undefined') window.addEventListener('pagehide', () => persistWorld());

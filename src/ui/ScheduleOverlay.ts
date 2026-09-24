@@ -156,6 +156,7 @@ export class ScheduleOverlay {
         const can = (st === 'upcoming' || st === 'open') && !booked.has(e.id);
         rows.push({ text: can ? '[ ] SELECT · [O] FLY AS ORDERED — OR BREAK IT' : booked.has(e.id) ? '◆ ON YOUR BOOK — TAKE STATION ON THE LINE' : '[ ] SELECT', color: can ? AMBER : 'rgba(255,179,71,0.6)' });
       }
+      if (fact(w, 'schedule.leaked')) rows.push({ text: 'LEAKED ON CHANNEL NINE · THE FLOOR IS SHAKING', color: RED });
       const broken = w.log.filter((x) => x.kind === 'schedule.broken').length;
       if (fact(w, 'continuity.hostile')) rows.push({ text: `OFFICE OF CONTINUITY: HOSTILE${broken ? ` · ${broken} BROKEN` : ''}`, color: RED });
     }

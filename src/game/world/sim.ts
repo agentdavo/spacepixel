@@ -193,6 +193,71 @@ export const STORY_RULES: readonly StoryRule[] = [
 
 const RULE_BY_EP = new Map(STORY_RULES.map((r) => [r.ep, r]));
 
+/**
+ * Lasting changes from guild arc choices (src/game/guilds/arcs.ts writes the
+ * facts): a fact (optionally with a value) → modifiers + a headline. Derived
+ * at read time like STORY_RULES.
+ */
+export interface FactRule {
+  fact: string;
+  is?: string | boolean;
+  mods: StoryEffect[];
+  news: string;
+}
+export const FACT_RULES: readonly FactRule[] = [
+  {
+    fact: 'keeping.core',
+    is: 'sealed',
+    mods: [fx('guild:keeping', 'attitude', 0.3), fx('guild:continuity', 'attitude', -0.1)],
+    news: 'The Cloister has sealed a golden-age core beside Hollis Marrow\'s reactors. The wardens will not say what it was.',
+  },
+  {
+    fact: 'keeping.core',
+    is: 'opened',
+    mods: [fx('guild:continuity', 'attitude', 0.15), fx('guild:keeping', 'attitude', -0.3), fx(REACH, 'price:cores', 0.08)],
+    news: 'The Office of Continuity opened a sealed core. Every warden in the Reach has stopped speaking to its inspectors; sealed cores are dearer for it.',
+  },
+  { fact: 'continuity.ledger', is: 'filed', mods: [fx('guild:continuity', 'attitude', 0.15)], news: 'Engagement 114\'s ledger filed and forgotten. Continuity thanks its case officers for their discretion.' },
+  {
+    fact: 'schedule.leaked',
+    mods: [fx(REACH, 'price:ebon', 0.12), fx(REACH, 'price:munitions', 0.06), fx('guild:continuity', 'attitude', -0.4), fx('faction:rustwake', 'attitude', 0.15), fx('system:lysowick', 'traffic', -0.15)],
+    news: 'CHANNEL NINE: "Engagement 114 — eleven fighters, budgeted like fuel." The exchange floor is pricing a war it can no longer see coming.',
+  },
+  { fact: 'allocation.quota', is: 'delivered', mods: [fx('faction:choir', 'attitude', 0.05)], news: 'Quota Night: expenditure within schedule. The Treasury received its grams on the minute.' },
+  {
+    fact: 'anchorage.fed',
+    // Diverted grams ease the refugee demand the Bastion's fall put on Anchorage.
+    mods: [fx('system:anchorage', 'price:rations', -0.2), fx('system:anchorage', 'price:medical', -0.12), fx('system:anchorage', 'attitude', 0.25)],
+    news: 'Forty kilograms to the Anchorage ration line. Nobody starves there this winter. Nobody says whose grams.',
+  },
+  { fact: 'rustwake.seam', is: 'tey', mods: [fx('system:rustwake', 'price:ebon', -0.08), fx('faction:concord', 'attitude', 0.03)], news: 'Clan Tey holds the Ember\'s last seam: Ebon cheap at the Tey works for five winters. The real five.' },
+  {
+    fact: 'rustwake.seam',
+    is: 'breakers',
+    mods: [fx('system:rustwake', 'price:relics', -0.12), fx('system:rustwake', 'price:spares', -0.08), fx('system:rustwake', 'piracy', -0.04)],
+    news: 'The Graveyard Breakers hold the Ember seam. Their yards pay in gas and sell wrecks cheap.',
+  },
+  {
+    fact: 'player.defected',
+    // Directorate patrols treat the pilot as hostile (traffic reader `hostilePatrol`).
+    mods: [fx('faction:concord', 'attitude', -0.45), fx('faction:choir', 'attitude', 0.35), fx(REACH, 'patrol', 0.1)],
+    news: 'A Directorate pilot took the Oath of House Casimir. Directorate pickets are logging a Kestrel under a Cantor\'s name.',
+  },
+];
+
+/** Guild-choice rules in force (fact present, value matching). */
+export function factRulesInForce(w: WorldState): FactRule[] {
+  return FACT_RULES.filter((r) => {
+    const v = fact(w, r.fact);
+    return r.is === undefined ? !!v : v === r.is;
+  });
+}
+
+/** Directorate patrols hunt a pilot who took a House's oath. */
+export function hostilePatrol(w: WorldState, flag: string): boolean {
+  return flag === 'concord' && !!fact(w, 'player.defected');
+}
+
 /** Facts the dev query / captures and tests fast-forward. */
 export function storyFacts(ep: number): string[] {
   return [`story.ep${ep}.done`, ...(RULE_BY_EP.get(ep)?.facts ?? [])];
@@ -226,10 +291,9 @@ let storyCache: { facts: WorldState['facts']; mods: Map<string, number> } | null
 export function storyMod(w: WorldState, scope: WorldScope, channel: string): number {
   if (storyCache?.facts !== w.facts) {
     const mods = new Map<string, number>();
-    for (const r of STORY_RULES) {
-      if (!fact(w, `story.ep${r.ep}.done`)) continue;
-      for (const m of r.mods) mods.set(`${m.scope}|${m.channel}`, (mods.get(`${m.scope}|${m.channel}`) ?? 0) + m.by);
-    }
+    const add = (m: StoryEffect) => mods.set(`${m.scope}|${m.channel}`, (mods.get(`${m.scope}|${m.channel}`) ?? 0) + m.by);
+    for (const r of STORY_RULES) if (fact(w, `story.ep${r.ep}.done`)) r.mods.forEach(add);
+    for (const r of factRulesInForce(w)) r.mods.forEach(add);
     storyCache = { facts: w.facts, mods };
   }
   return storyCache.mods.get(`${scope}|${channel}`) ?? 0;

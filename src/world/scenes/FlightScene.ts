@@ -66,6 +66,8 @@ import { greeting, lanternToll } from '@/game/world/sim';
 import type { WorldEvent } from '@/game/world/WorldState';
 import { ScheduleOverlay } from '@/ui/ScheduleOverlay';
 import { SignalCounter } from '@/ui/SignalCounter';
+import { GuildRuntime } from '@/game/guilds/GuildRuntime';
+import { sanitizeWorld, world } from '@/game/world/WorldState'; // guilds, arcs, outposts (+ the GUILD HALL / OUTPOST dock tabs)
 
 /**
  * Milestones 4–6 + 10–11: one ship flying well, then shooting.
@@ -200,6 +202,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   private wingDock = new WingDocking();
   /** Free-roam contracts: board, accepted jobs, live operations (src/game/contracts). */
   readonly contracts: ContractDesk;
+  /** Guilds, their arcs, and your outpost (src/game/guilds, src/game/outposts). */
+  readonly guilds: GuildRuntime;
   /** Shipyard & outfitting: owned hulls, fits, the active ship (src/game/outfitting). */
   readonly outfit = new Outfitter();
   /** Fitted turrets, point defence and hangar complements on non-capital hulls. */
@@ -397,6 +401,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     });
     this.signal = new SignalCounter(document.getElementById('ui-root')!);
     this.worldRt.on((e) => this.onWorldEvent(e));
+    this.guilds = new GuildRuntime(this);
     this.outfit.bind(this);
     bindOutfitter(this.outfit);
     this.outfit.settle(); // hold size, hangar complement
@@ -414,6 +419,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
     // ?contract=<kind>&cphase=board|op|pay|map: contract captures.
     this.contracts.stageFromQuery();
+    // ?guild=<id>.<rank> · ?outpost=<stage>: guild / outpost captures.
+    this.guilds.stageFromQuery();
     if (q.get('dockui') === '0') this.dockScreen.close();
     // ?reach=body|ring|lane|ambush [&sys=<id>] …: living-Reach captures (world/ReachStage.ts).
     if (q.get('reach')) this.reachFlag(q.get('reach')!, q);
@@ -549,6 +556,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       }
     }
     this.contracts.update(dt, time);
+    this.guilds.update(dt, time);
 
     // 4b. Mission bookkeeping (kills by faction of the victim).
     for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship) this.kills.set(e.ship.faction, (this.kills.get(e.ship.faction) ?? 0) + 1);
@@ -842,6 +850,10 @@ export class FlightScene implements GameScene, FlightHostScene {
   }
 
   // ── FlightHostScene ────────────────────────────────────────────────
+  /** The current system's view (stations, gates, bodies) — outposts build into it. */
+  get systemView(): StarSystemView {
+    return this.view;
+  }
   currentSystemId(): string {
     return this.systemId;
   }
@@ -1161,12 +1173,9 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.cinema.hide();
     this.onDocked?.(d.id);
     this.campaign?.runner.onDocked(d.id);
-    const notices = this.campaign ? [] : this.contracts.onDocked(d.id);
+    const notices = this.campaign ? [] : [...this.contracts.onDocked(d.id), ...this.guilds.onDocked(d.id)];
     const hello = this.campaign ? '' : greeting(this.worldRt.attitudeAt(d), d.faction);
     if (hello) notices.unshift({ text: hello, cls: this.worldRt.attitudeAt(d) < 0 ? 'err' : 'ok' });
-    // The wire: the chapter's headline in the dock log (the ticker carries the rest).
-    const wire = this.campaign ? undefined : this.worldRt.news(d.id, 1)[0];
-    if (wire) notices.push({ text: `WIRE · ${wire.toUpperCase()}` });
     const port = d.cls === 'descent' ? this.ports.markets().find((p) => p.id === d.id) : undefined;
     if (port) notices.unshift({ text: `${port.description.toUpperCase()}`, cls: '' });
     else if (d.cls === 'mooring') notices.unshift({ text: 'MOORED OFF THE PYLON · LIGHTER RUNNING THE CREW ACROSS', cls: 'ok' });
@@ -1457,15 +1466,17 @@ export class FlightScene implements GameScene, FlightHostScene {
       p.shield = p.shieldMax;
       return this.ports.berthAt(stationId);
     }
-    const owner = [...this.universe.systems.values()].find((s) => s.stations.some((st) => st.id === stationId));
+    // Your outpost's berth isn't in the universe's station list (the guild runtime builds it).
+    const owner = [...this.universe.systems.values()].find((s) => s.stations.some((st) => st.id === stationId))?.id ?? this.guilds?.outposts.systemOf(stationId);
     if (!owner) return false;
     this.docking.reset();
     this.dockScreen.close();
     this.cinema.hide();
-    if (owner.id !== this.systemId) {
-      this.warpTo(owner.id);
+    if (owner !== this.systemId) {
+      this.warpTo(owner);
       this.quiet();
     }
+    this.guilds?.outposts.sync();
     const d = this.docking.dockables().find((x) => x.id === stationId);
     if (!d) return false;
     const p = this.player;
@@ -1725,6 +1736,10 @@ export class FlightScene implements GameScene, FlightHostScene {
         break;
       case 'world-episode':
         this.worldRt.episode(a as number);
+        break;
+      case 'world':
+        // Guild hall / outpost actions (src/game/guilds/GuildRuntime.setWorld).
+        world().update(() => sanitizeWorld(a));
         break;
       default:
         console.warn(`[replay] unknown command ${cmd.c}`);

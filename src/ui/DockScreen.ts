@@ -261,7 +261,7 @@ export class DockScreen {
 
   private key(e: KeyboardEvent): void {
     if (!this.ctx) return;
-    const digit = /^Digit([1-6])$/.exec(e.code);
+    const digit = /^Digit([1-9])$/.exec(e.code);
     if (digit) {
       e.preventDefault();
       return this.switchTab(Number(digit[1]) - 1);

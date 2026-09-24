@@ -14,12 +14,14 @@ import {
   boardWeights,
   completeEpisode,
   fastForward,
+  hostilePatrol,
   lanternToll,
   piracyOffset,
   priceOffset,
   storyMod,
   sysMod,
   trafficOffset,
+  worldMod,
   type ReachInfo,
 } from '../src/game/world/sim.ts';
 import { stepWorld } from '../src/game/world/step.ts';
@@ -292,4 +294,28 @@ test('determinism: the same world stepped at 60 Hz with the same deeds is bit-id
   const a = run();
   assert.equal(a, run());
   assert.ok(JSON.parse(a).log.some((e: { kind: string }) => e.kind === 'news'), 'the Reach moved');
+});
+
+test('guild arc choices change the Reach: a leaked Schedule, a fed Anchorage, a defector', () => {
+  const fall = fastForward(10);
+  const set = (w: WorldState, facts: Record<string, string | boolean>) => ({ ...w, facts: { ...w.facts, ...facts } });
+  // Anchorage fed: the refugee demand eases, the station warms.
+  const fed = set(fall, { 'allocation.quota': 'diverted', 'anchorage.fed': true });
+  assert.ok(priceOffset(fed, 'anchorage', 'anchorage-orbital-2', 'rations') < priceOffset(fall, 'anchorage', 'anchorage-orbital-2', 'rations') - 0.15);
+  assert.ok(attitude(fed, { id: 'anchorage-orbital-2', faction: 'concord', kind: 'orbital' }, 'anchorage') > attitude(fall, { id: 'anchorage-orbital-2', faction: 'concord', kind: 'orbital' }, 'anchorage') + 0.2);
+  // The Schedule leaked on channel nine: Ebon jumps, Continuity turns.
+  const leaked = set(fall, { 'continuity.ledger': 'leaked', 'schedule.leaked': true });
+  assert.ok(priceOffset(leaked, 'meridian', 'meridian-refinery-1', 'ebon') > 0.1);
+  assert.ok(attitude(leaked, { id: 'anchorage-bastion-0', faction: 'concord', kind: 'bastion' }, 'anchorage') < -0.3);
+  assert.ok(worldNews(leaked, REACH, { sysId: 'meridian' }).some((l) => /CHANNEL NINE/.test(l)));
+  // A defector: Directorate doors cool, its patrols hunt the pilot.
+  const sworn = set(fall, { 'houses.oath': 'sworn', 'player.defected': true });
+  assert.equal(hostilePatrol(sworn, 'concord'), true);
+  assert.equal(hostilePatrol(fall, 'concord'), false);
+  assert.equal(hostilePatrol(sworn, 'choir'), false);
+  assert.ok(attitude(sworn, { id: 'meridian-orbital-0', faction: 'concord', kind: 'orbital' }, 'meridian') < -0.3);
+  // Values matter: a sealed core and an opened one pull different ways.
+  const sealed = set(fall, { 'keeping.core': 'sealed' });
+  const opened = set(fall, { 'keeping.core': 'opened' });
+  assert.ok(worldMod(sealed, 'guild:keeping', 'attitude') > 0 && worldMod(opened, 'guild:keeping', 'attitude') < 0);
 });
