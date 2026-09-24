@@ -75,8 +75,8 @@ opens the Reach up around them and gets the game in front of players.
 |---|---|---|---|
 | 1 | **Prologue** — 60 s scripted cold open: the gates, the Shattering, the Lanterns, two powers, the Signal (`?scene=prologue`) | plays at budget, skippable, first launch only (`npm run flow-check`) | ✅ |
 | 2 | Cinema sequencer — timeline of shots, captions, cues (shared by prologue, cutscenes, trailer) | a shot list is data only (`src/cinema`) | ✅ |
-| 3 | Attract mode / trailer — title idles into the prologue and flybys | runs unattended 10 min | 🔧 idle title → prologue reel |
-| 4 | Photo mode + clip capture (headless webm/GIF from recorded input) | 1080p clip from a replay | |
+| 3 | Attract mode / trailer — title idles into the prologue and the 90 s trailer (`?scene=trailer`), alternating; any input returns | runs unattended 10 min (`npm run attract-check`: GPU objects / heap / DOM flat cycle to cycle) | ✅ trailer + attract loop; live AI demo flight not yet |
+| 4 | Photo mode + clip capture (headless webm/GIF from recorded input) | 1080p clip from a replay | 🔧 photo mode (F10 freeze / orbit / PNG); clips = `record.mjs` frame-stepped ranges → `make-video.mjs` (H.264 + soundtrack); from a replay waits on 14 |
 | 5 | **Stations** — refineries, salvage yards, bastions, free ports, 1–3 per system | seeded, on star map | ✅ |
 | 5b | **Living Reach** — painted planets (giants, terrestrial, volcanic, burning, Lantern-lit), moons, shattered moons, fly-through rings; timetable traffic, patrol wings, raider ambushes, arrivals flashes | seeded & deterministic, stations/gates untouched (`tests/reach.test.ts`) | 🔧 |
 | 6 | **Docking** — request within 5 km, ILS corridor, auto-dock under 1 km, launch | hostiles within 10 km block it | ✅ |

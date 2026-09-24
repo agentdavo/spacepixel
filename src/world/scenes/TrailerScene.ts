@@ -1,35 +1,36 @@
-import { PerspectiveCamera, Scene } from 'three';
+import { PerspectiveCamera, Scene, Vector3 } from 'three';
 import type { FrameContext } from '@/core/Engine';
 import { WorldSpace } from '@/core/WorldSpace';
 import { flags } from '@/core/Flags';
 import { Fleet } from '@/sim/Fleet';
 import { Weapons } from '@/sim/Weapons';
 import { Missiles } from '@/sim/Missiles';
-import { getAudio } from '@/audio';
+import { getAudio, type AudioFrame } from '@/audio';
+import { getVoice } from '@/audio/voice';
 import { postFx } from '@/render/post/PostFx';
 import { Cinema, resetPostFx } from '@/cinema/Cinema';
 import { CinemaOverlay } from '@/cinema/CinemaOverlay';
-import { PrologueStage } from '@/cinema/PrologueStage';
-import { PROLOGUE } from '@/cinema/prologue';
-import { locate } from '@/cinema/timeline';
+import { TrailerStage } from '@/cinema/TrailerStage';
+import { TRAILER } from '@/cinema/trailer';
+import { intensityAt, locate } from '@/cinema/timeline';
 import { narrationCues, cuesCrossed } from '@/cinema/narration';
-import { getVoice } from '@/audio/voice';
 import type { GameScene } from '../GameScene';
 import { WeaponVisuals } from '../WeaponVisuals';
 import { CombatFx } from '../CombatFx';
 
 /**
- * `?scene=prologue` — the ~60 s cold open (src/cinema/prologue.ts).
+ * `?scene=trailer` — the 90 s gameplay trailer (src/cinema/trailer.ts).
  *
- *   t=SECONDS   start (seek) anywhere on the timeline — deterministic, for captures
+ *   t=SECONDS   start (seek) anywhere — deterministic, for captures / ranged recording
  *   loop=0      hold the last frame instead of looping (direct loads loop)
- *   reel=N      play N× faster (attract-mode soak tests: scripts/attract-check.mjs)
+ *   reel=N      play N× faster (attract-mode soak tests)
  *
- * Hosts that await it (first launch, title attract) set `exitOnSkip` and
- * read `done`; loaded directly, Skip jumps to the title card and the reel
- * loops like an attract mode.
+ * Hosts that await it (the title's attract loop) set `exitOnSkip` and read
+ * `done`. Live, the combat sims' own weapon and missile events feed the
+ * mixer on top of the shot list's authored cues; the offline soundtrack
+ * (`audio-render --only trailer`) renders the authored cues and voices.
  */
-export class PrologueScene implements GameScene {
+export class TrailerScene implements GameScene {
   readonly scene = new Scene();
   readonly camera = new PerspectiveCamera(50, 16 / 9, 0.5, 1_500_000);
   readonly world = new WorldSpace(this.scene);
@@ -37,11 +38,9 @@ export class PrologueScene implements GameScene {
   readonly weapons = new Weapons(this.fleet);
   readonly missiles = new Missiles(this.fleet);
   readonly cinema: Cinema;
-  /** Resolves when the reel ends or is skipped (hosts that await it set exitOnSkip). */
   readonly done: Promise<void>;
-  /** Skip / end finishes the scene (resolving `done`) instead of jumping to the title / looping. */
   exitOnSkip = false;
-  private readonly stage: PrologueStage;
+  private readonly stage: TrailerStage;
   private readonly overlay: CinemaOverlay;
   private readonly visuals: WeaponVisuals;
   private readonly combatFx: CombatFx;
@@ -50,11 +49,10 @@ export class PrologueScene implements GameScene {
   private finished = false;
   private readonly loop: boolean;
   private readonly speed: number;
-  /** Shader warm-up: one black frame parked on each shot before the film starts. */
   private warm = 0;
   private readonly startT: number;
-  /** Narration voice track keyed to the captions (src/cinema/narration.ts). */
-  private readonly narration = narrationCues(PROLOGUE);
+  private readonly narration = narrationCues(TRAILER);
+  private readonly audioFrame: AudioFrame;
 
   constructor() {
     const q = new URLSearchParams(location.search);
@@ -65,35 +63,46 @@ export class PrologueScene implements GameScene {
     this.scene.add(this.visuals.group);
     this.combatFx = new CombatFx(this.weapons, this.missiles);
     this.scene.add(this.combatFx.fx.object);
-    this.stage = new PrologueStage(this.scene, this.world, this.fleet, this.weapons, this.combatFx.fx, this.camera, PROLOGUE);
-    this.overlay = new CinemaOverlay(document.getElementById('ui-root')!);
+    const uiRoot = document.getElementById('ui-root')!;
+    this.stage = new TrailerStage(this.scene, this.world, this.fleet, this.weapons, this.missiles, this.combatFx.fx, this.camera, uiRoot);
+    this.overlay = new CinemaOverlay(uiRoot);
     this.overlay.onSkip = () => this.skip();
     const audio = getAudio();
     audio.autoMood = false;
-    this.cinema = new Cinema(PROLOGUE, this.stage, this.world, this.camera, this.overlay, audio);
-    this.cinema.t = flags.scene === 'prologue' ? flags.startTime : 0;
+    this.cinema = new Cinema(TRAILER, this.stage, this.world, this.camera, this.overlay, audio);
+    this.cinema.t = flags.scene === 'trailer' ? flags.startTime : 0;
     this.startT = this.cinema.t;
-    // Screenshots seek straight to their frame; the warm-up is for real playback.
-    if (flags.shot) this.warm = PROLOGUE.length + 1;
+    if (flags.shot) this.warm = TRAILER.length + 1;
     this.cinema.onEnd = () => {
       if (this.exitOnSkip || !this.loop) this.finish();
       else window.setTimeout(() => !this.finished && this.cinema.seek(0), 1200);
     };
-    window.__VANGUARD__ = { ...(window.__VANGUARD__ ?? { ready: false, frame: () => 0, backend: '' }), hooks: { ...window.__VANGUARD__?.hooks, prologue: this } };
+    const zero = new Vector3();
+    this.audioFrame = {
+      dt: 0,
+      eye: this.world.eye,
+      camera: this.camera.quaternion,
+      player: { position: zero, velocity: zero, throttle: 0, boosting: false, cruise: 'off', lockProgress: 0, locked: false, incomingMissile: false, alive: false },
+      weaponEvents: this.weapons.events,
+      missileEvents: this.missiles.events,
+      jumpPhase: 'none',
+      combatIntensity: 0,
+    };
+    window.__VANGUARD__ = { ...(window.__VANGUARD__ ?? { ready: false, frame: () => 0, backend: '' }), hooks: { ...window.__VANGUARD__?.hooks, trailer: this } };
   }
 
-  /** Skip: finish (awaited) or cut to the title card (direct / attract). */
+  /** Skip: finish (awaited) or cut to the title card (direct loads). */
   skip(): void {
     if (this.finished || this.exitT >= 0) return;
     getAudio().ui('confirm');
     getVoice().stopAll();
     if (this.exitOnSkip) {
-      this.exitT = 0; // quick fade to black, then finish
+      this.exitT = 0;
       return;
     }
-    const title = PROLOGUE.findIndex((s) => s.id === 'title');
+    const title = TRAILER.findIndex((s) => s.id === 'title');
     let start = 0;
-    for (let i = 0; i < title; i++) start += PROLOGUE[i].dur;
+    for (let i = 0; i < title; i++) start += TRAILER[i].dur;
     if (this.cinema.t < start) this.cinema.seek(start);
   }
 
@@ -107,45 +116,44 @@ export class PrologueScene implements GameScene {
     getAudio().autoMood = true;
     // Let the finished reel be collected (the hook would pin the whole scene).
     const hooks = window.__VANGUARD__?.hooks;
-    if (hooks?.prologue === this) delete hooks.prologue;
+    if (hooks?.trailer === this) delete hooks.trailer;
     this.resolveDone();
   }
 
-  /** Host swapping scenes: stop the voice, drop the overlay and the sets. */
+  /** GPU and DOM teardown when the host swaps scenes (main.ts). */
   dispose(): void {
     this.finish();
   }
 
   update(ctx: FrameContext): void {
     if (this.finished) return;
-    if (this.warm <= PROLOGUE.length) {
-      // Park on each set for one frame behind a black fade so every pipeline
-      // compiles now, not on the first cut into it (seek is silent: no
-      // captions, music or SFX). Then rewind to the real start.
+    if (this.warm <= TRAILER.length) {
+      // Compile every set's pipelines behind a black frame before the film starts.
       let at = 0;
-      for (let i = 0; i < Math.min(this.warm, PROLOGUE.length - 1); i++) at += PROLOGUE[i].dur;
-      this.cinema.seek(this.warm < PROLOGUE.length ? at + PROLOGUE[this.warm].dur * 0.5 : this.startT);
+      for (let i = 0; i < Math.min(this.warm, TRAILER.length - 1); i++) at += TRAILER[i].dur;
+      this.cinema.seek(this.warm < TRAILER.length ? at + TRAILER[this.warm].dur * 0.5 : this.startT);
       this.warm++;
       postFx.fade = 1;
-      this.overlay.el.style.visibility = this.warm <= PROLOGUE.length ? 'hidden' : '';
+      this.overlay.el.style.visibility = this.warm <= TRAILER.length ? 'hidden' : '';
       return;
     }
+    const dt = ctx.dt * this.speed;
     const before = this.cinema.t;
-    this.cinema.update(ctx.dt * this.speed);
-    // Narrator: speak each caption as the playhead crosses it (a loop / seek back just re-arms).
+    this.cinema.update(dt);
     if (this.exitT < 0 && this.cinema.t > before && this.speed <= 1) {
       for (const c of cuesCrossed(this.narration, before, this.cinema.t)) getVoice().speak({ who: c.who, text: c.caption.text, channel: c.channel, maxDur: c.maxDur, maxSqueeze: c.maxSqueeze });
     }
-    const dt = ctx.dt * this.speed;
-    // Everything the weapons sim emitted this frame → flashes, beams, particles.
-    this.visuals.consume();
     this.visuals.update(this.world, dt);
     this.combatFx.consume(dt);
     this.combatFx.update(dt, this.world.eye);
-    this.overlay.setSkipVisible(locate(PROLOGUE, this.cinema.t).index < PROLOGUE.length - 1 || this.exitOnSkip);
+    // The sims' own gunfire and blasts, spatialised from the lens, under the authored cues.
+    const a = this.audioFrame;
+    a.dt = dt;
+    a.combatIntensity = intensityAt(TRAILER, this.cinema.t, 0.3);
+    getAudio().update(a);
+    this.overlay.setSkipVisible(locate(TRAILER, this.cinema.t).index < TRAILER.length - 2 || this.exitOnSkip);
     if (this.exitT >= 0) {
       this.exitT += ctx.dt;
-      // Skipped: fade the frame to black over the sequencer's grade, then hand back.
       const k = Math.min(1, this.exitT / 0.45);
       postFx.fade = Math.max(postFx.fade, k);
       this.overlay.setExit(k);
@@ -159,8 +167,7 @@ export class PrologueScene implements GameScene {
   }
 
   cameraLabel(): string {
-    const loc = locate(PROLOGUE, this.cinema.t);
-    return `PROLOGUE · ${PROLOGUE[loc.index].id.toUpperCase()} · ${this.cinema.t.toFixed(1)}s`;
+    const loc = locate(TRAILER, this.cinema.t);
+    return `TRAILER · ${TRAILER[loc.index].id.toUpperCase()} · ${this.cinema.t.toFixed(1)}s`;
   }
 }
-

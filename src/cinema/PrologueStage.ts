@@ -1,5 +1,6 @@
 import { Color, Group, Quaternion, Vector3, type PerspectiveCamera, type Scene } from 'three';
 import type { WorldSpace } from '@/core/WorldSpace';
+import { disposeTree } from '@/core/dispose';
 import type { Livery } from '@/assets/Blueprint';
 import { faceAlong, type Fleet, type ShipEntity } from '@/sim/Fleet';
 import type { Weapons } from '@/sim/Weapons';
@@ -36,7 +37,7 @@ const KM = 1000;
 const TIMETABLE: Partial<Livery> = { primary: '#efe9da', secondary: '#c9a24a', accent: '#2f8f9d', dark: '#3a3530', glow: '#ffe2a0', plumeCore: '#fff6e0' };
 
 /** The long dark: almost no nebula, a thin cold band, sparse stars — so a relit Lantern reads as the only light. */
-const LONG_DARK_SKY: BackdropPreset = {
+export const LONG_DARK_SKY: BackdropPreset = {
   name: 'The Long Dark',
   nebula: [
     { at: 0.0, color: '#010104' },
@@ -623,9 +624,14 @@ export class PrologueStage implements CinemaStage {
   dispose(): void {
     for (const s of this.sets.values()) {
       for (const p of s.pieces) p.dispose();
+      disposeTree(s.group);
       s.group.removeFromParent();
     }
-    for (const b of this.skies.values()) this.scene.remove(b.group);
+    for (const b of this.skies.values()) {
+      disposeTree(b.group);
+      this.scene.remove(b.group);
+    }
+    disposeTree(this.glint.sprite);
     this.scene.remove(this.glint.sprite);
   }
 }

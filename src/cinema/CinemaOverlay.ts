@@ -68,8 +68,10 @@ export class CinemaOverlay {
         this.live.set(c, entry);
       }
       const rem = c.dur - age;
-      const fadeIn = c.kind === 'word' || c.kind === 'count' ? 0.06 : c.kind === 'title' ? 0.02 : 0.28;
-      const a = Math.max(0, Math.min(1, age / fadeIn, rem / (c.kind === 'title' ? 0.6 : 0.3)));
+      const k = c.kind;
+      const fadeIn = k === 'word' || k === 'count' ? 0.06 : k === 'title' || k === 'card' ? 0.02 : k === 'label' ? 0.12 : 0.28;
+      const fadeOut = k === 'title' ? 0.6 : k === 'card' ? 0.04 : k === 'slate' ? 0.8 : 0.3;
+      const a = Math.max(0, Math.min(1, age / fadeIn, rem / fadeOut));
       entry.el.style.opacity = a.toFixed(3);
       entry.el.style.setProperty('--age', age.toFixed(3));
       for (const t of entry.typedEls) {
@@ -114,7 +116,7 @@ export class CinemaOverlay {
         en.append(done, rest);
         el.append(en);
         el.classList.add('sub-line');
-        typedEls.push({ el: done, rest, text: c.text, shown: -1, plan: planFor({ who: 'narrator', text: c.text, maxDur: Math.max(0.6, c.dur - 0.2), maxSqueeze: 2 }).plan });
+        typedEls.push({ el: done, rest, text: c.text, shown: -1, plan: c.who === '' ? undefined : planFor({ who: c.who ?? 'narrator', text: c.text, maxDur: Math.max(0.6, c.dur - 0.2), maxSqueeze: 2 }).plan });
         this.subs.append(el);
         break;
       }
@@ -135,6 +137,39 @@ export class CinemaOverlay {
       case 'count': {
         if (c.kicker) el.append(line('cn-count-k', c.kicker));
         el.append(line('cn-count-n', c.text));
+        this.el.append(el);
+        break;
+      }
+      case 'card': {
+        // Eyecatch interstitial: a full-frame card over the letterbox, one slammed word.
+        el.classList.add(`cn-tone-${c.tone ?? 'orange'}`);
+        el.innerHTML = `<div class="cn-card-bg"></div><div class="cn-card-dots"></div><div class="cn-t-stripe"></div>`;
+        if (c.kicker) el.append(line('cn-card-k', c.kicker));
+        el.append(line('cn-card-w', c.text));
+        if (c.jp) el.append(line('cn-card-jp', c.jp));
+        this.el.append(el);
+        break;
+      }
+      case 'label': {
+        // Lower-third name tag (ship names in the lineup, the speaker in a UI shot).
+        if (c.kicker) el.append(line('cn-label-k', c.kicker));
+        el.append(line('cn-label-t', c.text));
+        if (c.jp) el.append(line('cn-label-s', c.jp));
+        this.el.append(el);
+        break;
+      }
+      case 'slate': {
+        el.classList.add(`cn-tone-${c.tone ?? 'dark'}`);
+        el.innerHTML = `<div class="cn-t-stripe"></div>`;
+        if (c.kicker) el.append(line('cn-slate-k', c.kicker));
+        const h = document.createElement('div');
+        h.className = 'cn-slate-t';
+        c.text.split('\n').forEach((part, i) => {
+          if (i) h.append(document.createElement('br'));
+          h.append(document.createTextNode(part));
+        });
+        el.append(h);
+        if (c.jp) el.append(line('cn-slate-s', c.jp));
         this.el.append(el);
         break;
       }

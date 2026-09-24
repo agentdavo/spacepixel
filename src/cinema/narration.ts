@@ -15,7 +15,7 @@ export interface NarrationCue {
   at: number;
   caption: Caption;
   who: string;
-  channel: 'narrator' | 'radio';
+  channel: 'narrator' | 'radio' | 'clean' | 'intercept';
   /** The voice must finish inside the caption… */
   maxDur: number;
   /** …which the dense captions allow at up to this many × natural pace. */
@@ -28,8 +28,11 @@ export function narrationCues(shots: readonly Shot[]): NarrationCue[] {
   for (const sh of shots) {
     for (const c of sh.captions ?? []) {
       const kind = c.kind ?? 'narration';
-      if (kind === 'narration') out.push({ at: start + c.at + 0.08, caption: c, who: 'narrator', channel: 'narrator', maxDur: Math.max(0.6, c.dur - 0.2), maxSqueeze: 2 });
-      else if (kind === 'word') out.push({ at: start + c.at, caption: c, who: 'relight-pilot', channel: 'radio', maxDur: Math.max(0.4, c.dur - 0.1), maxSqueeze: 1.7 });
+      if (c.who === '') continue; // silent caption
+      if (kind === 'narration') {
+        const who = c.who ?? 'narrator';
+        out.push({ at: start + c.at + 0.08, caption: c, who, channel: c.channel ?? (who === 'narrator' ? 'narrator' : 'radio'), maxDur: Math.max(0.6, c.dur - 0.2), maxSqueeze: 2 });
+      } else if (kind === 'word') out.push({ at: start + c.at, caption: c, who: c.who ?? 'relight-pilot', channel: c.channel ?? 'radio', maxDur: Math.max(0.4, c.dur - 0.1), maxSqueeze: 1.7 });
     }
     start += sh.dur;
   }

@@ -111,14 +111,15 @@ export class HullSheet {
     this.ctx = canvas.getContext('2d')!;
   }
 
-  setHull(blueprint: string, livery?: Partial<Livery>): void {
+  /** `t0`: the clock `draw(time)` will be driven with (default wall time) — the turntable starts there. */
+  setHull(blueprint: string, livery?: Partial<Livery>, t0?: number): void {
     this.mesh = extract(blueprint, livery);
     const n = this.mesh.count;
     this.order = new Uint32Array(n);
     this.depth = new Float32Array(n);
     this.sx = new Float32Array(n * 3);
     this.sy = new Float32Array(n * 3);
-    this.yaw0 = performance.now() / 1000;
+    this.yaw0 = t0 ?? performance.now() / 1000;
   }
 
   start(): void {

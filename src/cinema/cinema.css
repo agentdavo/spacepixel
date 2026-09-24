@@ -213,6 +213,142 @@
 }
 @keyframes cn-fade { from { opacity: 0; } }
 
+/* ── eyecatch card (trailer interstitials: "TRADE." "FIGHT." "RISE.") ─ */
+.cn-card {
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  --c1: var(--orange);
+  --c2: #140c1c;
+  --c3: var(--cobalt);
+}
+.cn-card.cn-tone-cobalt { --c1: #2b4ea8; --c2: #0b0f22; --c3: #ff7a1c; }
+.cn-card.cn-tone-magenta { --c1: #ff3fa8; --c2: #1a0716; --c3: #7dffb2; }
+.cn-card.cn-tone-ivory { --c1: #f4efe4; --c2: #140c1c; --c3: #ff3fa8; }
+.cn-card > * { position: relative; }
+.cn-card .cn-card-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(115deg, var(--c2) 0 38%, var(--c1) 38% 41%, var(--c2) 41% 44%, var(--c1) 44% 100%);
+  transform: translateX(calc((1 - min(var(--age) * 7, 1)) * -18%)) scale(1.4);
+}
+.cn-card .cn-card-dots {
+  position: absolute;
+  inset: 0;
+  opacity: 0.22;
+  background-image: radial-gradient(circle, #000 1.6px, transparent 1.9px);
+  background-size: 9px 9px;
+  mask-image: linear-gradient(115deg, transparent 40%, #000 100%);
+}
+.cn-card .cn-t-stripe { animation: none; margin-bottom: 3vh; }
+.cn-card-k {
+  font-family: var(--font-mono);
+  font-size: clamp(11px, 1.2vw, 17px);
+  letter-spacing: 0.5em;
+  color: var(--ivory);
+  background: #140c1c;
+  padding: 3px 14px 3px 20px;
+  margin-bottom: 1.2vh;
+}
+.cn-card-w {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(64px, 15vw, 250px);
+  line-height: 0.9;
+  letter-spacing: 0.04em;
+  color: var(--ivory);
+  -webkit-text-stroke: 4px #140c1c;
+  text-shadow: 7px 7px 0 var(--c3), 14px 14px 0 #140c1c;
+  transform: skewX(-9deg) scale(calc(1 + (1 - min(var(--age) * 6, 1)) * 0.5));
+}
+.cn-card-jp {
+  margin-top: 2.4vh;
+  font-family: 'WenQuanYi Zen Hei', 'Noto Sans JP', sans-serif;
+  font-size: clamp(14px, 2vw, 30px);
+  letter-spacing: 0.9em;
+  color: #140c1c;
+  background: var(--ivory);
+  padding: 4px 8px 4px 22px;
+  box-shadow: 6px 6px 0 #140c1c;
+}
+
+/* ── lower-third label (ship names, speakers) ─────────────────────── */
+.cn-label {
+  left: 6vw;
+  top: calc(var(--bar) + 4vh);
+  transform: translateX(calc((1 - min(var(--age) * 5, 1)) * -3vw));
+}
+.cn-label-k {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: clamp(10px, 1vw, 15px);
+  letter-spacing: 0.34em;
+  padding: 2px 10px 2px 12px;
+  color: #0d0a12;
+  background: var(--crt-amber, #ffc46b);
+  box-shadow: 3px 3px 0 var(--cobalt);
+}
+.cn-label-t {
+  margin-top: 0.8vh;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-style: italic;
+  font-size: clamp(22px, 3.4vw, 54px);
+  letter-spacing: 0.05em;
+  color: var(--ivory);
+  -webkit-text-stroke: 2px #140c1c;
+  text-shadow: 3px 3px 0 #ff3fa8, 6px 6px 0 #140c1c;
+}
+.cn-label-s {
+  margin-top: 0.4vh;
+  font-family: var(--font-mono);
+  font-size: clamp(11px, 1.15vw, 17px);
+  letter-spacing: 0.26em;
+  color: #cfe8ff;
+  text-shadow: 0 0 8px #000, 1px 1px 0 #000;
+}
+
+/* ── end slate ────────────────────────────────────────────────────── */
+.cn-slate {
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 55%, rgba(20, 12, 28, 0.55), rgba(0, 0, 0, 0.92) 70%);
+}
+.cn-slate .cn-t-stripe { animation: none; }
+.cn-slate-k {
+  font-family: var(--font-mono);
+  font-size: clamp(11px, 1.2vw, 17px);
+  letter-spacing: 0.5em;
+  color: var(--crt-amber, #ffc46b);
+  margin-bottom: 2vh;
+}
+.cn-slate-t {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(34px, 6vw, 96px);
+  line-height: 1.02;
+  letter-spacing: 0.06em;
+  color: var(--ivory);
+  -webkit-text-stroke: 2px #140c1c;
+  text-shadow: 4px 4px 0 var(--orange), 8px 8px 0 #140c1c;
+  transform: skewX(-8deg) scale(calc(1 + (1 - min(var(--age) * 4, 1)) * 0.15));
+}
+.cn-slate-s {
+  margin-top: 3vh;
+  font-family: var(--font-mono);
+  font-size: clamp(11px, 1.25vw, 18px);
+  letter-spacing: 0.3em;
+  color: #cfe8ff;
+}
+
 /* ── skip hint ────────────────────────────────────────────────────── */
 .cn-skip {
   right: 3vw;
@@ -232,3 +368,26 @@
   .cn-slug { left: 4vw; letter-spacing: 0.16em; }
   .cn-skip { right: 4vw; letter-spacing: 0.1em; }
 }
+
+/* ── trailer UI shots: the dock screen and a model sheet inside the letterbox ── */
+.dock-screen.trailer-dock {
+  transform: scale(0.78);
+  transform-origin: 50% 50%;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(125, 255, 178, 0.25), 0 30px 80px rgba(0, 0, 0, 0.7);
+}
+.trailer-yard {
+  --fc: #6fe6ff;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 22;
+  width: min(820px, 64vw);
+  height: min(420px, 60vh);
+  transform: translate(-50%, -54%);
+  font-family: var(--font-mono);
+  color: #e8f5ee;
+  pointer-events: none;
+}
+.trailer-yard .sy-card { height: 100%; box-sizing: border-box; }
+.trailer-yard .sy-card h2 { font-size: clamp(20px, 2.4vw, 32px); }

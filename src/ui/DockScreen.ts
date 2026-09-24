@@ -56,6 +56,11 @@ export interface DockContext {
   news?(): string[];
   /** Heard after every trade (units > 0 sold, < 0 bought): the world remembers heavy trading. */
   onTrade?(cid: CommodityId, units: number): void;
+  /**
+   * Display only (trailer / attract reels): no keyboard, and tabs that honour
+   * it show `person` without starting a conversation or touching saved state.
+   */
+  demo?: { person?: string };
 }
 
 /**
@@ -159,15 +164,30 @@ export class DockScreen {
       <div class="dock-ticker"><span>${ticker.map(esc).join('<em>◆</em>')}</span></div>`;
     el.querySelector('.dock-launch')!.addEventListener('click', () => this.launch());
     el.addEventListener('pointerdown', (e) => e.stopPropagation());
-    window.addEventListener('keydown', this.onKey);
+    if (!ctx.demo) window.addEventListener('keydown', this.onKey);
     this.tabs = TABS.filter((t) => t.available?.(ctx) ?? true);
     this.tab = null;
     this.renderTabs();
     this.render();
     // ?docktab=<id>: open on a registered tab (captures).
-    const want = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('docktab') : null;
-    const wi = want ? this.tabs.findIndex((t) => t.id === want) : -1;
-    if (wi >= 0) this.switchTab(wi + 1);
+    const want = typeof location !== 'undefined' && !ctx.demo ? new URLSearchParams(location.search).get('docktab') : null;
+    if (want) this.showTab(want);
+  }
+
+  /** Open a registered tab by id ('market' for the market); false if this station has no such tab. */
+  showTab(id: string): boolean {
+    if (id === 'market') {
+      this.switchTab(0);
+      return true;
+    }
+    const i = this.tabs.findIndex((t) => t.id === id);
+    if (i >= 0) this.switchTab(i + 1);
+    return i >= 0;
+  }
+
+  /** The screen's root element while open (trailer framing). */
+  get element(): HTMLElement | null {
+    return this.el;
   }
 
   private renderTabs(): void {

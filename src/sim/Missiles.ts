@@ -142,6 +142,14 @@ export class Missiles implements Shootables {
     return true;
   }
 
+  /** Drop every missile in flight and every queued launch (cutscene cuts). */
+  clear(): void {
+    this.alive.fill(0);
+    this.queue.length = 0;
+    this.shootable.length = 0;
+    this.dying.length = 0;
+  }
+
   private launch(shooter: ShipEntity, target: ShipEntity, k: number, spec: MissileSpec, sub: Subsystem | null): void {
     const i = this.head;
     this.head = (this.head + 1) % MISSILE_CAPACITY;

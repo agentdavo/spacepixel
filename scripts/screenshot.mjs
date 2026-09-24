@@ -31,7 +31,7 @@ if (!shots.length) shots.push('showcase:cam=0&t=3');
 
 mkdirSync(outDir, { recursive: true });
 
-const server = await createServer({ server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'warn' });
+const server = await createServer({ cacheDir: process.env.VITE_CACHE_DIR || undefined, server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'warn' });
 await server.listen();
 const base = `http://127.0.0.1:${port}/`;
 

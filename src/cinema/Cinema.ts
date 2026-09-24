@@ -3,7 +3,7 @@ import type { WorldSpace } from '@/core/WorldSpace';
 import { postFx } from '@/render/post/PostFx';
 import type { GameAudio, Mood } from '@/audio';
 import type { CinemaOverlay } from './CinemaOverlay';
-import { captionsAt, crossed, emptyFx, locate, makePose, moveAt, sampleFx, sampleMove, totalDuration, type Shot } from './timeline';
+import { captionsAt, crossed, emptyFx, locate, makePose, moveAt, sampleFx, sampleMove, soundTimes, totalDuration, type Shot } from './timeline';
 
 /**
  * What a cutscene's stage provides to the sequencer: sets it can switch
@@ -116,10 +116,12 @@ export class Cinema {
       const a = this.audio;
       for (const m of shot.music ?? []) if (crossed(m.at, prev, local)) a.music.setMood(m.mood, m.fade ?? 2);
       for (const s of shot.sound ?? []) {
-        if (!crossed(s.at, prev, local)) continue;
-        if (s.sfx) a.sfx.play(s.sfx, { gain: s.gain ?? 1 });
-        if (s.stinger) a.stinger(s.stinger);
-        if (s.radio) a.radio(s.radio);
+        for (const at of soundTimes(s)) {
+          if (!crossed(at, prev, local)) continue;
+          if (s.sfx) a.sfx.play(s.sfx, { gain: s.gain ?? 1 });
+          if (s.stinger) a.stinger(s.stinger);
+          if (s.radio) a.radio(s.radio);
+        }
       }
     }
 
