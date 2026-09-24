@@ -29,6 +29,8 @@ export interface RadioEvent {
   kind: string;
   ship: RadioShip | null;
   shooter: RadioShip | null;
+  /** 'subsystem': the mount that was destroyed. */
+  sub?: { label: string } | null;
 }
 export interface RadioFrame {
   player: RadioShip;
@@ -218,6 +220,11 @@ export class FlightRadio {
           else if (e.shooter && !e.shooter.isPlayer && e.shooter.team === p.team && wingSpeaker(e.shooter.name)) this.bark('splash-wing', f, wingSpeaker(e.shooter.name)!);
           else if (ship.flight.position.distanceTo(p.flight.position) < 2500) this.enemy('enemy-down', f, ship);
         }
+      } else if (e.kind === 'subsystem' && e.sub && ship.team !== p.team && ship.team !== 'neutral') {
+        // A turret / lance / hangar shot off a hostile hull: the wing calls it ("TURRET 3" → "Turret 3").
+        const name = e.sub.label.charAt(0) + e.sub.label.slice(1).toLowerCase();
+        if (e.shooter?.isPlayer && lead) this.bark('mount-player', f, wingSpeaker(lead.name)!, { name });
+        else if (e.shooter && !e.shooter.isPlayer && e.shooter.team === p.team && wingSpeaker(e.shooter.name)) this.bark('mount-wing', f, wingSpeaker(e.shooter.name)!, { name });
       } else if (e.kind === 'hit' || e.kind === 'shield') {
         if (ship.isPlayer) playerHit ||= e.kind === 'hit';
         else if (ship.team === p.team && wingSpeaker(ship.name) && e.kind === 'hit') this.bark('wing-hit', f, wingSpeaker(ship.name)!);

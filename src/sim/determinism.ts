@@ -109,7 +109,10 @@ export class ScriptedPilot {
     } else if (this.faBack > 0 && t >= this.faBack) this.faBack = -1;
     c.cruise = false;
     c.cycleMissile = false;
-    c.cycleSub = false;
+    // Sub-targeting on a fixed cadence (no dice: the script's stream stays as it was).
+    c.cycleSub = tick % 420 === 210;
+    c.cycleSubBack = tick % 1260 === 630;
+    c.pickSub = tick % 900 === 450;
     return quantizeControls(c);
   }
 }

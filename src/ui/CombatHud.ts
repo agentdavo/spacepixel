@@ -1,8 +1,11 @@
 import { Vector3, type PerspectiveCamera } from 'three';
 import type { WorldSpace } from '@/core/WorldSpace';
 import type { ShipEntity } from '@/sim/Fleet';
-import { gunOf, missileOf, selectedSubsystem, subsystemPosition } from '@/sim/Combat';
-import { BLEED_AT, FACING, FACING_NAMES, ZONE_NAMES, isOnline, type DamageState } from '@/sim/Damage';
+import { gunOf, isExposed, missileOf, selectedSubsystem, subsystemPosition } from '@/sim/Combat';
+import { BLEED_AT, FACING, FACING_NAMES, ZONE_NAMES, isOnline, type DamageState, type Subsystem } from '@/sim/Damage';
+import { AIM_SPHERE } from '@/sim/Subsystems';
+import { hostile } from '@/sim/Fleet';
+import type { WeaponEvent } from '@/sim/Weapons';
 import { HUD, claimRect, targetBottom, weaponsRect } from './hudLayout';
 import { hudLabels } from './HudLabels';
 
@@ -17,10 +20,14 @@ import { hudLabels } from './HudLabels';
  * - Target panel (left): name, role, range; shield facings (the glyph: fore /
  *   aft arcs for fighters, four arcs for corvettes plus an inner dorsal /
  *   ventral ring for big capitals; a lettered segment bar under it with lost
- *   emitters crossed out), hull, and the subsystem list with the B-selected
- *   one highlighted.
- * - Sub-target bracket on the selected subsystem in the view, and pips on
- *   the target's other subsystems (crossed out when destroyed).
+ *   emitters crossed out), hull, and the subsystem list (selected, then
+ *   exposed, then shielded, then wrecked) with a kill feed row ("TURRET 3
+ *   DESTROYED") on top for a few seconds.
+ * - Sub-target bracket on the selected subsystem in the view (white when
+ *   exposed, cyan PROTECTED while its shield facing holds; flashes on hits;
+ *   health bar), corner brackets on the target's other exposed mounts, dim
+ *   pips on shielded ones, crosses on destroyed ones.
+ * - Own hardware lost (player-flown warships): a red line in the weapons block.
  */
 const GREEN = '#7dffb2';
 const AMBER = '#ffc46b';
@@ -36,6 +43,18 @@ const GLYPH_ANGLE = [-Math.PI / 2, Math.PI / 2, Math.PI, 0];
 const _p = new Vector3();
 const _w = new Vector3();
 
+/** Kill-feed row / own-loss line lifetime (s). */
+const FEED_TIME = 4;
+const PROTECTED = 'rgba(111,230,255,0.55)';
+
+interface FeedLine {
+  text: string;
+  color: string;
+  t: number;
+  /** Whose mount (named in the row when it isn't the current target). */
+  ship: ShipEntity | null;
+}
+
 export class CombatHud {
   private canvas = document.createElement('canvas');
   private ctx: CanvasRenderingContext2D;
@@ -46,6 +65,12 @@ export class CombatHud {
   turrets: { mounts: number; engaged: number; mode: 'free' | 'target' | 'hold'; pd: boolean } | null = null;
   /** Hangar complement launched / total; null = no hangar. */
   hangar: { up: number; total: number } | null = null;
+  /** Subsystem kill feed (newest first) and the player's own last hardware loss. */
+  private feed: FeedLine[] = [];
+  private ownLoss: FeedLine | null = null;
+  /** Last time each subsystem was struck by the player (hit flash on its bracket). */
+  private struck = new Map<Subsystem, number>();
+  private clock = 0;
 
   constructor(root: HTMLElement) {
     this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
@@ -76,6 +101,32 @@ export class CombatHud {
     world.toRender(universe, _p).project(cam);
     if (_p.z > 1 || _p.z < -1) return null;
     return { x: (_p.x * 0.5 + 0.5) * this.w, y: (-_p.y * 0.5 + 0.5) * this.h };
+  }
+
+  /**
+   * Once per sim tick: this tick's weapon events → kill feed ("TURRET 3
+   * DESTROYED" for mounts the player's side knocks out), own losses, and hit
+   * flashes on struck subsystems. `time` = sim clock (s).
+   */
+  consume(events: readonly WeaponEvent[], player: ShipEntity, time: number): void {
+    this.clock = time;
+    for (const e of events) {
+      const s = e.ship;
+      const sub = e.sub;
+      if (!s || !sub) continue;
+      if (e.kind !== 'subsystem') {
+        if (e.shooter === player) this.struck.set(sub, time);
+        continue;
+      }
+      if (s === player) {
+        this.ownLoss = { text: `${sub.label} LOST`, color: RED, t: time, ship: s };
+      } else if (hostile(s, player) && e.shooter && (e.shooter === player || e.shooter.team === player.team)) {
+        const by = e.shooter === player ? '' : ` · ${e.shooter.name.toUpperCase()}`;
+        this.feed.unshift({ text: `${sub.label} DESTROYED${by}`, color: e.shooter === player ? '#ffffff' : AMBER, t: time, ship: s });
+        if (this.feed.length > 2) this.feed.length = 2;
+      }
+    }
+    if (this.struck.size > 64) for (const [k, t] of this.struck) if (time - t > 1) this.struck.delete(k);
   }
 
   /** Call once per frame (after the camera is final). `target` = the player's lock target. */
@@ -201,6 +252,12 @@ export class CombatHud {
         c.fillText('HARPOONED — THRUST 50%', x, y + 34);
       }
     }
+    // Own hardware shot off (warships): capitals use the zone line, others the one under it.
+    const loss = this.ownLoss;
+    if (loss && this.clock - loss.t < FEED_TIME && !(st.tether > 0)) {
+      c.fillStyle = (time * 4) % 1 < 0.6 ? RED : AMBER;
+      c.fillText(loss.text, x, y + (st.capital ? 22 : 40));
+    }
   }
 
   private bar(x: number, y: number, label: string, v: number, color: string): void {
@@ -310,7 +367,10 @@ export class CombatHud {
     const top = Math.max(HUD.targetY, debug ? debug.y + debug.h + 12 : 0);
     let y = top + 18;
     const subs = st.subsystems;
-    const rows = Math.max(0, Math.min(subs.length, 14, Math.floor((targetBottom(this.h) - top - 112) / 15)));
+    let live = 0;
+    for (const f of this.feed) if (this.clock - f.t < FEED_TIME) live++;
+    // Header, feed and list rows share one budget (the layout test caps the panel at 14 rows).
+    const rows = Math.max(0, Math.min(subs.length ? subs.length + live + 1 : 0, 14, Math.floor((targetBottom(this.h) - top - 112) / 15)));
     c.fillStyle = 'rgba(0,10,6,0.45)';
     c.fillRect(x - 12, y - 18, 262, 112 + rows * 15);
     hudLabels.obstacle(x - 12, y - 18, 262, 112 + rows * 15);
@@ -347,16 +407,43 @@ export class CombatHud {
       return;
     }
     const sel = selectedSubsystem(player, t);
+    let intact = 0;
+    let open = 0;
+    for (const s of subs) {
+      if (s.destroyed) continue;
+      intact++;
+      if (isExposed(t, s)) open++;
+    }
+    const head = `[B] SUBSYSTEMS ${intact}/${subs.length}`;
     c.fillStyle = DIM;
-    c.fillText(`[B] SUBSYSTEMS ${subs.filter((s) => !s.destroyed).length}/${subs.length}`, x, y);
+    c.fillText(head, x, y);
+    if (open) {
+      c.fillStyle = AMBER;
+      c.fillText(`· ${open} EXPOSED`, x + c.measureText(`${head} `).width, y);
+    }
     y += 16;
-    // Selected first (so it is always listed), then the rest in order.
-    const order = sel ? [sel, ...subs.filter((s) => s !== sel)] : subs;
-    for (let i = 0; i < rows; i++) {
-      const s = order[i];
+    // Kill feed: the newest "… DESTROYED" lines take the first rows. (The header line above
+    // sits in the last row's slot of the panel budget: list one row fewer so nothing spills out.)
+    let rowsLeft = rows - 1;
+    for (const f of this.feed) {
+      if (rowsLeft <= 1 || this.clock - f.t >= FEED_TIME) continue;
+      c.fillStyle = f.color;
+      c.globalAlpha = Math.min(1, (FEED_TIME - (this.clock - f.t)) * 1.5);
+      c.fillText(`✕ ${f.ship && f.ship !== t ? `${f.ship.name.toUpperCase()} · ` : ''}${f.text}`, x, y, 238);
+      c.globalAlpha = 1;
+      y += 15;
+      rowsLeft--;
+    }
+    // Selected first (so it is always listed), then exposed, shielded, wrecked.
+    const rank = (s: Subsystem) => (s === sel ? 0 : s.destroyed ? 3 : isExposed(t, s) ? 1 : 2);
+    const order = subs.map((s, i) => ({ s, k: rank(s) * 1000 + i })).sort((a, b) => a.k - b.k);
+    for (let i = 0; i < Math.min(rowsLeft, order.length); i++) {
+      const s = order[i].s;
       const k = s.hp / s.hpMax;
       const isSel = s === sel;
-      c.fillStyle = s.destroyed ? 'rgba(255,95,122,0.55)' : isSel ? '#ffffff' : k < 0.5 ? AMBER : GREEN;
+      const exposed = !s.destroyed && isExposed(t, s);
+      const col = s.destroyed ? 'rgba(255,95,122,0.55)' : isSel ? '#ffffff' : !exposed ? PROTECTED : k < 0.5 ? AMBER : GREEN;
+      c.fillStyle = col;
       c.fillText(`${isSel ? '▶' : ' '} ${s.label}`, x, y);
       if (s.destroyed) {
         c.fillRect(x + 12, y - 4, c.measureText(s.label).width + 4, 1.5);
@@ -364,8 +451,15 @@ export class CombatHud {
       } else {
         c.fillStyle = 'rgba(0,0,0,0.5)';
         c.fillRect(x + 150, y - 7, 70, 5);
-        c.fillStyle = isSel ? '#ffffff' : k < 0.5 ? AMBER : GREEN;
+        c.fillStyle = col;
         c.fillRect(x + 150, y - 7, 70 * k, 5);
+        if (!exposed) {
+          // Protected: a shield outline round the bar.
+          c.strokeStyle = PROTECTED;
+          c.lineWidth = 1;
+          c.strokeRect(x + 149.5, y - 8.5, 71, 8);
+          c.lineWidth = 1.5;
+        }
       }
       y += 15;
     }
@@ -382,12 +476,15 @@ export class CombatHud {
       const pt = this.project(subsystemPosition(t, s, _w), world, cam);
       if (!pt || pt.x < 0 || pt.y < 0 || pt.x > this.w || pt.y > this.h) continue;
       const d = world.toRender(_w, _p).length();
+      const r = (s.radius * AIM_SPHERE * fovScale) / Math.max(d, 1);
+      const exposed = !s.destroyed && isExposed(t, s);
       if (s === sel) {
-        const r = Math.max(10, (s.radius * fovScale) / Math.max(d, 1));
+        const flash = this.clock - (this.struck.get(s) ?? -9) < 0.12;
         const pulse = 1 + 0.12 * Math.sin(time * 8);
-        c.strokeStyle = '#ffffff';
-        c.lineWidth = 2;
-        const h = r * pulse;
+        const h = Math.max(10, r) * pulse;
+        const col = flash ? AMBER : exposed ? '#ffffff' : CYAN;
+        c.strokeStyle = col;
+        c.lineWidth = flash ? 3 : 2;
         c.beginPath();
         c.moveTo(pt.x, pt.y - h - 6);
         c.lineTo(pt.x + h + 6, pt.y);
@@ -395,20 +492,52 @@ export class CombatHud {
         c.lineTo(pt.x - h - 6, pt.y);
         c.closePath();
         c.stroke();
-        c.fillStyle = '#ffffff';
-        c.fillText(`${s.label}  ${Math.round((s.hp / s.hpMax) * 100)}%`, pt.x + h + 12, pt.y + 4);
+        const lx = pt.x + h + 12;
+        const k = s.hp / s.hpMax;
+        c.fillStyle = col;
+        c.fillText(`${s.label}  ${Math.round(k * 100)}%`, lx, pt.y + 1);
+        // Health bar under the label; a protected mount says so.
+        c.fillStyle = 'rgba(0,0,0,0.5)';
+        c.fillRect(lx, pt.y + 6, 80, 4);
+        c.fillStyle = k < 0.35 ? RED : k < 0.65 ? AMBER : GREEN;
+        c.fillRect(lx, pt.y + 6, 80 * k, 4);
+        if (!exposed) {
+          c.fillStyle = CYAN;
+          c.fillText('PROTECTED', lx, pt.y + 24);
+        }
+        hudLabels.obstacle(pt.x - h - 6, pt.y - h - 6, lx + 90 - (pt.x - h - 6), h * 2 + 12);
         c.lineWidth = 1.5;
       } else if (dist < 9000) {
-        c.strokeStyle = s.destroyed ? 'rgba(255,95,122,0.7)' : 'rgba(255,95,180,0.55)';
         c.beginPath();
         if (s.destroyed) {
+          c.strokeStyle = 'rgba(255,95,122,0.7)';
           c.moveTo(pt.x - 3, pt.y - 3);
           c.lineTo(pt.x + 3, pt.y + 3);
           c.moveTo(pt.x + 3, pt.y - 3);
           c.lineTo(pt.x - 3, pt.y + 3);
-        } else c.rect(pt.x - 2, pt.y - 2, 4, 4);
+        } else if (exposed) {
+          // Open to fire: corner brackets sized to the mount.
+          const e = Math.max(4, Math.min(r, 40));
+          const k = Math.max(2, e * 0.45);
+          c.strokeStyle = 'rgba(255,196,107,0.85)';
+          for (const [sx, sy] of CORNERS) {
+            c.moveTo(pt.x + sx * e, pt.y + sy * (e - k));
+            c.lineTo(pt.x + sx * e, pt.y + sy * e);
+            c.lineTo(pt.x + sx * (e - k), pt.y + sy * e);
+          }
+        } else {
+          c.strokeStyle = 'rgba(111,230,255,0.3)';
+          c.rect(pt.x - 2, pt.y - 2, 4, 4);
+        }
         c.stroke();
       }
     }
   }
 }
+
+const CORNERS = [
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+] as const;

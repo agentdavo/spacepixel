@@ -22,6 +22,7 @@ import { EventTap } from '../EventTap';
 import { Weapons } from '@/sim/Weapons';
 import { Missiles, type LockState } from '@/sim/Missiles';
 import { Capitals } from '@/sim/Capitals';
+import { selectedSubsystem } from '@/sim/Combat';
 import { loadProfile } from '@/game/Profile';
 import { WeaponVisuals } from '../WeaponVisuals';
 import { CombatFx } from '../CombatFx';
@@ -628,6 +629,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (!this.fastForward) {
       if (this.fxOn) this.combatFx.consume(dt);
       this.visuals.consume();
+      this.combatHud.consume(this.weapons.events, this.player, this.simTime);
       this.radio.update(dt, {
         player: this.player,
         ships: this.fleet.ships,
@@ -1643,7 +1645,9 @@ export class FlightScene implements GameScene, FlightHostScene {
       const labels = ['FORM ON ME', 'ATTACK MY TARGET', 'ENGAGE AT WILL', 'COVER ME'];
       const i = Number(code.slice(5)) - 1;
       this.wingOrder = orders[i];
-      this.orderStatus = `VANGUARD 1 → WING: "${labels[i]}"   · COPY, LEAD.`;
+      // With a subsystem selected, "attack my target" means that mount (the wing's brains follow the lead's pick).
+      const sub = i === 1 ? selectedSubsystem(this.player, this.player.target) : null;
+      this.orderStatus = `VANGUARD 1 → WING: "${labels[i]}${sub ? ` — ${sub.label}` : ''}"   · COPY, LEAD.`;
       this.onWingOrder?.(this.wingOrder);
     }
   }

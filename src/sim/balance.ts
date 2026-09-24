@@ -3,7 +3,9 @@ import { Fleet, faceAlong, type ShipEntity } from './Fleet';
 import { Weapons } from './Weapons';
 import { Missiles } from './Missiles';
 import { Capitals } from './Capitals';
-import { chooseGun, gunOf, leadSpeedOf, subsystemPosition, toUniverse } from './Combat';
+import { chooseGun, gunOf, leadSpeedOf, selectSubsystem, subsystemPosition, toUniverse } from './Combat';
+import { FACING, facingOf, syncShield, type Subsystem } from './Damage';
+import { issueOrder, setFormation, updateAI } from './ai';
 import { GUNS, MISSILES, SHIP_STATS, type GunId } from './Loadouts';
 import { leadPoint } from './ai/Pilot';
 import type { Check, ScenarioResult } from './ai/sim';
@@ -21,6 +23,9 @@ import { ShipTurrets } from '@/game/outfitting/turrets';
  *   fighter vs fighter   Kestrel (auto gun switch) vs Cantor     3–8 s
  *   turret               wing of 4 Kestrels vs one capital turret  5–15 s
  *   capital              squadron (4 Kestrel + 2 Warhorse) kills a capital   60–180 s
+ *   subsystems           aimed hits land on the selected mount; a torpedo
+ *                        splashes a turret cluster; an AI wing on "attack my
+ *                        target" kills the lead's pick, then strips exposed mounts
  *
  * Aim error is Gaussian in metres at the target (σ grows with range), so hit
  * rates come out like a skilled player's, not an aimbot's.
@@ -577,8 +582,8 @@ function duelInner(hullId: string, fit: Fit, targetBp: string, range: number, ma
   let intercepted = 0;
   const taken: DuelOut['taken'] = {};
   const hit = w.fleet.hit.bind(w.fleet);
-  w.fleet.hit = (s, amount, type, point, normal, shooter) => {
-    const r = hit(s, amount, type, point, normal, shooter);
+  w.fleet.hit = (s, amount, type, point, normal, shooter, sub) => {
+    const r = hit(s, amount, type, point, normal, shooter, sub);
     if (s === sh) {
       const o = (taken[type] ??= { shield: 0, hull: 0 });
       o.shield += r.shieldDamage;
@@ -653,6 +658,169 @@ export function outfitScenario(): ScenarioResult {
 
 void GUNS;
 
+// ── subsystem targeting ─────────────────────────────────────────────
+
+/** Strip one shield facing and keep it down (a flank someone already worked over): no charge, no regeneration, no transfer into it. */
+function stripFacing(cap: ShipEntity, f: number): void {
+  const st = cap.combat.dmg;
+  st.facings[f] = 0;
+  st.down |= 1 << f;
+  st.cooldown[f] = 999;
+  syncShield(st, cap);
+  cap.sinceHit = 0;
+}
+
+/**
+ * One Kestrel 900 m off a stripped flank, the mount selected (B) and aimed
+ * at (σ = 0.8% of range): share of the bolts that reach the hull which land
+ * on that mount, and the time to kill it.
+ */
+export function aimedShare(capBp: string, socket: string, range = 900, maxT = 60): { share: number; t: number } {
+  seed = 17;
+  const w = world();
+  const cap = w.fleet.spawn(capBp, 'choir', ORIGIN.clone(), new Vector3(0, 0, 1));
+  cap.flight.velocity.set(0, 0, 0);
+  const st = cap.combat.dmg;
+  const sub = st.subsystems.find((s) => s.id === socket)!;
+  const tp = subsystemPosition(cap, sub, new Vector3());
+  const side = new Vector3(Math.sign(sub.x - st.cx) || 1, 0.35, 0.1).normalize();
+  // The facing over the mount, and the one the shots come in through.
+  const over = facingOf(st, sub);
+  const through = facingOf(st, side.clone().multiplyScalar(Math.max(st.halfW, st.halfH) * 2).add(new Vector3(sub.x, sub.y, sub.z)));
+  const s = w.fleet.spawn('vf27-kestrel', 'concord', tp.clone().addScaledVector(side, range), side.clone().negate());
+  s.target = cap;
+  s.combat.gun = 0; // lasers
+  selectSubsystem(s, cap, st.subsystems.indexOf(sub));
+  const zero = new Vector3();
+  let onSub = 0;
+  let onHull = 0;
+  let t = 0;
+  for (; t < maxT && !sub.destroyed; t += DT) {
+    stripFacing(cap, over);
+    stripFacing(cap, through);
+    cap.flight.velocity.set(0, 0, 0);
+    subsystemPosition(cap, sub, tp);
+    hold(s, zero);
+    aimAndFire(s, tp, zero, range * 0.008);
+    w.fleet.step(DT);
+    w.weapons.step(DT);
+    for (const e of w.weapons.events) {
+      if (e.kind !== 'hit' || e.shooter !== s) continue;
+      if (e.sub === sub) onSub++;
+      else onHull++;
+    }
+  }
+  return { share: onSub / Math.max(1, onSub + onHull), t: sub.destroyed ? t : Infinity };
+}
+
+/** One torpedo homed on a mount of a shield-less capital: how many mounts it destroys or damages. */
+export function torpedoSplash(capBp: string, socket: string): { destroyed: number; damaged: number } {
+  seed = 19;
+  const w = world();
+  const cap = w.fleet.spawn(capBp, 'choir', ORIGIN.clone(), new Vector3(0, 0, 1));
+  cap.flight.velocity.set(0, 0, 0);
+  const st = cap.combat.dmg;
+  const sub = st.subsystems.find((s) => s.id === socket)!;
+  const tp = subsystemPosition(cap, sub, new Vector3());
+  const side = new Vector3(Math.sign(sub.x - st.cx) || 1, 0.3, 0).normalize();
+  const bomber = w.fleet.spawn('sb9-warhorse', 'concord', tp.clone().addScaledVector(side, 2200), side.clone().negate(), { isPlayer: true });
+  bomber.target = cap;
+  selectSubsystem(bomber, cap, st.subsystems.indexOf(sub));
+  w.missiles.salvo(bomber, cap, MISSILES.torpedo);
+  const zero = new Vector3();
+  for (let t = 0; t < 15; t += DT) {
+    // Shields down all round: a torpedo curves in, and a standing facing anywhere on its path would take it.
+    for (let f = 0; f < st.facings.length; f++) stripFacing(cap, f);
+    cap.flight.velocity.set(0, 0, 0);
+    hold(bomber, zero);
+    bomber.controls.fire = false;
+    w.fleet.step(DT);
+    w.weapons.step(DT);
+    w.missiles.step(DT);
+  }
+  return { destroyed: st.subsystems.filter((s) => s.destroyed).length, damaged: st.subsystems.filter((s) => !s.destroyed && s.hp < s.hpMax).length };
+}
+
+/**
+ * The player's wing on "attack my target" against a capital with a stripped
+ * port flank and the facing over `socket` down (no return fire: this
+ * measures the brains, not survival). The
+ * lead holds 2.5 km off with `socket` selected; the wing kills it, then (lead
+ * deselects) picks exposed mounts on its own for 60 s.
+ */
+export function wingStrip(capBp: string, socket: string, maxT = 90): { ordered: number; after: number; shielded: number } {
+  seed = 29;
+  const w = world();
+  const cap = w.fleet.spawn(capBp, 'choir', ORIGIN.clone(), new Vector3(0, 0, 1));
+  cap.flight.velocity.set(0, 0, 0);
+  const st = cap.combat.dmg;
+  const sub = st.subsystems.find((s) => s.id === socket)!;
+  const tp = subsystemPosition(cap, sub, new Vector3());
+  const side = new Vector3(Math.sign(sub.x - st.cx) || 1, 0.3, 0).normalize();
+  const leadPos = tp.clone().addScaledVector(side, 2500);
+  const lead = w.fleet.spawn('vf27-kestrel', 'concord', leadPos.clone(), side.clone().negate(), { isPlayer: true, name: 'Vanguard 1' });
+  lead.target = cap;
+  selectSubsystem(lead, cap, st.subsystems.indexOf(sub));
+  const wing = [1, 2, 3].map((i) => w.fleet.spawn('vf27-kestrel', 'concord', leadPos.clone().add(new Vector3(0, i * 40, -i * 50)), side.clone().negate(), { name: `Vanguard ${i + 1}` }));
+  setFormation(wing, 'fingerFour', 40);
+  issueOrder(wing, 'attackMyTarget', lead);
+  const zero = new Vector3();
+  let ordered = Infinity;
+  let shieldedKills = 0;
+  const killed = new Set<Subsystem>();
+  let t = 0;
+  const over = facingOf(st, sub);
+  for (; t < maxT + 60 && cap.alive; t += DT) {
+    stripFacing(cap, FACING.PORT);
+    stripFacing(cap, over);
+    cap.flight.velocity.set(0, 0, 0);
+    lead.flight.position.copy(leadPos);
+    hold(lead, zero);
+    lead.controls.fire = false;
+    if (sub.destroyed && ordered === Infinity) {
+      ordered = t;
+      selectSubsystem(lead, cap, -1);
+    }
+    if (ordered === Infinity && t > maxT) break;
+    if (ordered !== Infinity && t > ordered + 60) break;
+    updateAI(w.fleet, DT, t);
+    w.fleet.step(DT);
+    w.weapons.step(DT);
+    w.missiles.step(DT);
+    for (const e of w.weapons.events) {
+      if (e.kind !== 'subsystem' || e.ship !== cap || !e.sub || killed.has(e.sub)) continue;
+      killed.add(e.sub);
+      // (Mounts the stripped facings don't cover are still under their shields.)
+      if (!e.sub.destroyed || facingOf(st, e.sub) === FACING.PORT || facingOf(st, e.sub) === over) continue;
+      shieldedKills++;
+    }
+  }
+  return { ordered, after: killed.size - (sub.destroyed ? 1 : 0), shielded: shieldedKills };
+}
+
+export function subsystemScenario(): ScenarioResult {
+  const cath = aimedShare('choir-cathedral', 'battery-4');
+  const lg = aimedShare('ffc-lantern-guard', 'main-b', 450);
+  const torp = torpedoSplash('choir-cathedral', 'battery-4');
+  const wing = wingStrip('choir-cathedral', 'battery-4');
+  return {
+    name: 'subsystem targeting (aimed hits, torpedo splash, AI wing on the lead\'s pick)',
+    metrics: {
+      cathedralBattery: `${(cath.share * 100).toFixed(0)}% of hull hits on the selected mount · killed in ${cath.t.toFixed(1)} s`,
+      lanternGuardMain: `${(lg.share * 100).toFixed(0)}% on the mount (450 m) · killed in ${lg.t.toFixed(1)} s`,
+      torpedo: `one torpedo on a shield-less Cathedral's battery: ${torp.destroyed} mounts destroyed · ${torp.damaged} damaged`,
+      wing: `wing kills the lead's pick in ${wing.ordered.toFixed(1)} s · then ${wing.after} more exposed mounts in 60 s (${wing.shielded} through standing shields)`,
+    },
+    checks: [
+      check('aimed hits on a Cathedral battery (% of hull hits)', cath.share * 100, '>= 60', cath.share >= 0.6),
+      check('aimed hits on a Lantern Guard turret (% of hull hits)', lg.share * 100, '>= 40', lg.share >= 0.4),
+      check('one torpedo on a bare hull: mounts destroyed + damaged', torp.destroyed + torp.damaged, '>= 3', torp.destroyed + torp.damaged >= 3),
+      check('wing kills the lead\'s selected mount (s)', wing.ordered, '< 60', wing.ordered < 60),
+      check('… then strips exposed mounts on its own (in 60 s)', wing.after, '>= 1', wing.after >= 1),
+    ],
+  };
+}
+
 const SCENARIOS: [string, () => ScenarioResult][] = [
   ['damage types', damageTypeScenario],
   ['fighter', fighterScenario],
@@ -661,6 +829,7 @@ const SCENARIOS: [string, () => ScenarioResult][] = [
   ['effects', effectsScenario],
   ['swarm', swarmScenario],
   ['outfit', outfitScenario],
+  ['subsystem', subsystemScenario],
 ];
 
 export function runAll(filter = ''): ScenarioResult[] {

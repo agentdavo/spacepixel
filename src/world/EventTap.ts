@@ -55,6 +55,7 @@ export function copyWeaponEvent(e: WeaponEvent, o: WeaponEvent): WeaponEvent {
   o.shooter = e.shooter;
   o.gun = e.gun;
   o.sub = e.sub;
+  o.subHp = e.subHp;
   o.facing = e.facing;
   o.strength = e.strength;
   o.bleed = e.bleed;

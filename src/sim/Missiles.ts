@@ -306,19 +306,29 @@ export class Missiles implements Shootables {
     const spec = this.spec[i];
     const p = this.pos[i];
     let hit = false;
+    let sub: Subsystem | null = null;
     if (tgt.combat.dmg.capital) {
       _seg.copy(this.vel[i]).divideScalar(speed || 1).multiplyScalar(speed * dt + spec.fuse);
       if (raycastShip(tgt, p, _seg, 0, _hit)) {
         p.copy(_hit.point);
+        sub = _hit.sub;
         hit = true;
       }
     } else if (dist < spec.fuse + Math.max(0, tgt.radius - 10)) {
       // (Big non-capital hulls — gunships, corvettes — fuse on their skin, not their centre.)
       _hit.normal.subVectors(p, tgt.flight.position).normalize();
+      // Homed on a mount with the bubble down: the warhead finds it.
+      const aim = this.aimSub[i];
+      if (aim && !aim.destroyed && tgt.shield <= 0) sub = aim;
       hit = true;
     }
     if (!hit) return false;
-    this.fleet.hit(tgt, spec.damage, spec.type, p, _hit.normal, this.owner[i]);
+    const r = this.fleet.hit(tgt, spec.damage, spec.type, p, _hit.normal, this.owner[i], sub);
+    // A burst on the plating (not on a standing shield) splashes the mounts around it — centred on the mount it struck.
+    if (spec.blast && !r.shielded) {
+      const struck = r.subsystem;
+      this.fleet.blast(tgt, struck ? subsystemPosition(tgt, struck, _aim) : p, spec.blast, spec.damage, spec.type, this.owner[i], struck);
+    }
     if (spec.tether && !tgt.combat.dmg.capital) tgt.combat.dmg.tether = spec.tether;
     this.emit('detonate', i);
     this.kill(i);

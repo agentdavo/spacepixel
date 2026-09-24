@@ -76,7 +76,7 @@ export function hashShip(H: StateHasher, s: ShipEntity): void {
   H.f64(f.throttle).f64(f.boostGauge).bool(f.boosting).bool(f.flightAssist).str(f.cruise).f64(f.cruiseT);
   H.f64(s.hull).f64(s.shield).f64(s.sinceHit).u32(s.target ? s.target.id : 0).u32(s.rng.state);
   const c = s.combat;
-  H.u32(c.gun).u32(c.missile).f64(c.missileReload);
+  H.u32(c.gun).u32(c.missile).f64(c.missileReload).u32(c.subTarget + 1).u32(c.subShip);
   const d = c.dmg;
   for (const x of d.facings) H.f64(x);
   // Shield power: trim, per-facing capacity / collapse cooldown / incoming-fire memory.

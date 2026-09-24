@@ -530,6 +530,11 @@ export interface HitInput {
   local: { x: number; y: number; z: number } | null;
   /** True when the impact point is on the shield shell (the layer is decided by the caller's geometry). */
   onShield?: boolean;
+  /**
+   * Aimed hit: the ray entered this subsystem's hit sphere (Combat.raycastShip),
+   * so the hull hit routes to it rather than to whatever is nearest the point.
+   */
+  sub?: Subsystem | null;
 }
 
 export interface HitResult {
@@ -639,33 +644,18 @@ export function applyHit(st: DamageState, pools: Pools, hit: HitInput, out: HitR
   // ── hull layer ───────────────────────────────────────────────────
   let hull = raw * mul.hull;
   const p = hit.local;
-  if (st.capital && p) {
-    const sub = pickSubsystem(st.subsystems, p.x, p.y, p.z);
-    if (sub) {
-      out.subsystem = sub;
-      sub.hp -= raw * mul.subsystem;
-      // Armoured mounts: the hull behind a subsystem only takes half.
-      hull *= 0.5;
-      if (sub.hp <= 0) {
-        sub.hp = 0;
-        sub.destroyed = true;
-        out.subsystemDestroyed = true;
-        if (sub.kind === 'shieldGen') {
-          // The generator feeds every emitter: all facings drop, no regen.
-          for (let i = 0; i < n; i++) collapse(st, i);
-          syncShield(st, pools);
-        } else if (sub.kind === 'shieldEmitter' && sub.facing !== undefined && sub.facing < n) {
-          // That facing's projector is gone: it drops and stays down.
-          collapse(st, sub.facing);
-          updateCaps(st);
-          syncShield(st, pools);
-        }
-      }
-      st.version++;
-    } else {
-      addScar(st, p.x, p.y, p.z, hull / Math.max(pools.hullMax, 1));
-    }
-  } else if (!st.capital && p) {
+  // Anything with hardware on the hull (capitals, gunships with turret mounts) routes to it.
+  const aimed = hit.sub && !hit.sub.destroyed ? hit.sub : null;
+  const sub = aimed ?? (p && st.subsystems.length ? pickSubsystem(st.subsystems, p.x, p.y, p.z) : null);
+  if (sub) {
+    out.subsystem = sub;
+    out.subsystemDestroyed = hitSubsystem(st, pools, sub, raw * mul.subsystem);
+    // Armoured mounts: the hull behind a subsystem only takes half.
+    hull *= 0.5;
+  } else if (st.capital && p) {
+    addScar(st, p.x, p.y, p.z, hull / Math.max(pools.hullMax, 1));
+  }
+  if (!st.capital && p) {
     const z = fighterZone(p.x - st.cx, p.y - st.cy, p.z - st.cz);
     out.zone = z;
     const before = st.zones[z];
@@ -675,6 +665,35 @@ export function applyHit(st: DamageState, pools: Pools, hit: HitInput, out: HitR
   pools.hull -= hull;
   out.hullDamage = hull;
   return out;
+}
+
+/**
+ * Damage one subsystem directly: a routed hull hit, blast splash, a hangar's
+ * secondary explosion (src/sim/Subsystems.ts). Returns true when this hit
+ * destroyed it. Destruction consequences that live in the damage state are
+ * applied here (a dead shield generator drops every facing, a dead emitter
+ * its own); the rest follow
+ * from `destroyed` (Capitals / ShipTurrets stop the mount, capitalEffects).
+ */
+export function hitSubsystem(st: DamageState, pools: Pools, sub: Subsystem, amount: number): boolean {
+  if (sub.destroyed || amount <= 0) return false;
+  sub.hp -= amount;
+  st.version++;
+  if (sub.hp > 0) return false;
+  sub.hp = 0;
+  sub.destroyed = true;
+  const n = st.facings.length;
+  if (sub.kind === 'shieldGen') {
+    // The generator feeds every emitter: all facings drop, no regen.
+    for (let i = 0; i < n; i++) collapse(st, i);
+    syncShield(st, pools);
+  } else if (sub.kind === 'shieldEmitter' && sub.facing !== undefined && sub.facing < n) {
+    // That facing's projector is gone: it drops and stays down.
+    collapse(st, sub.facing);
+    updateCaps(st);
+    syncShield(st, pools);
+  }
+  return true;
 }
 
 const MAX_SCARS = 24;

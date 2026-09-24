@@ -3,7 +3,7 @@ import type { Fleet, HitEventKind, ShipEntity, Team } from './Fleet';
 import type { FactionId } from '@/assets/Blueprint';
 import { GUNS, GUN_INDEX, GUN_LIST, type DamageType, type GunSpec } from './Loadouts';
 import { facingStrength, type Subsystem } from './Damage';
-import { chooseGun, createRayHit, cycleSubsystem, gunOf, raycastShip } from './Combat';
+import { chooseGun, createRayHit, cycleSubsystem, gunOf, pickSubsystemAtCrosshair, raycastShip } from './Combat';
 import type { Rng } from './Rng';
 
 export type { GunSpec } from './Loadouts';
@@ -52,8 +52,10 @@ export interface WeaponEvent {
   shooter: ShipEntity | null;
   /** Gun that fired / hit (fire, hit, shield); null for beams from capitals and hit consequences. */
   gun: GunSpec | null;
-  /** Destroyed subsystem ('subsystem'). */
+  /** Destroyed subsystem ('subsystem'); on 'hit' / 'beam-hit', the subsystem the hit struck (null = bare hull). */
   sub: Subsystem | null;
+  /** `sub`'s hit points after the event, 0..1 (0 on 'subsystem'); −1 / absent = no subsystem involved. */
+  subHp?: number;
   /**
    * Shield facing (shield, shield-bleed, shield-down, shield-up, and hits /
    * subsystems for the facing they landed under): a Damage.FACING index —
@@ -141,7 +143,7 @@ export class Weapons {
   constructor(readonly fleet: Fleet) {
     this.rng = fleet.rng.fork('weapons');
     for (let i = 0; i < EVENT_POOL; i++) {
-      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1, strength: -1, bleed: 0 });
+      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, subHp: -1, facing: -1, strength: -1, bleed: 0 });
     }
     for (let i = 0; i < 128; i++) {
       this.flashes.push({ kind: 'fire', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1, strength: -1, bleed: 0 });
@@ -150,6 +152,7 @@ export class Weapons {
       const e = this.emit(kind, point, normal, ship.flight.velocity, ship, shooter);
       if (e) {
         e.sub = sub;
+        e.subHp = sub ? sub.hp / sub.hpMax : -1;
         e.facing = facing;
         if (hit && (kind === 'shield-bleed' || kind === 'shield-down')) {
           e.strength = hit.strength;
@@ -174,6 +177,7 @@ export class Weapons {
     e.shooter = shooter;
     e.gun = gun;
     e.sub = null;
+    e.subHp = -1;
     e.facing = -1;
     e.strength = -1;
     e.bleed = 0;
@@ -194,13 +198,15 @@ export class Weapons {
     return out.applyQuaternion(s.flight.orientation).add(s.flight.position);
   }
 
-  /** Weapon-select edges (R guns · Y missiles · B subsystem) and the AI's gun choice. */
+  /** Weapon-select edges (R guns · Y missiles · B / Shift+B / I subsystem) and the AI's gun choice. */
   private arms(s: ShipEntity): void {
     const c = s.controls;
     const cs = s.combat;
     if (c.cycleGun && cs.loadout.guns.length) cs.gun = (cs.gun + 1) % cs.loadout.guns.length;
     if (c.cycleMissile && cs.loadout.missiles.length) cs.missile = (cs.missile + 1) % cs.loadout.missiles.length;
-    if (c.cycleSub) cycleSubsystem(s);
+    if (c.cycleSub) cycleSubsystem(s, 1);
+    if (c.cycleSubBack) cycleSubsystem(s, -1);
+    if (c.pickSub) pickSubsystemAtCrosshair(s);
     const auto = !s.isPlayer || (s.brain as { autopilot?: boolean } | null)?.autopilot === true;
     if (auto && !cs.dmg.capital) chooseGun(s, s.target);
   }
@@ -336,12 +342,14 @@ export class Weapons {
       const tm = this.team[i];
       let hitT = 2;
       let hitShip: ShipEntity | null = null;
+      let hitSub: Subsystem | null = null;
       for (const s of ships) {
         // Bolts hit anyone not on the shooter's team (neutrals included — shooting them provokes them).
         if (!s.alive || TEAM_INDEX[s.team] === tm || s.id === this.owner[i]) continue;
         if (raycastShip(s, _a, _d, 0, _hit) && _hit.t < hitT) {
           hitT = _hit.t;
           hitShip = s;
+          hitSub = _hit.sub;
           _b.copy(_hit.point);
           _c.copy(_hit.normal);
         }
@@ -351,13 +359,17 @@ export class Weapons {
         _f.set(this.vx[i], this.vy[i], this.vz[i]);
         const shooter = ships.find((x) => x.id === this.owner[i]) ?? null;
         if (shooter) provoke(hitShip, shooter);
-        const r = this.fleet.hit(hitShip, this.damage[i], gun.type, _b, _c, shooter);
-        const e = this.emit(r.shielded ? 'shield' : 'hit', _b, _c, _f, hitShip, shooter, gun);
+        const r = this.fleet.hit(hitShip, this.damage[i], gun.type, _b, _c, shooter, hitSub);
+        const shielded = r.shielded;
+        const e = this.emit(shielded ? 'shield' : 'hit', _b, _c, _f, hitShip, shooter, gun);
         if (e) {
           e.facing = r.facing;
           e.strength = r.strength;
           e.bleed = r.bleed;
+          subOnEvent(e, r.subsystem);
         }
+        // Explosive rounds splash the mounts around the burst (Subsystems.splashSubsystems).
+        if (gun.blast && !shielded) this.fleet.blast(hitShip, _b, gun.blast, this.damage[i], gun.type, shooter, r.subsystem);
         this.life[i] = 0;
         continue;
       }
@@ -390,28 +402,38 @@ export class Weapons {
       _d.copy(b.dir).multiplyScalar(b.length);
       let hitT = 1;
       let hitShip: ShipEntity | null = null;
+      let hitSub: Subsystem | null = null;
       for (const s of ships) {
         if (!s.alive || s.team === b.team || s === b.owner) continue;
         if (raycastShip(s, b.origin, _d, b.width * 0.5, _hit) && _hit.t < hitT) {
           hitT = _hit.t;
           hitShip = s;
+          hitSub = _hit.sub;
           _c.copy(_hit.normal);
         }
       }
       b.end.copy(b.origin).addScaledVector(_d, Math.min(hitT, 1));
       if (hitShip) {
-        const r = this.fleet.hit(hitShip, b.dps * dt, b.type, b.end, _c, b.owner);
+        const r = this.fleet.hit(hitShip, b.dps * dt, b.type, b.end, _c, b.owner, hitSub);
         const e = this.emit(r.shielded ? 'shield' : 'beam-hit', b.end, _c, hitShip.flight.velocity, hitShip, b.owner, b.gun);
         if (e) {
           e.facing = r.facing;
           e.strength = r.strength;
           e.bleed = r.bleed;
+          subOnEvent(e, r.subsystem);
           // Beam shield contact is continuous: only flash the ripple now and then.
           if (r.shielded && this.rand() > 0.12) e.kind = 'beam-hit';
         }
       }
     }
   }
+}
+
+/** A hit that struck a subsystem carries it and its remaining hp (for damage VFX, the HUD bracket flash). */
+function subOnEvent(e: WeaponEvent, sub: Subsystem | null): void {
+  if (!sub) return;
+  e.sub = sub;
+  e.subHp = sub.hp / sub.hpMax;
 }
 
 export const FACTION_INDEX: Record<FactionId, number> = { concord: 0, choir: 1, rustwake: 2 };

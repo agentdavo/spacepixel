@@ -327,6 +327,8 @@ export class ShipTurrets {
 
   private stepHangar(s: ShipEntity, h: HangarRt, dt: number): void {
     if (!s.alive) return;
+    // A wrecked bay launches nothing (its cook-off is Fleet.cookOff's).
+    if (s.combat.dmg.subsystems.some((x) => x.id === 'hangar' && x.destroyed)) return;
     h.cooldown -= dt;
     if (h.cooldown > 0) return;
     // A craft shot down (hull 0) stays down until the carrier docks.

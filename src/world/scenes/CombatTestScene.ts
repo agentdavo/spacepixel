@@ -6,7 +6,7 @@ import { Fleet, faceAlong, type ShipEntity } from '@/sim/Fleet';
 import { Weapons } from '@/sim/Weapons';
 import { Missiles } from '@/sim/Missiles';
 import { Capitals } from '@/sim/Capitals';
-import { subsystemPosition, toUniverse } from '@/sim/Combat';
+import { selectSubsystem, subsystemPosition, toUniverse } from '@/sim/Combat';
 import { GUNS, MISSILES } from '@/sim/Loadouts';
 import { WeaponVisuals } from '../WeaponVisuals';
 import { CombatFx } from '../CombatFx';
@@ -162,7 +162,7 @@ export class CombatTestScene implements GameScene {
     this.player = wing[0];
     this.player.isPlayer = true;
     this.player.target = cap;
-    this.player.combat.subTarget = st.subsystems.indexOf(aimAt);
+    selectSubsystem(this.player, cap, st.subsystems.indexOf(aimAt));
     // Close on the wrecked port batteries and hangar (z ≈ −200…−450 m), looking down and aft.
     this.eyeFn = (t, eye, look) => {
       if (this.camMode === 1) {
@@ -261,7 +261,7 @@ export class CombatTestScene implements GameScene {
       return s;
     });
     const wh = ships[5];
-    wh.combat.subTarget = -1;
+    selectSubsystem(wh, lg, -1);
     this.missiles.salvo(wh, lg, MISSILES.torpedo);
     this.player = ships[0];
     this.player.isPlayer = true;
@@ -299,6 +299,7 @@ export class CombatTestScene implements GameScene {
     this.weapons.step(dt);
     this.missiles.step(dt);
     if (fx && this.fxOn) this.combatFx.consume(dt);
+    this.hud.consume(this.weapons.events, this.player, this.simT);
     if (this.freezeOnCollapse && fx && this.weapons.events.some((e) => e.kind === 'shield-down') && !Number.isFinite(this.freeze)) this.freeze = this.liveT + 0.1;
   }
 
