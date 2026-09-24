@@ -453,7 +453,7 @@ export class WeaponVisuals {
   }
 
   /** A hit ripple on `ship`'s shell. `amount` scales its reach; weak facings flare brighter. */
-  private shieldHit(ship: ShipEntity, pos: Vector3, facing: number, type: DamageType | undefined, amount: number): void {
+  private shieldHit(ship: ShipEntity, pos: Vector3, facing: number, type: DamageType | undefined, amount: number, strength = -1): void {
     const s = this.shieldFor(ship);
     shellDir(ship, pos, _d);
     const cap = ship.combat.dmg.capital;
@@ -464,7 +464,7 @@ export class WeaponVisuals {
     for (let i = 1; i < HITS; i++) if (s.hits[i].w > s.hits[k].w) k = i;
     const n = facingLayout(ship).count;
     const f = this.facingSlot(ship, facing, _d);
-    const frac = facingFrac(ship, n ? f : -1);
+    const frac = strength >= 0 ? strength : facingFrac(ship, n ? f : -1);
     const reach = cap ? Math.min(Math.max(28 + Math.sqrt(Math.max(amount, 1)) * 11, 34), big * 0.35) : big * (0.55 + Math.min(0.5, amount * 0.02));
     s.hits[k].set(_d.x, _d.y, _d.z, 0);
     s.hitB[k].set(reach, TYPE_INDEX[type ?? 'laser'], 1 + (1 - frac) * 1.8, cap ? HIT_LIFE_CAP : HIT_LIFE_FTR);
@@ -567,14 +567,16 @@ export class WeaponVisuals {
     for (const e of w.events) {
       switch (e.kind) {
         case 'fire':
-          this.flash(e.position, 3.5, 0.06);
+          // Muzzle flash sized to the gun (bolt width) and the mount: capital turrets fire big.
+          this.flash(e.position, 3.5 * Math.max(1, (e.gun?.width ?? 1.6) / 1.6) * (e.shooter?.combat.dmg.capital ? 3 : 1), 0.06);
           break;
         case 'hit':
           this.flash(e.position, 9, 0.2);
           break;
         case 'shield':
+        case 'shield-bleed':
           this.flash(e.position, e.ship?.combat.dmg.capital ? 9 : 6, 0.12);
-          if (e.ship) this.shieldHit(e.ship, e.position, e.facing, e.type, e.amount ?? e.gun?.damage ?? 8);
+          if (e.ship) this.shieldHit(e.ship, e.position, e.facing, e.type, e.amount ?? e.gun?.damage ?? 8, e.strength);
           break;
         case 'shield-down':
           this.flash(e.position, e.ship?.combat.dmg.capital ? 90 : 18, 0.25);

@@ -132,6 +132,8 @@ export interface ShieldItem extends ItemBase {
   regen: number;
   /** Regen delay multiplier (lower is better). */
   delay: number;
+  /** Charge transfer between facings (× the hull's rate): Hesper wards shift fast, patched rigs slowly. */
+  transfer?: number;
 }
 
 export interface ArmourItem extends ItemBase {
@@ -315,7 +317,7 @@ const UTIL_NAME: Record<'shield' | 'armour' | 'engine' | 'reactor', Record<Facti
 };
 
 const UTIL_BLURB: Record<'shield' | 'armour' | 'engine' | 'reactor', string> = {
-  shield: 'Capacity, recharge rate and the delay before it starts. Big hulls split it over four facings.',
+  shield: 'Capacity, recharge rate, the delay before it starts, and how fast charge shifts between facings. Fighters split it fore and aft; big hulls over four or six facings, each on its own emitter.',
   armour: 'More hull. More mass: slower to accelerate and turn.',
   engine: 'Top speed, acceleration and turn authority.',
   reactor: 'The power budget. Every fitted item draws from it.',
@@ -363,6 +365,7 @@ function buildItems(): Item[] {
               capacity: r1(p * (choir ? 1.1 : h.perf)),
               regen: r1((1 + (mk - 1) * 0.1) * (choir ? 1.2 : h.perf)),
               delay: r1((1 - (mk - 1) * 0.05) * (f === 'rustwake' ? 1.1 : choir ? 0.9 : 1)),
+              transfer: r1((1 + (mk - 1) * 0.05) * (choir ? 1.25 : f === 'rustwake' ? 0.8 : 1)),
             });
           } else if (kind === 'armour') {
             out.push({
@@ -440,7 +443,7 @@ function buildGuildItems(): Item[] {
       const k = `${key}-c${c}`;
       const name = `C${c} ${label}`;
       if (kind === 'shield')
-        out.push(tag({ ...base(k, name, kind, mk, maker, 800 * CLASS_PRICE(c), SHIELD_POWER[c], blurb), kind, cls: c, capacity: r1(p * (f === 'choir' ? 1.1 : 1)), regen: r1(1.45 * (f === 'choir' ? 1.2 : 1)), delay: 0.8 }, g, rank));
+        out.push(tag({ ...base(k, name, kind, mk, maker, 800 * CLASS_PRICE(c), SHIELD_POWER[c], blurb), kind, cls: c, capacity: r1(p * (f === 'choir' ? 1.1 : 1)), regen: r1(1.45 * (f === 'choir' ? 1.2 : 1)), delay: 0.8, transfer: r1(1.3 * (f === 'choir' ? 1.2 : 1)) }, g, rank));
       else if (kind === 'armour') out.push(tag({ ...base(k, name, kind, mk, maker, 600 * CLASS_PRICE(c), 0, blurb), kind, cls: c, hull: r1(p * (f === 'rustwake' ? 1.08 : 1)), mass: r1(f === 'rustwake' ? 1.18 : 1.1) }, g, rank));
       else if (kind === 'engine') out.push(tag({ ...base(k, name, kind, mk, maker, 900 * CLASS_PRICE(c), ENGINE_POWER[c], blurb), kind, cls: c, speed: r1(f === 'concord' ? 1.26 : 1.22), accel: r1(1.45 * HOUSE[f].perf), turn: r1(1.16) }, g, rank));
       else out.push(tag({ ...base(k, name, kind, mk, maker, 1000 * CLASS_PRICE(c), 0, blurb), kind, cls: c, output: r1(p * HOUSE[f].perf) }, g, rank));

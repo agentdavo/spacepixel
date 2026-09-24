@@ -199,7 +199,12 @@ Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
   micro-missiles; Resolute Mk III vs Lantern Guard ~78 s / 49 % hull, Valiant
   Mk III vs Vesper ~68 s / 52 % hull, swarm vs PD bands (`npm run balance`);
   Cantor shield 80 → 95 brings the 96-seed dogfight sweep from 69 % to 53 %
-  Concord (`npm run ai-sim`).
+  Concord (`npm run ai-sim`). Directional shields (fore / aft halves on
+  fighters, 4 / 6 facings with emitters on capitals, trim + transfer, bleed,
+  collapse cooldown) pushed it to 74 %; the Choral ward (Cantor shield 110,
+  1.5× transfer) brings it back to 54 % (51 % with the turret rigs merged).
+  With both: Resolute Mk III vs Lantern Guard ~74 s / 43 % hull, Valiant
+  Mk III vs Vesper ~78 s / 44 %.
 - **Valiant bridge camera** — eye 0.16 L above / 0.08 L behind the bridge over
   a forward battery; the mounts sit in the bottom sixth (tested).
 - **Hires** — Magpie (wing) and Brennick (−30 % repairs) verified end to end

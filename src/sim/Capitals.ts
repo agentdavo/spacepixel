@@ -4,8 +4,9 @@ import type { Weapons, Beam } from './Weapons';
 import { createTurretSolution, turretAim, turretCanPoint, turretSelectTarget, TURRET_DEFAULTS, type TurretMount, type TurretSolution } from './ai/Turret';
 import { issueOrder, leadPoint } from './ai';
 import { CAPITAL_LANCE, GUNS, type BatterySpec, type GunSpec } from './Loadouts';
-import { shieldFacing, type Subsystem } from './Damage';
+import { facingOf, facingUp, type Subsystem } from './Damage';
 import type { Rng } from './Rng';
+import { PD_TOL, createDrive, gateTolerance, mountFromRig, nextMuzzle, poseTurret, restoreDrive, rigFor, stepDrive, wreckDrive, type TurretDrive, type TurretRig } from './TurretRig';
 
 /**
  * Capital ships as combatants: flak turrets on every 'turret' hardpoint
@@ -22,16 +23,29 @@ import type { Rng } from './Rng';
  * pick targets at random). Turrets break off to shoot down incoming torpedoes
  * and micro-missiles (at a faster point-defence cadence than their bursts).
  *
+ * Turrets are physical (TurretRig.ts): each trains its traverse and
+ * elevation joints at a rate set by its size, holds fire until the barrels
+ * are on the solution, can't shoot outside its arcs, fires from its barrel
+ * muzzles in turn (a 'fire' event per shot for the muzzle flash), and
+ * freezes wrecked when its subsystem is destroyed. A laid gun tracks its
+ * solution every step and re-picks (ordnance first) when it is ready to fire;
+ * an idle gun looks every SCAN seconds (then homes and scans).
+ *
  * Main-battery turrets (Loadout.battery) are dual-purpose: against a big hull
  * — a gunship, corvette or frigate — they fire heavy rounds (the shield
  * breaker while the facing is up, the hull breaker once it is down), so a
  * corvette is a real threat to a player-flown warship, not just to fighters.
  */
+/** What a gun is laid on between target picks: nothing, inbound ordnance, a big hull (battery), a fighter (flak). */
+type Aim = 'none' | 'pd' | 'big' | 'flak';
+
 interface Gun {
   sub: Subsystem | null;
-  local: Vector3;
-  localUp: Vector3;
-  localFwd: Vector3;
+  rig: TurretRig;
+  drive: TurretDrive;
+  /** Seconds to the next target pick. */
+  scan: number;
+  aim: Aim;
   cooldown: number;
   burst: number;
   mount: TurretMount;
@@ -90,23 +104,28 @@ const PD_INTERVAL = 1.2;
 const PD_DAMAGE_MUL = 1.5;
 /** A main battery busy with a warship still takes ordnance this close (m). */
 const PD_LAST_DITCH = 700;
+/** Seconds between target picks per gun (the current solution is tracked every step). */
+const SCAN = 0.5;
 const _tp = new Vector3();
 const _tv = new Vector3();
+const _mz = new Vector3();
+const _dl = new Vector3();
 
 const _sol = createTurretSolution();
 
 /** Is the shield between `from` and the ship still up (its facing, or its bubble)? */
 function shieldUpToward(t: ShipEntity, from: Vector3): boolean {
   const st = t.combat.dmg;
-  if (!st.capital) return t.shield > t.shieldMax * 0.05;
+  if (st.facings.length < 2) return t.shield > t.shieldMax * 0.05;
+  // The facing toward the gun (fore/aft halves, 4 or 6 capital facings).
   _v.subVectors(from, t.flight.position).applyQuaternion(_q.copy(t.flight.orientation).invert());
-  const f = shieldFacing(_v.x - st.cx, _v.z - st.cz, st.halfW, st.halfL);
-  return st.facings[f] > st.facingMax * 0.05;
+  return facingUp(st, facingOf(st, _v), 0.05);
 }
 
 const _m = new Matrix4();
 const _inv = new Matrix4();
 const _q = new Quaternion();
+const _qi = new Quaternion();
 const _v = new Vector3();
 const _w = new Vector3();
 
@@ -136,15 +155,17 @@ export class Capitals {
       _m.multiplyMatrices(_inv, o.matrixWorld); // socket → root-local
       const local = new Vector3().setFromMatrixPosition(_m);
       _q.setFromRotationMatrix(_m);
-      const up = new Vector3(0, 1, 0).applyQuaternion(_q);
       const fwd = new Vector3(0, 0, 1).applyQuaternion(_q);
       const kind = o.userData.kind as string;
       if (kind === 'turret') {
+        const rig = rigFor(ship.model, id);
+        if (!rig) continue;
         guns.push({
           sub: subOf(id),
-          local,
-          localUp: up,
-          localFwd: fwd,
+          rig,
+          drive: createDrive(),
+          scan: (guns.length % 5) * 0.05,
+          aim: 'none',
           cooldown: rng.next() * 2,
           burst: 0,
           mount: { ...TURRET_DEFAULTS, position: new Vector3(), forward: new Vector3(), up: new Vector3(), velocity: new Vector3(), boltSpeed: gun.speed, range: Math.min(2400, gun.speed * gun.life) },
@@ -180,6 +201,81 @@ export class Capitals {
     return best;
   }
 
+  /** Universe muzzle of the gun's next barrel (alternating through a salvo). */
+  private muzzle(s: ShipEntity, g: Gun, out: Vector3): Vector3 {
+    return nextMuzzle(g.rig, g.drive, out).applyQuaternion(s.flight.orientation).add(s.flight.position);
+  }
+
+  /** Point defence: lead on the nearest inbound ordnance in arc (solution in g.sol). */
+  private layPd(c: Capital, g: Gun, range: number): boolean {
+    const ord = this.fleet.ordnance;
+    const m = g.mount;
+    if (!ord || ord.nearestThreat(m.position, c.ship.team, range, _tp, _tv) < 0) return false;
+    const tof = leadPoint(m.position, m.velocity, _tp, _tv, null, _w, c.gun.speed);
+    if (tof <= 0 || !turretCanPoint(m, _v.subVectors(_w, m.position).normalize())) return false;
+    g.sol.aimDir.copy(_v);
+    g.sol.aimPoint.copy(_w);
+    g.sol.distance = _tp.distanceTo(m.position);
+    g.sol.target = null;
+    return true;
+  }
+
+  /** Keep the current lay (between picks). False when it's lost. */
+  private track(c: Capital, g: Gun): boolean {
+    const s = c.ship;
+    if (g.aim === 'pd') return this.layPd(c, g, g.bigTarget && g.bigTarget.alive ? PD_LAST_DITCH : PD_RANGE);
+    if (g.aim === 'big') {
+      const cur = g.bigTarget;
+      if (!g.big || !cur || !cur.alive || !hostile(cur, s)) return false;
+      this.syncBig(g);
+      return turretAim(g.big, cur, g.sol);
+    }
+    const cur = g.sol.target;
+    return !!cur && cur.alive && hostile(cur, s) && turretAim(g.mount, cur, g.sol);
+  }
+
+  private syncBig(g: Gun): void {
+    const bm = g.big!;
+    const m = g.mount;
+    bm.position.copy(m.position);
+    bm.up.copy(m.up);
+    bm.forward.copy(m.forward);
+    bm.velocity.copy(m.velocity);
+    bm.traverse = m.traverse;
+    bm.minElevation = m.minElevation;
+    bm.maxElevation = m.maxElevation;
+  }
+
+  /** Choose a lay: inbound ordnance, else (battery) a big hull, else flak at the best fighter. */
+  private pick(c: Capital, g: Gun): boolean {
+    const s = c.ship;
+    const m = g.mount;
+    // Point defence first: inbound ordnance in arc beats any ship.
+    // (A main battery laid on a warship only breaks off for last-ditch shots: PD is the small mounts' job.)
+    const laid = g.bigTarget !== null && g.bigTarget.alive;
+    if (this.layPd(c, g, laid ? PD_LAST_DITCH : PD_RANGE)) {
+      g.aim = 'pd';
+      return true;
+    }
+    // Main battery: lay on a big hull (the current one while it stays in arc).
+    if (g.big && c.battery) {
+      this.syncBig(g);
+      const cur = g.bigTarget;
+      if (!(cur && cur.alive && hostile(cur, s) && turretAim(g.big, cur, g.sol))) g.bigTarget = this.selectBig(g.big, s, c.battery.minRadius, g.sol);
+      if (g.bigTarget) {
+        g.aim = 'big';
+        return true;
+      }
+    }
+    const cur = g.sol.target && g.sol.target.alive ? g.sol.target : null;
+    if ((cur && turretAim(m, cur, g.sol)) || turretSelectTarget(m, s.team, this.fleet.ships, cur, g.sol)) {
+      g.aim = 'flak';
+      return true;
+    }
+    g.aim = 'none';
+    return false;
+  }
+
   step(dt: number): void {
     for (const c of this.list) {
       const s = c.ship;
@@ -200,60 +296,51 @@ export class Capitals {
 
       // ── turrets (flak / choir batteries) ──────────────────────────
       const ord = this.fleet.ordnance;
+      _qi.copy(f.orientation).invert();
       for (const g of c.guns) {
-        if (g.sub?.destroyed) continue;
-        g.cooldown -= dt;
-        if (g.cooldown > 0) continue;
-        const m = g.mount;
-        m.position.copy(g.local).applyQuaternion(f.orientation).add(f.position);
-        m.up.copy(g.localUp).applyQuaternion(f.orientation);
-        m.forward.copy(g.localFwd).applyQuaternion(f.orientation);
-        m.velocity.copy(f.velocity);
-        // Point defence first: inbound ordnance in arc beats any ship.
-        let aimed = false;
-        let pd = false;
-        // (A main battery laid on a warship only breaks off for last-ditch shots: PD is the small mounts' job.)
-        const laid = g.bigTarget !== null && g.bigTarget.alive;
-        if (ord && ord.nearestThreat(m.position, s.team, laid ? PD_LAST_DITCH : PD_RANGE, _tp, _tv) >= 0) {
-          const tof = leadPoint(m.position, m.velocity, _tp, _tv, null, _w, gun.speed);
-          if (tof > 0 && turretCanPoint(m, _v.subVectors(_w, m.position).normalize())) {
-            g.sol.aimDir.copy(_v);
-            aimed = pd = true;
+        const d = g.drive;
+        const rig = g.rig;
+        if (g.sub?.destroyed) {
+          if (!d.wrecked) {
+            wreckDrive(rig, d);
+            poseTurret(s.model, rig, d);
           }
-        }
-        // Main battery: lay on a big hull (the current one while it stays in arc).
-        let bigGun: GunSpec | null = null;
-        if (!aimed && g.big && c.battery) {
-          const bm = g.big;
-          bm.position.copy(m.position);
-          bm.up.copy(m.up);
-          bm.forward.copy(m.forward);
-          bm.velocity.copy(m.velocity);
-          const cur = g.bigTarget;
-          if (!(cur && cur.alive && hostile(cur, s) && turretAim(bm, cur, g.sol))) g.bigTarget = this.selectBig(bm, s, c.battery.minRadius, g.sol);
-          if (g.bigTarget) {
-            aimed = true;
-            bigGun = GUNS[shieldUpToward(g.bigTarget, bm.position) ? c.battery.vsShield : c.battery.vsHull];
-          }
-        }
-        if (!aimed) {
-          const cur = g.sol.target && g.sol.target.alive ? g.sol.target : null;
-          aimed = cur && turretAim(m, cur, g.sol) ? true : turretSelectTarget(m, s.team, this.fleet.ships, cur, g.sol);
-        }
-        if (!aimed) {
-          g.cooldown = 0.5;
           continue;
         }
-        if (bigGun && c.battery) {
+        if (d.wrecked) restoreDrive(d);
+        g.cooldown -= dt;
+        g.scan -= dt;
+        const m = g.mount;
+        mountFromRig(rig, m, f.position, f.orientation, f.velocity);
+        // A laid gun tracks its lay through the reload and re-picks (ordnance first)
+        // when it's ready to fire; an idle one looks every SCAN s; a lost lay re-picks now.
+        const laid = g.aim !== 'none' && this.track(c, g);
+        let aimed = laid;
+        if (laid ? g.cooldown <= 0 && g.scan <= 0 : g.scan <= 0 || g.aim !== 'none') {
+          aimed = this.pick(c, g);
+          g.scan = SCAN;
+        }
+        if (!aimed) g.aim = 'none';
+        const err = stepDrive(rig, d, aimed ? _dl.copy(g.sol.aimDir).applyQuaternion(_qi) : null, dt);
+        poseTurret(s.model, rig, d);
+        if (!aimed || g.cooldown > 0) continue;
+        // Fire gate: only with the barrels on the solution.
+        const tgt = g.aim === 'big' ? g.bigTarget : g.aim === 'flak' ? g.sol.target : null;
+        if (err > (tgt ? gateTolerance(tgt.radius, g.sol.distance) : PD_TOL)) continue;
+        if (g.aim === 'big' && g.bigTarget && c.battery) {
           // Heavy rounds: a tight salvo, then a long reload.
+          const bigGun = GUNS[shieldUpToward(g.bigTarget, m.position) ? c.battery.vsShield : c.battery.vsHull];
           const b = c.battery.burst;
           const sc = b.scatter / coord;
-          _v.copy(g.sol.aimDir)
+          this.muzzle(s, g, _mz);
+          _tp.subVectors(g.sol.aimPoint, _mz).normalize();
+          _v.copy(_tp)
             .add(_w.set(rng.centered(), rng.centered(), rng.centered()).multiplyScalar(sc))
             .normalize()
             .multiplyScalar(bigGun.speed)
             .add(f.velocity);
-          this.weapons.spawnBolt(m.position, _v, c.battery.range / bigGun.speed, bigGun.damage * c.battery.dmgMul, s, bigGun);
+          this.weapons.spawnBolt(_mz, _v, c.battery.range / bigGun.speed, bigGun.damage * c.battery.dmgMul, s, bigGun);
+          this.weapons.muzzleFlash(_mz, _tp, f.velocity, s, bigGun);
           g.burst++;
           if (g.burst >= b.count) {
             g.burst = 0;
@@ -262,15 +349,19 @@ export class Capitals {
           continue;
         }
         // Short bursts with a little scatter — flak, not snipers. No bridge: wilder.
+        const pd = g.aim === 'pd';
         const scatter = burst.scatter / coord;
+        this.muzzle(s, g, _mz);
+        _tp.subVectors(g.sol.aimPoint, _mz).normalize();
         for (let k = 0; k < gun.pellets; k++) {
-          _v.copy(g.sol.aimDir)
+          _v.copy(_tp)
             .add(_w.set(rng.centered(), rng.centered(), rng.centered()).multiplyScalar(scatter + gun.spread))
             .normalize()
             .multiplyScalar(gun.speed)
             .add(f.velocity);
-          this.weapons.spawnBolt(m.position, _v, gun.life, gun.damage * (pd ? PD_DAMAGE_MUL : 1), s, gun);
+          this.weapons.spawnBolt(_mz, _v, gun.life, gun.damage * (pd ? PD_DAMAGE_MUL : 1), s, gun);
         }
+        this.weapons.muzzleFlash(_mz, _tp, f.velocity, s, gun);
         g.burst++;
         if (g.burst >= burst.count) {
           g.burst = 0;

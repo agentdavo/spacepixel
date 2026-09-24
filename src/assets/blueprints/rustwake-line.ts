@@ -1,6 +1,6 @@
 import type { Blueprint, Part, Station, Vec3 } from '../Blueprint';
 import { flipX, topAt, wingSlice, type WingSpec } from './kit';
-import { bd, bell, bx, cyl, hazard, hp, lf, post, turret, turrets, windows } from './yard';
+import { bd, bell, bx, cyl, hazard, hp, lf, post, turret, windows } from './yard';
 
 /**
  * Rustwake clan designs: patchwork, rust and harpoons. Nothing is new and
@@ -125,9 +125,9 @@ const KD_GUN = turret('dorsal', [0.3, kdTop(-1.5) + 0.2, -1.5], {
   barrelLength: 1.8,
   barrelRadius: 0.07,
   paint: 'secondary',
-  joint: 'dorsal',
+  traverse: [-165, 165], // the dorsal fin
 });
-KD_GUN.parts[0].livery = 'concord';
+KD_GUN.livery = 'concord';
 
 /** One grapple arm (authored on +X, mirrored): boom, forearm, two claws. */
 const kdArm = (): Part[] => [
@@ -188,7 +188,7 @@ export const KNUCKLEDUSTER: Blueprint = {
     ...kdArm(),
     // Salvaged Directorate PD turret on a scrap ring.
     post('turret-ring', 'dark', [0.3, kdTop(-1.5) - 0.05, -1.5], 0.66, 0.62, 0.3, 8),
-    ...KD_GUN.parts,
+    KD_GUN,
     // Two mismatched engines.
     cyl('engine', 'metal', [1.1, 0.3, -9.6], 1.05, 0.98, 2.6, { segments: 8 }),
     cyl('engine-band', 'accent', [1.1, 0.3, -9.0], 1.1, 1.1, 0.3, { segments: 8 }),
@@ -223,7 +223,6 @@ export const KNUCKLEDUSTER: Blueprint = {
   articulations: [
     // Grapple arms swing in to grab (0 = open, 1 = clamped).
     { id: 'arm', pivot: KD_ARM_PIVOT, axis: [0, 1, 0], range: [0, -24], channel: 'claw' },
-    ...(KD_GUN.joint ? [KD_GUN.joint] : []),
   ],
   hardpoints: [
     hp('claw', 'gun', [2.6, -0.45, 10.4], { mirror: true, articulation: 'arm' }),
@@ -241,11 +240,12 @@ const BD_TANK: Station[] = [
   { z: 6.0, w: 4.8, h: 4.8, y: 0.0, c: 1.45 },
   { z: 7.0, w: 4.2, h: 4.2, y: -0.1, c: 1.25 },
 ];
-const BD_GUNS = turrets([
-  turret('turret-fore', [0, 2.55, 3.6], { radius: 1.0, height: 1.0, barrels: 3, barrelLength: 3.2, barrelRadius: 0.11, housing: [1.7, 0.7, 1.9], paint: 'secondary', joint: 'turret-fore' }),
-  turret('turret-aft', [0.3, 2.55, -4.2], { radius: 0.85, height: 0.85, barrels: 2, barrelLength: 2.6, barrelRadius: 0.1, yaw: 170, joint: 'turret-aft' }),
-]);
-BD_GUNS.parts[1].livery = 'concord';
+/** Two mounts on one deck: each masks the other. */
+const BD_GUNS = [
+  turret('turret-fore', [0, 2.55, 3.6], { radius: 1.0, height: 1.0, barrels: 3, barrelLength: 3.2, barrelRadius: 0.11, housing: [1.7, 0.7, 1.9], paint: 'secondary', traverse: [-160, 160], elevation: [-10, 75] }),
+  turret('turret-aft', [0.3, 2.55, -4.2], { radius: 0.85, height: 0.85, barrels: 2, barrelLength: 2.6, barrelRadius: 0.1, yaw: 170, traverse: [-155, 155], elevation: [-10, 75] }),
+];
+BD_GUNS[1].livery = 'concord';
 
 export const BULLDOG: Blueprint = {
   id: 'rw-bulldog',
@@ -278,7 +278,7 @@ export const BULLDOG: Blueprint = {
     // Turrets (the aft one still in Directorate paint) on welded decks.
     bx('deck', 'metal', [0, 2.3, -0.2], [2.2, 0.3, 11.0], 0.1),
     bx('deck-edge', 'dark', [1.15, 2.2, -0.2], [0.12, 0.2, 10.6], 0, { mirror: true }),
-    ...BD_GUNS.parts,
+    ...BD_GUNS,
     // Ventral mass-driver.
     bx('driver-cradle', 'dark', [0, -2.55, 2.0], [0.9, 0.7, 9.0], 0.15),
     cyl('driver', 'metal', [0, -3.0, 7.0], 0.34, 0.44, 13.0, { segments: 8 }),
@@ -329,7 +329,6 @@ export const BULLDOG: Blueprint = {
     { pos: [-0.9, -1.1, -12.05], radius: 0.74, plume: 7 },
     { pos: [1.3, -1.2, -11.7], radius: 0.5, plume: 5 },
   ],
-  articulations: BD_GUNS.joints,
   hardpoints: [hp('driver', 'gun', [0, -3.0, 14.2]), hp('bridge', 'gun', [0, 1.4, 10.4])],
 };
 
@@ -442,7 +441,7 @@ export const MOTHER_LODE: Blueprint = {
     { name: 'radiator-port', paint: 'secondary', pos: [-0.9, -0.3, -3.8], rot: [0, 0, 190], shape: { kind: 'wing', root: 2.0, tip: 1.2, span: 2.2, sweep: 0.8, thickness: 0.08 } },
     post('mast', 'metal', [0, 1.2, 7.0], 0.06, 0.03, 1.4, 5),
     { name: 'lamp', paint: 'glow', emissive: 1.4, pos: [0, 2.65, 7.0], shape: { kind: 'dome', radius: 0.1, segments: 6 } },
-    turret('pd', [0, 0.35, -2.4], { radius: 0.24, height: 0.26, barrels: 2, barrelLength: 0.7, barrelRadius: 0.035, paint: 'secondary' }).parts[0],
+    turret('pd', [0, 0.35, -2.4], { radius: 0.24, height: 0.26, barrels: 2, barrelLength: 0.7, barrelRadius: 0.035, paint: 'secondary' }),
   ],
   engines: [
     { pos: [0.65, 0.4, -10.4], radius: 0.4, plume: 4.2, mirror: true },

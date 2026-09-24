@@ -24,7 +24,7 @@ export interface AudioShip {
 }
 
 export interface AudioWeaponEvent {
-  readonly kind: 'hit' | 'shield' | 'kill' | 'fire' | 'beam-hit' | 'subsystem' | 'shield-down' | 'shield-up';
+  readonly kind: 'hit' | 'shield' | 'kill' | 'fire' | 'beam-hit' | 'subsystem' | 'shield-down' | 'shield-up' | 'shield-bleed';
   readonly position: Vec3Like;
   readonly ship: AudioShip | null;
   readonly shooter: AudioShip | null;

@@ -16,8 +16,8 @@ import {
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CelMaterial } from '@/render/materials/CelMaterial';
 import { GlowMaterial } from '@/render/materials/GlowMaterial';
-import type { Articulation, Blueprint, Hardpoint, Livery, Paint, Part, Vec3 } from './Blueprint';
-import { buildShapeParts, flipWinding } from './HullKit';
+import type { Articulation, Blueprint, Hardpoint, Livery, Paint, Part, TurretRigDef, Vec3 } from './Blueprint';
+import { buildShapeParts, flipWinding, turretSplit, type ShapeParts } from './HullKit';
 import { FACTIONS } from './Factions';
 
 /** Surface presets per paint slot: [emissive, gloss]. */
@@ -55,6 +55,43 @@ export interface ArticulationNode {
   angle: number;
 }
 
+/**
+ * A rigged turret (every 'turret'-shape part with a socket): a traverse joint
+ * named after the socket (base + housing) and an elevation joint
+ * `${socket}/el` under it (mantlet + barrels). Geometry is in the ship-root
+ * frame, metres, rest pose — the sim's turret drive (src/sim/TurretRig.ts)
+ * works from these numbers alone, never from the scene graph.
+ */
+export interface TurretRigInfo {
+  socket: string;
+  /** Traverse joint id (= socket id); + angle turns right-handed about `up`. */
+  yaw: string;
+  /** Elevation joint id; + angle raises the guns off the mount plane. */
+  pitch: string;
+  /** Turret origin on the deck (the socket). */
+  base: Vector3;
+  /** Mount normal (unit). */
+  up: Vector3;
+  /** Barrel direction at rest (unit, in the mount plane). */
+  fwd: Vector3;
+  /** Trunnion: the elevation pivot. */
+  pivot: Vector3;
+  /** Muzzle of each barrel at rest. */
+  tips: Vector3[];
+  /** Base-ring radius (m): heavier mounts train slower. */
+  radius: number;
+  /** Traverse limits relative to rest, radians (right-handed about `up`). */
+  traverse: [number, number];
+  /** Elevation limits above the mount plane, radians. */
+  elevation: [number, number];
+}
+
+/** Elevation joint id of a rigged turret. */
+export const pitchJointId = (socket: string): string => `${socket}/el`;
+
+const RIG_TRAVERSE: [number, number] = [-180, 180];
+const RIG_ELEVATION: [number, number] = [-8, 80];
+
 export interface ShipModel {
   blueprint: Blueprint;
   root: Group;
@@ -67,6 +104,8 @@ export interface ShipModel {
   sockets: Map<string, Object3D>;
   /** Articulated joints by id (authored ids plus mirrored `.L` twins). */
   articulations: Map<string, ArticulationNode>;
+  /** Rigged turrets by socket id. */
+  turrets: Map<string, TurretRigInfo>;
   /** Bounding radius in metres (after scale). */
   radius: number;
   length: number;
@@ -228,7 +267,84 @@ export function buildShip(bp: Blueprint, liveryOverride?: Partial<Livery>): Ship
   let nextRegion = bp.parts.length + 1;
   const socketDrafts: { id: string; kind: Hardpoint['kind']; matrix: Matrix4; joint?: string }[] = [];
 
+  const turrets = new Map<string, TurretRigInfo>();
+  /** Traverse + elevation joints for one turret copy (ship matrix `mm`, maybe mirrored). */
+  const rigTurret = (sid: string, mm: Matrix4, rig: TurretRigDef, tips: Vector3[], pivotLocal: Vector3, radius: number): { yaw: string; pitch: string } => {
+    if (joints.has(sid)) throw new Error(`ShipBuilder: ${bp.id} turret "${sid}" clashes with a joint of the same id`);
+    const up = new Vector3(0, 1, 0).transformDirection(mm);
+    const fwd = new Vector3(0, 0, 1).transformDirection(mm);
+    const side = new Vector3().crossVectors(up, fwd).normalize();
+    const base = new Vector3().setFromMatrixPosition(mm);
+    const pivot = pivotLocal.clone().applyMatrix4(mm);
+    const [t0, t1] = rig.traverse ?? RIG_TRAVERSE;
+    const tr: [number, number] = mm.determinant() < 0 ? [-t1, -t0] : [t0, t1];
+    const el = rig.elevation ?? RIG_ELEVATION;
+    const pid = pitchJointId(sid);
+    const yawDef: Articulation = { id: sid, pivot: base.toArray(), axis: up.toArray(), range: tr, channel: 'turret', mirror: false };
+    const pitchDef: Articulation = { id: pid, pivot: pivot.toArray(), axis: side.clone().negate().toArray(), parent: sid, range: el, channel: 'elevation', mirror: false };
+    joints.set(sid, { id: sid, def: yawDef, pivot: base.clone(), axis: up.clone(), isTwin: false, geos: [] });
+    joints.set(pid, { id: pid, def: pitchDef, pivot: pivot.clone(), axis: side.clone().negate(), parent: sid, isTwin: false, geos: [] });
+    const k = new Vector3().setFromMatrixScale(mm).x * scale;
+    const rad = MathUtils.degToRad;
+    turrets.set(sid, {
+      socket: sid,
+      yaw: sid,
+      pitch: pid,
+      base: base.multiplyScalar(scale),
+      up,
+      fwd,
+      pivot: pivot.multiplyScalar(scale),
+      tips: tips.map((t) => t.clone().applyMatrix4(mm).multiplyScalar(scale)),
+      radius: radius * k,
+      traverse: [rad(tr[0]), rad(tr[1])],
+      elevation: [rad(el[0]), rad(el[1])],
+    });
+    return { yaw: sid, pitch: pid };
+  };
+
   bp.parts.forEach((part, index) => {
+    const sh = part.shape;
+    if (sh.kind === 'turret' && part.socket?.kind === 'turret' && part.rig !== false && part.articulation === undefined) {
+      // Rigged turret: the mount on a traverse joint, the guns on an elevation joint under it.
+      const split = turretSplit(sh.radius, sh.height, sh.barrels, sh.barrelLength, sh.barrelRadius, sh.housing);
+      const pal: Livery = part.livery ? FACTIONS[part.livery].livery : livery;
+      const mainColor = new Color(part.color ?? pal[part.paint]);
+      const [em, gl] = PAINT_SURFACE[part.paint];
+      const trimPaint = part.trim ?? part.paint;
+      const [tEm, tGl] = PAINT_SURFACE[trimPaint];
+      const trimColor = new Color(part.trim ? pal[part.trim] : (part.color ?? pal[part.paint]));
+      const gunRegion = nextRegion++;
+      const trimRegion = nextRegion++;
+      const paintOf = (sp: ShapeParts, mm: Matrix4, region: number): BufferGeometry[] => {
+        const flip = mm.determinant() < 0;
+        const out: BufferGeometry[] = [];
+        const add = (g: BufferGeometry, color: Color, surf: [number, number, number, number]) => {
+          const c = g.clone();
+          c.applyMatrix4(mm);
+          if (flip) flipWinding(c);
+          paintGeometry(c, color, surf);
+          out.push(normaliseAttributes(c));
+        };
+        add(sp.main, mainColor, [region, part.emissive ?? em, part.gloss ?? gl, part.shade ?? 0]);
+        if (sp.trim) add(sp.trim, trimColor, [trimRegion, tEm, tGl, part.shade ?? 0]);
+        return out;
+      };
+      const count = Math.max(1, Math.floor(part.repeat?.count ?? 1));
+      for (let i = 0; i < count; i++) {
+        const m = repeatMatrix(part, i).multiply(partMatrix(part));
+        const region = part.group ?? (i === 0 ? 1 + index : nextRegion++);
+        const base = count > 1 ? `${part.socket.id}-${i}` : part.socket.id;
+        const copies: [string, Matrix4][] = [[base, m]];
+        if (part.mirror) copies.push([`${base}.L`, MIRROR.clone().multiply(m)]);
+        for (const [sid, mm] of copies) {
+          const j = rigTurret(sid, mm, part.rig || {}, split.tips, split.pivot, sh.radius);
+          joints.get(j.yaw)!.geos.push(...paintOf(split.mount, mm, region));
+          joints.get(j.pitch)!.geos.push(...paintOf(split.guns, mm, gunRegion));
+          socketDrafts.push({ id: sid, kind: part.socket.kind, matrix: mm, joint: j.yaw });
+        }
+      }
+      return;
+    }
     const shape = buildShapeParts(part.shape);
     const pal: Livery = part.livery ? FACTIONS[part.livery].livery : livery;
     const mainColor = new Color(part.color ?? pal[part.paint]);
@@ -240,6 +356,13 @@ export function buildShip(bp: Blueprint, liveryOverride?: Partial<Livery>): Ship
     const twin = joint ? joints.get(joint)!.twin : undefined;
     const count = Math.max(1, Math.floor(part.repeat?.count ?? 1));
     const trimRegion = shape.trim ? nextRegion++ : 0;
+    // A fixed gun in a turret housing (a chin gun) fires from its muzzle, not the base ring.
+    let muzzle: Matrix4 | null = null;
+    if (sh.kind === 'turret' && part.socket && part.socket.kind !== 'turret') {
+      const t = turretSplit(sh.radius, sh.height, sh.barrels, sh.barrelLength, sh.barrelRadius, sh.housing).tips;
+      const c = t.reduce((a, v) => a.add(v), new Vector3()).divideScalar(t.length);
+      muzzle = new Matrix4().makeTranslation(c.x, c.y, c.z);
+    }
 
     for (let i = 0; i < count; i++) {
       const m = repeatMatrix(part, i).multiply(partMatrix(part));
@@ -262,7 +385,7 @@ export function buildShip(bp: Blueprint, liveryOverride?: Partial<Livery>): Ship
       bucket(joint).push(...pieces);
       if (part.socket) {
         const sid = count > 1 ? `${part.socket.id}-${i}` : part.socket.id;
-        socketDrafts.push({ id: sid, kind: part.socket.kind, matrix: m, joint });
+        socketDrafts.push({ id: sid, kind: part.socket.kind, matrix: muzzle ? m.clone().multiply(muzzle) : m, joint });
       }
 
       if (part.mirror) {
@@ -275,7 +398,7 @@ export function buildShip(bp: Blueprint, liveryOverride?: Partial<Livery>): Ship
         }
         if (part.socket) {
           const sid = count > 1 ? `${part.socket.id}-${i}.L` : `${part.socket.id}.L`;
-          socketDrafts.push({ id: sid, kind: part.socket.kind, matrix: MIRROR.clone().multiply(m), joint: target });
+          socketDrafts.push({ id: sid, kind: part.socket.kind, matrix: MIRROR.clone().multiply(muzzle ? m.clone().multiply(muzzle) : m), joint: target });
         }
       }
     }
@@ -419,6 +542,7 @@ export function buildShip(bp: Blueprint, liveryOverride?: Partial<Livery>): Ship
     engines,
     sockets,
     articulations,
+    turrets,
     radius: Math.sqrt(r2) * scale,
     length: (box.max.z - box.min.z) * scale,
     triangles,

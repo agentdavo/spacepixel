@@ -141,7 +141,7 @@ export const LONGHAUL: Blueprint = {
     { name: 'radiator', paint: 'dark', mirror: true, pos: [1.25, 0.2, -7.8], rot: [0, 0, 15], shape: { kind: 'wing', root: 2.4, tip: 1.6, span: 2.2, sweep: 0.6, thickness: 0.08 } },
     bell('bell', [0.62, 0, -11.2], 0.55, 0.8, true),
     { name: 'nav-light', paint: 'glow', emissive: 1.5, mirror: true, pos: [1.72, 1.95, 11.6], shape: { kind: 'box', w: 0.08, h: 0.1, d: 0.2 } },
-    turret('pd', [0, 1.13, -8.6], { radius: 0.2, height: 0.22, barrels: 1, barrelLength: 0.5, barrelRadius: 0.035, paint: 'secondary', yaw: 180 }).parts[0],
+    turret('pd', [0, 1.13, -8.6], { radius: 0.2, height: 0.22, barrels: 1, barrelLength: 0.5, barrelRadius: 0.035, paint: 'secondary', yaw: 180, traverse: [-130, 130] }),
   ],
   engines: [{ pos: [0.62, 0, -11.65], radius: 0.48, plume: 4.5, mirror: true }],
   hardpoints: [hp('dock', 'hangar', [0, -1.25, 11.0], { rot: [90, 0, 0] }), hp('bridge', 'gun', [0, 1.9, 12.3])],

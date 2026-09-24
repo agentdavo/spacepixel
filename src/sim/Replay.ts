@@ -98,7 +98,8 @@ export function quantizeControls(c: ControlState): ControlState {
   return c;
 }
 
-const BUTTONS = ['afterburner', 'flightAssistToggle', 'fire', 'missile', 'nextTarget', 'cruise', 'cycleGun', 'cycleMissile', 'cycleSub'] as const;
+// Append only: a tape stores these as bit flags in this order (bits past the end read as unpressed on old tapes).
+const BUTTONS = ['afterburner', 'flightAssistToggle', 'fire', 'missile', 'nextTarget', 'cruise', 'cycleGun', 'cycleMissile', 'cycleSub', 'cycleSubBack', 'pickSub'] as const;
 
 function buttonsOf(c: ControlState): number {
   let b = 0;

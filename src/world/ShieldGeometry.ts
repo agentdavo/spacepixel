@@ -1,5 +1,5 @@
 import { Quaternion, Vector3 } from 'three';
-import { facingOf, type DamageState } from '@/sim/Damage';
+import { facingOf, facingStrength, type DamageState } from '@/sim/Damage';
 import type { ShipEntity } from '@/sim/Fleet';
 
 /**
@@ -168,6 +168,6 @@ export function sampleFacing(s: ShipEntity, f: number, rand: () => number, out: 
 /** Remaining strength of a facing, 0..1 (−1 / no facings = the whole shield pool). */
 export function facingFrac(s: ShipEntity, f: number): number {
   const st = s.combat.dmg;
-  if (f >= 0 && f < st.facings.length && st.facingMax > 0) return Math.min(1, Math.max(0, st.facings[f] / st.facingMax));
+  if (f >= 0 && f < st.facings.length) return facingStrength(st, f);
   return s.shieldMax > 0 ? Math.min(1, Math.max(0, s.shield / s.shieldMax)) : 0;
 }

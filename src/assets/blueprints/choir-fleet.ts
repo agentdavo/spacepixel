@@ -270,6 +270,7 @@ export const VESPER: Blueprint = {
         pos: [0.62, shoulderY(VS_HULL, z, 0.62) - 0.02, z],
         rot: [0, i ? -20 : 15, -18],
         socket: { id: `emitter-${i}`, kind: 'turret' },
+        rig: { traverse: [-110, 160] }, // not across the spine
         shape: { kind: 'turret', radius: 0.26, height: 0.28, barrels: 1, barrelLength: 0.8, barrelRadius: 0.06 },
       }),
     ),
@@ -427,6 +428,7 @@ export const CATHEDRAL: Blueprint = {
         pos: [x, topAt(NAVE, z) - 0.02, z],
         rot: [0, 18 + (i % 3) * 14, 0],
         socket: { id: `battery-${i}`, kind: 'turret' },
+        rig: { traverse: [-45, 150] }, // the spires mask inboard
         shape: { kind: 'turret', radius: 0.26, height: 0.3, barrels: 2, barrelLength: 0.75, barrelRadius: 0.045 },
       };
     }),

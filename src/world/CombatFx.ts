@@ -79,7 +79,7 @@ const COLUMNS = 16;
 const CUTS = 16;
 
 /** Subsystem blast scale by kind (× its routing radius): hangars, engines and generators go up hardest. */
-const SUB_BLAST: Record<SubsystemKind, number> = { turret: 1, lance: 1.2, bridge: 1.35, shieldGen: 1.6, hangar: 1.9, engine: 2 };
+const SUB_BLAST: Record<SubsystemKind, number> = { turret: 1, lance: 1.2, bridge: 1.35, shieldEmitter: 1.3, shieldGen: 1.6, hangar: 1.9, engine: 2 };
 
 const _p = new Vector3();
 const _v = new Vector3();
@@ -148,6 +148,7 @@ export class CombatFx {
           this.hullHit(e, true);
           break;
         case 'shield':
+        case 'shield-bleed':
           this.shieldHit(e);
           break;
         case 'shield-down':
@@ -474,7 +475,8 @@ export class CombatFx {
     const st = s.combat.dmg;
     const mul = SUB_BLAST[sub.kind] ?? 1;
     const r = sub.radius * mul;
-    const pal = sub.kind === 'shieldGen' ? PAL.PLASMA : paletteOf(s);
+    const gen = sub.kind === 'shieldGen' || sub.kind === 'shieldEmitter';
+    const pal = gen ? PAL.PLASMA : paletteOf(s);
     const v = s.flight.velocity;
     _p.set(sub.x, sub.y, sub.z).applyQuaternion(s.flight.orientation).add(s.flight.position);
     // Outward: the hit normal if it has one, else away from the hull's long axis.
@@ -482,7 +484,7 @@ export class CombatFx {
     else _n.set(sub.x - st.cx, (sub.y - st.cy) * 1.5 + st.halfH * 0.2, 0).normalize().applyQuaternion(s.flight.orientation);
     subsystemBurst(fx, _p, _n, v, r, pal);
     fx.explosion(_v.copy(_p).addScaledVector(_n, r * 0.3), v, r * 0.9, pal);
-    if (sub.kind === 'shieldGen') arcs(fx, _p, _n, v, r * 0.5, 8, PAL.PLASMA, 0.8);
+    if (gen) arcs(fx, _p, _n, v, r * 0.5, 8, PAL.PLASMA, 0.8);
     if (!live) return;
     this.decals.add(s, _p, _n, DECAL.CRATER, r * 0.7, 6);
     // Secondaries: two pops (three for the big ones) around the socket.
@@ -516,7 +518,7 @@ export class CombatFx {
     c.nz = _d.z;
     c.r = r;
     c.pal = pal;
-    c.arcs = sub.kind === 'shieldGen';
+    c.arcs = gen;
   }
 
   private stepPops(dt: number): void {
