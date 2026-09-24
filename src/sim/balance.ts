@@ -4,9 +4,13 @@ import { Weapons } from './Weapons';
 import { Missiles } from './Missiles';
 import { Capitals } from './Capitals';
 import { chooseGun, gunOf, leadSpeedOf, subsystemPosition, toUniverse } from './Combat';
-import { GUNS, MISSILES, type GunId } from './Loadouts';
+import { GUNS, MISSILES, SHIP_STATS, type GunId } from './Loadouts';
 import { leadPoint } from './ai/Pilot';
 import type { Check, ScenarioResult } from './ai/sim';
+import { CATALOG_BY_ID } from '@/game/shipyard/catalog';
+import { computeFit, slotsFor, stockFit, type Fit } from '@/game/outfitting/fit';
+import { applyFit } from '@/game/outfitting/apply';
+import { ShipTurrets } from '@/game/outfitting/turrets';
 
 /**
  * Headless combat balance (`npm run balance`): the real weapons, missiles
@@ -429,6 +433,122 @@ export function effectsScenario(): ScenarioResult {
   };
 }
 
+// ── outfitting: fitted player hulls vs AI warships ──────────────────
+
+/** A "good" dockside fit: Mk III guns, turrets, shield, plate and reactor (legal on the power budget). */
+export function goodFit(hullId: string): Fit {
+  const e = CATALOG_BY_ID[hullId];
+  const fit = { ...stockFit(e) };
+  for (const s of slotsFor(e)) {
+    const id = fit[s.id];
+    if (!id) continue;
+    if (s.kind === 'gun' || s.kind === 'turret' || s.kind === 'missile' || s.kind === 'shield' || s.kind === 'armour' || s.kind === 'reactor') fit[s.id] = id.replace(/-mk\d$/, '-mk3');
+  }
+  return fit;
+}
+
+export interface DuelOut {
+  /** Seconds to kill the target (Infinity = didn't). */
+  t: number;
+  /** Attacker hull left, 0..1 (0 = lost). */
+  hullLeft: number;
+  power: { draw: number; output: number };
+  torps: number;
+}
+
+/**
+ * A fitted player hull (scripted helm: holds a standoff and keeps the bow —
+ * and the spinal gun — on the target, aim σ = 0.6% of range) against an AI
+ * warship registered with Capitals, whose turrets and lances fire back.
+ * The attacker's turrets are the real outfitting system (assisted aim,
+ * FREE); torpedoes go in on reload.
+ */
+export function fittedDuel(hullId: string, fit: Fit, targetBp: string, range = 1500, maxT = 300, seeds = [31, 47, 59, 73]): DuelOut {
+  // Capitals draws on Math.random (turret cadence, scatter): seed it so the bands are repeatable,
+  // and average a few seeds (a capital duel is chaotic: facings, torpedo intercepts).
+  const random = Math.random;
+  Math.random = rand;
+  try {
+    const runs = seeds.map((sd) => duelInner(hullId, fit, targetBp, range, maxT, sd));
+    const mean = (f: (d: DuelOut) => number) => runs.reduce((n, d) => n + f(d), 0) / runs.length;
+    return { t: mean((d) => d.t), hullLeft: mean((d) => d.hullLeft), power: runs[0].power, torps: Math.round(mean((d) => d.torps)) };
+  } finally {
+    Math.random = random;
+  }
+}
+
+function duelInner(hullId: string, fit: Fit, targetBp: string, range: number, maxT: number, sd: number): DuelOut {
+  seed = sd;
+  const w = world();
+  const turrets = new ShipTurrets(w.fleet, w.weapons, w.capitals);
+  const tgt = w.fleet.spawn(targetBp, targetBp.startsWith('choir') ? 'choir' : 'concord', ORIGIN.clone(), new Vector3(1, 0, 0));
+  tgt.team = 'renegade';
+  w.capitals.register(tgt, { launchBlueprint: null });
+  const e = CATALOG_BY_ID[hullId];
+  const pos = ORIGIN.clone().add(new Vector3(0, range * 0.12, range));
+  const sh = w.fleet.spawn(e.blueprint, 'concord', pos, new Vector3(0, 0, -1), { isPlayer: true });
+  const r = applyFit(sh, e, fit);
+  sh.target = tgt;
+  const torp = sh.combat.loadout.missiles.indexOf('torpedo');
+  if (torp >= 0) sh.combat.missile = torp;
+  const zero = new Vector3();
+  const aim = new Vector3();
+  let torps = 0;
+  let t = 0;
+  for (; t < maxT && tgt.alive && sh.alive; t += DT) {
+    tgt.flight.velocity.set(0, 0, 0);
+    tgt.flight.position.copy(ORIGIN);
+    sh.flight.position.copy(pos);
+    hold(sh, zero);
+    // Walk fire along the hull a little (a pilot raking the plating).
+    toUniverse(tgt, tgt.combat.dmg.cx + Math.sin(t * 0.7) * tgt.combat.dmg.halfW * 0.3, tgt.combat.dmg.cy, tgt.combat.dmg.cz + Math.sin(t * 0.37) * tgt.combat.dmg.halfL * 0.5, aim);
+    if (sh.combat.loadout.guns.length) {
+      chooseGun(sh, tgt);
+      aimAndFire(sh, aim, zero, range * 0.006);
+    } else faceAlong(sh.flight.orientation, _b.subVectors(aim, sh.flight.position).normalize());
+    if (torp >= 0 && sh.combat.missileReload <= 0 && w.missiles.salvo(sh, tgt)) torps++;
+    w.capitals.step(DT);
+    turrets.step(DT, tgt);
+    w.fleet.step(DT);
+    w.weapons.step(DT);
+    w.missiles.step(DT);
+  }
+  return { t: tgt.alive ? Infinity : t, hullLeft: sh.alive ? sh.hull / sh.hullMax : 0, power: r.power, torps };
+}
+
+export function outfitScenario(): ScenarioResult {
+  const resGood = fittedDuel('cr5-resolute', goodFit('cr5-resolute'), 'ffc-lantern-guard');
+  const resStock = fittedDuel('cr5-resolute', stockFit(CATALOG_BY_ID['cr5-resolute']), 'ffc-lantern-guard');
+  const valGood = fittedDuel('ffl3-valiant', goodFit('ffl3-valiant'), 'choir-vesper', 1800);
+  const valStock = fittedDuel('ffl3-valiant', stockFit(CATALOG_BY_ID['ffl3-valiant']), 'choir-vesper', 1800);
+  const bulGood = fittedDuel('gs12-bulwark', goodFit('gs12-bulwark'), 'ffc-lantern-guard', 1200, 400);
+  const fmt = (d: DuelOut) => `${d.t.toFixed(1)} s · hull left ${(d.hullLeft * 100).toFixed(0)}% · ${d.torps} torpedoes · ${d.power.draw}/${d.power.output} MW`;
+  // The stock Kestrel through the fit layer is the legacy Kestrel, number for number.
+  const k = CATALOG_BY_ID['vf27-kestrel'];
+  const kf = computeFit(k, stockFit(k));
+  const legacy = kf.stats.hull === SHIP_STATS['vf27-kestrel'].hull && kf.stats.shield === SHIP_STATS['vf27-kestrel'].shield && kf.loadout.guns.join() === 'laser,autocannon';
+  return {
+    name: 'outfitting: fitted hulls vs AI warships (scripted helm at standoff, turrets live on both sides)',
+    metrics: {
+      resoluteGoodVsLanternGuard: fmt(resGood),
+      resoluteStockVsLanternGuard: fmt(resStock),
+      valiantGoodVsVesper: fmt(valGood),
+      valiantStockVsVesper: fmt(valStock),
+      bulwarkGoodVsLanternGuard: fmt(bulGood),
+    },
+    checks: [
+      check('Resolute (Mk III fit) solo kills a Lantern Guard (s)', resGood.t, '60..120', resGood.t >= 60 && resGood.t <= 120),
+      check('… and survives (hull left %)', resGood.hullLeft * 100, '> 10', resGood.hullLeft > 0.1),
+      check('Mk III fit beats stock (s faster)', resStock.t - resGood.t, '> 0', resStock.t > resGood.t),
+      check('Valiant (Mk III fit) wins a duel with a Vesper (s)', valGood.t, '20..120', valGood.t >= 20 && valGood.t <= 120),
+      check('… and survives (hull left %)', valGood.hullLeft * 100, '> 10', valGood.hullLeft > 0.1),
+      check('good fits are legal on the power budget', Math.max(resGood.power.draw - resGood.power.output, valGood.power.draw - valGood.power.output), '<= 0', resGood.power.draw <= resGood.power.output && valGood.power.draw <= valGood.power.output),
+      check('stock Kestrel through the fit layer = legacy Kestrel', legacy ? 1 : 0, '== 1', legacy),
+      info('Bulwark (Mk III) vs Lantern Guard (s)', bulGood.t, `gunship: not what it is for · hull left ${(bulGood.hullLeft * 100).toFixed(0)}%`),
+    ],
+  };
+}
+
 void GUNS;
 
 const SCENARIOS: [string, () => ScenarioResult][] = [
@@ -437,6 +557,7 @@ const SCENARIOS: [string, () => ScenarioResult][] = [
   ['turret', turretScenario],
   ['capital', capitalScenario],
   ['effects', effectsScenario],
+  ['outfit', outfitScenario],
 ];
 
 export function runAll(filter = ''): ScenarioResult[] {

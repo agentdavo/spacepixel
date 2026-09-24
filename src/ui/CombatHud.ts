@@ -33,6 +33,10 @@ export class CombatHud {
   private w = 1;
   private h = 1;
   private dpr = 1;
+  /** Fitted turrets (shipyard hulls): set each frame by the flight scene; null = none. */
+  turrets: { mounts: number; engaged: number; mode: 'free' | 'target' | 'hold'; pd: boolean } | null = null;
+  /** Hangar complement launched / total; null = no hangar. */
+  hangar: { up: number; total: number } | null = null;
 
   constructor(root: HTMLElement) {
     this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
@@ -85,6 +89,19 @@ export class CombatHud {
     const cs = p.combat;
     c.fillStyle = 'rgba(0,10,6,0.45)';
     c.fillRect(x - 12, y - 18, 240, 126);
+    const tu = this.turrets;
+    const hg = this.hangar;
+    if (tu || hg) {
+      // Outfitted hulls: turret discipline [H] and the hangar complement, above the block.
+      c.fillStyle = 'rgba(0,10,6,0.45)';
+      c.fillRect(x - 12, y - 42, 240, 22);
+      let t = '';
+      if (tu && tu.mounts) t += `[H] TURRETS ${tu.engaged}/${tu.mounts} ${tu.mode === 'free' ? 'FREE' : tu.mode === 'target' ? 'TGT' : 'HOLD'}`;
+      if (tu?.pd) t += `${t ? ' · ' : ''}PD`;
+      if (hg) t += `${t ? ' · ' : ''}BAY ${hg.up}/${hg.total}`;
+      c.fillStyle = tu?.mode === 'hold' ? AMBER : GREEN;
+      c.fillText(t, x, y - 26);
+    }
     c.fillStyle = GREEN;
     if (gun) {
       c.fillText(`[R] ${gun.name}`, x, y);

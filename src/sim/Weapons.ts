@@ -70,6 +70,8 @@ export interface Beam {
   gun: GunSpec | null;
 }
 
+const GUN_SOCKETS = ['gun', 'gun.L'];
+
 /** The Directorate pulse laser (kept for callers that want "the" default gun). */
 export const LASER: GunSpec = GUNS.laser;
 
@@ -170,7 +172,12 @@ export class Weapons {
       this.cooldown.set(s.id, Math.max(cd, 0));
       return;
     }
-    const sockets = ['gun', 'gun.L'].filter((n) => s.model.sockets.has(n));
+    // Outfitted ships name the sockets per gun (src/game/outfitting); else the classic twin mount.
+    const lo = s.combat.loadout;
+    const gi = lo.guns.length ? s.combat.gun % lo.guns.length : 0;
+    const mul = lo.gunMul?.[gi] ?? 1;
+    const rate = gun.rate * (lo.gunRate?.[gi] ?? 1);
+    const sockets = (lo.gunSockets?.[gi] ?? GUN_SOCKETS).filter((n) => s.model.sockets.has(n));
     const side = (this.gunSide.get(s.id) ?? 0) + 1;
     this.gunSide.set(s.id, side);
     const name = sockets.length ? sockets[side % sockets.length] : null;
@@ -179,10 +186,10 @@ export class Weapons {
     s.flight.forward(_f);
     if (gun.beam) {
       const sock = ['lance', 'harp'].find((n) => s.model.sockets.has(n)) ?? name;
-      const b = this.fireBeam(s, sock, gun.beam.length, gun.beam.width, gun.beam.duration, gun.beam.dps, gun.type);
+      const b = this.fireBeam(s, sock, gun.beam.length, gun.beam.width, gun.beam.duration, gun.beam.dps * mul, gun.type);
       b.gun = gun;
       this.emit('fire', _a, _f, s.flight.velocity, null, s, gun);
-      this.cooldown.set(s.id, Math.max(cd, 0) + 1 / gun.rate);
+      this.cooldown.set(s.id, Math.max(cd, 0) + 1 / rate);
       return;
     }
     const spread = gun.spread + s.combat.fx.gunSpread;
@@ -194,10 +201,10 @@ export class Weapons {
         _u.addScaledVector(_s, Math.tan(spread) * Math.sqrt(this.rand())).normalize();
       }
       _d.copy(_u).multiplyScalar(gun.speed * (gun.pellets > 1 ? 0.94 + this.rand() * 0.12 : 1)).add(s.flight.velocity);
-      this.spawnBolt(_a, _d, gun.life, gun.damage, s, gun);
+      this.spawnBolt(_a, _d, gun.life, gun.damage * mul, s, gun);
     }
     this.emit('fire', _a, _f, _d, null, s, gun);
-    this.cooldown.set(s.id, cd + 1 / gun.rate);
+    this.cooldown.set(s.id, cd + 1 / rate);
   }
 
   spawnBolt(pos: Vector3, vel: Vector3, life: number, damage: number, owner: ShipEntity, gun: GunSpec = GUNS.laser): void {

@@ -39,6 +39,10 @@ import { FlightRadio } from '@/dialog/FlightRadio';
 import { loadLedger, saveLedger } from '@/game/Profile';
 import { MISSILE_MAX, cargoUsed, dockingClearance, reputationForKill, type EconFaction, type TradeLedger } from '@/game/economy';
 import { ContractDesk, type PriorityInfo } from '@/game/contracts/ContractDesk';
+import { Outfitter, bindOutfitter } from '@/game/outfitting/Outfitter';
+import { ShipTurrets } from '@/game/outfitting/turrets';
+import '@/ui/ShipyardTab'; // registers the SHIPYARD dock tab (hulls, your hangar)
+import '@/ui/OutfittingTab'; // registers the OUTFITTING dock tab (slots, items, power)
 
 /**
  * Milestones 4–6 + 10–11: one ship flying well, then shooting.
@@ -71,7 +75,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   readonly fleet = new Fleet(this.world.root);
   readonly weapons = new Weapons(this.fleet);
   readonly missiles = new Missiles(this.fleet);
-  readonly player: ShipEntity;
+  /** The pilot's ship; replaced when the shipyard swaps hulls (see swapPlayer). */
+  player: ShipEntity;
   readonly chase = new ChaseCamera(this.camera);
   readonly director = new CameraDirector(this.camera, this.chase);
   readonly lock: LockState = { target: null, progress: 0, locked: false };
@@ -155,6 +160,10 @@ export class FlightScene implements GameScene, FlightHostScene {
   private wingDock = new WingDocking();
   /** Free-roam contracts: board, accepted jobs, live operations (src/game/contracts). */
   readonly contracts: ContractDesk;
+  /** Shipyard & outfitting: owned hulls, fits, the active ship (src/game/outfitting). */
+  readonly outfit = new Outfitter();
+  /** Fitted turrets, point defence and hangar complements on non-capital hulls. */
+  readonly turrets: ShipTurrets;
 
   constructor() {
     this.systemId = this.universe.start;
@@ -167,6 +176,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.paintPlanes();
     }
     this.capitals = new Capitals(this.fleet, this.weapons);
+    this.turrets = new ShipTurrets(this.fleet, this.weapons, this.capitals);
 
     // Start 2.6 km short of the first Lantern, flying at it.
     const gate0 = this.view.gates[0];
@@ -174,16 +184,19 @@ export class FlightScene implements GameScene, FlightHostScene {
     const ORIGIN = gate0.center.clone().addScaledVector(fwd, -2600).add(new Vector3(0, -60, 0));
     const GATE = gate0.center;
     const profile = loadProfile();
-    this.player = this.fleet.spawn('vf27-kestrel', 'concord', ORIGIN, fwd, { isPlayer: true, name: 'Vanguard 1' }, profile.livery);
+    // The active hull from the hangar with its fit (old saves: a stock Kestrel).
+    this.player = this.outfit.spawn(this.fleet, ORIGIN, fwd, profile.livery, { isPlayer: true, name: 'Vanguard 1' });
     this.player.controls = input.state; // the player's controls ARE the input
-    this.player.flight.velocity.copy(fwd).multiplyScalar(150);
+    this.player.flight.velocity.copy(fwd).multiplyScalar(Math.min(150, this.player.flight.spec.maxSpeed * 0.7));
     this.player.flight.throttle = 0.7;
+    const wingK = Math.max(1, this.player.model.length / 40);
 
     [new Vector3(-46, -7, -34), new Vector3(52, 6, -50)].forEach((slot, i) => {
+      slot.multiplyScalar(wingK);
       const ship = this.fleet.spawn('vf27-kestrel', 'concord', slot.clone().add(ORIGIN), fwd, { name: `Vanguard ${i + 2}` });
       this.wingmen.push({ ship, slot });
     });
-    setFormation(this.wingmen.map((w) => w.ship), 'fingerFour', 40);
+    setFormation(this.wingmen.map((w) => w.ship), 'fingerFour', 40 * wingK);
     issueOrder(this.wingmen.map((w) => w.ship), 'formUp', this.player);
     for (let i = 0; i < 3; i++) {
       const pos = GATE.clone().add(new Vector3((i - 1) * 300, 80 * i, 600));
@@ -205,8 +218,9 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.scene.add(this.combatFx.fx.object);
     this.hulls = new HullCollisions(this.fleet, () => (this.fxOn ? this.combatFx.fx : null));
 
+    this.outfit.frame(this.player, this.chase, this.camera);
     this.chase.snap(this.player.flight);
-    this.playerSubject = { position: this.player.flight.position, velocity: this.player.flight.velocity, radius: 9 };
+    this.playerSubject = { position: this.player.flight.position, velocity: this.player.flight.velocity, radius: Math.max(9, this.player.radius) };
     if (flags.demo) {
       setAutopilot(this.player, true);
       input.override = demoMissiles(this);
@@ -264,6 +278,9 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.starMap.toggle();
     }
     this.contracts = new ContractDesk(this);
+    this.outfit.bind(this);
+    bindOutfitter(this.outfit);
+    this.outfit.settle(); // hold size, hangar complement
     // ?dock=approach|auto|docked|launch [&station=<id|index>] [&cargo=demo]: docking captures.
     if (q.get('dock')) this.dockFlag(q.get('dock')!, q.get('station') ?? '', q.get('cargo') === 'demo');
     // ?contract=<kind>&cphase=board|op|pay|map: contract captures.
@@ -320,6 +337,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       updateAI(this.fleet, dt, time, this.hulls.obstacles);
       this.wingDock.update(dt, this.docking, this.player, this.fleet, this.hulls.obstacles, this.wingOrder);
       this.capitals.step(dt);
+      this.turrets.step(dt, this.lock.target);
       this.campaign?.preStep(dt);
       this.contracts.preStep(dt);
     }
@@ -442,6 +460,8 @@ export class FlightScene implements GameScene, FlightHostScene {
       const nav = this.docking.phase === 'cleared' ? undefined : this.navGate();
       if (nav) this.hud.drawNav(this.universe.systems.get(nav.link.to)!.name, nav.center, pf.position, this.camera, this.world, time);
     }
+    this.combatHud.turrets = this.turrets.status(this.player);
+    this.combatHud.hangar = this.turrets.hangarStatus(this.player);
     this.combatHud.draw(this.player, this.lock.target, this.camera, this.world, time, !this.tactical && this.jumpPhase === 'none');
     this.hud.drawStatus(this.view.system.name, pf.cruise, this.jumpPhase !== 'none' ? `LANTERN TRANSIT → ${this.universe.systems.get(this.jumpTo)?.name ?? ''}` : '');
     if (this.jumpPhase === 'none' && !this.tactical) this.drawDockHud(time);
@@ -567,6 +587,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     park(this.cathedral);
     park(this.carrier);
     this.cathedral.hull = this.carrier.hull = 0; // keep placeCapitals from reviving them
+    this.outfit.settle(); // episodes fly a fighter: a big active hull stays in the hangar
     // Player: 2.6 km short of the first Lantern (or at the origin of an off-map system).
     const g = this.view.gates[0];
     const pf = this.player.flight;
@@ -802,6 +823,10 @@ export class FlightScene implements GameScene, FlightHostScene {
 
   /** Free-roam missiles come off the rails (restock when docked); story episodes are fleet-supplied. */
   private takeMissile(): boolean {
+    if (!this.player.combat.loadout.missiles.length) {
+      this.docking.say('NO MISSILE RACKS FITTED', '#ff5f7a', 2);
+      return false;
+    }
     if (this.campaign) return true;
     if (this.ledger.missiles <= 0) {
       this.docking.say('RAILS EMPTY — REARM AT A STATION OR CARRIER', '#ff5f7a', 3);
@@ -825,6 +850,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.campaign?.runner.onDocked(d.id);
     const notices = this.campaign ? [] : this.contracts.onDocked(d.id);
     this.lock.target = null;
+    this.turrets.recall(this.player);
     this.dockScreen.open({
       notices,
       station: d,
@@ -1042,6 +1068,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     issueOrder(this.wingmen.map((w) => w.ship), 'formUp', this.player);
     this.audio.autoMood = true;
     this.audio.music.setMood('cruise', 3);
+    this.outfit.settle(); // back into the active hull
     if (!this.berthAt(stationId)) this.berthAt(this.contracts.homeStation());
     this.contracts.priority = priority;
     return new Promise((resolve) => {
@@ -1083,6 +1110,11 @@ export class FlightScene implements GameScene, FlightHostScene {
         this.director.cut('lock', target, Infinity);
       } else if (next === 'orbit') this.director.cut('orbit', target ?? this.playerSubject, 4);
       else this.director.cut('flyby', this.playerSubject, 3, this.player.flight);
+    } else if (code === 'KeyH') {
+      if (this.turrets.status(this.player)) {
+        const m = this.turrets.cycleMode();
+        this.docking.say(`TURRETS: ${m === 'free' ? 'FREE — ENGAGE ANY HOSTILE IN ARC' : m === 'target' ? 'MY TARGET ONLY' : 'HOLD FIRE'}`, m === 'hold' ? '#ffc46b' : '#7dffb2', 2.5);
+      }
     } else if (code === 'KeyK') {
       this.cinematic = !this.cinematic;
     } else if (code === 'KeyM') {
@@ -1103,6 +1135,44 @@ export class FlightScene implements GameScene, FlightHostScene {
 
   /** Set by the AI integration to receive wing orders. */
   onWingOrder: ((o: FlightScene['wingOrder']) => void) | null = null;
+
+  // ── Shipyard (OutfitHost) ──────────────────────────────────────────
+  inEpisode(): boolean {
+    return !!this.campaign;
+  }
+
+  /** Put a freshly built hull in the pilot's seat at the old one's pose (shipyard purchase / transfer). */
+  swapPlayer(next: ShipEntity): void {
+    const old = this.player;
+    if (old === next) return;
+    const pf = old.flight;
+    const nf = next.flight;
+    nf.position.copy(pf.position);
+    nf.orientation.copy(pf.orientation);
+    nf.velocity.copy(pf.velocity);
+    nf.throttle = pf.throttle;
+    next.isPlayer = true;
+    next.controls = input.state;
+    next.model.root.visible = old.model.root.visible;
+    this.turrets.drop(old);
+    old.alive = false;
+    old.isPlayer = false;
+    old.model.root.removeFromParent();
+    const i = this.fleet.ships.indexOf(old);
+    if (i >= 0) this.fleet.ships.splice(i, 1);
+    this.player = next;
+    this.docking.setPlayer(next);
+    if (flags.demo) setAutopilot(next, true);
+    this.playerSubject = { position: nf.position, velocity: nf.velocity, radius: Math.max(9, next.radius) };
+    this.audioFrame.player.position = nf.position;
+    this.audioFrame.player.velocity = nf.velocity;
+    this.lock.target = null;
+    const k = Math.max(1, next.model.length / 40);
+    for (const w of this.wingmen) w.slot.normalize().multiplyScalar(60 * k);
+    setFormation(this.wingmen.map((w) => w.ship), 'fingerFour', 40 * k);
+    issueOrder(this.wingmen.map((w) => w.ship), this.wingOrder, next);
+    this.chase.snap(nf);
+  }
 
   cycleCamera(): void {
     this.onKey('KeyV');
