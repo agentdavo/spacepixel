@@ -17,7 +17,7 @@ export interface SpawnDesc {
   to: Vector3 | null;
   /** Inherited velocity (m/s, world axes). Drag pulls the burst velocity toward this. */
   baseVel: Vector3;
-  /** Emission axis (unit or zero). For RING/SHIELD this is the plane normal (zero = face camera). */
+  /** Emission axis (unit or zero). For RING/SHIELD/ARC/SHARD this is the plane normal (zero = face camera). */
   dir: Vector3;
   /** Cone spread: 0 = along dir, 1 = full sphere. */
   spread: number;

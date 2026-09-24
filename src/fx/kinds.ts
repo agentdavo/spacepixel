@@ -26,6 +26,12 @@ export const PK = {
   SHIELD: 8,
   /** Small 4-point glint (missile heads, muzzle pings). */
   GLINT: 9,
+  /** Molten ember: a soft cel blob that cools white → orange → red → dark over its life (laser burns, droplets). */
+  EMBER: 10,
+  /** Crackling electric arc: a jagged bolt re-drawn on twos; lies in the plane of `dir` (harmonic hits crawling over plating / shields). */
+  ARC: 11,
+  /** Flat hexagon tile of a shattered shield, tumbling about its plane (`dir` = initial plane normal). */
+  SHARD: 12,
 } as const;
 
 export type ParticleKind = (typeof PK)[keyof typeof PK];

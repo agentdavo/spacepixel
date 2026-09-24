@@ -47,6 +47,12 @@ export interface WeaponEvent {
   sub: Subsystem | null;
   /** Capital shield facing (shield, shield-down, shield-up); −1 = fighter bubble / n/a. */
   facing: number;
+  /** Damage type of the impact (hit, shield, beam-hit). Presentation only (FX tint, impact sound). */
+  type?: DamageType;
+  /** Raw damage of the impact (per tick for beams). Presentation only (FX scale). */
+  amount?: number;
+  /** beam-hit: the contact point is on a shield (a beam's shield contact is mostly reported as beam-hit). */
+  shielded?: boolean;
 }
 
 export interface Beam {
@@ -114,7 +120,7 @@ export class Weapons {
   constructor(readonly fleet: Fleet) {
     this.rng = fleet.rng.fork('weapons');
     for (let i = 0; i < EVENT_POOL; i++) {
-      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1 });
+      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1, type: undefined, amount: 0, shielded: false });
     }
     fleet.onEvent = (kind, ship, point, normal, shooter, sub, facing) => {
       const e = this.emit(kind, point, normal, ship.flight.velocity, ship, shooter);
@@ -141,6 +147,9 @@ export class Weapons {
     e.gun = gun;
     e.sub = null;
     e.facing = -1;
+    e.type = gun?.type;
+    e.amount = 0;
+    e.shielded = false;
     this.events.push(e);
     return e;
   }
@@ -292,7 +301,11 @@ export class Weapons {
         if (shooter) provoke(hitShip, shooter);
         const r = this.fleet.hit(hitShip, this.damage[i], gun.type, _b, _c, shooter);
         const e = this.emit(r.shielded ? 'shield' : 'hit', _b, _c, _f, hitShip, shooter, gun);
-        if (e) e.facing = r.facing;
+        if (e) {
+          e.facing = r.facing;
+          e.amount = this.damage[i];
+          e.shielded = r.shielded;
+        }
         this.life[i] = 0;
         continue;
       }
@@ -338,6 +351,9 @@ export class Weapons {
         const e = this.emit(r.shielded ? 'shield' : 'beam-hit', b.end, _c, hitShip.flight.velocity, hitShip, b.owner, b.gun);
         if (e) {
           e.facing = r.facing;
+          e.type = b.type;
+          e.amount = b.dps * dt;
+          e.shielded = r.shielded;
           // Beam shield contact is continuous: only flash the ripple now and then.
           if (r.shielded && this.rand() > 0.12) e.kind = 'beam-hit';
         }

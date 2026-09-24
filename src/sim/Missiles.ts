@@ -48,6 +48,10 @@ export interface MissileEvent {
   spec: MissileSpec;
   /** Shot down before reaching its target. */
   intercepted: boolean;
+  /** detonate on a target: a shield layer took the blast (presentation only). */
+  shielded?: boolean;
+  /** detonate on a target: surface normal at the blast (presentation only). */
+  normal?: Vector3;
 }
 
 export interface LockState {
@@ -102,7 +106,7 @@ export class Missiles implements Shootables {
       this.vel.push(new Vector3());
     }
     for (let i = 0; i < 160; i++) {
-      this.eventPool.push({ kind: 'launch', position: new Vector3(), velocity: new Vector3(), index: 0, target: null, shooter: null, spec: MICRO_MISSILE, intercepted: false });
+      this.eventPool.push({ kind: 'launch', position: new Vector3(), velocity: new Vector3(), index: 0, target: null, shooter: null, spec: MICRO_MISSILE, intercepted: false, shielded: false, normal: new Vector3() });
     }
     fleet.ordnance = this;
   }
@@ -111,8 +115,8 @@ export class Missiles implements Shootables {
     return this.rng.next();
   }
 
-  private emit(kind: MissileEvent['kind'], i: number, intercepted = false): void {
-    if (this.events.length >= this.eventPool.length) return;
+  private emit(kind: MissileEvent['kind'], i: number, intercepted = false): MissileEvent | null {
+    if (this.events.length >= this.eventPool.length) return null;
     const e = this.eventPool[this.events.length];
     e.kind = kind;
     e.index = i;
@@ -122,7 +126,10 @@ export class Missiles implements Shootables {
     e.shooter = this.owner[i];
     e.spec = this.spec[i];
     e.intercepted = intercepted;
+    e.shielded = false;
+    e.normal?.set(0, 0, 0);
     this.events.push(e);
+    return e;
   }
 
   /**
@@ -287,9 +294,13 @@ export class Missiles implements Shootables {
       hit = true;
     }
     if (!hit) return false;
-    this.fleet.hit(tgt, spec.damage, spec.type, p, _hit.normal, this.owner[i]);
+    const shielded = this.fleet.hit(tgt, spec.damage, spec.type, p, _hit.normal, this.owner[i]).shielded;
     if (spec.tether && !tgt.combat.dmg.capital) tgt.combat.dmg.tether = spec.tether;
-    this.emit('detonate', i);
+    const e = this.emit('detonate', i);
+    if (e) {
+      e.shielded = shielded;
+      e.normal?.copy(_hit.normal);
+    }
     this.kill(i);
     return true;
   }

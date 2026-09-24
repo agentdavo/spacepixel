@@ -6,7 +6,7 @@ import { Fleet, faceAlong, type ShipEntity } from '@/sim/Fleet';
 import { Weapons } from '@/sim/Weapons';
 import { Missiles } from '@/sim/Missiles';
 import { Capitals } from '@/sim/Capitals';
-import { subsystemPosition, toUniverse } from '@/sim/Combat';
+import { createRayHit, raycastShip, subsystemPosition, toUniverse } from '@/sim/Combat';
 import { GUNS, MISSILES } from '@/sim/Loadouts';
 import { WeaponVisuals } from '../WeaponVisuals';
 import { CombatFx } from '../CombatFx';
@@ -26,6 +26,13 @@ import { CombatHud } from '@/ui/CombatHud';
  *   stage=smoke     a crippled Kestrel trailing black smoke, a Cantor on its six
  *   stage=weapons   every gun family firing at a Lantern Guard, a torpedo inbound
  *                   and its point defence shooting at it
+ *   stage=impacts   weapon impacts on an Indomitable's port side, per damage type:
+ *                   a laser Kestrel, an autocannon Kestrel, a hymn Cantor, a lance
+ *                   Cantor sweeping and a micro-missile salvo. &side=hull (port facing
+ *                   down: molten spots, sparks, arcs, cut line, warheads) · shield
+ *                   (port facing weak: ripples, facing outline, flicker) · collapse
+ *                   (the facing fails; freezes &after=S later) · regen (a collapsed
+ *                   facing comes back) · subsystem (a hangar and an engine blow)
  *   &ship=<id>      capital for stage=capital (default choir-cathedral)
  *   &freeze=S       stop the sim S seconds into the live section (screenshots)
  *   &cam=0..2       alternate framings
@@ -36,7 +43,7 @@ import { CombatHud } from '@/ui/CombatHud';
 const ORIGIN = new Vector3(2_400_000, 150_000, -1_100_000);
 const DT = 1 / 60;
 
-type Stage = 'capital' | 'shield' | 'smoke' | 'weapons';
+type Stage = 'capital' | 'shield' | 'smoke' | 'weapons' | 'impacts';
 
 interface Scripted {
   ship: ShipEntity;
@@ -73,14 +80,22 @@ export class CombatTestScene implements GameScene {
   private camMode: number;
   private eyeFn: (t: number, eye: Vector3, look: Vector3) => void = () => {};
   private freezeOnCollapse = false;
+  /** Seconds past a facing collapse to freeze at (freezeOnCollapse). */
+  private collapseAfter = 0.1;
+  /** Live-section weapon event counts (label readout). */
+  private tally: Record<string, number> = {};
+  /** Scripted one-offs at live-section times (s). */
+  private timed: { at: number; fn: () => void }[] = [];
   /** Keep fast-forwarding while this holds (bounded by 4 × pre). */
   private preUntil: (() => boolean) | null = null;
+  /** &hud=0: no combat HUD (clean captures). */
+  private hudOn = new URLSearchParams(location.search).get('hud') !== '0';
   /** &fx=0: no particles (inspect the hull paint alone). */
   private fxOn = new URLSearchParams(location.search).get('fx') !== '0';
 
   constructor() {
     const q = new URLSearchParams(location.search);
-    this.stage = (['capital', 'shield', 'smoke', 'weapons'] as const).find((s) => s === q.get('stage')) ?? 'capital';
+    this.stage = (['capital', 'shield', 'smoke', 'weapons', 'impacts'] as const).find((s) => s === q.get('stage')) ?? 'capital';
     this.freeze = Number(q.get('freeze') ?? NaN);
     this.camMode = Number(q.get('cam') ?? 0) || 0;
     LightRig.apply(LIGHT_PRESETS.meridian);
@@ -91,6 +106,7 @@ export class CombatTestScene implements GameScene {
     if (this.stage === 'capital') pre = this.setupCapital(q.get('ship') ?? 'choir-cathedral');
     else if (this.stage === 'shield') pre = this.setupShield();
     else if (this.stage === 'smoke') pre = this.setupSmoke();
+    else if (this.stage === 'impacts') pre = this.setupImpacts(q.get('side') ?? 'hull', Number(q.get('after') ?? 0.1));
     else pre = this.setupWeapons();
 
     // Fast-forward (no FX): the fight settles into shape.
@@ -274,6 +290,100 @@ export class CombatTestScene implements GameScene {
     return 0.9;
   }
 
+  private setupImpacts(side: string, after: number): number {
+    const cap = this.fleet.spawn('bb-indomitable', 'concord', ORIGIN.clone(), new Vector3(0, 0, 1), { name: 'Indomitable' });
+    cap.team = 'renegade';
+    cap.flight.velocity.set(0, 0, 0);
+    cap.plotArmour = true;
+    this.target = cap;
+    const st = cap.combat.dmg;
+    const PORT = 2;
+    const setFacing = (f: number, frac: number) => {
+      st.facings[f] = st.facingMax * frac;
+      if (frac <= 0) st.down |= 1 << f;
+      cap.shield = st.facings.reduce((a, b) => a + b, 0);
+    };
+    if (side === 'hull' || side === 'subsystem') setFacing(PORT, 0);
+    else if (side === 'shield') setFacing(PORT, 0.3);
+    else if (side === 'collapse') setFacing(PORT, 0.04);
+    else if (side === 'regen') {
+      setFacing(PORT, 0);
+      cap.sinceHit = 99;
+    }
+    // The strike line, 600 m off the port side, each gun on its own patch of
+    // plating: aim points are found by raycasting the hull from that side.
+    const lineUp: [string, number, number, (t: number) => number][] = [
+      ['vf27-kestrel', 0, 0.3, () => 0], // laser
+      ['vf27-kestrel', 1, 0.12, () => 0], // autocannon
+      ['choir-cantor', 0, -0.06, () => 0], // hymn (harmonic)
+      ['choir-cantor', 1, -0.24, (t) => Math.sin(t * 2.4) * 0.07], // beam lance, sweeping
+    ];
+    const probeHit = createRayHit();
+    const plating = (z: number, out: Vector3): Vector3 => {
+      const from = toUniverse(cap, st.cx + st.halfW * 4, st.cy - st.halfH * 0.4, st.cz + st.halfL * z, new Vector3());
+      const dir = new Vector3(-st.halfW * 8, 0, 0).applyQuaternion(cap.flight.orientation);
+      const facings = st.facings.slice();
+      st.facings.fill(0); // probe the plating, not the shell
+      const hit = raycastShip(cap, from, dir, 0, probeHit);
+      st.facings.splice(0, facings.length, ...facings);
+      return hit ? out.copy(probeHit.point) : toUniverse(cap, st.cx, st.cy, st.cz + st.halfL * z, out);
+    };
+    const mid = plating(0.03, new Vector3());
+    const fire = side !== 'regen' && side !== 'subsystem';
+    lineUp.forEach(([bp, gun, z, sweep], i) => {
+      const at = toUniverse(cap, st.cx + st.halfW + 600, st.cy + st.halfH * (0.3 + i * 0.25), st.cz + st.halfL * z, new Vector3());
+      const s = this.fleet.spawn(bp, bp.startsWith('choir') ? 'choir' : 'concord', at, new Vector3(-1, 0, 0), { name: `${bp} ${i}`, plotArmour: true });
+      s.team = 'concord';
+      s.combat.gun = gun;
+      this.scripted.push({
+        ship: s,
+        aim: () => plating(z + sweep(this.simT), new Vector3()),
+        speed: 0,
+        fire: (t) => fire && (gun === 1 && bp === 'choir-cantor' ? t % 0.8 < 0.5 : true),
+      });
+      if (i === 0) this.player = s;
+    });
+    this.player.isPlayer = true;
+    this.player.target = cap;
+    if (fire) {
+      // A micro-missile swarm from further out (explosive).
+      const wh = this.fleet.spawn('sb9-warhorse', 'concord', toUniverse(cap, st.cx + st.halfW + 900, st.cy + st.halfH * 2.5, st.cz - st.halfL * 0.1, new Vector3()), new Vector3(-1, 0, 0), { name: 'Warhorse', plotArmour: true });
+      wh.team = 'concord';
+      this.scripted.push({ ship: wh, aim: () => cap.flight.position, speed: 0, fire: () => false });
+      this.missiles.salvo(wh, cap, MISSILES.micro);
+    }
+    if (side === 'collapse') {
+      this.freezeOnCollapse = true;
+      this.collapseAfter = after;
+    }
+    if (side === 'subsystem') {
+      const blow = (kind: string, at: number) => {
+        const sub = st.subsystems.find((x) => x.kind === kind && !x.destroyed);
+        if (sub) this.timed.push({ at, fn: () => this.fleet.hit(cap, sub.hpMax * 3, 'explosive', subsystemPosition(cap, sub, new Vector3()), null, null) });
+      };
+      blow('hangar', 0.05);
+      blow('engine', 0.35);
+      blow('turret', 0.6);
+    }
+    const view = Number(new URLSearchParams(location.search).get('cam') ?? 0) || 0;
+    const side3 = new Vector3(1, 0.35, 0.25).applyQuaternion(cap.flight.orientation).normalize();
+    this.eyeFn = (_t, eye, look) => {
+      if (view === 1) {
+        // Close on the struck plating.
+        eye.copy(mid).addScaledVector(side3, 330);
+        look.copy(mid);
+      } else if (view === 2) {
+        // Over the stern (engines, hangar).
+        toUniverse(cap, st.cx + st.halfW * 3.2, st.cy + st.halfH * 3.5, st.cz - st.halfL * 1.5, eye);
+        toUniverse(cap, st.cx, st.cy, st.cz - st.halfL * 0.45, look);
+      } else {
+        eye.copy(mid).addScaledVector(side3, 900);
+        look.copy(mid);
+      }
+    };
+    return side === 'regen' || side === 'subsystem' ? 0.02 : 0.7;
+  }
+
   // ── sim ──────────────────────────────────────────────────────────────
 
   private step(dt: number, fx: boolean): void {
@@ -298,12 +408,18 @@ export class CombatTestScene implements GameScene {
     this.weapons.step(dt);
     this.missiles.step(dt);
     if (fx && this.fxOn) this.combatFx.consume(dt);
-    if (this.freezeOnCollapse && fx && this.weapons.events.some((e) => e.kind === 'shield-down') && !Number.isFinite(this.freeze)) this.freeze = this.liveT + 0.1;
+    if (fx) for (const e of this.weapons.events) this.tally[e.kind] = (this.tally[e.kind] ?? 0) + 1;
+    if (this.freezeOnCollapse && fx && this.weapons.events.some((e) => e.kind === 'shield-down') && !Number.isFinite(this.freeze)) this.freeze = this.liveT + this.collapseAfter;
   }
 
   update({ dt }: FrameContext): void {
     if (!this.frozen) {
       this.liveT += dt;
+      for (let i = this.timed.length - 1; i >= 0; i--) {
+        if (this.liveT < this.timed[i].at) continue;
+        this.timed[i].fn();
+        this.timed.splice(i, 1);
+      }
       this.step(dt, true);
       if (Number.isFinite(this.freeze) && this.liveT >= this.freeze) this.frozen = true;
     }
@@ -316,7 +432,7 @@ export class CombatTestScene implements GameScene {
     this.visuals.consume();
     this.visuals.update(this.world, vdt);
     this.combatFx.update(vdt, this.world.eye);
-    this.hud.draw(this.player, this.target, this.camera, this.world, this.simT, this.stage === 'capital' || this.stage === 'shield');
+    if (this.hudOn) this.hud.draw(this.player, this.target, this.camera, this.world, this.simT, this.stage === 'capital' || this.stage === 'shield' || this.stage === 'impacts');
   }
 
   resize(w: number, h: number): void {
@@ -326,6 +442,8 @@ export class CombatTestScene implements GameScene {
   }
 
   cameraLabel(): string {
-    return `COMBAT · ${this.stage.toUpperCase()}${this.frozen ? ' · FROZEN' : ''}`;
+    const t = this.tally;
+    const n = this.stage === 'impacts' ? ` · hit ${t.hit ?? 0} · shield ${t.shield ?? 0} · beam ${t['beam-hit'] ?? 0} · ${this.combatFx.decals.count} marks` : '';
+    return `COMBAT · ${this.stage.toUpperCase()}${n}${this.frozen ? ' · FROZEN' : ''}`;
   }
 }
