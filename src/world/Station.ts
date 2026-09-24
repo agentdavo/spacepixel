@@ -67,7 +67,7 @@ export class StationView {
     this.group.quaternion.copy(this.quaternion);
     this.bay.copy(this.center).addScaledVector(this.axis, BAY_OFFSET);
 
-    if (site.kind === 'carrier') throw new Error('StationView: carriers dock at their own hangars');
+    if (site.kind === 'carrier' || site.kind === 'surface') throw new Error('StationView: carriers dock at their own hangars; surface ports are reached by descent');
     this.model = buildShip(stationBlueprint(site.kind, site.faction, site.seed));
     this.group.add(this.model.root);
     this.radius = this.model.radius;

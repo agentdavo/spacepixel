@@ -4,6 +4,7 @@ import { Vector3 } from 'three';
 import { BANDS, SAFE_RISK, bestHold, scanRoutes, summarise, type SimMarket } from '../src/game/econSim.ts';
 import { buy, newLedger, sell, hazard } from '../src/game/economy.ts';
 import { placeStations, systemRisk, type StationSystemInput } from '../src/universe/stations.ts';
+import { surfacePorts } from '../src/universe/surfacePorts.ts';
 
 /**
  * Economy balance on a synthetic Reach (the real one is `npm run econ-sim`):
@@ -38,7 +39,11 @@ function reach(): { markets: SimMarket[]; hops: (a: string, b: string) => number
       }),
     };
     const risk = systemRisk(sys.threat, sys.faction, CHAIN[i + 1]?.id === 'null');
-    for (const st of placeStations(1994, input)) markets.push({ id: st.id, name: st.name, kind: st.kind, faction: st.faction, risk, system: sys.id });
+    const stations = placeStations(1994, input);
+    for (const st of stations) markets.push({ id: st.id, name: st.name, kind: st.kind, faction: st.faction, risk, system: sys.id });
+    // Planetary ports: a city market under every orbital port.
+    const ports = surfacePorts(1994, { id: sys.id, name: sys.id, planets: input.planets.map((pl) => ({ preset: { name: pl.name, radius: pl.radius }, position: pl.position })), stations });
+    for (const sp of ports) markets.push({ id: sp.id, name: sp.name, kind: sp.kind, faction: sp.faction, risk, system: sys.id });
     if (sys.faction === 'concord') markets.push({ id: 'carrier:Hesperus Dawn', name: 'Hesperus Dawn', kind: 'carrier', faction: 'concord', risk: 0, system: sys.id });
   });
   const idx = new Map(CHAIN.map((s, i) => [s.id, i]));

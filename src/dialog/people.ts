@@ -333,6 +333,7 @@ const ARCH_BY_KIND: Record<DStationKind, Archetype[]> = {
   freeport: ['trader', 'broker', 'refugee', 'trader', 'dock', 'cantor'],
   orbital: ['trader', 'refugee', 'officer', 'dock', 'trader'],
   carrier: ['pilot', 'dock', 'officer', 'pilot'],
+  surface: ['trader', 'dock', 'refugee', 'broker', 'trader', 'officer'],
 };
 
 const ROLES: Record<Archetype, Partial<Record<DFaction, string[]>> & { any: string[] }> = {

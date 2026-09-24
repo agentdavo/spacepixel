@@ -273,7 +273,7 @@ function orbital(r: () => number): Part[] {
 const cache = new Map<string, Blueprint>();
 
 /** A station design for a kind + faction; `seed` varies proportions and greebles. */
-export function stationBlueprint(kind: Exclude<StationKind, 'carrier'>, faction: FactionId, seed: number): Blueprint {
+export function stationBlueprint(kind: Exclude<StationKind, 'carrier' | 'surface'>, faction: FactionId, seed: number): Blueprint {
   const key = `${kind}:${faction}:${seed}`;
   const hit = cache.get(key);
   if (hit) return hit;

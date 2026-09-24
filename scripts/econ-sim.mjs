@@ -6,7 +6,8 @@
  *   npm run econ-sim -- -v      # every scan, not just the summary
  *
  * Loads the real seeded Reach (seed 1994) through Vite's SSR loader, adds the
- * Hesperus Dawn's hangar market in Directorate space, and scans every
+ * Hesperus Dawn's hangar market in Directorate space and the surface ports
+ * under the orbital tethers, and scans every
  * station pair within two Lantern hops at 12 points over ~4 h of play clock.
  * Pure logic lives in src/game/econSim.ts (also run by tests/econ-sim.test.ts).
  */
@@ -27,6 +28,7 @@ try {
   const markets = [];
   for (const sys of u.systems.values()) {
     for (const st of sys.stations) markets.push({ id: st.id, name: st.name, kind: st.kind, faction: st.faction, risk: st.risk ?? 0, system: sys.id });
+    for (const st of sys.surfacePorts ?? []) markets.push({ id: st.id, name: st.name, kind: st.kind, faction: st.faction, risk: st.risk ?? 0, system: sys.id });
     if (sys.faction === 'concord') markets.push({ id: 'carrier:Hesperus Dawn', name: 'Hesperus Dawn', kind: 'carrier', faction: 'concord', risk: 0, system: sys.id });
   }
   const hopCache = new Map();
