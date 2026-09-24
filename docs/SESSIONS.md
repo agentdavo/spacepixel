@@ -1,15 +1,21 @@
 # Parallel sessions: who owns what
 
-Several Claude sessions work on this repo at once and can't message each
-other, so this file is the noticeboard. Add a row when you start on an area.
-Leave requests for another owner under **Requests**, then pull before
-touching their files.
+Since 24 Sep all work runs as threads in one Claude project; the original
+sessions have stopped and handed over (their notes are kept below). Each
+thread owns an area. Leave requests for another owner under **Requests**,
+pull before touching their files, and open PRs into the lead branch.
 
-| Area | Owner (session / branch) | Files |
+| Area | Owner (project thread · branch) | Files |
 |---|---|---|
-| Engine, world, campaign, merges | Vanguard lead · `claude/vanguard-space-combat-0l3bfi` | everything not listed below |
-| Turrets, shields, weapon impacts (batch 6) | turrets session · `claude/ship-turrets-shields-weapons-8lz4su` (the user returned it there on 24 Sep) | `src/sim/turrets/**`, `src/sim/Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, weapon/impact FX + SFX |
-| **Character voices, chat, soundtrack** | voices/score session · `claude/ova-soundtrack-voices` | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
+| Engine, world, campaign, merges, this file | **Vanguard lead** thread · `claude/vanguard-space-combat-0l3bfi` | everything not listed below |
+| Turrets, shields, weapon impacts, subsystems, kill paths (batch 6) | **Turrets, shields and subsystems** thread · `claude/project-thread-dl05kd` (continues `claude/ship-turrets-shields-weapons-8lz4su`) | `src/sim/turrets/**`, `src/sim/Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, weapon/impact FX + SFX |
+| Character voices, chat, soundtrack | **Soundtrack and voices** thread (continues `claude/ova-soundtrack-voices`) | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
+| Kessen mecha race (design) | **Kessen mecha race** thread · `claude/project-thread-t748fw` (continues `claude/mecha-race-design-qtw680`) | `docs/KESSEN.md`, Kessen concepts |
+
+Paused lead batch 6 work (unverified, for the turrets thread to mine) is on
+origin: `worktree-agent-a9181dba8d1e07ff0` (turret rigs + muzzles),
+`worktree-agent-ad2e6ed36bfec934d` (shields v2 + impact decals),
+`worktree-agent-a936121b44b53858f` (subsystems v2 + kill paths, wrecks).
 
 ## Soundtrack backend (landed)
 
@@ -119,13 +125,14 @@ The lead session is stopping here; a project thread continues from this file.
 - **Batch 6 overlap, resolved (user, 24 Sep ~10:20).** Batch 6 (turrets,
   shields, impacts, subsystems, kill paths) stays with the turrets session.
   The lead session's three batch 6 agents are **paused** and it will start no
-  new batch 6 work. Their unfinished, unverified work is committed on local
-  branches in the lead session's container (not pushed):
+  new batch 6 work. Their unfinished, unverified work is **pushed to origin**
+  (24 Sep, at the user's request), unmerged and not re-verified, on:
   `worktree-agent-a9181dba8d1e07ff0` (turret rigs + muzzles, 6 commits),
   `worktree-agent-ad2e6ed36bfec934d` (shields v2 + impact decals, 2 commits),
   `worktree-agent-a936121b44b53858f` (subsystems v2 + kill paths: structural
-  break-up, reactor, bridge kill, wrecks/salvage, 14 commits). Ask the lead
-  session (via the user) to push any of them if you want to mine them.
+  break-up, reactor, bridge kill, wrecks/salvage, 14 commits). Mine what fits;
+  they'll need a merge with the current turrets/shields code and a full
+  re-verify (`tsc`, `npm test`, `ai-sim`, `balance`, `determinism`).
 
 - **Voices → batch 6 owner (turrets session):** once shields v2, subsystems and kill paths emit
   events, list their `WeaponEvent.kind` names here (e.g. `facing-down`,
