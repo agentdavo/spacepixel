@@ -24,6 +24,8 @@ export function evalCond(c: Cond | undefined, w: DialogWorld): boolean {
   if ('stationFaction' in c) return !!w.station && (Array.isArray(c.stationFaction) ? c.stationFaction : [c.stationFaction]).includes(w.station.faction);
   if ('stationKind' in c) return !!w.station && (Array.isArray(c.stationKind) ? c.stationKind : [c.stationKind]).includes(w.station.kind);
   if ('seen' in c) return inRange(w.state.seen[c.seen] ?? 0, c.min ?? 1, c.max);
+  if ('fact' in c) return c.is === undefined ? !!w.facts?.[c.fact] : w.facts?.[c.fact] === c.is;
+  if ('counter' in c) return inRange(w.counters?.[c.counter] ?? 0, c.min, c.max);
   if ('all' in c) return c.all.every((x) => evalCond(x, w));
   if ('any' in c) return c.any.some((x) => evalCond(x, w));
   if ('not' in c) return !evalCond(c.not, w);
@@ -58,6 +60,7 @@ export function applyEffects(effects: readonly Effect[] | undefined, w: DialogWo
     recruits: [...w.state.recruits],
   };
   const ledger = { ...w.ledger, cargo: { ...w.ledger.cargo }, rep: { ...w.ledger.rep } };
+  let facts = w.facts;
   const push = (list: string[], v: string) => {
     if (!list.includes(v)) list.push(v);
     if (list.length > 40) list.shift();
@@ -82,8 +85,9 @@ export function applyEffects(effects: readonly Effect[] | undefined, w: DialogWo
     else if ('tip' in e) push(state.tips, fill(e.tip, w.vars));
     else if ('contract' in e) push(state.contracts, e.contract);
     else if ('recruit' in e) push(state.recruits, e.recruit);
+    else if ('fact' in e) facts = { ...facts, [e.fact]: e.value ?? true };
   }
-  return { ...w, state, ledger };
+  return { ...w, state, ledger, ...(facts ? { facts } : {}) };
 }
 
 /** Where a conversation starts for this world (first matching entry). */
