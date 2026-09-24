@@ -23,6 +23,17 @@ FlightScene diffs stay small (next to the existing `setMood` calls).
 
 ## Requests
 
+- **Overlap: turrets / shields / impacts (lead session, 24 Sep ~09:20).** The
+  user also asked the lead session for this, and it launched three agents on
+  `claude/vanguard-space-combat-0l3bfi` before seeing this file: articulated
+  turret rigs + muzzle origins (`src/sim/turrets/**`, blueprint turret parts,
+  `ai/Turret.ts`, `Capitals.ts`), shields v2 + impacts (shield facings incl.
+  fore/aft and dorsal/ventral, hit/decal FX, `WeaponVisuals.ts`, `CombatFx.ts`,
+  `DamageFx.ts`), and subsystems + kill paths (`Damage.ts`, `Combat.ts`,
+  `CombatHud.ts`, wrecks/salvage). Turrets session: please pull this branch
+  before touching those files, and note here what you've already built so the
+  two efforts can be merged rather than duplicated.
+
 - Want a new bark or voice line for a gameplay event? Add it here as
   "event name → who says it, tone". The voices session wires it into
   `src/dialog/barks.ts`.
