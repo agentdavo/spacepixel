@@ -2,7 +2,7 @@ import { Vector3 } from 'three';
 import type { FlightScene } from '@/world/scenes/FlightScene';
 import { COMMODITIES, cargoUsed, type EconFaction, type TradeLedger } from '@/game/economy';
 import { loadProfile, saveContracts, saveLedger } from '@/game/Profile';
-import { saveWorld, tick, world, type WorldState } from '@/game/world/WorldState';
+import { loadWorld, saveWorld, tick, world, type WorldState } from '@/game/world/WorldState';
 import { registerVoice, npcVoice, CAST_VOICES } from '@/audio/voice';
 import { findStation, type Contract, type Receipt } from '@/game/contracts/contracts';
 import { SYSTEM_OFFSET } from '@/world/StarSystemView';
@@ -31,6 +31,8 @@ export class GuildRuntime {
   private dirty = false;
 
   constructor(readonly scene: FlightScene) {
+    // A tape boots from its own profile (storage shim): the world must be the tape's too.
+    if (scene.replay.mode === 'play') world().update(() => loadWorld());
     for (const [id, v] of Object.entries(GUILD_VOICES)) if (!CAST_VOICES[id]) registerVoice(id, npcVoice(hash(id), { ...v, faction: this.factionOf(id) }));
     this.outposts = new OutpostRuntime(scene, (t, c) => this.note(t, c));
     scene.contracts.onReceipt.add((k, r) => this.onReceipt(k, r));
@@ -52,9 +54,20 @@ export class GuildRuntime {
     this.scene.contracts.toast(text, cls === 'err' ? '#ff5f7a' : '#7dffb2');
   }
 
-  /** Apply a membership result: world, standing, notes. */
-  apply(r: GuildResult): void {
-    world().update(() => r.world);
+  /**
+   * A world change made from the dock screen (outside a sim tick): recorded on
+   * the replay tape as a 'world' command so playback rebuilds it at its tick.
+   * Sim-side changes (receipts, arrears, raids) happen inside ticks and replay
+   * by themselves.
+   */
+  setWorld(w: WorldState): void {
+    this.scene.replay.external('world', w, () => world().update(() => w));
+  }
+
+  /** Apply a membership result: world, standing, notes (`fromUI`: a dock-screen action). */
+  apply(r: GuildResult, fromUI = false): void {
+    if (fromUI) this.setWorld(r.world);
+    else world().update(() => r.world);
     if (Object.keys(r.rep).length) {
       const l = this.scene.ledger;
       const rep = { ...l.rep };
@@ -190,13 +203,13 @@ export class GuildRuntime {
 
   join(g: GuildId): GuildResult {
     const r = join(world().state, g, this.scene.ledger.rep);
-    if (!r.error) this.apply(r);
+    if (!r.error) this.apply(r, true);
     return r;
   }
 
   promote(g: GuildId): GuildResult {
     const r = promote(world().state, g, this.scene.ledger.rep);
-    if (!r.error) this.apply(r);
+    if (!r.error) this.apply(r, true);
     return r;
   }
 

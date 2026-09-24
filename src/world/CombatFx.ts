@@ -4,8 +4,8 @@ import { PAL, PK, type ParticlePalette } from '@/fx/kinds';
 import { TRAIL_MISSILE, type TrailStyle } from '@/fx/Trails';
 import { makeSpawn, resetSpawn } from '@/fx/spawn';
 import { DamageFx } from './DamageFx';
-import type { Weapons } from '@/sim/Weapons';
-import type { Missiles } from '@/sim/Missiles';
+import type { WeaponEvent, Weapons } from '@/sim/Weapons';
+import type { MissileEvent, Missiles } from '@/sim/Missiles';
 import { MISSILE_CAPACITY } from '@/sim/Missiles';
 import type { ShipEntity } from '@/sim/Fleet';
 
@@ -47,10 +47,13 @@ export class CombatFx {
   private chains: Chain[] = [];
   private rng = 777;
 
-  constructor(
-    private weapons: Weapons,
-    private missiles: Missiles,
-  ) {
+  /** Event / missile sources: the live sim, or the kill-cam's recorded frame (same shapes). */
+  weapons: Pick<Weapons, 'events'>;
+  missiles: Pick<Missiles, 'events' | 'alive' | 'pos' | 'age' | 'spec'>;
+
+  constructor(weapons: Weapons, missiles: Missiles) {
+    this.weapons = weapons;
+    this.missiles = missiles;
     this.damage = new DamageFx(weapons.fleet, this.fx);
   }
 
@@ -153,6 +156,29 @@ export class CombatFx {
       }
       if (--c.left <= 0) this.chains.splice(k, 1);
     }
+  }
+
+  /**
+   * Kill-cam: re-play recorded events as particles. No death chains, trails
+   * or scorch marks — those belong to the live world and resume with it.
+   */
+  replayEvents(w: readonly WeaponEvent[], m: readonly MissileEvent[]): void {
+    const fx = this.fx;
+    for (const e of w) {
+      const s = e.ship;
+      if (e.kind === 'hit') fx.impact(e.position, e.normal, e.velocity, PAL.WARM);
+      else if (e.kind === 'shield' && s) fx.shieldHit(e.position, e.normal, s.combat.dmg.capital ? Math.min(160, s.model.length * 0.05) : s.radius * 1.3, e.velocity, s.faction === 'choir' ? PAL.MAGENTA : PAL.PLASMA);
+      else if (e.kind === 'shield-down' && s) this.shieldCollapse(s, e.position, e.normal);
+      else if (e.kind === 'subsystem' && s && e.sub) {
+        fx.explosion(e.position, e.velocity, e.sub.radius * 0.9, paletteOf(s));
+        fx.debris(e.position, e.velocity, e.sub.radius * 0.35, 14);
+      } else if (e.kind === 'kill' && s) {
+        const big = s.radius > 60;
+        fx.explosion(e.position, e.velocity, big ? s.model.radius * 0.35 : Math.max(10, s.radius * 1.4), paletteOf(s));
+        fx.debris(e.position, e.velocity, big ? s.model.radius * 0.12 : s.radius, big ? 24 : 10);
+      }
+    }
+    for (const e of m) if (e.kind === 'detonate') fx.explosion(e.position, e.velocity, e.spec.id === 'torpedo' ? (e.intercepted ? 16 : 45) : e.intercepted ? 6 : 7, PAL.WARM);
   }
 
   /**

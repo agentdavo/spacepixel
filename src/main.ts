@@ -16,6 +16,7 @@ import type { FlightScene } from '@/world/scenes/FlightScene';
 import type { PrologueScene } from '@/world/scenes/PrologueScene';
 import { getAudio } from '@/audio';
 import { DynamicResolution } from '@/core/DynamicResolution';
+import { installStorageShim, loadReplay, replayBootUrl, setPendingReplay } from '@/game/ReplayDirector';
 
 declare global {
   interface Window {
@@ -40,7 +41,33 @@ function fail(err: unknown): void {
   window.__VANGUARD__ = { ready: false, frame: () => 0, backend: 'none', error: msg };
 }
 
+/**
+ * ?replay=<slot|url>: read the tape, make sure the page runs the query it
+ * was recorded with (flags are read at module load, so reload there if
+ * not), shim storage with its profile and hand it to the flight scene.
+ */
+async function prepareReplay(): Promise<boolean> {
+  const q = new URLSearchParams(location.search);
+  const ref = q.get('replay');
+  if (!ref) return false;
+  const file = await loadReplay(ref);
+  const seek = q.has('rseek') ? Number(q.get('rseek')) : -1;
+  const want = new URLSearchParams(replayBootUrl(file, ref, seek).slice(1));
+  const have = new URLSearchParams(location.search);
+  want.sort();
+  have.sort();
+  if (want.toString() !== have.toString()) {
+    location.replace(`${location.pathname}?${want.toString()}`);
+    return new Promise(() => {}); // navigating
+  }
+  installStorageShim(file.header.storage);
+  setPendingReplay(file, seek);
+  console.info(`[vanguard] replay ${ref}: ${file.ticks} ticks (${(file.ticks / 60).toFixed(1)} s), seed ${file.header.seed}`);
+  return true;
+}
+
 async function boot(): Promise<void> {
+  await prepareReplay();
   const canvas = document.getElementById('viewport') as HTMLCanvasElement;
   const uiRoot = document.getElementById('ui-root')!;
   const info = await createRenderer(canvas);

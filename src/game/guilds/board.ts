@@ -106,7 +106,7 @@ export function guildOffers(inp: GuildBoardInput): Contract[] {
 }
 
 /** Re-voice a generated contract as guild work. */
-export function dress(k: Contract, gid: GuildId, rnd: () => number = Math.random): Contract {
+export function dress(k: Contract, gid: GuildId, rnd: () => number): Contract {
   const g = GUILDS[gid];
   const v = VOICE[gid];
   const pick = <T>(a: T[]) => a[Math.floor(rnd() * a.length)];

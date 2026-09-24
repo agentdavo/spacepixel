@@ -492,7 +492,7 @@ class GuildTab {
           this.say(res.error, 'err');
         } else {
           ok();
-          world().update(() => res.world);
+          r.setWorld(res.world);
           this.setL(res.ledger);
           this.say(res.text, 'ok');
         }
@@ -506,7 +506,7 @@ class GuildTab {
         }
         this.armLeave = false;
         const res = leave(w, g);
-        r.apply(res);
+        r.apply(res, true);
         for (const n of res.notes) this.say(n.text, n.cls);
         this.speak(this.speaker, GUILDS[g].farewell);
         break;
@@ -555,7 +555,7 @@ class GuildTab {
           break;
         }
         ok();
-        r.apply(res);
+        r.apply(res, true);
         this.setL(r.ledger());
         for (const n of res.notes) this.say(n.text, n.cls);
         if (res.option) this.speak(res.option.who, res.option.line);
@@ -586,7 +586,7 @@ class GuildTab {
           this.say(res.error, 'err');
         } else {
           ok();
-          world().update(() => res.world);
+          r.setWorld(res.world);
           this.setL(res.ledger);
           this.say(res.text, 'ok');
           this.speak(this.speaker, `The ${site.name}. Dead a long time. We will make her keep again — bring spares and relics, and she will see.`);
@@ -602,7 +602,7 @@ class GuildTab {
           break;
         }
         ok();
-        world().update(() => res.world);
+        r.setWorld(res.world);
         this.setL(res.ledger);
         this.say(`HANDED OVER · ${moved.map(([c, n]) => `${n} × ${COMMODITY[c as CommodityId].name.toUpperCase()}`).join(' · ')}`, 'ok');
         break;
@@ -614,7 +614,7 @@ class GuildTab {
           this.say(res.error, 'err');
         } else {
           ok();
-          world().update(() => res.world);
+          r.setWorld(res.world);
           this.setL(res.ledger);
           this.say(res.text, 'ok');
           const o = outpostOf(world().state);
@@ -631,7 +631,7 @@ class GuildTab {
           break;
         }
         ok();
-        world().update(() => res.world);
+        r.setWorld(res.world);
         this.setL(res.ledger);
         this.say(`${a === 'stow' ? 'STOWED' : 'TAKEN ABOARD'} ${Math.abs(res.moved)} × ${COMMODITY[arg as CommodityId].name.toUpperCase()}`, 'ok');
         break;

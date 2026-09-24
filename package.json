@@ -17,7 +17,9 @@
     "econ-sim": "node scripts/econ-sim.mjs",
     "record": "node scripts/record.mjs",
     "make-video": "node scripts/make-video.mjs",
-    "balance": "node scripts/balance.mjs"
+    "balance": "node scripts/balance.mjs",
+    "determinism": "node scripts/determinism.mjs",
+    "latency": "node scripts/latency.mjs"
   },
   "dependencies": {
     "three": "^0.186.0"
