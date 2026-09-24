@@ -47,7 +47,7 @@ export const SHIP_STATS: Record<string, ShipStats> = {
   'choir-cantor': {
     role: 'interceptor',
     hull: 110,
-    shield: 80,
+    shield: 95,
     shieldRegen: 0.22,
     shieldDelay: 2.5,
     facings: 1,
