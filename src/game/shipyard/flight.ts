@@ -90,7 +90,7 @@ export function bridgeFraming(bridge: [number, number, number], lengthM: number)
   const base = chaseFraming(lengthM);
   return {
     ...base,
-    offset: [bridge[0], bridge[1] + lengthM * 0.012, bridge[2] - lengthM * 0.02],
+    offset: [bridge[0], bridge[1] + lengthM * 0.05, bridge[2] - lengthM * 0.03],
     lookAhead: lengthM * 6,
     speedPullback: 0,
     posSmooth: 0.05,

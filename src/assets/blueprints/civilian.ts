@@ -22,7 +22,7 @@ const BULK: Partial<Livery> = {
 };
 /** Tey Ebon Works — black hulls, ivory cabs, black-light violet. */
 const EBON: Partial<Livery> = {
-  primary: '#2c2836',
+  primary: '#4a4458',
   secondary: '#d9d2c2',
   accent: '#b56bff',
   dark: '#15131c',
@@ -100,7 +100,7 @@ function containerBay(z: number, seed: number): Part[] {
 export const LONGHAUL: Blueprint = {
   id: 'civ-longhaul',
   name: 'Longhaul',
-  designation: 'MV Longhaul',
+  designation: 'MV',
   faction: 'concord',
   shipClass: 'frigate',
   scale: 10,
@@ -157,7 +157,7 @@ const UM_R = 1.55;
 export const UMBRA: Blueprint = {
   id: 'civ-umbra',
   name: 'Umbra',
-  designation: 'EGT Umbra',
+  designation: 'EGT',
   faction: 'concord',
   shipClass: 'frigate',
   scale: 14,
@@ -249,14 +249,14 @@ function msDeck(i: number): Part[] {
   return [
     lf(`deck-${i}`, 'primary', st),
     bd(`deck-rail-${i}`, 'secondary', st, z0 + 0.4, z0 + 0.6, 0.02),
-    windows(`deck-windows-${i}`, [w / 2 + 0.005, y + h * 0.5, z1 - 1.3], n, [0, 0, -0.36], [0.02, h * 0.36, 0.2], { mirror: true }),
+    windows(`deck-windows-${i}`, [w / 2 + 0.005, y + h * 0.5, z1 - 1.3], n, [0, 0, -0.36], [0.02, h * 0.36, 0.2], { mirror: true, emissive: 0.45 }),
   ];
 }
 
 export const MERIDIAN_STAR: Blueprint = {
   id: 'civ-meridian-star',
   name: 'Meridian Star',
-  designation: 'TSS Meridian Star',
+  designation: 'TSS',
   faction: 'concord',
   shipClass: 'carrier',
   scale: 20,
@@ -280,7 +280,7 @@ export const MERIDIAN_STAR: Blueprint = {
     ),
     // Hull portholes: two rows.
     ...[0.35, 0.0].map((y, r): Part =>
-      windows(`ports-${r}`, [sideX(MS_HULL, 1.0, y) + 0.005, y, 7.0 - r * 0.18], 38 - r * 2, [0, 0, -0.36], [0.02, 0.1, 0.16], { mirror: true }),
+      windows(`ports-${r}`, [sideX(MS_HULL, 1.0, y) + 0.005, y, 7.0 - r * 0.18], 38 - r * 2, [0, 0, -0.36], [0.02, 0.1, 0.16], { mirror: true, emissive: 0.4 }),
     ),
     ...[0, 1, 2].flatMap(msDeck),
     // Bridge at the head of the top deck.
@@ -334,7 +334,7 @@ const TL_HEAD_Z = 7.4;
 export const TALLOW: Blueprint = {
   id: 'civ-tallow',
   name: 'Tallow',
-  designation: 'MB Tallow',
+  designation: 'MB',
   faction: 'concord',
   shipClass: 'corvette',
   scale: 10,
@@ -419,7 +419,7 @@ const SW_OUT: WingSpec = { pos: [0.85 + 3.0 * Math.cos(0.279), 3.0 * Math.sin(0.
 export const SWALLOW: Blueprint = {
   id: 'civ-swallow',
   name: 'Swallow',
-  designation: 'XC-2 Swallow',
+  designation: 'XC-2',
   faction: 'concord',
   shipClass: 'interceptor',
   ramp: 'classic',

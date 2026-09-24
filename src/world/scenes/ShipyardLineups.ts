@@ -5,7 +5,7 @@ import { FACTIONS } from '@/assets/Factions';
 import { CATALOG_BY_ID } from '@/game/shipyard/catalog';
 
 /**
- * Shipyard lineups for the hangar (`?scene=hangar&cam=6..10`): scale charts
+ * Shipyard lineups for the hangar (`?scene=hangar&cam=6..11`): scale charts
  * of the shipyard designs — the Vanguard progression line, Rustwake clans,
  * civilian traffic and line warships — standing in true relative size,
  * nose to screen-right, each with an ink-and-paint caption (designation,
@@ -23,37 +23,28 @@ export interface LineupSpec {
 
 export const SHIPYARD_LINEUPS: LineupSpec[] = [
   {
-    name: 'SHIPYARD · FIGHTER LINE (T1–T3)',
-    rows: [
-      ['vf27-kestrel', 'vf27s-super-kestrel', 'vf31-harrier', 'vf40-gauntlet'],
-      ['rw-scrapjack', 'choir-seraph', 'rw-gaff', 'civ-swallow', 'rw-knuckleduster'],
-    ],
-    elevation: 0.42,
-    fov: 26,
+    name: 'DIRECTORATE LINE · T1–T3',
+    rows: [['vf27-kestrel', 'vf27s-super-kestrel', 'vf31-harrier', 'vf40-gauntlet']],
   },
   {
-    name: 'SHIPYARD · PROGRESSION T3 → T6',
+    name: 'ALTERNATES · RAIDERS · COURIERS',
+    rows: [['rw-scrapjack', 'rw-gaff', 'choir-seraph', 'civ-swallow', 'rw-knuckleduster']],
+  },
+  {
+    name: 'PROGRESSION · T3 GAUNTLET → T6 VALIANT',
     rows: [['vf40-gauntlet', 'gs12-bulwark', 'cr5-resolute', 'ffl3-valiant']],
-    elevation: 0.3,
-    fov: 28,
   },
   {
     name: 'RUSTWAKE CLANS',
-    rows: [['rw-scrapjack', 'rw-gaff', 'rw-knuckleduster', 'rw-bulldog', 'rw-mother-lode']],
-    elevation: 0.3,
-    fov: 28,
+    rows: [['rw-scrapjack', 'rw-gaff', 'rw-knuckleduster', 'rw-bulldog']],
   },
   {
     name: 'CIVIL TRAFFIC',
     rows: [['civ-swallow', 'civ-tallow', 'civ-longhaul', 'civ-umbra', 'civ-meridian-star']],
-    elevation: 0.3,
-    fov: 28,
   },
   {
-    name: 'LINE WARSHIPS · CORVETTE → DESTROYER',
-    rows: [['ffc-lantern-guard', 'choir-vesper', 'cr5-resolute', 'ffl3-valiant', 'choir-canticle', 'ddg40-arbiter']],
-    elevation: 0.3,
-    fov: 28,
+    name: 'LINE WARSHIPS · CORVETTE → DESTROYER · CLAN CARRIER',
+    rows: [['ffc-lantern-guard', 'choir-vesper', 'cr5-resolute', 'ffl3-valiant', 'rw-mother-lode', 'choir-canticle', 'ddg40-arbiter']],
   },
 ];
 
@@ -72,7 +63,7 @@ export interface BuiltLineup {
   frame(t: number, aspect: number): [Vector3, Vector3];
 }
 
-const YAW = MathUtils.degToRad(64); // nose to screen-right, a little toward camera
+const YAW = MathUtils.degToRad(56); // nose to screen-right, turned toward camera
 
 /** Caption text for a blueprint: designation · name, then tier · length · maker. */
 export function shipCaption(id: string, length: number): { title: string; sub: string; faction: string } {
@@ -146,12 +137,13 @@ export class ShipyardLineups {
         placed.push(...rowPlaced);
         rowZ -= rowDepth * 1.25 + (r === 0 ? 10 : 0);
       });
-      // Recompute a clean extent after centring.
+      // Recompute a clean extent after centring (world matrices are stale after the shift).
+      group.updateMatrixWorld(true);
       const box = new Box3();
       for (const p of placed) for (const m of p.ship.meshes) box.expandByObject(m);
       this.placed.push(placed);
-      const fov = spec.fov ?? 28;
-      const elev = spec.elevation ?? 0.3;
+      const fov = spec.fov ?? 24;
+      const elev = spec.elevation ?? 0.5;
       const centre = box.getCenter(new Vector3());
       const size = box.getSize(new Vector3());
       this.lineups.push({

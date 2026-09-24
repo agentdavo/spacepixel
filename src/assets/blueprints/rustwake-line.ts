@@ -397,11 +397,11 @@ export const MOTHER_LODE: Blueprint = {
     {
       name: 'hab-windows',
       paint: 'glass',
-      emissive: 0.9,
+      emissive: 0.45,
       color: '#ffcf7a',
       pos: [0, 2.1, 2.6],
       repeat: { count: 3, rot: [0, 0, 120] },
-      shape: { kind: 'box', w: 0.5, h: 0.04, d: 2.6 },
+      shape: { kind: 'box', w: 0.3, h: 0.04, d: 2.6 },
     },
     // Flight deck off a dead carrier (still in Directorate ivory), with its hangar mouth.
     lf('deck', 'primary', ML_DECK, { livery: 'concord' }),

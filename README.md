@@ -100,7 +100,7 @@ freighter, Umbra Ebon tanker, Meridian Star liner); and line warships (DDG-40
 Arbiter, Hegemony Canticle). Prices, tiers, crew, hardpoint layouts and stat
 hints are data in `src/game/shipyard/catalog.ts`. Handling and camera
 distance scale with hull size (`src/game/shipyard/flight.ts`). To view them:
-`?scene=hangar&cam=6..10` (scale charts with captions),
+`?scene=hangar&cam=6..11` (scale charts with captions),
 `?scene=hangar&ship=<id>` (four-view model sheet), and
 `?scene=dogfight&ship=<id>` (fly it; `&bridge=1|0` forces the bridge camera
 on or off).
