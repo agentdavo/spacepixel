@@ -13,7 +13,7 @@
 import type { Universe } from '@/universe/Universe';
 import { setTrafficWorld } from '@/universe/traffic';
 import { setMarketWorld, type CommodityId, type EconFaction, type MarketSpec } from '../economy';
-import { saveWorld, world, type WorldEvent, type WorldState } from './WorldState';
+import { saveWorld, setFact, world, type WorldEvent, type WorldState } from './WorldState';
 import { actAmbush, actContract, actKill, actTrade, attitude, backfillStory, completeEpisode, fastForward, patrolOffset, piracyOffset, priceOffset, since, trafficOffset, type ReachInfo } from './sim';
 import { stepWorld } from './step';
 import { breakEngagement, currentSchedule, flyAsOrdered, engagementById, type Engagement } from './schedule';
@@ -166,6 +166,11 @@ export class WorldRuntime {
   }
   engagement(id: string): Engagement | null {
     return engagementById(world().state, this.reach, id);
+  }
+  /** Orders taken: the engagement waits for the pilot instead of being fought without them. */
+  takeSchedule(id: string): void {
+    this.apply((w) => setFact(w, `schedule.taken.${id}`));
+    persistWorld();
   }
   scheduleOutcome(id: string, broken: false | 'protected' | 'refused'): void {
     const e = this.engagement(id);

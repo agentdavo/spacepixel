@@ -228,6 +228,78 @@ survey panel. Captures: `?reach=body|ring|lane|ambush [&sys=<id>] [&body=<name|i
 ![Raider ambush](docs/screenshots/reach-ambush.jpg)
 ![Star map survey](docs/screenshots/reach-map.jpg)
 
+## A Reach that remembers
+
+One shared memory, `src/game/world/WorldState.ts` (facts, counters, decaying
+modifiers, an event log), and a pure simulation over it
+(`src/game/world/sim.ts`, `step.ts`, `schedule.ts`, `signal.ts`, `news.ts`;
+no Math.random — every roll hashes the Reach seed and a clock slot).
+
+**Story → sandbox.** Every episode debriefed as a success writes
+`story.ep<N>.done` and its chapter facts (`bastion.fallen`, `schism`,
+`gates.aligned`, …). `STORY_RULES` turns completed episodes into *lasting*
+modifiers derived at read time (never decayed, never washed out by a
+nudge): the Fall of the Bastion puts refugee demand on Anchorage (rations
++28 %, medical +32 %, traffic +35 %, patrols thinned); the Schism contests
+Tessaly's fields; after the Symphony of Gates Ebon collapses (refinery Ebon
+−64 %, and the demand side further, so the old Ebon run pays nothing), relics
+and luxuries rise and the Lantern toll (1 g of Ebon a jump) is gone. Old
+careers are backfilled from the profile's episode.
+
+**The pilot's deeds.** Breaking ambushes thins piracy and swells traffic in
+that system for hours (three clean saves and the haulers call the run safe);
+shooting a faction's ships brings patrols and cools its berths; every unit
+traded leaves a price mark that outlives the 15-minute market pressure (a run
+of eight makes the news); contracts paid warm the station. Background drift
+rolls about four events an hour — convoys lost, refinery strikes, clan feuds,
+Ember flares, relic finds, Allocation Hours, Observances, and, by chapter,
+refugee convoys, joint squads, humming Lanterns — each a decaying modifier
+and a line in the log.
+
+**Readers.** Channels per scope (`system:<id>`, `system:*`, `station:<id>`,
+`faction:<f>`, `guild:<id>`): `price:<commodity>`, `traffic`, `piracy`,
+`patrol`, `attitude`. The economy (`setMarketWorld`: prices, tariffs from a
+cold attitude, berth refusal at −0.8), the lanes (`setTrafficWorld`: sailings,
+raid rate, patrol wings, rebuilt on system entry, the star map on opening),
+contract boards (kind weights follow the lanes; fees ±15 % with attitude),
+dock greetings, the ticker and the concourse (world headlines lead the
+rumours; conversations can gate on `{ worldFact }`) all read through
+`worldMod` / `sysMod` / `attitude`. With no world installed the Reach is the
+batch-4 default, so `npm run econ-sim` bands still hold; it now also runs
+three world scenarios with pass/fail: post-Episode 19 (Ebon collapses and
+leaves the trade, safe holds still ~1,450 sh), post-Episode 10 (Anchorage
+refugee demand) and a cleared lane (+45 % sailings, raids 0.20 → 0).
+
+**The Schedule of Engagements** (after Episode 8): each quarter (40 min of
+free flight) a seeded Schedule posts 3–5 engagements on the contested line,
+the Treaty Line and the Null pickets — expected expenditure each side, Ebon
+released to market, the 88 sh floor, a protected Hegemony "conductor". The
+star map marks each field (crossed sabres, countdown) with a Schedule panel;
+`[ ]` select, `O` takes one as ordered: a staged `sortie` op — take station
+on the line, the Measure expends its quota, Allocation orders everyone home,
+Continuity pays in shares. Or break it: kill the conductor or stay on the line
+40 s after the order. Broken engagements are recorded (`schedule.broken.<id>`,
+`continuity.hostile`): Ebon spikes +25 %, Continuity desks go cold (bastions
+can refuse you), the news spreads, and next quarter's Schedule carries a
+correction at the same field with the 13th requested by name. Unflown
+engagements are fought as scheduled when their hour passes. The Schedule is
+suspended when it is read aloud (Episode 18).
+
+**The Signal.** A pure function of the story and the world clock: hidden
+until Episode 5, pinned to each debrief's count (1,009 … 2), ticking one
+prime down per 15 minutes of free flight but never to the next episode's
+number; after Episode 12 its source is the Monolith, after 13 it shows the
+Breath (56 days at 241), after 19 it stops at 2, after 20 it counts up.
+Shown on the star map header, as a small violet counter in the HUD corner,
+and on the title card once a career has heard it; every burst is a radio
+intercept banner and a ticker line.
+
+Captures: `?world=ep<N>` fast-forwards the story (never saved)
+`[&wclock=<s>] [&wbreak=1] [&wclear=<system>] [&wop=line|map]`.
+
+![The Schedule on the star map](docs/screenshots/world-schedule-map.jpg)
+![Anchorage after the Fall](docs/screenshots/world-anchorage-fall.jpg)
+
 ## Shipyard & outfitting
 
 From a borrowed Kestrel to your own frigate. Docked, two more tabs:

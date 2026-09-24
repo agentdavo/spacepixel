@@ -17,6 +17,7 @@ import {
   standingLabel,
   hazard,
   HAZARD_DEMAND,
+  marketWorldPrice,
   type CommodityId,
   type EconFaction,
   type MarketSpec,
@@ -81,6 +82,10 @@ export function registerDockTab(tab: DockTab): void {
   if (i >= 0) TABS[i] = tab;
   else TABS.push(tab);
 }
+
+/** The Reach's say in a price (src/game/world): ▲28 % / ▼64 % beside the stance, when it matters. */
+const worldTag = (v: number) =>
+  Math.abs(v) < 0.05 ? '' : `<span title="the Reach moves this price" style="margin-left:6px;font-size:10px;color:${v > 0 ? '#ffb347' : '#b77bff'}">${v > 0 ? '▲' : '▼'}${Math.round(Math.abs(v) * 100)}%</span>`;
 
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!);
 const sh = (n: number) => `${Math.round(n).toLocaleString('en-US')} sh`;
@@ -306,7 +311,7 @@ export class DockScreen {
       const tag = q.stance === 'surplus' ? 'SURPLUS' : q.stance === 'demand' ? 'DEMAND' : 'STEADY';
       return `<tr class="${sel}" data-i="${i}">
         <td class="name">${c.name}<span class="unit">${c.unit}</span></td>
-        <td><span class="tag ${q.stance}">${tag}</span></td>
+        <td><span class="tag ${q.stance}">${tag}</span>${worldTag(marketWorldPrice(st, c.id))}</td>
         <td class="ask">${q.buy.toLocaleString('en-US')}</td>
         <td>${q.sell.toLocaleString('en-US')}</td>
         <td class="held">${held || '·'}</td>

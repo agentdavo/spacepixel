@@ -18,7 +18,7 @@ export class SignalCounter {
   constructor(root: HTMLElement) {
     this.el.className = 'signal-counter';
     this.el.style.cssText =
-      'position:absolute;left:24px;top:40px;z-index:6;pointer-events:none;font:12px "Share Tech Mono",monospace;color:#b77bff;letter-spacing:0.06em;text-shadow:0 0 6px rgba(183,123,255,0.55);display:none;transition:color .4s,text-shadow .4s';
+      'position:absolute;left:24px;top:64px;z-index:6;pointer-events:none;font:12px "Share Tech Mono",monospace;color:#b77bff;letter-spacing:0.06em;text-shadow:0 0 6px rgba(183,123,255,0.55);display:none;transition:color .4s,text-shadow .4s';
     this.bar.style.cssText = 'display:block;height:1px;margin-top:3px;background:#b77bff;opacity:0.7;width:0';
     this.el.append(this.text, this.bar);
     root.append(this.el);

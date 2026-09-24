@@ -274,6 +274,10 @@ let marketWorld: MarketWorld | null = null;
 export function setMarketWorld(w: MarketWorld | null): void {
   marketWorld = w;
 }
+/** The installed world's price offset for `cid` at a market (0 without one). */
+export function marketWorldPrice(spec: MarketSpec, cid: CommodityId): number {
+  return marketWorld ? marketWorld.price(spec, cid) : 0;
+}
 /** The installed world's attitude at a market (0 without one). */
 export function marketAttitude(spec: MarketSpec): number {
   return marketWorld ? marketWorld.attitude(spec) : 0;

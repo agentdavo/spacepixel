@@ -75,6 +75,8 @@ export interface PriorityInfo {
 }
 
 const _v = new Vector3();
+/** HUD / map label: Schedule engagements read as SCHEDULE, not a board sortie. */
+const labelOf = (k: Contract): string => (k.schedule ? `SCHEDULE · ENG ${k.schedule.number}` : KIND_LABEL[k.kind]);
 const OFFSET: V3 = [SYSTEM_OFFSET.x, SYSTEM_OFFSET.y, SYSTEM_OFFSET.z];
 const toU = (v: V3, out = new Vector3()) => out.set(v[0] + OFFSET[0], v[1] + OFFSET[1], v[2] + OFFSET[2]);
 
@@ -392,6 +394,7 @@ export class ContractDesk {
     const k = scheduleContract(e, this.reach, this.book.clock, rt.state.clock);
     if (!k) return { text: 'NO SUCH FIELD', ok: false };
     const err = this.accept(k, io);
+    if (!err) rt.takeSchedule(e.id);
     return err ? { text: `ORDERS · ${err}`, ok: false } : { text: `ORDERS ACCEPTED · ENGAGEMENT ${e.number} · ${e.systemName.toUpperCase()} · ${k.reward.toLocaleString('en-US')} sh`, ok: true };
   }
 
@@ -713,7 +716,7 @@ export class ContractDesk {
       const objective = op && op.runner.outcome === 'running' ? op.currentObjective() : null;
       const left = k.state === 'active' && k.due !== undefined ? k.due - this.book.clock : null;
       rows.push({
-        kind: KIND_LABEL[k.kind],
+        kind: labelOf(k),
         title: k.title,
         status: objective ?? statusLine(k, sys, this.sysName),
         timer: left !== null ? formatClock(left) : k.state === 'ready' ? 'DONE' : '',
@@ -727,7 +730,7 @@ export class ContractDesk {
         const st = findStation(this.reach, k.payAt)?.station;
         if (st) target = { pos: toU(st.pos, new Vector3()), label: `${k.state === 'ready' ? 'PAYMENT' : 'DELIVER'} · ${k.payAtName.toUpperCase()}` };
       }
-      if (target) hud.marker(target.pos, target.label, KIND_LABEL[k.kind], pp, cam, world, time, tracked);
+      if (target) hud.marker(target.pos, target.label, labelOf(k), pp, cam, world, time, tracked);
       if (op) for (const d of op.runner.dwells) hud.dwell(d.position, d.radius, d.progress, cam, world);
     }
     if (rows.length) hud.panel(rows, this.book.active.length > 1);
@@ -761,7 +764,7 @@ export class ContractDesk {
       c.closePath();
       c.fill();
       c.textAlign = 'right';
-      c.fillText(`${KIND_LABEL[k.kind]}${k.state === 'ready' ? ' · PAY' : ''}`, x - 9, y + 4);
+      c.fillText(`${labelOf(k)}${k.state === 'ready' ? ' · PAY' : ''}`, x - 9, y + 4);
       c.textAlign = 'left';
     }
     // Side list.
@@ -777,7 +780,7 @@ export class ContractDesk {
       for (const k of this.book.active) {
         const j = this.jumpsTo(nextSystem(k));
         c.fillStyle = k.id === this.tracked ? '#ffffff' : 'rgba(255,179,71,0.8)';
-        c.fillText(`${k.id === this.tracked ? '▶' : ' '} ${KIND_LABEL[k.kind]} · ${this.sysName(nextSystem(k)).toUpperCase()} · ${j <= 0 ? 'HERE' : `${j} JUMP${j > 1 ? 'S' : ''}`}`, x0, y);
+        c.fillText(`${k.id === this.tracked ? '▶' : ' '} ${labelOf(k)} · ${this.sysName(nextSystem(k)).toUpperCase()} · ${j <= 0 ? 'HERE' : `${j} JUMP${j > 1 ? 'S' : ''}`}`, x0, y);
         y += 15;
       }
       if (this.priority && this.onPriority) {

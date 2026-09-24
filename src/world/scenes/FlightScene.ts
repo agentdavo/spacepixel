@@ -921,6 +921,9 @@ export class FlightScene implements GameScene, FlightHostScene {
     const notices = this.campaign ? [] : this.contracts.onDocked(d.id);
     const hello = this.campaign ? '' : greeting(this.worldRt.attitudeAt(d), d.faction);
     if (hello) notices.unshift({ text: hello, cls: this.worldRt.attitudeAt(d) < 0 ? 'err' : 'ok' });
+    // The wire: the chapter's headline in the dock log (the ticker carries the rest).
+    const wire = this.campaign ? undefined : this.worldRt.news(d.id, 1)[0];
+    if (wire) notices.push({ text: `WIRE · ${wire.toUpperCase()}` });
     this.lock.target = null;
     this.turrets.recall(this.player);
     this.dockScreen.open({

@@ -6,6 +6,7 @@ import { attitude, fastForward, priceOffset, type ReachInfo } from '../src/game/
 import { stepWorld } from '../src/game/world/step.ts';
 import {
   QUARTER,
+  TRANSIT,
   WINDOW,
   breakEngagement,
   currentSchedule,
@@ -107,6 +108,8 @@ test('status follows the clock; unflown engagements are fought as scheduled and 
   assert.equal(takeable({ ...w, clock: e.at }, e), true);
   w = stepWorld(w, e.at + WINDOW + 1, REACH).w;
   assert.equal(engagementStatus(w, e), 'fought');
+  const taken = stepWorld({ ...fastForward(8), facts: { ...fastForward(8).facts, [`schedule.taken.${e.id}`]: true } }, e.at + WINDOW + 1, REACH).w;
+  assert.ok(!taken.log.some((x) => x.kind === 'schedule.fought' && x.data!.id === e.id), 'a taken engagement waits for the pilot');
   assert.equal(takeable(w, e), false);
   const fought = w.log.find((x) => x.kind === 'schedule.fought' && x.data!.id === e.id);
   assert.ok(fought, 'recorded');
@@ -251,7 +254,7 @@ test('a lapsed engagement cannot be taken; the contract carries its window', () 
   const w: WorldState = { ...fastForward(8), clock: 0 };
   const e = currentSchedule(w, REACH)[0];
   const k = scheduleContract(e, MAP, 1000, w.clock)!;
-  assert.ok(Math.abs(k.duration - (e.at + WINDOW)) < 1);
+  assert.ok(Math.abs(k.duration - (e.at + WINDOW + TRANSIT)) < 1);
   assert.equal(k.expires, 1000 + k.duration);
   assert.equal(takeable({ ...w, clock: e.at + WINDOW + 1 }, e), false);
   assert.equal(emptyWorld().clock, 0);

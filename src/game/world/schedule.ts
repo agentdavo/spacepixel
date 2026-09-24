@@ -35,6 +35,8 @@ import { roll, sysScope, type ReachInfo } from './sim.ts';
 export const QUARTER = 2400;
 /** An engagement is open this long either side of its hour. */
 export const WINDOW = 360;
+/** Grace on a taken engagement's contract: time to reach the field. */
+export const TRANSIT = 600;
 /** The agreed floor, shares per gram. */
 export const FLOOR = 88;
 
@@ -215,7 +217,7 @@ export function resolveSchedule(w: WorldState, from: number, to: number, reach: 
   for (let q = quarterOf(from - WINDOW); q <= quarterOf(to); q++)
     for (const e of scheduleFor(n, reach, q)) {
       const end = e.at + WINDOW;
-      if (end > from && end <= to && !fact(n, `schedule.flown.${e.id}`) && !fact(n, `schedule.broken.${e.id}`)) n = foughtAsScheduled(n, e);
+      if (end > from && end <= to && !fact(n, `schedule.taken.${e.id}`) && !fact(n, `schedule.flown.${e.id}`) && !fact(n, `schedule.broken.${e.id}`)) n = foughtAsScheduled(n, e);
     }
   return n;
 }
@@ -265,7 +267,8 @@ export function scheduleContract(e: Engagement, reach: ReachMap, bookClock: numb
   if (!sys) return null;
   const pay = nearestConcord(reach, e.system);
   const { measure, quota } = measureOf(e);
-  const left = Math.max(120, e.at + WINDOW - worldClock);
+  // Orders taken inside the window: ten more minutes to get there and fly it.
+  const left = Math.max(0, e.at + WINDOW - worldClock) + TRANSIT;
   const reward = scheduleFee(e);
   return {
     id: `schedule:${e.id}`,

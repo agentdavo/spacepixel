@@ -140,9 +140,9 @@ modifiers, an event log), is read and written by everything below.
 | 1 | Guilds: Order of the Keeping, Office of Continuity, Board of Allocation, Rustwake clans, Ascendant Houses — halls, ranks, quartermasters, guild contracts | a rank-up in ~45 min of guild work | 🔧 |
 | 2 | Guild arc missions (hand-written, 3–5 per guild) and conflicting loyalties | arcs complete end to end | 🔧 |
 | 3 | Outposts: restore a hulk as your guild's base | build → upgrade → defend | 🔧 |
-| 4 | World state driven by story flags and player actions: prices, traffic, patrols, station attitude | effects visible within one session | 🔧 |
-| 5 | The Schedule on the star map: fixed engagements to fly or break | breaking one has consequences | 🔧 |
-| 6 | The Signal countdown between chapters | visible, advances with the story | 🔧 |
+| 4 | World state driven by story flags and player actions: prices, traffic, patrols, station attitude | effects visible within one session | ✅ `src/game/world/sim.ts`: STORY_RULES (20 episodes), deeds (ambushes, kills, trading, contracts), ~4 background events/h; readers on prices, tariffs, berths, lanes, boards, ticker; econ-sim world scenarios pass |
+| 5 | The Schedule on the star map: fixed engagements to fly or break | breaking one has consequences | ✅ `schedule.ts` + `ui/ScheduleOverlay.ts`: seeded quarterly Schedule, staged op (fly as ordered / kill the conductor / refuse to withdraw); broken → Ebon +25 %, Continuity hostile, correction next quarter |
+| 6 | The Signal countdown between chapters | visible, advances with the story | ✅ `signal.ts` + `ui/SignalCounter.ts`: pinned to each debrief, a prime per 15 min of free flight, Breath ETA after Ep 13, stops at 2, counts up; map, HUD, title, intercept banners |
 | 7 | Persistent NPC arcs that advance while you're away | ≥ 6 arcs | 🔧 |
 | 8 | Rivals: named aces and bounty targets that remember and escalate | ≥ 5 rivals | 🔧 |
 
