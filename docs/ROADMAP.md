@@ -77,15 +77,15 @@ opens the Reach up around them and gets the game in front of players.
 | 2 | Cinema sequencer — timeline of shots, captions, cues (shared by prologue, cutscenes, trailer) | a shot list is data only (`src/cinema`) | ✅ |
 | 3 | Attract mode / trailer — title idles into the prologue and flybys | runs unattended 10 min | 🔧 idle title → prologue reel |
 | 4 | Photo mode + clip capture (headless webm/GIF from recorded input) | 1080p clip from a replay | |
-| 5 | **Stations** — refineries, salvage yards, bastions, free ports, 1–3 per system | seeded, on star map | 🔧 |
+| 5 | **Stations** — refineries, salvage yards, bastions, free ports, 1–3 per system | seeded, on star map | ✅ |
 | 5b | **Living Reach** — painted planets (giants, terrestrial, volcanic, burning, Lantern-lit), moons, shattered moons, fly-through rings; timetable traffic, patrol wings, raider ambushes, arrivals flashes | seeded & deterministic, stations/gates untouched (`tests/reach.test.ts`) | 🔧 |
-| 6 | **Docking** — request within 5 km, ILS corridor, auto-dock under 1 km, launch | hostiles within 10 km block it | 🔧 |
-| 7 | **Trade** — commodities, supply/demand per station, cargo, credits | pure, unit-tested economy; `npm run econ-sim` bands (safe 1.5–4k / hold, risky ≤ 9k) | 🔧 |
-| 8 | Repair, rearm, reputation per faction | persists in profile | 🔧 |
+| 6 | **Docking** — request within 5 km, ILS corridor, auto-dock under 1 km, launch | hostiles within 10 km block it | ✅ |
+| 7 | **Trade** — commodities, supply/demand per station, cargo, credits | pure, unit-tested economy; `npm run econ-sim` bands (safe 1.5–4k / hold, risky ≤ 9k) | ✅ |
+| 8 | Repair, rearm, reputation per faction | persists in profile | ✅ |
 | 9 | Planetary ports — orbital elevators / descent corridor to the surface port | seamless approach, no load screen | |
-| 10 | Contracts board — courier, escort, bounty jobs generated from station state | uses the campaign runner | 🔧 8 kinds, seeded boards, runner-driven ops (`src/game/contracts`) |
-| 11 | Free-roam between episodes — the Reach stays open, episodes start from a station | save/resume anywhere docked | 🔧 debrief → free flight → priority orders; title CONTINUE |
-| 12 | Ship upgrades & hangar — guns, missiles, shields, engines; livery shop | visible on the model | |
+| 10 | Contracts board — courier, escort, bounty jobs generated from station state | uses the campaign runner | ✅ 8 kinds, seeded boards, runner-driven ops (`src/game/contracts`) |
+| 11 | Free-roam between episodes — the Reach stays open, episodes start from a station | save/resume anywhere docked | ✅ debrief → free flight → priority orders; title CONTINUE |
+| 12 | Ship upgrades & hangar — guns, missiles, shields, engines; livery shop | visible on the model | ✅ |
 | 13 | **MP-0 determinism** — fixed 60 Hz step, seeded RNG, sim/render split | bit-identical 10 min replay | |
 | 14 | Replays + kill-cam from recorded input | replay matches live | |
 | 15 | Headless shard (Node) + bot clients | 200 ships < 8 ms tick | |
@@ -97,25 +97,25 @@ opens the Reach up around them and gets the game in front of players.
 
 Design for 13–20: [docs/MULTIPLAYER.md](MULTIPLAYER.md).
 
-## Batch 4 — the hero's career (in progress)
+## Batch 4 — the hero's career (first versions: all in)
 
 From a borrowed Kestrel to your own frigate: earn shares and standing, refit,
 buy the next hull, take on bigger adversaries.
 
 | # | Milestone | Pass/fail | Status |
 |---|---|---|---|
-| 1 | Per-ship stats, faction weapon families, damage types | Kestrel vs Cantor TTK 3–8 s | 🔧 |
-| 2 | Locational damage: capital subsystems, fighter zones, visible damage | subsystem effects felt | 🔧 |
-| 3 | Directional shields, collapse/regen visuals | facings on HUD | 🔧 |
-| 4 | Progression line T1→T6: Kestrel → heavy fighter → gunship → corvette → frigate | each tier flyable | 🔧 |
-| 5 | Rustwake line, civilian freighters/tankers/liners, mid-tier warships | in hangar | 🔧 |
+| 1 | Per-ship stats, faction weapon families, damage types | Kestrel vs Cantor TTK 3–8 s | ✅ |
+| 2 | Locational damage: capital subsystems, fighter zones, visible damage | subsystem effects felt | ✅ |
+| 3 | Directional shields, collapse/regen visuals | facings on HUD | ✅ |
+| 4 | Progression line T1→T6: Kestrel → heavy fighter → gunship → corvette → frigate | each tier flyable | ✅ |
+| 5 | Rustwake line, civilian freighters/tankers/liners, mid-tier warships | in hangar | ✅ |
 | 6 | Shipyard + outfitting (hardpoints, shields, armour, engines, reactor) | fit changes stats & model | ✅ `src/game/outfitting`, SHIPYARD / OUTFITTING dock tabs, turrets fire, `npm run balance` *outfit* |
-| 7 | Contracts board: courier, haul, escort, bounty, patrol, salvage, recon, sorties | seeded, tested | 🔧 |
-| 8 | Free-roam career loop between episodes | story resumes on demand | 🔧 |
-| 9 | Living Reach: ringed giants, moons, city lights, traffic lanes, patrols, pirates | perf budget holds | 🔧 |
-| 10 | People: concourse NPCs, branching dialog, rumours | ≥ 12 conversations | 🔧 |
-| 11 | Voices: procedural OVA voice synth (+ optional Web Speech), subtitles everywhere | < 17 chars/s | 🔧 |
-| 12 | Hollow hangar bays, collisions, economy rebalance | next ship in 30–60 min | 🔧 |
+| 7 | Contracts board: courier, haul, escort, bounty, patrol, salvage, recon, sorties | seeded, tested | ✅ |
+| 8 | Free-roam career loop between episodes | story resumes on demand | ✅ |
+| 9 | Living Reach: ringed giants, moons, city lights, traffic lanes, patrols, pirates | perf budget holds | ✅ |
+| 10 | People: concourse NPCs, branching dialog, rumours | ≥ 12 conversations | ✅ |
+| 11 | Voices: procedural OVA voice synth (+ optional Web Speech), subtitles everywhere | < 17 chars/s | ✅ |
+| 12 | Hollow hangar bays, collisions, economy rebalance | next ship in 30–60 min | ✅ |
 ### Combat depth ✅
 
 | Piece | Pass/fail | Where |
