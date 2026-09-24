@@ -6,6 +6,7 @@ import type { ColorStop } from '@/render/materials/PaletteRamp';
 import type { StarSystem, Universe } from './Universe';
 import { placeStations, systemRisk } from './stations';
 import { surveySystem } from './bodies';
+import { surfacePorts } from './surfacePorts';
 
 /**
  * Seeded Meridian Reach generator. Six hand-placed key systems anchor the
@@ -188,6 +189,8 @@ export function generateUniverse(seed = 1994, count = 22): Universe {
   }
   // Survey pass: kinds, moons, landmarks, flavour — appended, never moved.
   for (const sys of systems.values()) surveySystem(seed, sys);
+  // Planetary ports: a city under every orbital port's tether (needs the planet kinds).
+  for (const sys of systems.values()) sys.surfacePorts = surfacePorts(seed, sys);
 
   return { seed, systems, start: 'meridian' };
 }
