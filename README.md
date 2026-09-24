@@ -29,6 +29,7 @@ npm run econ-sim       # trade-route balance on the seeded Reach (profit per hol
 npm run ai-sim         # headless dogfight/formation sim with pass/fail numbers
 npm run balance        # headless combat balance: time-to-kill bands, pass/fail
 npm run perf           # frame-time budgets (meaningful on real GPUs only)
+npm run attract-check  # title attract loop soak (prologue ↔ trailer): GPU objects / heap / DOM flat
 npm run shot -- --jpg --shot 'hero:cam=0&t=3'   # headless screenshots
 ```
 
@@ -61,6 +62,7 @@ still runs (TSL ink twin), but compute particles are disabled there.
 | L | codex / archive |
 | N | mute |
 | F3 | dev panel (perf graph, latency) · F1–F6 G-buffer views |
+| F10 | photo mode: freeze, free orbit (drag / arrows, wheel or [ ], Q/E roll), **P** / F12 save PNG, Esc resume |
 
 ## Docking & trade
 
@@ -310,7 +312,8 @@ Captures: `?scene=flight&dock=docked&station=meridian-bastion-2&docktab=shipyard
 families, `&freeze=S` holds a frame) · `fx`
 (particles) · `setpieces&piece=monolith|megagate|derelict|nebula|bastion|pilgrimage|…`
 · `comms` · `audio` · `prologue` (the ~60 s cold open; `&t=SECONDS` seeks,
-loops as an attract reel). Add `&episode=N` to `flight` to jump into a
+loops as an attract reel) · `trailer` (the 90 s gameplay trailer; `&t=`
+seeks, `&reel=N` plays N× faster). Add `&episode=N` to `flight` to jump into a
 campaign episode.
 
 **Prologue.** A new profile sees the cold open once before Episode 1 (skip:
@@ -321,6 +324,54 @@ postFx envelopes, captions, music / SFX / stage cues — all pure functions of
 time, so any frame can be seeked and screenshotted.
 
 ![Prologue](docs/screenshots/prologue-2-shattering.jpg)
+
+**Trailer.** `?scene=trailer` (also TRAILER on the title menu): 90 s cut on
+the same sequencer — the Signal's prime count, "In the Long Dark…", then
+three movements behind OVA eyecatch cards. **FIGHT.** a catapult launch, a
+head-on merge, a tail chase, a break, the micro-missile circus, a Cathedral
+with burning batteries, a dreadnought's fore shield collapsing, a line of
+battle (cut on the 156 bpm combat score's beat). **TRADE.** Castellan's
+rings, haulers through a Lantern, a liner, the corridor and the hollow bay,
+the real dock screen (market, a concourse greeting). **RISE.** the model
+sheet up the ladder, the Kestrel → Valiant line at true scale, a frigate
+broadside. Title card, tagline, end slate. The fights are the game's own
+sims driven by scripted pilots (`src/cinema/TrailerStage.ts`: kinematic
+paths, a fire flag, scripted kills; bolts, beams, shield facings, missiles,
+section blasts and craters are real); the Reach is the live Meridian system;
+UI shots open the dock screen display-only on a demo ledger
+(`src/cinema/TrailerUi.ts`). Shot list: `src/cinema/trailer.ts`
+(`tests/trailer.test.ts`: ~90 s, cards in order, cams tile, beat-cut combat,
+readable subtitles).
+
+**Attract mode.** Left idle 45 s, the title plays the prologue, comes back,
+then the trailer, and so on; any key, click or pad input returns to the
+title. Scene swaps tear the old scene down (GPU buffers, materials, the ink
+pipeline's render targets, DOM), so it runs unattended: `npm run
+attract-check` soaks the loop headless (`?idle=6&reel=24`, 3 cycles ≈ 12 min
+of unattended play) and checks renderer.info geometries / textures, JS heap
+and DOM size cycle to cycle.
+
+**Clips.** The capture pipeline is frame-stepped (`?record=fps`: each frame
+advances exactly 1/fps, CSS animations run on the film clock), so any scene
+renders to video headless, in parallel ranges:
+
+```bash
+export VITE_CACHE_DIR=/tmp/vc      # own Vite dep cache on a shared machine
+node scripts/record.mjs --scene trailer --fps 24 --from 0      --to 31.292 --out frames --port 5405 &
+node scripts/record.mjs --scene trailer --fps 24 --from 31.292 --to 62.015 --out frames --port 5407 &   # start ~1 min apart
+node scripts/record.mjs --scene trailer --fps 24 --from 62.015 --to 89.385 --out frames --port 5408 &
+node scripts/audio-render.mjs --only trailer --out audio   # the soundtrack: music, SFX, every voiced line
+FFMPEG=/path/to/ffmpeg node scripts/make-video.mjs --frames frames --audio audio/trailer.wav --crf 23 --out trailer-720p.mp4
+```
+
+Ranges split on shot boundaries (sims replay from the cut). Photo mode (F10)
+covers stills.
+
+![Trailer: FIGHT.](docs/screenshots/trailer-fight-card.jpg)
+![Trailer: the missile circus](docs/screenshots/trailer-itano.jpg)
+![Trailer: a shield facing goes](docs/screenshots/trailer-shield.jpg)
+![Trailer: Castellan](docs/screenshots/trailer-giant.jpg)
+![Trailer: the ladder at true scale](docs/screenshots/trailer-lineup.jpg)
 
 **Shipyard.** 28 hull designs. The Vanguard progression line runs T1 Kestrel
 (17 m) → T2 Super Kestrel → T3 Gauntlet heavy fighter → T4 Bulwark gunship
