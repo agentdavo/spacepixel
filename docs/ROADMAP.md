@@ -129,7 +129,7 @@ buy the next hull, take on bigger adversaries.
 | Capital subsystems with effects; B sub-targets | turret to a wing of 4: 5–15 s | `src/sim/Damage.ts`, `Combat.ts`, `Capitals.ts` |
 | Fighter damage zones (thrust, roll drift, smoke) | unit-tested routing | `Damage.ts`, `src/world/DamageFx.ts` |
 | Directional capital shields, collapse / regen visuals | facing routing unit-tested | `WeaponVisuals.ts`, `CombatFx.ts` |
-| Balance | Kestrel vs Cantor 3–8 s · capital to a squadron 60–180 s · Mk III Resolute vs Lantern Guard 60–120 s / 30–80 % hull · Mk III Valiant vs Vesper 45–120 s / 30–80 % hull · PD thins swarms | `npm run balance` |
+| Balance | Kestrel vs Cantor 3–8 s · capital to a squadron 60–180 s · Mk III Resolute vs Lantern Guard 60–120 s / 30–80 % hull · Mk III Valiant vs Vesper 45–120 s / 30–80 % hull · stock Resolute beats a Lantern Guard narrowly (5–35 % hull) · stock Valiant vs Vesper 15–40 % hull · PD thins swarms | `npm run balance` |
 
 ![Shield facing collapse](screenshots/combat-shield.jpg)
 
@@ -175,18 +175,10 @@ modifiers, an event log), is read and written by everything below.
 - Planet LOD switches compile the mid / far surface pipeline the first time a
   body crosses a threshold (a one-off hitch per body kind); prewarming them
   with `compileAsync` at system load would hide it.
-- Label declutter hides low-priority labels when the screen is crowded; the
-  arrivals board can end up two rings out from the Lantern on a leader line.
-  Off-screen edge arrows (target, nav, contracts, distress) are not packed yet.
-- The bridge camera rides high over a forward battery; turrets training up at
-  a target overhead still poke their barrels into the bottom of the frame
-  (by design — it's the Yamato shot — but a bow-view toggle would help).
+- Label declutter hides low-priority labels when the screen is crowded (by
+  design: the lowest priorities fade out first).
 - Bay dust fades only for the docking target / nearest bay: a camera parked
   in another ship's hangar (cutaways of wingmen) still sees streaks.
-- A stock (unfitted) Resolute loses a solo duel with a Lantern Guard (a stock
-  Valiant scrapes past a Vesper with ~18 % hull; `npm run balance` INFO
-  lines): fitting out is the intended answer, but the first T5 sortie can
-  surprise.
 
 Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
 
@@ -197,6 +189,16 @@ Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
   door outline and the curtain's wide edge glow; all three toned down.
 - **Label declutter** — one placement pass for every world-space label
   (`src/ui/HudLabels.ts`, pure packer `src/ui/labelPlacement.ts`, tested).
+- **Edge arrows** — off-screen target, nav, contract and distress arrows share
+  one track inset round the screen edge and are packed before the labels
+  (`HudLabels.edge()`, pure packer `src/ui/edgePlacement.ts`, tested): true
+  spot where the ray from the centre crosses the track, priority order,
+  bounded slides, HUD panels pushed clear of, same-kind collisions folded
+  into one arrow with a ×N badge, target and nav pinned, eased movement and
+  per-arrow hysteresis. The target arrow pointed the wrong way for ships
+  behind the camera (its angle came from the projected point); fixed. The
+  arrivals board now sits under the nav diamond, one ring out at most
+  (`docs/screenshots/edge-arrows-*.jpg`).
 - **Planet shader LOD** — full / mid / far impostor by disc size
   (`src/world/planets/lod.ts`, tested). Per pixel, a terrestrial world with
   clouds and cities drops from 16 fBm octaves (+ cell noise; + Worley on
@@ -216,8 +218,24 @@ Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
   1.5× transfer) brings it back to 54 % (51 % with the turret rigs merged).
   With both: Resolute Mk III vs Lantern Guard ~74 s / 43 % hull, Valiant
   Mk III vs Vesper ~78 s / 44 %.
+- **Stock warship fits** — an all-Mk I Resolute lost a solo duel with a
+  Lantern Guard (0 % hull) and a stock Valiant scraped past a Vesper with
+  ~18 % hull. Both now leave the yard with Mk II kit (`STOCK_OVERRIDE` in
+  `src/game/outfitting/fit.ts`): Resolute Mk II mounts, driver, torpedoes,
+  shield and plate; Valiant Mk II rail mounts and shield. Utility ratios are
+  now taken against the Mk I stock item (`baselineFit`), so the Mk II kit
+  counts. Mk II alone doesn't save the Resolute (the picket's PD takes
+  nearly every Mk I/II torpedo), so its catalogue hull goes 3000 → 4500.
+  Stock Resolute vs Lantern Guard ~110 s / ~22 % hull (band 5–35 %, 6 of 6
+  seeds; 12 of 12 on a wider sweep at ~32 %), stock Valiant vs Vesper ~81 s /
+  ~24 % hull (band 15–40 %). Mk III Resolute now ~78 s / ~66 % hull (was
+  49 %, band 30–80 % unchanged); Mk III Valiant unchanged.
 - **Valiant bridge camera** — eye 0.16 L above / 0.08 L behind the bridge over
   a forward battery; the mounts sit in the bottom sixth (tested).
+- **Bow view** — V on a bridge hull goes bridge → bow → lock → …: the eye
+  sits on the foredeck forward of the bow battery's full traverse, so mounts
+  training up overhead stay behind the camera (`bowFraming` in
+  `src/game/shipyard/flight.ts`, tested; `docs/screenshots/bow-view-*.jpg`).
 - **Hires** — Magpie (wing) and Brennick (−30 % repairs) verified end to end
   by `npm run career-check` (new profile → free flight → hires → contract →
   launch → formation + fight → dock → repair → shipyard → reload).

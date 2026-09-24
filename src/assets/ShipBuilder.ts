@@ -109,6 +109,8 @@ export interface ShipModel {
   /** Bounding radius in metres (after scale). */
   radius: number;
   length: number;
+  /** Rest-pose bounds in the ship frame, metres (after scale; joints included). */
+  bounds: Box3;
   /** Total hull triangle count (all meshes). */
   triangles: number;
   setThrottle(t: number): void;
@@ -545,6 +547,7 @@ export function buildShip(bp: Blueprint, liveryOverride?: Partial<Livery>): Ship
     turrets,
     radius: Math.sqrt(r2) * scale,
     length: (box.max.z - box.min.z) * scale,
+    bounds: new Box3(box.min.clone().multiplyScalar(scale), box.max.clone().multiplyScalar(scale)),
     triangles,
     setThrottle(t: number) {
       const k = MathUtils.clamp(t, 0, 1.6);

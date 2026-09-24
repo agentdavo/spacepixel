@@ -3,6 +3,7 @@
  * Headless audio verification.
  *
  *   node scripts/audio-render.mjs [--out <dir>] [--only name,name] [--port 5198]
+ *   (append +cast to a name to render it with the recorded voices: voice-radio+cast)
  *
  * Boots Vite, opens a blank page in Chromium, imports src/audio/offline.ts and
  * renders each scenario (music moods + SFX) on an OfflineAudioContext through
@@ -250,8 +251,8 @@ try {
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
   await page.goto(`http://127.0.0.1:${port}/__audio.html`);
   const names = await page.evaluate(async () => Object.keys((await import('/src/audio/offline.ts')).SCENARIOS));
-  for (const name of names) {
-    if (only.length && !only.includes(name)) continue;
+  // `--only voice-radio+cast` renders a scenario with the recorded voices.
+  for (const name of only.length ? only.filter((n) => names.includes(n.replace(/\+cast$/, ''))) : names) {
     const t0 = Date.now();
     let r;
     try {

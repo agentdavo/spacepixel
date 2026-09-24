@@ -3,12 +3,14 @@ import { CAST } from '@/game/campaign/cast';
 import { Comms } from '@/ui/Comms';
 import { Subtitles } from '@/ui/Subtitles';
 import { npcVoice, registerVoice } from '@/audio/voice';
-import { BARK_PRIORITY, BarkLimiter, barkLine, trafficCargo, trafficHail, type BarkKind } from './barks';
+import { BANTER, BARK_PRIORITY, DOCK_LINES, BarkLimiter, barkLine, orderKind, pickBanter, trafficCargo, trafficHail, type BarkKind } from './barks';
 
 /**
  * In-flight radio: wingman and enemy combat barks (target splashed, taking
  * hits, missile inbound, wing down, open-band taunts and last words) and
  * hails from passing traffic ("Freighter Anselm's Patience, cargo: rations").
+ * The lead wingman answers the Point's wing orders (keys 1–4) in their own
+ * voice, and on a long quiet leg the wing chats among itself.
  * Everything is voiced and subtitled through Comms and rate-limited by
  * BarkLimiter so a furball never becomes a wall of chatter.
  *
@@ -64,29 +66,6 @@ const PORTRAIT_BY_FACTION: Record<string, Character['portrait']> = {
 const COLOR: Record<string, string> = { choir: '#ff5fd0', rustwake: '#ffae4f', concord: '#7dffb2' };
 const LABEL: Record<string, string> = { choir: 'ZENITH HEGEMONY · CHOIR', rustwake: 'RUSTWAKE · SCRAPJACK', concord: 'TERRAN DIRECTORATE' };
 
-const DOCK_LINES: Record<string, { cleared: string; auto: string; launch: string }> = {
-  concord: {
-    cleared: '{name} Control. Vanguard, you are cleared to berth {berth}. Corridor is lit. Keep the light.',
-    auto: 'Guidance has you, Vanguard. Hands off the stick. Seals standing by.',
-    launch: 'Catapult hot. Good hunting, Vanguard.',
-  },
-  choir: {
-    cleared: 'Be witnessed, Directorate. {name} grants you berth {berth}. Fly the corridor exactly.',
-    auto: 'Our guidance holds you now. Be still, and be welcome.',
-    launch: 'Ascend, pilot. The Line is watching.',
-  },
-  rustwake: {
-    cleared: '{name}. Berth {berth}\'s yours. Don\'t scratch anything you can\'t pay for.',
-    auto: 'Tractor\'s got you, love. Don\'t touch anything shiny.',
-    launch: 'Off you go. Bring us back something worth breaking.',
-  },
-  carrier: {
-    cleared: 'Dawn Control, Vanguard One: you are cleared to the bow hangar. Deck is green.',
-    auto: 'Guidance has you. Deck is green. Welcome home, Point.',
-    launch: 'Catapult hot. Deck is green. Good hunting, Vanguard.',
-  },
-};
-
 export class FlightRadio {
   private own: Comms | null = null;
   private readonly limiter = new BarkLimiter();
@@ -101,6 +80,10 @@ export class FlightRadio {
   /** Cutscene subtitles (docking / launch cutaways own the frame; no HUD comms). */
   private subs: Subtitles | null = null;
   private dockPhase = 'free';
+  /** The last frame, so a wing order between frames knows who is flying. */
+  private frame: RadioFrame | null = null;
+  private lastBanter = 0;
+  private readonly banterUsed = new Set<number>();
 
   constructor(private readonly uiRoot: HTMLElement) {}
 
@@ -164,6 +147,7 @@ export class FlightRadio {
   update(dt: number, f: RadioFrame): void {
     if (!this.enabled) return;
     this.story = f.story;
+    this.frame = f;
     this.time += dt;
     if (this.capture) {
       const kind = this.capture as BarkKind;
@@ -246,6 +230,28 @@ export class FlightRadio {
         break;
       }
     }
+
+    // ── cruise banter: the wing talks among itself on a long quiet leg ──
+    if (!f.story && !this.engaged && this.hotT > 30 && this.time - this.lastBanter > 90 && this.time - this.lastHail > 12 && !this.own?.busy) {
+      this.lastBanter = this.time;
+      const flying = wing.map((w) => wingSpeaker(w.name)!);
+      const i = pickBanter(flying, this.banterUsed, this.n++);
+      if (i >= 0) {
+        this.banterUsed.add(i);
+        if (this.banterUsed.size >= BANTER.length) this.banterUsed.clear();
+        this.comms(f).play({ id: `banter-${i}-${this.n}`, trigger: { on: 'start' }, lines: BANTER[i].map(([who, text]) => ({ who, text })), priority: 0 });
+      }
+    }
+  }
+
+  /** The Point gave a wing order (keys 1–4): the lead wingman answers it. */
+  order(order: 'formUp' | 'attackMyTarget' | 'engageAtWill' | 'coverMe', hasTarget: boolean): void {
+    const f = this.frame;
+    if (!this.enabled || !f || f.quiet || !f.player.alive) return;
+    const lead = f.ships.find((s) => s.alive && !s.isPlayer && s.team === f.player.team && wingSpeaker(s.name));
+    if (!lead) return;
+    this.lastBanter = this.time;
+    this.bark(orderKind(order, hasTarget), f, wingSpeaker(lead.name)!);
   }
 
   private bark(kind: BarkKind, f: RadioFrame, who: string, vars: Record<string, string> = {}): void {

@@ -43,6 +43,8 @@ export interface LabelRequest {
   pinned?: boolean;
   /** Slot index it held last frame (tried first). */
   prefer?: number;
+  /** Rings it may use (default: the options' `rings`). */
+  rings?: number;
 }
 
 export interface LabelPlacement {
@@ -143,9 +145,9 @@ export function placeLabels(reqs: readonly LabelRequest[], o: PlacementOptions):
     return true;
   };
   const out: LabelPlacement[] = new Array(reqs.length);
-  const total = rings * SLOTS_PER_RING;
   const order2: number[] = [];
   for (const { r, i } of order) {
+    const total = Math.max(1, Math.min(rings, r.rings ?? rings)) * SLOTS_PER_RING;
     // Candidate order: last frame's slot, then ring by ring.
     order2.length = 0;
     if (r.prefer !== undefined && r.prefer >= 0 && r.prefer < total) order2.push(r.prefer);

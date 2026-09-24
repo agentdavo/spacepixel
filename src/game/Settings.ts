@@ -12,7 +12,8 @@ import { SOUNDTRACK_SETTINGS, describeSoundtrack, type SoundtrackSetting } from 
  * size / off · F9 second language line. Listeners (`onSettings`) re-apply
  * CSS, voice state and the score.
  */
-export type VoiceMode = 'synth' | 'speech' | 'off';
+/** cast: recorded neural voices (public/voice), synth where a line has no clip. */
+export type VoiceMode = 'cast' | 'synth' | 'speech' | 'off';
 export type SubSize = 's' | 'm' | 'l';
 
 export interface GameSettings {
@@ -26,9 +27,9 @@ export interface GameSettings {
 }
 
 const KEY = 'vanguard.settings.v1';
-const DEFAULTS: GameSettings = { voice: 'synth', subtitles: true, subSize: 'm', subSecond: true, soundtrack: 'auto' };
+const DEFAULTS: GameSettings = { voice: 'cast', subtitles: true, subSize: 'm', subSecond: true, soundtrack: 'auto' };
 
-const VOICES: VoiceMode[] = ['synth', 'speech', 'off'];
+const VOICES: VoiceMode[] = ['cast', 'synth', 'speech', 'off'];
 const SIZES: SubSize[] = ['s', 'm', 'l'];
 
 function load(): GameSettings {
@@ -38,6 +39,8 @@ function load(): GameSettings {
     if (raw) {
       const r = JSON.parse(raw) as Partial<GameSettings>;
       if (VOICES.includes(r.voice as VoiceMode)) s.voice = r.voice as VoiceMode;
+      // 'synth' was the only voice before the recorded cast: move old saves over once.
+      if (s.voice === 'synth' && !(r as { castVoices?: boolean }).castVoices) s.voice = 'cast';
       if (typeof r.subtitles === 'boolean') s.subtitles = r.subtitles;
       if (SIZES.includes(r.subSize as SubSize)) s.subSize = r.subSize as SubSize;
       if (typeof r.subSecond === 'boolean') s.subSecond = r.subSecond;
@@ -75,7 +78,7 @@ export function onSettings(cb: (s: GameSettings) => void): () => void {
 export function setSettings(patch: Partial<GameSettings>): void {
   Object.assign(settings, patch);
   try {
-    localStorage.setItem(KEY, JSON.stringify(settings));
+    localStorage.setItem(KEY, JSON.stringify({ ...settings, castVoices: true }));
   } catch {
     /* session only */
   }
@@ -85,7 +88,7 @@ export function setSettings(patch: Partial<GameSettings>): void {
 
 /** Human-readable summary for menus / toasts. */
 export function describeSettings(s: GameSettings = settings): string {
-  const v = s.voice === 'synth' ? 'SYNTH' : s.voice === 'speech' ? 'SPEECH' : 'OFF';
+  const v = s.voice === 'cast' ? 'CAST' : s.voice === 'synth' ? 'SYNTH' : s.voice === 'speech' ? 'SPEECH' : 'OFF';
   const sub = s.subtitles ? s.subSize.toUpperCase() : 'OFF';
   const score = s.soundtrack === 'auto' ? 'AUTO' : s.soundtrack.toUpperCase();
   return `VOICE ${v} [F7] · SUBTITLES ${sub} [F8] · 日本語 ${s.subSecond ? 'ON' : 'OFF'} [F9] · SCORE ${score} [⇧F7]`;

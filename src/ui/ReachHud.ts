@@ -199,7 +199,7 @@ export class ReachHud {
       const list = o.traffic.arrivals(o.navGate.to, 2);
       const pt = this.project(o.navGate.center, world, cam);
       if (list.length && !pt.behind && pt.x > 0 && pt.x < this.w && pt.y > 0 && pt.y < this.h) {
-        // Its own label, anchored on the nav diamond: it gives way to the Lantern's name (and everything else).
+        // Its own label, anchored on the nav diamond: it gives way to the Lantern's name and every higher priority (LABEL_PRIORITY).
         hudLabels.add({
           id: 'arrivals',
           x: pt.x,
@@ -211,6 +211,9 @@ export class ReachHud {
             return { text: `INBOUND ${m}:${String(sec).padStart(2, '0')}  ${TRAFFIC_ROLES[s.role].label.toUpperCase()} ${s.name.toUpperCase()}`, color: 'rgba(111,230,255,0.8)' };
           }),
           priority: LABEL_PRIORITY.arrivals,
+          // Under the nav diamond (the Lantern's name takes its right), never more than one ring out.
+          slot: 7,
+          rings: 2,
         });
       }
     }
@@ -264,19 +267,9 @@ export class ReachHud {
       c.lineWidth = 1.2;
       hudLabels.obstacle(pt.x - r, pt.y - r, r * 2, r * 2);
     } else {
-      // Edge arrow toward the call.
+      // Edge arrow toward the call (packed on the shared edge track by HudLabels.flush).
       world.toRender(a.position, _p).applyMatrix4(cam.matrixWorldInverse);
-      const ang = Math.atan2(-_p.y, _p.x);
-      const rr = Math.min(this.w, this.h) / 2 - 90;
-      const x = this.w / 2 + Math.cos(ang) * rr;
-      const yy = this.h / 2 + Math.sin(ang) * rr;
-      c.fillStyle = RED;
-      c.beginPath();
-      c.moveTo(x + Math.cos(ang) * 12, yy + Math.sin(ang) * 12);
-      c.lineTo(x + Math.cos(ang + 2.5) * 9, yy + Math.sin(ang + 2.5) * 9);
-      c.lineTo(x + Math.cos(ang - 2.5) * 9, yy + Math.sin(ang - 2.5) * 9);
-      c.closePath();
-      c.fill();
+      hudLabels.edge({ id: `edge:distress:${a.id}`, dir: { x: _p.x, y: _p.y }, color: RED, shape: 'tri', fill: true, size: 12, kind: 'distress', priority: LABEL_PRIORITY.distress });
     }
   }
 

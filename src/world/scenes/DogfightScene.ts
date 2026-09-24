@@ -33,7 +33,8 @@ import { LightRig, LIGHT_PRESETS } from '@/render/LightRig';
 import { noInkMRT } from '@/render/materials/InkChannels';
 import { useBlendedMRT } from '../BlendedMRT';
 import { postFx } from '@/render/post/PostFx';
-import { applyShipyardFlight, requestedShip } from './shipyardFlight';
+import { applyShipyardFlight, frameShipyardFlight, requestedShip } from './shipyardFlight';
+import { cameraOverride, type ShipView } from '@/game/shipyard/flight';
 
 /**
  * Milestones 13–14 demo: `?scene=dogfight`.
@@ -80,6 +81,9 @@ export class DogfightScene implements GameScene {
   readonly director = new CameraDirector(this.camera, this.chase);
   readonly guns = new DebugGuns(1024, 10, 6);
   readonly player: ShipEntity;
+  /** Chase framing the player's hull rides; bridge hulls toggle bridge ↔ bow on V. */
+  private shipView: ShipView = 'chase';
+  private bowView = cameraOverride() === 'bow';
   readonly wing: ShipEntity[] = [];
   readonly bandits: ShipEntity[] = [];
   private backdrop = new Backdrop(BACKDROPS.meridian);
@@ -107,7 +111,7 @@ export class DogfightScene implements GameScene {
     // Player + wingmen. `?ship=<id>` flies any catalogued hull (handling + camera scale with size).
     this.player = this.fleet.spawn(requestedShip(), 'concord', ORIGIN.clone(), FWD, { isPlayer: true });
     setPersonality(this.player, PERSONALITIES.ace);
-    applyShipyardFlight(this.player, this.chase, this.camera);
+    this.shipView = applyShipyardFlight(this.player, this.chase, this.camera, this.bowView).view;
     const spread = Math.max(40, this.player.model.length * 0.9);
     for (const p of [new Vector3(spread, 0, -spread * 0.8), new Vector3(-spread, 4, -spread * 0.8)]) {
       const s = this.fleet.spawn('vf27-kestrel', 'concord', ORIGIN.clone().add(p), FWD);
@@ -313,7 +317,7 @@ export class DogfightScene implements GameScene {
     this.overlay!.textContent =
       `WING ${ORDER_LABEL[this.order]}  ·  wing ${alive(this.wing)}/2  bandits ${alive(this.bandits)}/4  ·  target ${tgt}` +
       `  ·  shots ${this.guns.shots} hits ${this.guns.hits} kills ${this.guns.kills}${brainOf(this.player).autopilot ? '  ·  AUTOPILOT' : ''}\n` +
-      `[F] form up  [G] attack my target  [H] engage at will  [J] cover me  [N] break & attack  [T] target  [V] camera  [P] autopilot`;
+      `[F] form up  [G] attack my target  [H] engage at will  [J] cover me  [N] break & attack  [T] target  [V] camera${this.shipView !== 'chase' ? ' (bridge / bow)' : ''}  [P] autopilot`;
   }
 
   private setOrder(order: Order): void {
@@ -335,6 +339,13 @@ export class DogfightScene implements GameScene {
     } else if (code === 'KeyP') {
       setAutopilot(this.player, !brainOf(this.player).autopilot);
     } else if (code === 'KeyV') {
+      // Bridge hulls: bridge → bow → lock → orbit.
+      if (this.bowView || (this.shipView !== 'chase' && this.director.kind === 'chase')) {
+        this.bowView = !this.bowView;
+        this.shipView = frameShipyardFlight(this.player, this.chase, this.camera, this.bowView).view;
+        this.chase.snap(this.player.flight);
+        if (this.bowView) return;
+      }
       const tgt = this.player.target ? (this.subjects.get(this.player.target.id) ?? null) : null;
       const order = ['chase', 'lock', 'orbit'] as const;
       const next = order[(order.indexOf(this.director.kind as (typeof order)[number]) + 1) % order.length];
@@ -356,7 +367,8 @@ export class DogfightScene implements GameScene {
   }
 
   cameraLabel(): string {
-    return `${this.director.label()} · WING ${ORDER_LABEL[this.order]}`;
+    const shot = this.director.kind === 'chase' && this.shipView !== 'chase' ? this.shipView.toUpperCase() : this.director.label();
+    return `${shot} · WING ${ORDER_LABEL[this.order]}`;
   }
 
   cycleCamera(): void {

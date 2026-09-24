@@ -11,6 +11,7 @@ pull before touching their files, and open PRs into the lead branch.
 | Turrets, shields, weapon impacts, subsystems, kill paths (batch 6) | **Turrets, shields and subsystems** thread · `claude/project-thread-dl05kd` (took over from the turrets session 24 Sep ~10:40; draft PR #1 into the lead branch) | `src/sim/TurretRig.ts`, `Subsystems.ts`, `Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, `src/fx/impacts.ts`, `src/world/{WeaponVisuals,CombatFx,ImpactDecals,ShieldGeometry}.ts`, impact SFX, `src/cinema/gunnery.ts` |
 | Character voices, chat, soundtrack | **Soundtrack and voices** thread (continues `claude/ova-soundtrack-voices`) | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
 | Kessen mecha race (design approved 24 Sep; now in code) | **Kessen mecha race** thread · `claude/project-thread-t748fw` (continues `claude/mecha-race-design-qtw680`) | `src/kessen/**`, `src/world/scenes/KessenTestScene.ts` (+ its one line in `scenes/index.ts`), `tests/kessen.test.ts`, `docs/KESSEN.md`, `docs/concepts/kessen/**`, `scripts/concepts/kessen/**` |
+| Gameplay polish: stock warship fits, bridge bow view, off-screen edge arrows | **Spacepixel gameplay improvements** thread · `claude/project-thread-k48ga1` (PRs into the lead branch) | stock fits in `src/game/outfitting/fit.ts` + outfit bands in `src/sim/balance.ts`; camera framing in `src/game/shipyard/flight.ts`, `Outfitter.frame`, `shipyardFlight.ts`, V-key handling in `FlightScene`/`DogfightScene`; edge arrows in `src/ui/edgePlacement.ts` (new), `HudLabels.ts`, and the arrow code in `FlightHud`, `ContractHud`, `ReachHud` |
 
 The paused lead batch 6 worktrees (`worktree-agent-*`) have been ported onto
 `claude/project-thread-dl05kd`; nothing left to mine there.
@@ -195,6 +196,26 @@ The lead session is stopping here; a project thread continues from this file.
   `docs/MULTIPLAYER.md`.
 - Batch 3 items still open: attract/trailer "10 min unattended" is verified
   (3 cycles); photo mode exists; planetary ports have no contract kinds.
+
+## Recorded voices (voices session)
+
+- Every written line is pre-recorded with Piper neural voices into
+  `public/voice/` (clips + `manifest.json`); `VoiceBox` plays the clip in the
+  new default voice mode `cast` and falls back to the synth for lines without
+  one. **After adding or changing spoken lines, run `npm run voices`** (see
+  README, *People, voices & subtitles*) or they stay on the synth.
+- Touches outside this area: `VoiceMode` gained `'cast'` in
+  `src/game/Settings.ts` (old saves move to it once); `DOCK_LINES` moved from
+  `FlightRadio.ts` into `barks.ts`; `package.json` has a `voices` script.
+
+## Wing chat (voices session)
+
+- Wing orders (keys 1–4) get a spoken answer from the lead wingman, in
+  character (`order-*` barks in `src/dialog/barks.ts`); "attack my target"
+  with no lock gets a "which one?". The only touch outside this area is one
+  line in `FlightScene.onKey`: `this.radio.order(this.wingOrder, !!this.lock.target)`.
+- On a long quiet leg (30 s clear of hostiles, 90 s between exchanges, never
+  during an episode) the wing chats among itself: `BANTER` in `barks.ts`.
 
 ## Requests
 

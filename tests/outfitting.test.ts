@@ -6,7 +6,7 @@ import { CATALOG, CATALOG_BY_ID } from '../src/game/shipyard/catalog.ts';
 import { LOADOUTS, SHIP_STATS } from '../src/sim/Loadouts.ts';
 import { newLedger, type TradeLedger } from '../src/game/economy.ts';
 import { ITEMS, ITEM_BY_ID, MAKERS, itemId, type Item } from '../src/game/outfitting/items.ts';
-import { computeFit, fits, normaliseFit, ratedPower, slotsFor, stockFit, type Fit } from '../src/game/outfitting/fit.ts';
+import { baselineFit, computeFit, fits, normaliseFit, ratedPower, slotsFor, stockFit, type Fit } from '../src/game/outfitting/fit.ts';
 import {
   activeShip,
   buyHull,
@@ -86,7 +86,9 @@ test('every flyable hull: slots from its hardpoints, a stock fit that fills them
     assert.ok(r.power.draw <= r.power.output, `${e.id} stock ${r.power.draw}/${r.power.output} MW`);
     assert.equal(r.power.output, ratedPower(e));
     assert.equal(r.cargo, e.stats.cargo, `${e.id} cargo`);
-    assert.deepEqual(r.flight, { speed: 1, accel: 1, turn: 1 }, e.id);
+    // Stock drives are Mk I; a hull that leaves the yard with heavier (Mk II) plate pays for it in accel / turn.
+    if (stock.armour === baselineFit(e).armour) assert.deepEqual(r.flight, { speed: 1, accel: 1, turn: 1 }, e.id);
+    else assert.ok(r.flight.speed === 1 && r.flight.accel < 1 && r.flight.accel > 0.9 && r.flight.turn < 1 && r.flight.turn > 0.95, `${e.id} ${JSON.stringify(r.flight)}`);
     assert.equal(r.loadout.mounts?.length ?? 0, e.hardpoints.turrets.length, `${e.id} turret mounts`);
   }
 });
@@ -310,4 +312,21 @@ test('applyFit on a live ship: stats, pools, flight, loadout; fitted turrets fir
     weapons.step(1 / 60);
   }
   assert.ok(c.shield + c.hull >= Math.min(before, c.shieldMax + c.hull) - 1e-6, 'HOLD: turrets silent');
+});
+
+test('warships leave the yard with Mk II kit that really counts (base numbers assume Mk I)', () => {
+  const res = CATALOG_BY_ID['cr5-resolute'];
+  const val = CATALOG_BY_ID['ffl3-valiant'];
+  const rs = computeFit(res, stockFit(res));
+  const rb = computeFit(res, baselineFit(res));
+  assert.equal(stockFit(res)['tur:main-a'], itemId('t-heavy', 2));
+  assert.equal(stockFit(val)['tur:main-a'], itemId('t-rail', 2));
+  assert.ok(rs.stats.shield > rb.stats.shield && rs.stats.hull > rb.stats.hull, 'Mk II shield and plate above the hull base');
+  assert.equal(rb.stats.hull, res.stats.hull);
+  const vs = computeFit(val, stockFit(val));
+  assert.ok(vs.stats.shield > val.stats.shield && vs.summary.turretDps > computeFit(val, baselineFit(val)).summary.turretDps);
+  // A Mk III refit is still an upgrade over stock, and stock is legal on the rated reactor.
+  const mk3 = computeFit(res, { ...stockFit(res), shield: itemId('shield-c4-aegis', 3) });
+  assert.ok(mk3.stats.shield > rs.stats.shield);
+  assert.ok(rs.power.draw <= rs.power.output && vs.power.draw <= vs.power.output);
 });
