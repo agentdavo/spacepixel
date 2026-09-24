@@ -10,7 +10,8 @@ export function statsFromCatalog(e: CatalogEntry): ShipStats {
     shield: e.stats.shield,
     shieldRegen: big ? 0.05 : 0.12,
     shieldDelay: big ? 6 : 3,
-    facings: big ? 4 : 1,
+    // Fore / aft halves for fighters and gunships; flanks from corvettes up, dorsal / ventral on the big hulls.
+    facings: e.length >= 400 ? 6 : big ? 4 : 2,
     mass: 1,
     agility: 1,
     speed: 1,

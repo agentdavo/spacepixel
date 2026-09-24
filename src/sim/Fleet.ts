@@ -62,8 +62,12 @@ export interface ShipEntity {
   rng: Rng;
 }
 
-/** Consequences of a hit that FX / audio / HUD care about (emitted through `Fleet.onEvent`). */
-export type HitEventKind = 'kill' | 'subsystem' | 'shield-down';
+/**
+ * Consequences of a hit that FX / audio / HUD care about (emitted through
+ * `Fleet.onEvent`). 'shield-bleed': a failing facing let part of the hit
+ * through to the hull (HitResult.bleed).
+ */
+export type HitEventKind = 'kill' | 'subsystem' | 'shield-down' | 'shield-bleed';
 
 /**
  * Anything that can be shot down (torpedoes, micro-missiles). Registered by the
@@ -96,8 +100,8 @@ const _up = new Vector3(0, 1, 0);
 export class Fleet {
   readonly ships: ShipEntity[] = [];
   private nextId = 1;
-  /** Hit consequences (kills, subsystems destroyed, shield facings down) — the weapons system listens. */
-  onEvent: ((kind: HitEventKind, ship: ShipEntity, point: Vector3, normal: Vector3, shooter: ShipEntity | null, sub: Subsystem | null, facing: number) => void) | null = null;
+  /** Hit consequences (kills, subsystems destroyed, shield facings down / bleeding) — the weapons system listens. `hit`: the result that caused it. */
+  onEvent: ((kind: HitEventKind, ship: ShipEntity, point: Vector3, normal: Vector3, shooter: ShipEntity | null, sub: Subsystem | null, facing: number, hit?: HitResult) => void) | null = null;
   /** Shoot-down-able ordnance (set by Missiles). */
   ordnance: Shootables | null = null;
 
@@ -209,7 +213,8 @@ export class Fleet {
     if (ev) {
       const p = point ?? s.flight.position;
       const n = normal ?? _n.set(0, 1, 0);
-      if (r.facingCollapsed) ev('shield-down', s, p, n, shooter, null, r.facing);
+      if (r.bleed > 0) ev('shield-bleed', s, p, n, shooter, null, r.facing, r);
+      if (r.facingCollapsed) ev('shield-down', s, p, n, shooter, null, r.facing, r);
       if (r.subsystemDestroyed && r.subsystem) ev('subsystem', s, p, n, shooter, r.subsystem, r.facing);
       if (r.killed) ev('kill', s, s.flight.position, n, shooter, null, -1);
     }

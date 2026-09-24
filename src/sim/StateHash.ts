@@ -79,6 +79,11 @@ export function hashShip(H: StateHasher, s: ShipEntity): void {
   H.u32(c.gun).u32(c.missile).f64(c.missileReload);
   const d = c.dmg;
   for (const x of d.facings) H.f64(x);
+  // Shield power: trim, per-facing capacity / collapse cooldown / incoming-fire memory.
+  H.u32(d.trim + 1).bool(d.trimAuto).f64(d.trimHold).f64(d.facingMax);
+  for (const x of d.facingCap) H.f64(x);
+  for (const x of d.cooldown) H.f64(x);
+  for (const x of d.heat) H.f64(x);
   for (const x of d.zones) H.f64(x);
   for (const sub of d.subsystems) H.f64(sub.hp);
   const b = s.brain as { rng?: number; maneuver?: string; nextThink?: number } | null;

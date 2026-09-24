@@ -20,14 +20,21 @@ export interface ShipStats {
   /** Short role line for HUD / hangar. */
   role: string;
   hull: number;
-  /** Total shield. Capitals split it over four facings (fore/aft/port/starboard). */
+  /** Total shield, split over the facings (Damage.ts). */
   shield: number;
   /** Fraction of max regenerated per second once `shieldDelay` has passed. */
   shieldRegen: number;
   /** Seconds after the last hit before shields regenerate. */
   shieldDelay: number;
-  /** 1 = one bubble (fighters), 4 = directional facings (capitals). */
-  facings: 1 | 4;
+  /**
+   * Shield facings (Damage.FACING, the first n): 1 bubble · 2 fore / aft
+   * (fighters, gunships) · 4 + port / starboard (corvettes) · 6 + dorsal /
+   * ventral (big capitals). 4+ makes the hull a capital for combat (emitters,
+   * subsystems, voxel hits).
+   */
+  facings: 1 | 2 | 4 | 6;
+  /** Shield transfer between facings × the class rate (Damage.TRANSFER_RATE); default 1. */
+  shieldTransfer?: number;
   /** Inertia multiplier: thrust accelerations are divided by it. */
   mass: number;
   /** Turn-rate multiplier. */
@@ -41,35 +48,37 @@ export interface ShipStats {
 }
 
 export const SHIP_STATS: Record<string, ShipStats> = {
-  'vf27-kestrel': { role: 'all-rounder', hull: 110, shield: 70, shieldRegen: 0.15, shieldDelay: 3, facings: 1, mass: 1, agility: 1, speed: 1, signature: 1 },
-  'vf31-harrier': { role: 'interceptor', hull: 90, shield: 60, shieldRegen: 0.2, shieldDelay: 2.5, facings: 1, mass: 0.85, agility: 1.15, speed: 1.12, signature: 0.85 },
-  'sb9-warhorse': { role: 'heavy strike', hull: 240, shield: 120, shieldRegen: 0.1, shieldDelay: 4, facings: 1, mass: 1.6, agility: 0.62, speed: 0.82, signature: 1.7 },
+  'vf27-kestrel': { role: 'all-rounder', hull: 110, shield: 70, shieldRegen: 0.15, shieldDelay: 3, facings: 2, mass: 1, agility: 1, speed: 1, signature: 1 },
+  'vf31-harrier': { role: 'interceptor', hull: 90, shield: 60, shieldRegen: 0.2, shieldDelay: 2.5, facings: 2, mass: 0.85, agility: 1.15, speed: 1.12, signature: 0.85 },
+  'sb9-warhorse': { role: 'heavy strike', hull: 240, shield: 120, shieldRegen: 0.1, shieldDelay: 4, facings: 2, mass: 1.6, agility: 0.62, speed: 0.82, signature: 1.7 },
   'choir-cantor': {
     role: 'interceptor',
     hull: 110,
-    shield: 95,
+    // Choral ward: bigger than the Directorate's and quick to shift between halves (tuned with the fore / aft split: 54% Concord in the 96-seed sweep).
+    shield: 110,
+    shieldTransfer: 1.5,
     shieldRegen: 0.22,
     shieldDelay: 2.5,
-    facings: 1,
+    facings: 2,
     mass: 1,
     agility: 1.1,
     speed: 1.07,
     signature: 0.9,
     flight: { maxSpeed: 235, boostSpeed: 440, pitchRate: 2.3, yawRate: 1.4, rollRate: 4.0 },
   },
-  'choir-psalter': { role: 'torpedo bomber', hull: 170, shield: 150, shieldRegen: 0.15, shieldDelay: 3.5, facings: 1, mass: 1.4, agility: 0.7, speed: 0.86, signature: 1.5 },
-  'rw-scrapjack': { role: 'brawler', hull: 200, shield: 30, shieldRegen: 0.08, shieldDelay: 5, facings: 1, mass: 1.35, agility: 0.8, speed: 0.85, signature: 1.25 },
+  'choir-psalter': { role: 'torpedo bomber', hull: 170, shield: 150, shieldRegen: 0.15, shieldDelay: 3.5, facings: 2, shieldTransfer: 1.5, mass: 1.4, agility: 0.7, speed: 0.86, signature: 1.5 },
+  'rw-scrapjack': { role: 'brawler', hull: 200, shield: 30, shieldRegen: 0.08, shieldDelay: 5, facings: 2, mass: 1.35, agility: 0.8, speed: 0.85, signature: 1.25 },
   // Corvettes fly on the fighter base spec (escort routes and the AI were tuned on it), just heavier.
   'ffc-lantern-guard': { role: 'picket corvette', hull: 8000, shield: 2400, shieldRegen: 0.04, shieldDelay: 6, facings: 4, mass: 1.25, agility: 0.8, speed: 0.9, signature: 6 },
   'choir-vesper': { role: 'escort corvette', hull: 5000, shield: 3200, shieldRegen: 0.05, shieldDelay: 5, facings: 4, mass: 1.2, agility: 0.85, speed: 0.95, signature: 6 },
-  'cvs07-hesperus-dawn': { role: 'carrier', hull: 36000, shield: 7000, shieldRegen: 0.03, shieldDelay: 8, facings: 4, mass: 1, agility: 1, speed: 1, signature: 20 },
-  'bb-indomitable': { role: 'dreadnought', hull: 48000, shield: 9000, shieldRegen: 0.03, shieldDelay: 8, facings: 4, mass: 1, agility: 0.8, speed: 0.9, signature: 25 },
-  'choir-cathedral': { role: 'dreadnought', hull: 40000, shield: 9000, shieldRegen: 0.04, shieldDelay: 7, facings: 4, mass: 1, agility: 1, speed: 1, signature: 25 },
+  'cvs07-hesperus-dawn': { role: 'carrier', hull: 36000, shield: 7000, shieldRegen: 0.03, shieldDelay: 8, facings: 6, mass: 1, agility: 1, speed: 1, signature: 20 },
+  'bb-indomitable': { role: 'dreadnought', hull: 48000, shield: 9000, shieldRegen: 0.03, shieldDelay: 8, facings: 6, mass: 1, agility: 0.8, speed: 0.9, signature: 25 },
+  'choir-cathedral': { role: 'dreadnought', hull: 40000, shield: 9000, shieldRegen: 0.04, shieldDelay: 7, facings: 6, mass: 1, agility: 1, speed: 1, signature: 25 },
 };
 
 /** Fallback for designs without an entry (glTF heroes, test ships). */
 export const DEFAULT_FIGHTER_STATS: ShipStats = SHIP_STATS['vf27-kestrel'];
-export const DEFAULT_CAPITAL_STATS: ShipStats = { role: 'capital', hull: 20000, shield: 8000, shieldRegen: 0.03, shieldDelay: 8, facings: 4, mass: 1, agility: 1, speed: 1, signature: 20 };
+export const DEFAULT_CAPITAL_STATS: ShipStats = { role: 'capital', hull: 20000, shield: 8000, shieldRegen: 0.03, shieldDelay: 8, facings: 6, mass: 1, agility: 1, speed: 1, signature: 20 };
 
 // ── guns ──────────────────────────────────────────────────────────────
 
@@ -430,5 +439,7 @@ export const SUBSYSTEM_TUNING = {
   hangar: { hp: 0.045, radius: 0.035, label: 'HANGAR' },
   engine: { hp: 0.04, radius: 0, label: 'ENGINE' },
   shieldGen: { hp: 0.05, radius: 0.04, label: 'SHIELD GEN' },
+  // One per facing (4+ facings), on the plating that faces that way: knock one out and the facing stays down.
+  shieldEmitter: { hp: 0.02, radius: 0.026, label: 'EMITTER' },
   bridge: { hp: 0.05, radius: 0.035, label: 'BRIDGE' },
 } as const;
