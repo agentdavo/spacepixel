@@ -110,6 +110,11 @@ export class DockingController {
     private player: ShipEntity,
   ) {}
 
+  /** The player changed hulls at the shipyard: guidance flies the new one. */
+  setPlayer(p: ShipEntity): void {
+    this.player = p;
+  }
+
   /** The docking sequence owns the ship (inputs ignored, HUD hidden). */
   get busy(): boolean {
     return this.phase === 'auto' || this.phase === 'docked' || this.phase === 'launch';

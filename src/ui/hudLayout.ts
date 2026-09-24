@@ -36,6 +36,8 @@ export const HUD = {
   weaponsW: 240,
   weaponsH: 126,
   weaponsBottom: 44,
+  /** The outfitting line (turrets / hangar) sits this far above the weapons block. */
+  weaponsLine: 26,
   /** Bottom-left comms stack base (px above the bottom edge: clears the flight block). */
   commsBottom: 150,
   commsGap: 10,
@@ -81,9 +83,9 @@ export function corridorY(h: number): number {
   return promptY(h) - 118;
 }
 
-/** Hail card: bottom edge sits above the weapons block. */
+/** Hail card: bottom edge sits above the weapons block and its outfitting line. */
 export function hailBottom(h: number): number {
-  return h - HUD.weaponsBottom - HUD.weaponsH - 12;
+  return h - HUD.weaponsBottom - HUD.weaponsH - HUD.weaponsLine - 10;
 }
 
 /** Lowest y the top-left target panel may use (the comms stack starts below it). */

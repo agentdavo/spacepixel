@@ -83,7 +83,7 @@ const _try = createTurretSolution();
  * Choose what a turret should engage. Prefers short flight time, fighters
  * closing on the mount, the player (point-defence priority), and the current
  * target (hysteresis so turrets don't twitch between ships). Capital ships are
- * skipped unless `allowCapitals`. Returns true and fills `out` on success.
+ * skipped unless `allowCapitals` (a player-flown capital is always fair game). Returns true and fills `out` on success.
  */
 export function turretSelectTarget(
   m: TurretMount,
@@ -98,7 +98,8 @@ export function turretSelectTarget(
   for (let i = 0; i < ships.length; i++) {
     const s = ships[i];
     if (!s.alive || !hostile(s, { team })) continue;
-    if (!allowCapitals && isCapital(s)) continue;
+    // Capital hulls are other capitals' business — except the player's own (a shipyard frigate).
+    if (!allowCapitals && isCapital(s) && !s.isPlayer) continue;
     if (!turretAim(m, s, _try)) continue;
     // Closing speed toward the mount (positive = inbound).
     _p.subVectors(m.position, s.flight.position).normalize();

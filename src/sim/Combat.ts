@@ -218,8 +218,11 @@ export function gunOf(s: ShipEntity): GunSpec | null {
 }
 
 export function missileOf(s: ShipEntity): MissileSpec | null {
-  const m = s.combat.loadout.missiles;
-  return m.length ? MISSILES[m[s.combat.missile % m.length]] : null;
+  const lo = s.combat.loadout;
+  const m = lo.missiles;
+  if (!m.length) return null;
+  const i = s.combat.missile % m.length;
+  return lo.missileSpecs?.[i] ?? MISSILES[m[i]];
 }
 
 /** Bolt speed the AI and HUD should lead for (beams hit instantly). */

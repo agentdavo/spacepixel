@@ -108,3 +108,27 @@ export function saveContracts(b: ContractBook): void {
     /* storage unavailable — contracts last for this session only */
   }
 }
+
+// ── Hangar (shipyard & outfitting): owned ships, their fits, the active one ──
+// Own key again; an old save without one starts in a stock Kestrel.
+import { newHangar, normaliseHangar, type Hangar } from './outfitting/hangar';
+
+const HANGAR_KEY = 'vanguard.hangar.v1';
+
+export function loadHangar(): Hangar {
+  try {
+    const raw = localStorage.getItem(HANGAR_KEY);
+    if (raw) return normaliseHangar(JSON.parse(raw));
+  } catch {
+    /* storage unavailable */
+  }
+  return newHangar();
+}
+
+export function saveHangar(h: Hangar): void {
+  try {
+    localStorage.setItem(HANGAR_KEY, JSON.stringify(h));
+  } catch {
+    /* storage unavailable — the hangar lasts for this session only */
+  }
+}

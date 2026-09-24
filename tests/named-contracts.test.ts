@@ -166,6 +166,6 @@ test('crew: hires, duplicates, the mechanic discount on repairs', () => {
   const spec: MarketSpec = { id: 'x', name: 'X', kind: 'orbital', faction: 'concord' } as unknown as MarketSpec;
   const l = newLedger();
   const full = repairCost(spec, l, 0.5);
-  const cheap = repairCost(spec, l, 0.5, repairMultiplier(c));
+  const cheap = repairCost(spec, l, 0.5, 1, repairMultiplier(c));
   assert.ok(cheap < full && Math.abs(cheap - full * 0.7) <= 1, `${cheap} ≈ 0.7 × ${full}`);
 });

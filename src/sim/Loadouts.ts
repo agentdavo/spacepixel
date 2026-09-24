@@ -73,7 +73,22 @@ export const DEFAULT_CAPITAL_STATS: ShipStats = { role: 'capital', hull: 20000, 
 
 // ── guns ──────────────────────────────────────────────────────────────
 
-export type GunId = 'laser' | 'autocannon' | 'hymn' | 'lance' | 'scatter' | 'flak' | 'battery' | 'rustflak';
+export type GunId =
+  | 'laser'
+  | 'autocannon'
+  | 'hymn'
+  | 'lance'
+  | 'scatter'
+  | 'flak'
+  | 'battery'
+  | 'rustflak'
+  // Outfitting (src/game/outfitting): heavier guns for M / L slots and turrets.
+  | 'cannon'
+  | 'heavylaser'
+  | 'railgun'
+  | 'massdriver'
+  | 'flakcannon'
+  | 'greatlance';
 
 /** Visual family: which instanced bolt mesh draws it (WeaponVisuals). */
 export type BoltStyle = 'streak' | 'slug' | 'shard' | 'pellet';
@@ -141,6 +156,31 @@ export const GUNS: Record<GunId, GunSpec> = {
   flak: { id: 'flak', name: 'FLAK', type: 'kinetic', rate: 11, speed: 1100, life: 2.4, damage: 4, pellets: 1, spread: 0, burst: { count: 3, gap: 0.09, interval: 1.6, scatter: 0.03 }, style: 'slug', color: '#ffc46b', core: '#ffffff', width: 1.6, length: 10, sfx: 'cannon', timbre: 'concord' },
   battery: { id: 'battery', name: 'CHOIR BATTERY', type: 'harmonic', rate: 11, speed: 1300, life: 2.0, damage: 5, pellets: 1, spread: 0, burst: { count: 3, gap: 0.1, interval: 1.7, scatter: 0.028 }, style: 'shard', color: '#ff3fb4', core: '#ffe0f4', width: 2.2, length: 22, sfx: 'laser', timbre: 'choir' },
   rustflak: { id: 'rustflak', name: 'SCRAP FLAK', type: 'kinetic', rate: 11, speed: 1000, life: 2.2, damage: 4, pellets: 3, spread: 0.02, burst: { count: 2, gap: 0.12, interval: 1.8, scatter: 0.04 }, style: 'pellet', color: '#ff9a2e', core: '#ffe6b0', width: 1.4, length: 5, sfx: 'cannon', timbre: 'rustwake' },
+  // ── outfitting guns (M / L slots, turrets) ──
+  cannon: { id: 'cannon', name: 'GU-17 CANNON', type: 'kinetic', rate: 5, speed: 1400, life: 1.3, damage: 13, pellets: 1, spread: 0.003, style: 'slug', color: '#ffc23f', core: '#fff2cc', width: 1.9, length: 13, sfx: 'cannon', timbre: 'concord' },
+  heavylaser: { id: 'heavylaser', name: 'HEAVY PULSE LASER', type: 'laser', rate: 4.5, speed: 1750, life: 1.3, damage: 15, pellets: 1, spread: 0, style: 'streak', color: '#6fe0ff', core: '#ffffff', width: 2.6, length: 64, sfx: 'laser', timbre: 'concord' },
+  railgun: { id: 'railgun', name: 'HEAVY RAILGUN', type: 'kinetic', rate: 0.9, speed: 3400, life: 1.1, damage: 52, pellets: 1, spread: 0, style: 'slug', color: '#bfe8ff', core: '#ffffff', width: 2.4, length: 80, sfx: 'cannon', timbre: 'concord' },
+  massdriver: { id: 'massdriver', name: 'MASS DRIVER', type: 'kinetic', rate: 0.35, speed: 2400, life: 1.6, damage: 100, pellets: 1, spread: 0, style: 'slug', color: '#ffe08a', core: '#ffffff', width: 4.2, length: 34, sfx: 'cannon', timbre: 'rustwake' },
+  flakcannon: { id: 'flakcannon', name: 'FLAK CANNON', type: 'kinetic', rate: 2, speed: 1150, life: 1.5, damage: 5, pellets: 6, spread: 0.022, style: 'pellet', color: '#ffb05a', core: '#fff0d0', width: 1.5, length: 5, sfx: 'cannon', timbre: 'rustwake' },
+  greatlance: {
+    id: 'greatlance',
+    name: 'GREAT LANCE',
+    type: 'harmonic',
+    rate: 0.3,
+    speed: 0,
+    life: 0,
+    damage: 0,
+    pellets: 1,
+    spread: 0,
+    beam: { length: 2400, width: 3.2, duration: 0.9, dps: 200 },
+    style: 'streak',
+    color: '#ff4fd8',
+    core: '#ffd0f4',
+    width: 3.2,
+    length: 0,
+    sfx: 'laser',
+    timbre: 'choir',
+  },
 };
 
 export const GUN_LIST: GunSpec[] = Object.values(GUNS);
@@ -272,6 +312,36 @@ export interface Loadout {
   missiles: MissileId[];
   /** Capital turrets fire this. */
   turret?: GunId;
+  // ── outfitted ships (src/game/outfitting): all optional, parallel to `guns` / `missiles` ──
+  /** Sockets each gun fires from (alternating); default 'gun' / 'gun.L'. */
+  gunSockets?: string[][];
+  /** Damage multiplier per gun (Mk tier). */
+  gunMul?: number[];
+  /** Fire-rate multiplier per gun (more barrels of the same gun). */
+  gunRate?: number[];
+  /** Per-ship missile specs (Mk tier, extra racks) overriding MISSILES[id]. */
+  missileSpecs?: MissileSpec[];
+  /** Fitted turret mounts (fired by src/game/outfitting/turrets.ts, not Capitals). */
+  mounts?: MountSpec[];
+  /** Point-defence clusters: dps against torpedoes / missiles within ~900 m. */
+  pd?: number;
+}
+
+/** One fitted turret (a mirrored pair is one mount with two sockets). */
+export interface MountSpec {
+  /** Catalogue socket id (mirrored twin `${socket}.L` is resolved at runtime). */
+  socket: string;
+  mirror: boolean;
+  arc: 'dorsal' | 'ventral' | 'broadside' | 'aft' | 'bow';
+  size: 'S' | 'M' | 'L';
+  gun: GunId;
+  /** Damage and fire-rate multipliers (Mk tier, turret size). */
+  dmgMul: number;
+  rateMul: number;
+  /** Aim scatter, radians. */
+  scatter: number;
+  /** Item id, for the HUD. */
+  item: string;
 }
 
 export const LOADOUTS: Record<string, Loadout> = {

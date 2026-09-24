@@ -56,6 +56,7 @@ still runs (TSL ink twin), but compute particles are disabled there.
 | V · K | camera shots · cinematic auto-cutaways |
 | M | star map (click a system to plot a route) |
 | H | hail the ship under your nose (name, flag, route, manifest) |
+| U | turret discipline on outfitted hulls: FREE (any hostile in arc) → MY TARGET → HOLD |
 | G | request docking within 5 km of a station / friendly carrier (again to cancel) |
 | L | codex / archive |
 | N | mute |
@@ -226,6 +227,80 @@ survey panel. Captures: `?reach=body|ring|lane|ambush [&sys=<id>] [&body=<name|i
 ![Jump-in](docs/screenshots/reach-jump-in.jpg)
 ![Raider ambush](docs/screenshots/reach-ambush.jpg)
 ![Star map survey](docs/screenshots/reach-map.jpg)
+
+## Shipyard & outfitting
+
+From a borrowed Kestrel to your own frigate. Docked, two more tabs:
+
+**SHIPYARD** — your hangar (up to 6 hulls; owned ships are ferried with you, so
+you can board any of them at any berth) and the hulls this yard sells:
+Directorate bastions sell the whole line up to the T6 Valiant, orbital ports
+up to T5 plus civilian hulls, refineries the small stuff, carriers fighters,
+free ports Rustwake and civilian hulls; the catalogue's standing gates apply
+(Resolute: Directorate +30, Valiant +60, Seraph: Hegemony +50). A rotating
+cel model sheet of the selected hull (a software rasteriser on a 2D canvas:
+the blueprint's real triangles, livery colours, three-tone cel light and an
+ink silhouette), a stat comparison against the ship you fly, and the deal:
+**B** buy with trade-in (60 % of the hull less damage, plus half the value of
+its upgrades), **N** buy and keep, **A** board, **X** sell (twice).
+
+**OUTFITTING** — the slots of the ship you fly, what this yard stocks for the
+selected slot, stat deltas and a power bar. **↑↓** select, **←→** slots /
+items, **B** buy & fit (the old item sells back at 50 %), **V** strip.
+
+| Slot | Items (Mk I–IV from Directorate yards, Hegemony choir-forges, Rustwake salvage) |
+|---|---|
+| Guns S / M / L | S: PL/GU-11 twin mount (Kestrel), pulse laser, autocannon, hymn pulse, tine chord (hymn + lance), scattergun · M: GU-17 cannon pod, heavy pulse laser, beam-lance, flak cannon, scrap pair · L: heavy railgun, mass driver, great lance |
+| Missile racks S / M / L | micro-missile rack, MCDF rail pair (swarm + torpedo), scrap rockets · swarm pod, harpoon launcher · heavy torpedo tube, psalm cell |
+| Turrets S / M / L (assisted) | twin pulse, PD flak, scrap flak, hymn · heavy twin, heavy pulse, choir battery, lance, flak battery · triple rail, great lance, driver |
+| Shield C1–5 | capacity / regen / delay (big hulls split it over four facings) |
+| Armour C1–5 | hull ×, mass × (slower to accelerate and turn) |
+| Drive C1–5 | speed / acceleration / turn |
+| Reactor C1–5 | power output — every item draws MW; the fit can't exceed it |
+| Utility bays | cargo extension, point-defence cluster, shield capacitor |
+| Hangar bays (T6) | Kestrel / Gaff complement: launches when hostiles close, replaced on docking |
+
+Makers have a house style: Directorate is the baseline; choir-forged items
+are ~8 % better, draw 20 % more power, cost 35 % more and want Hegemony
+standing; Rustwake salvage is 6 % worse, heavier and 28 % cheaper. Mk III and
+Mk IV need standing with the maker's faction (Directorate +20 / +50) and
+Mk IV is sold only at bastions and carriers. Guns and turrets fit a slot of
+their size; racks their size or smaller; utility items their slot's class.
+Utility numbers are ratios against the hull's stock (Mk I) item, so a stock
+Kestrel is exactly the Kestrel the balance was tuned on, and every hull's
+stock fit leaves ~20 % power headroom (all-Mk IV needs a better reactor).
+
+A fit is applied to the live ship at spawn and after every refit
+(`applyFit`: combat stats, damage pools, loadout with per-gun sockets / Mk
+damage / barrels, missile specs, turret mounts, flight spec × drive and mass);
+non-stock guns and racks get a pod on their socket and empty turret
+barbettes are struck. Hull, fit and condition persist under their own key
+(`vanguard.hangar.v1`; old saves start in a stock Kestrel); the hold follows
+the ship. Story episodes are flown in a fighter: a bigger active hull stays
+in the hangar and the fleet issues a Kestrel. Repairs scale with airframe
+size. Contract boards match the hull's tier (T3–4 → II, T5–6 → III).
+
+**Turrets fire.** Catalogue turret mounts on player hulls (and AI-flown
+shipyard hulls) use the capital solver (`src/sim/ai/Turret.ts`: lead,
+traverse and elevation limits by arc — dorsal / ventral full circle, bow and
+aft 135°, broadside 108°) and train their barbettes toward the aim; flak
+mounts break off for inbound torpedoes. Player turrets engage the selected
+target when it is in arc, else (FREE) the best hostile they can reach. The
+T6 Valiant is commanded from the bridge (bridge camera); chase distance
+scales with hull length. Capital turrets now engage a player-flown capital.
+
+**Balance** (`npm run balance`, scenario *outfit*: scripted helm at 1.5 km,
+turrets live on both sides, mean of four seeds): a Mk III Resolute kills a
+Lantern Guard solo in ~83 s (band 60–120, stock ~94 s) and a Mk III Valiant
+beats a Vesper in ~32 s with ~85 % hull left (band 20–120). Pure + tested:
+`src/game/outfitting/{items,fit,hangar}.ts`, `tests/outfitting.test.ts`.
+Captures: `?scene=flight&dock=docked&station=meridian-bastion-2&docktab=shipyard|outfitting[&own=<hull id>]`
+(`&own=` gives you that hull, stock fit).
+
+![Shipyard](docs/screenshots/outfit-shipyard.jpg)
+![Outfitting](docs/screenshots/outfit-outfitting.jpg)
+![Resolute, turrets free](docs/screenshots/outfit-resolute-turrets.jpg)
+![Valiant from the bridge](docs/screenshots/outfit-valiant-bridge.jpg)
 
 ## Scenes (`?scene=`)
 

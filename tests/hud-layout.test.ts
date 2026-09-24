@@ -36,6 +36,7 @@ function blocks(w: number, h: number): Record<string, Rect> {
     flightBlock: { x: 12, y: h - 132, w: 364, h: 124 },
     surveyLine: { x: w / 2 - band.width / 2, y: h - 70, w: band.width, h: 16 },
     weapons: weaponsRect(w, h),
+    turretLine: { x: weaponsRect(w, h).x + weaponsRect(w, h).w - HUD.objectivesW, y: weaponsRect(w, h).y - HUD.weaponsLine, w: HUD.objectivesW, h: 22 },
     cameraLabel: { x: w - 22 - 260, y: h - 18 - 18, w: 260, h: 18 },
     hail,
     prompt: { x: px - pw / 2, y: py - 18, w: pw, h: 26 },
