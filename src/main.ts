@@ -15,7 +15,7 @@ import { loadProfile, saveProfile } from '@/game/Profile';
 import type { FlightScene } from '@/world/scenes/FlightScene';
 import type { PrologueScene } from '@/world/scenes/PrologueScene';
 import type { TrailerScene } from '@/world/scenes/TrailerScene';
-import { disposeTree } from '@/core/dispose';
+import { disposeTree, DISPOSE_PARTS } from '@/core/dispose';
 import { PhotoMode } from '@/ui/PhotoMode';
 import { getAudio } from '@/audio';
 import { DynamicResolution } from '@/core/DynamicResolution';
@@ -59,12 +59,14 @@ async function boot(): Promise<void> {
     engine.clearSystems();
     input.override = null;
     photo.exit();
+    // Nothing draws until the new scene is up: the old one is being torn down.
+    engine.setRender(() => {});
     if (current) {
       current.dispose?.();
       disposeTree(current.scene);
       current = null;
     }
-    ink?.dispose();
+    if (DISPOSE_PARTS.ink) ink?.dispose();
     ink = null;
     const game = await SCENES[name]();
     current = game;
