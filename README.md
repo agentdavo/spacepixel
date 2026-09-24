@@ -57,7 +57,7 @@ still runs (TSL ink twin), but compute particles are disabled there.
 | B | next subsystem on the target (turrets, lances, hangars, engines, shield generator, bridge) |
 | 1–4 | wing orders: form up · attack my target · engage at will · cover me |
 | Tab | tactical view (battle at ¼ speed) |
-| V · K | camera shots · cinematic auto-cutaways |
+| V · K | camera shots (bridge ships: bridge → bow → lock → orbit → flyby) · cinematic auto-cutaways |
 | M | star map (click a system to plot a route) |
 | H | hail the ship under your nose (name, flag, route, manifest) |
 | U | turret discipline on outfitted hulls: FREE (any hostile in arc) → MY TARGET → HOLD |
@@ -535,7 +535,8 @@ traverse and elevation limits by arc — dorsal / ventral full circle, bow and
 aft 135°, broadside 108°) and train their barbettes toward the aim; flak
 mounts break off for inbound torpedoes. Player turrets engage the selected
 target when it is in arc, else (FREE) the best hostile they can reach. The
-T6 Valiant is commanded from the bridge (bridge camera); chase distance
+T6 Valiant is commanded from the bridge (bridge camera; V steps down to a
+bow view on the foredeck, ahead of the forward battery); chase distance
 scales with hull length. Capital turrets now engage a player-flown capital.
 
 **Corvettes bite.** The Lantern Guard and the Vesper carry dual-purpose
@@ -723,7 +724,7 @@ distance scale with hull size (`src/game/shipyard/flight.ts`). To view them:
 `?scene=hangar&cam=6..11` (scale charts with captions),
 `?scene=hangar&ship=<id>` (four-view model sheet), and
 `?scene=dogfight&ship=<id>` (fly it; `&bridge=1|0` forces the bridge camera
-on or off).
+on or off, `&bridge=bow` starts on the bow view).
 
 ![Shipyard](docs/screenshots/ships-progression.jpg)
 

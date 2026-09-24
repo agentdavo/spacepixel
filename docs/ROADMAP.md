@@ -178,9 +178,6 @@ modifiers, an event log), is read and written by everything below.
 - Label declutter hides low-priority labels when the screen is crowded; the
   arrivals board can end up two rings out from the Lantern on a leader line.
   Off-screen edge arrows (target, nav, contracts, distress) are not packed yet.
-- The bridge camera rides high over a forward battery; turrets training up at
-  a target overhead still poke their barrels into the bottom of the frame
-  (by design — it's the Yamato shot — but a bow-view toggle would help).
 - Bay dust fades only for the docking target / nearest bay: a camera parked
   in another ship's hangar (cutaways of wingmen) still sees streaks.
 - A stock (unfitted) Resolute loses a solo duel with a Lantern Guard (a stock
@@ -213,6 +210,10 @@ Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
   Concord (`npm run ai-sim`).
 - **Valiant bridge camera** — eye 0.16 L above / 0.08 L behind the bridge over
   a forward battery; the mounts sit in the bottom sixth (tested).
+- **Bow view** — V on a bridge hull goes bridge → bow → lock → …: the eye
+  sits on the foredeck forward of the bow battery's full traverse, so mounts
+  training up overhead stay behind the camera (`bowFraming` in
+  `src/game/shipyard/flight.ts`, tested; `docs/screenshots/bow-view-*.jpg`).
 - **Hires** — Magpie (wing) and Brennick (−30 % repairs) verified end to end
   by `npm run career-check` (new profile → free flight → hires → contract →
   launch → formation + fight → dock → repair → shipyard → reload).

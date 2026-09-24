@@ -10,6 +10,8 @@
  *   ?t=12.5          start time in seconds (useful with shot mode)
  *   ?scene=flight    which scene to boot (flight | showcase | spatial | hangar)
  *   ?cam=0..n        camera preset
+ *   ?bridge=0|1|bow  bridge hulls' chase framing (read by `cameraOverride` in
+ *                    src/game/shipyard/flight.ts, which stays window-free)
  *   ?budget=8.3      frame budget (ms) for the perf graph / pass-fail
  *   ?demo=1          scripted autopilot (implied by shot mode)
  */

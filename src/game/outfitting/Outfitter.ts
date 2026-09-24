@@ -1,8 +1,8 @@
 import { Vector3, type PerspectiveCamera } from 'three';
 import type { Livery } from '@/assets/Blueprint';
 import type { Fleet, ShipEntity } from '@/sim/Fleet';
-import { DEFAULT_CHASE, type ChaseCamera } from '@/sim/ChaseCamera';
-import { bridgeFraming, chaseFraming, hasBowBattery } from '@/game/shipyard/flight';
+import type { ChaseCamera } from '@/sim/ChaseCamera';
+import { applyFraming, cameraOverride, framingFor, viewFor, type ShipView } from '@/game/shipyard/flight';
 import { CATALOG_BY_ID, type CatalogEntry } from '@/game/shipyard/catalog';
 import { loadHangar, saveHangar, saveLedger } from '@/game/Profile';
 import type { TradeLedger } from '@/game/economy';
@@ -42,6 +42,10 @@ export class Outfitter {
   private livery: Partial<Livery> = {};
   /** A story episode is running (set by settle(true / false)). */
   private episode = false;
+  /** Bridge hulls ride the bow camera instead of the bridge (`?bridge=bow` starts there). */
+  bowView = cameraOverride() === 'bow';
+  /** The chase framing the flying ship got at its last frame(). */
+  view: ShipView = 'chase';
 
   constructor() {
     // ?own=<hull id>: own (and fly) that hull with its stock fit — captures, balance checks.
@@ -100,34 +104,16 @@ export class Outfitter {
     return ship;
   }
 
-  /** Chase framing scaled to the hull; T6 (catalogue camera 'bridge') rides the bridge. */
-  frame(ship: ShipEntity, chase: ChaseCamera, camera: PerspectiveCamera): void {
+  /**
+   * Chase framing scaled to the hull; T6 (catalogue camera 'bridge') rides the
+   * bridge, or the bow while `bowView` is set (V toggles it; it survives hull
+   * swaps). Records the view the ship got in `view`.
+   */
+  frame(ship: ShipEntity, chase: ChaseCamera, camera: PerspectiveCamera): ShipView {
     const e = CATALOG_BY_ID[ship.model.blueprint.id];
-    const len = ship.model.length;
-    const t = chase.tuning;
-    const sock = ship.model.sockets.get('bridge');
-    const bridge = e?.camera === 'bridge' && !!sock && new URLSearchParams(location.search).get('bridge') !== '0';
-    if (len <= 20 && !bridge) {
-      t.offset = DEFAULT_CHASE.offset.clone();
-      t.lookAhead = DEFAULT_CHASE.lookAhead;
-      t.speedPullback = DEFAULT_CHASE.speedPullback;
-      t.posSmooth = DEFAULT_CHASE.posSmooth;
-      t.lookSmooth = DEFAULT_CHASE.lookSmooth;
-      t.upSmooth = DEFAULT_CHASE.upSmooth;
-      t.shake = DEFAULT_CHASE.shake;
-      camera.near = 0.3;
-    } else {
-      const f = bridge && sock ? bridgeFraming([sock.position.x, sock.position.y, sock.position.z], len, hasBowBattery(e)) : chaseFraming(len);
-      t.offset = new Vector3(...f.offset);
-      t.lookAhead = f.lookAhead;
-      t.speedPullback = f.speedPullback;
-      t.posSmooth = f.posSmooth;
-      t.lookSmooth = f.lookSmooth;
-      t.upSmooth = f.upSmooth;
-      t.shake = f.shake;
-      camera.near = Math.min(0.3, f.near);
-    }
-    camera.updateProjectionMatrix();
+    this.view = viewFor(ship.model, e, this.bowView, cameraOverride());
+    applyFraming(chase, camera, framingFor(ship.model, e, this.view));
+    return this.view;
   }
 
   /** Hangar complement + hold for the ship now flying. */

@@ -1583,7 +1583,8 @@ export class FlightScene implements GameScene, FlightHostScene {
 
   cameraLabel(): string {
     const f = this.player.flight;
-    return `${this.director.label()} · ${f.flightAssist ? 'FA ON' : 'FA OFF'}${this.cinematic ? ' · CINEMATIC' : ''}`;
+    const shot = this.director.kind === 'chase' && this.outfit.view !== 'chase' ? this.outfit.view.toUpperCase() : this.director.label();
+    return `${shot} · ${f.flightAssist ? 'FA ON' : 'FA OFF'}${this.cinematic ? ' · CINEMATIC' : ''}`;
   }
 
   /** Keys that change the world (dock request, turret mode, tactical slow-mo, wing orders): recorded on the tape. */
@@ -1606,6 +1607,14 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (code === 'KeyG') return this.requestDock();
     if (this.docking.busy && code !== 'KeyM') return; // the dock screen / cutaway owns the keys
     if (code === 'KeyV') {
+      // Bridge hulls: bridge → bow → lock → orbit → flyby. The bow eye sits
+      // forward of the bow battery, clear of mounts training up overhead.
+      if (this.outfit.bowView || (this.outfit.view !== 'chase' && this.director.kind === 'chase')) {
+        this.outfit.bowView = !this.outfit.bowView;
+        this.outfit.frame(this.player, this.chase, this.camera);
+        this.chase.snap(this.player.flight);
+        if (this.outfit.bowView) return;
+      }
       const order = ['chase', 'lock', 'orbit', 'flyby'] as const;
       const next = order[(order.indexOf(this.director.kind as (typeof order)[number]) + 1) % order.length];
       if (next === 'chase') {
