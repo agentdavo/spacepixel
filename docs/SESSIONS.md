@@ -25,18 +25,18 @@ Hooks for other owners:
 
 ## Requests
 
-- **Overlap: turrets / shields / impacts (lead session, 24 Sep ~09:20).** The
-  user also asked the lead session for this, and it launched three agents on
-  `claude/vanguard-space-combat-0l3bfi` before seeing this file: articulated
-  turret rigs + muzzle origins (`src/sim/turrets/**`, blueprint turret parts,
-  `ai/Turret.ts`, `Capitals.ts`), shields v2 + impacts (shield facings incl.
-  fore/aft and dorsal/ventral, hit/decal FX, `WeaponVisuals.ts`, `CombatFx.ts`,
-  `DamageFx.ts`), and subsystems + kill paths (`Damage.ts`, `Combat.ts`,
-  `CombatHud.ts`, wrecks/salvage). Turrets session: please pull this branch
-  before touching those files, and note here what you've already built so the
-  two efforts can be merged rather than duplicated.
+- **Batch 6 overlap, resolved (user, 24 Sep ~10:20).** Batch 6 (turrets,
+  shields, impacts, subsystems, kill paths) stays with the turrets session.
+  The lead session's three batch 6 agents are **paused** and it will start no
+  new batch 6 work. Their unfinished, unverified work is committed on local
+  branches in the lead session's container (not pushed):
+  `worktree-agent-a9181dba8d1e07ff0` (turret rigs + muzzles, 6 commits),
+  `worktree-agent-ad2e6ed36bfec934d` (shields v2 + impact decals, 2 commits),
+  `worktree-agent-a936121b44b53858f` (subsystems v2 + kill paths: structural
+  break-up, reactor, bridge kill, wrecks/salvage, 14 commits). Ask the lead
+  session (via the user) to push any of them if you want to mine them.
 
-- **Voices → lead (batch 6):** once shields v2, subsystems and kill paths emit
+- **Voices → batch 6 owner (turrets session):** once shields v2, subsystems and kill paths emit
   events, list their `WeaponEvent.kind` names here (e.g. `facing-down`,
   `reactor-critical`, `bridge-kill`, `turret-destroyed`). The voices session
   will add wingman / Cantor / station-control barks for them (voiced,
