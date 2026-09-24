@@ -218,7 +218,9 @@ export class StarMap {
     }
     this.drawSurvey(this.hover ?? this.destination ?? cur, w, h);
     c.fillStyle = 'rgba(125,255,178,0.7)';
-    c.fillText('[M] close · click a system to plot a route · fly through the marked Lantern to jump · ■ = dockable station · ⚠ = raiders', w - 800, h - 32);
+    c.textAlign = 'right';
+    c.fillText('[M] close · click a system to plot a route · fly through the marked Lantern to jump · ■ = dockable station · ⚠ = raiders', w - 24, h - 32);
+    c.textAlign = 'left';
   }
 
   /** Mean sailings per hour on the lane between two systems (both Lantern ends). */
@@ -243,7 +245,8 @@ export class StarMap {
     const tr = this.traffic.get(sys.id);
     if (tr) {
       const pir = tr.piracy > 0.3 ? 'HIGH' : tr.piracy > 0.15 ? 'MODERATE' : tr.piracy > 0 ? 'LOW' : 'NONE';
-      lines.push({ text: `TRAFFIC ~${Math.round(tr.perHour)} sailings/h · PATROLS ${tr.patrol ? tr.patrol.toUpperCase() : 'NONE'} · RAIDERS ${pir}`, color: tr.piracy > 0.15 ? '#ffc46b' : '#7dffb2' });
+      lines.push({ text: `TRAFFIC ~${Math.round(tr.perHour)} sailings/h · PATROLS ${tr.patrol ? tr.patrol.toUpperCase() : 'NONE'}`, color: '#7dffb2' });
+      lines.push({ text: `RAIDERS ${pir}${tr.piracy > 0.15 ? ' — convoys advised' : ''}`, color: tr.piracy > 0.15 ? '#ffc46b' : '#7dffb2' });
     }
     for (const pl of sys.planets) {
       const k = pl.preset.kind ?? 'gas';

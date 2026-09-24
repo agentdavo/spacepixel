@@ -229,7 +229,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.director.cut('tactical', null, Infinity);
     }
     this.hud = new FlightHud(document.getElementById('ui-root')!);
-    this.reachHud = new ReachHud(document.getElementById('ui-root')!);
+    this.reachHud = new ReachHud(this.hud.context);
     const pf0 = this.player.flight;
     this.audioFrame = {
       dt: 0,
@@ -416,7 +416,6 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (this.docking.busy) {
       // Cutaway: the frame belongs to the cinematography.
       this.hud.clear();
-      this.reachHud.clear();
       this.updateCinema();
       this.starMap.draw(time);
       return;
@@ -887,10 +886,7 @@ export class FlightScene implements GameScene, FlightHostScene {
 
   /** Planet / moon markers, traffic tags, distress calls, hail card. */
   private drawReachHud(time: number): void {
-    if (this.jumpPhase !== 'none' || this.tactical) {
-      this.reachHud.clear();
-      return;
-    }
+    if (this.jumpPhase !== 'none' || this.tactical) return;
     const nav = this.navGate();
     this.reachHud.navNoise = this.hud.navNoise;
     this.reachHud.draw({
@@ -945,6 +941,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (mode === 'ambush') this.traffic.stageAmbush(this.player);
     else if (mode === 'lane') this.traffic.stageArrival(this.player, this.view.gates[0]?.link.to ?? '');
     else stageReach(mode, q, { view: this.view, player: this.player, wingmen: this.wingmen.map((w) => w.ship) });
+    // &hail=1: open the hail card on whatever is under the nose (captures).
+    if (q.get('hail')) this.reachHud.hail(this.traffic.hailTarget(this.player, 12_000, 0.6), this.reachTime);
     this.chase.snap(this.player.flight);
   }
 

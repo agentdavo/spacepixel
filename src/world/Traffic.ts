@@ -78,6 +78,8 @@ export interface TrafficShip {
   /** Destroyed (vs merely parked out of range). */
   dead: boolean;
   parked: boolean;
+  /** Seconds spent running (raiders / haulers leave the scene after a while). */
+  fledFor: number;
 }
 
 export interface Ambush {
@@ -157,6 +159,8 @@ export class Traffic {
   private active: Sailing[] = [];
   private byShip = new Map<ShipEntity, TrafficShip>();
   private spawnDesc = makeSpawn();
+  private builds = 0;
+  private buildCooldown = 0;
 
   constructor(
     private fleet: Fleet,
@@ -177,10 +181,9 @@ export class Traffic {
     this.view = view;
     this.sysId = view.system.id;
     this.lanes = systemLanes(this.seed, view.system);
-    for (const l of this.lanes) {
-      l.from.position.add(SYSTEM_OFFSET);
-      l.to.position.add(SYSTEM_OFFSET);
-    }
+    // Lanes share their node objects: shift each node into universe space once.
+    const nodes = new Set(this.lanes.flatMap((l) => [l.from, l.to]));
+    for (const n of nodes) n.position.add(SYSTEM_OFFSET);
     this.gone.clear();
     this.refreshIn = 0;
   }
@@ -205,6 +208,7 @@ export class Traffic {
     this.frame++;
     this.consume(weaponEvents, player);
 
+    this.buildCooldown -= dt;
     if ((this.refreshIn -= dt) <= 0) {
       this.refreshIn = 0.25;
       this.materialise(player);
@@ -237,6 +241,7 @@ export class Traffic {
 
   private materialise(player: ShipEntity): void {
     const pp = player.flight.position;
+    this.builds = 0;
     sailingsAt(this.sysId, this.lanes, this.clock, this.active);
     const cands: { s: Sailing; d: number }[] = [];
     for (const s of this.active) {
@@ -247,10 +252,21 @@ export class Traffic {
     }
     cands.sort((x, y) => x.d - y.d);
     for (const c of cands) {
+      // New hulls cost a model build (and a pipeline compile the first time):
+      // at most one fresh build every 0.75 s, so filling the lanes never hitches.
+      if (this.buildCooldown > 0 && !this.poolHas(c.s)) continue;
       const need = c.s.role === 'patrol' ? wingSize(c.s) : 1;
       if (this.budgetUsed() + need > this.budget) break;
       this.spawnSailing(c.s);
+      if (this.builds > 0) this.buildCooldown = 0.75;
     }
+  }
+
+  /** A parked hull is ready for this sailing (no model build needed). */
+  private poolHas(s: Sailing): boolean {
+    if (s.role === 'patrol') return false;
+    const bp = this.hull(s.role, s.flag);
+    return (this.pool.get(`${bp}|${s.flag}|${s.role}`)?.length ?? 0) > 0;
   }
 
   private hull(role: TrafficRole, flag: EconFaction): string {
@@ -274,6 +290,7 @@ export class Traffic {
       Object.assign(s.controls, emptyControls());
       return s;
     }
+    this.builds++;
     const e = this.fleet.spawn(bp, faction, pos, fwd, { name }, livery);
     this.owned.add(e);
     return e;
@@ -291,7 +308,8 @@ export class Traffic {
     ship.flight.cruiseScale = 1;
     ship.flight.throttle = 0.6;
     const big = ship.radius > 30;
-    ship.hullMax = ship.hull = big ? def.hull * 2 : def.hull;
+    // Big haulers soak a raid for a minute or so: long enough for someone to come.
+    ship.hullMax = ship.hull = big ? def.hull * 4 : def.hull;
     ship.shieldMax = ship.shield = def.shield;
     const b = brainOf(ship);
     b.scripted = true;
@@ -316,6 +334,7 @@ export class Traffic {
       pass: 'attack',
       dead: false,
       parked: false,
+      fledFor: 0,
     };
     t.leader = t;
     this.ships.push(t);
@@ -432,6 +451,7 @@ export class Traffic {
     // Haulers under attack run for it.
     if (t.state === 'evade' && t.ambush) return this.flyEvade(t, dt);
     if (t.state === 'fled') {
+      if ((t.fledFor += dt) > 45 && dPlayer > 4000) return this.park(t);
       s.flight.cruise = 'off';
       setSpeed(c, s.flight, s.flight.spec.boostSpeed, true);
       c.pitch = c.yaw = c.roll = 0;
@@ -691,6 +711,7 @@ export class Traffic {
     const a = t.ambush;
     if (!b.scripted) return; // dogfighting under the fighter AI
     if (t.state === 'fled') {
+      if ((t.fledFor += dt) > 30) return this.park(t);
       // Run for the dark, away from the fight.
       _dir.subVectors(f.position, a?.position ?? player.flight.position).normalize();
       steerToward(c, f, _dir, null, t.pilot, dt, RAIDER_GAINS);
@@ -764,7 +785,10 @@ export class Traffic {
       _dir.subVectors(_aim, f.position).normalize();
       steerToward(c, f, _dir, null, t.pilot, dt, RAIDER_GAINS);
       setSpeed(c, f, d > 1400 ? f.spec.boostSpeed : tf.velocity.length() + 90, d > 1400);
-      c.fire = d < 1300 && inFiringSolution(f, _aim, d, victim.radius, 0.012);
+      // Raiders want the cargo, not a wreck: short bursts. Militia shoot to kill.
+      const opening = !!t.ambush && this.clock - t.ambush.started < 3;
+      const burst = t.role !== 'pirate' || opening || (this.clock * 0.6 + s.id * 0.37) % 1 < 0.3;
+      c.fire = burst && d < 1300 && inFiringSolution(f, _aim, d, victim.radius, 0.012);
     } else {
       f.forward(_dir);
       _c.subVectors(f.position, tf.position).normalize();
@@ -833,7 +857,7 @@ export class Traffic {
     if (!fx) return;
     const d = this.spawnDesc;
     const p = t.ship.flight.position;
-    const r = Math.max(30, t.ship.radius * 3);
+    const r = Math.max(40, t.ship.radius * 4);
     const set = (k: number, count: number, size: number, life: number) => {
       d.kind = k as typeof d.kind;
       d.palette = PAL.PLASMA;
@@ -883,12 +907,12 @@ export class Traffic {
     const fwd = pf.forward(new Vector3());
     const right = new Vector3(-1, 0, 0).applyQuaternion(pf.orientation);
     const up = new Vector3(0, 1, 0).applyQuaternion(pf.orientation);
-    const pos = pf.position.clone().addScaledVector(fwd, 1500).addScaledVector(right, 180).addScaledVector(up, 70);
+    const pos = pf.position.clone().addScaledVector(fwd, 800).addScaledVector(right, 140).addScaledVector(up, 190);
     const heading = right.clone().multiplyScalar(-1).addScaledVector(fwd, 0.35).normalize();
-    const f = this.view.system.faction;
-    const flag: EconFaction = f === 'concord' || f === 'choir' ? f : 'rustwake';
+    // A Directorate hauler over the border (a Hegemony one in Zenith space).
+    const flag: EconFaction = this.view.system.faction === 'choir' ? 'choir' : 'concord';
     const man: Manifest = {
-      name: flag === 'choir' ? 'Glass Canticle' : flag === 'rustwake' ? 'Barter Queen' : 'Honest Weight',
+      name: flag === 'choir' ? 'Glass Canticle' : 'Honest Weight',
       registry: 'FV-2231',
       cargo: [
         { id: 'rations', label: 'rations', tons: 44 },
@@ -899,7 +923,8 @@ export class Traffic {
     v.ship.flight.velocity.copy(heading).multiplyScalar(110);
     const a = this.startAmbush(v, player, { at: 0, raiders: 3, band: 'Blackwake' }, 420);
     for (const r of a?.raiders ?? []) r.ship.flight.velocity.subVectors(v.ship.flight.position, r.ship.flight.position).normalize().multiplyScalar(240);
-    faceAlong(pf.orientation, _dir.subVectors(pos, pf.position).normalize());
+    // Nose a little under her, so the chase camera frames the fight above the Kestrel.
+    faceAlong(pf.orientation, _dir.subVectors(pos, pf.position).addScaledVector(up, -220).normalize());
     pf.velocity.copy(_dir).multiplyScalar(140);
     return a;
   }
@@ -907,9 +932,17 @@ export class Traffic {
   /** Wind the timetable so the next arrival through `gateTo` jumps in now. */
   stageArrival(player: ShipEntity, gateTo: string): void {
     const next = nextArrivals(this.sysId, this.lanes, gateTo, this.clock, 1)[0];
-    if (next) this.clock = next.depart + 0.05;
+    if (!next) return;
+    // Beside the lane, 1.7 km in from the Lantern, looking across its mouth.
+    this.clock = next.depart - 0.2;
+    const g = next.lane.from;
+    const n = g.normal ?? new Vector3(0, 0, 1);
+    const side = new Vector3(0, 1, 0).cross(n).normalize();
+    const pf = player.flight;
+    pf.position.copy(g.position).addScaledVector(n, -1100).addScaledVector(side, 800).add(new Vector3(0, 160, 0));
+    faceAlong(pf.orientation, _dir.subVectors(g.position, pf.position).addScaledVector(n, -500).normalize());
+    pf.velocity.copy(_dir).multiplyScalar(60);
     this.refreshIn = 0;
-    this.materialise(player);
   }
 
   // ── HUD helpers ────────────────────────────────────────────────────
@@ -944,14 +977,14 @@ export class Traffic {
   /** Where the sailing is headed, for the hail card. */
   destination(t: TrafficShip): string {
     const s = t.sailing;
-    if (!s) return t.role === 'pirate' ? 'unlisted' : 'on station';
+    if (!s) return t.role === 'pirate' ? 'unlisted' : t.role === 'patrol' ? 'on station' : 'off the lanes';
     const to = s.lane.to;
     return to.kind === 'gate' ? `Lantern to ${to.id}` : to.kind === 'belt' ? 'the belt' : to.name;
   }
 
   origin(t: TrafficShip): string {
     const s = t.sailing;
-    if (!s) return '—';
+    if (!s) return t.role === 'pirate' ? 'unlisted' : t.leader !== t ? `wing of ${t.leader.manifest.name}` : 'unfiled';
     const f = s.lane.from;
     return f.kind === 'gate' ? `Lantern from ${f.id}` : f.kind === 'belt' ? 'the belt' : f.name;
   }

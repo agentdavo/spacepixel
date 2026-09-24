@@ -108,6 +108,13 @@ mid-range ones steer every 3rd frame. The star map shows lane volume
 survey panel. Captures: `?reach=body|ring|lane|ambush [&sys=<id>] [&body=<name|index>] [&side=lit|term|night]`,
 `?traffic=0` for A/B.
 
+![Castellan](docs/screenshots/reach-gas-giant.jpg)
+![Night-side cities](docs/screenshots/reach-night-cities.jpg)
+![Ring plane](docs/screenshots/reach-ring-plane.jpg)
+![Jump-in](docs/screenshots/reach-jump-in.jpg)
+![Raider ambush](docs/screenshots/reach-ambush.jpg)
+![Star map survey](docs/screenshots/reach-map.jpg)
+
 ## Scenes (`?scene=`)
 
 `flight` (default game) · `showcase` · `hangar` (model sheets) · `paint`

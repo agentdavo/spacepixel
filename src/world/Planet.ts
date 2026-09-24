@@ -1,4 +1,4 @@
-import { AdditiveBlending, Color, Group, Mesh, Quaternion, RingGeometry, SphereGeometry, Vector3 } from 'three';
+import { AdditiveBlending, Color, DoubleSide, Group, Mesh, Quaternion, RingGeometry, SphereGeometry, Vector3 } from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import {
   Fn,
@@ -20,10 +20,13 @@ import {
   uniform,
   length,
   mx_fractal_noise_float,
+  mx_noise_float,
+  step,
+  mix,
+  min,
 } from 'three/tsl';
-import { CelMaterial } from '@/render/materials/CelMaterial';
 import { buildPalette, type ColorStop } from '@/render/materials/PaletteRamp';
-import { noInkMRT } from '@/render/materials/InkChannels';
+import { inkMRT, noInkMRT } from '@/render/materials/InkChannels';
 import { LightRig } from '@/render/LightRig';
 import type { ShaderNode } from '@/render/tsl';
 import { planetSurface } from './planets/PlanetMaterial';
@@ -180,21 +183,26 @@ export class Planet {
         const toC = planetCenter.sub(P);
         const t = dot(toC, LightRig.keyDirection);
         const d2 = dot(toC, toC).sub(t.mul(t));
-        const shadow = select(t.greaterThan(0.0).and(d2.lessThan(planetRadius.mul(planetRadius))), float(0.12), float(1.0));
-        return pow(ringSample.rgb, vec3(2.2)).mul(float(1).add(detail)).mul(shadow);
+        const inShadow = t.greaterThan(0.0).and(d2.lessThan(planetRadius.mul(planetRadius)));
+        // Sunlit face at full key light; the far face glows through (forward
+        // scatter) a step darker — painted, never black. Planet shadow on top.
+        const V = normalize(cameraPosition.sub(P));
+        const sameSide = dot(ringNormal, LightRig.keyDirection).mul(dot(ringNormal, V)).greaterThan(0.0);
+        const light = mix(LightRig.shadowTint, LightRig.keyColor, select(sameSide, float(1.0), float(0.55)));
+        const lit: ShaderNode = select(inShadow, vec3(LightRig.shadowTint).mul(0.35), light);
+        const col: ShaderNode = pow(ringSample.rgb, vec3(2.2)).mul(float(1).add(detail)).mul(lit);
+        return min(col, vec3(0.97));
       })();
 
-      const ringMat = new CelMaterial({
-        paintNode: ringPaint,
-        ramp: 'dramatic',
-        rimWidth: 2, // no rim on a flat ring
-        gloss: 0,
-        inkWeight: 0.6,
-        inkId: inkId + 1,
-        haze: 0.2,
-        doubleSided: true,
-      });
-      ringMat.opacityNode = ringSample.a.mul(1);
+      const ringMat = new MeshBasicNodeMaterial();
+      ringMat.colorNode = ringPaint;
+      ringMat.side = DoubleSide;
+      ringMat.mrtNode = inkMRT(0.6, inkId + 1, 0.2);
+      // Up close the painted sheet dissolves in blotches (the chunks of
+      // RingDebris take over), so flying the ring plane never meets a floor.
+      const grain = mx_noise_float(positionLocal.xy.mul(1 / 420)).mul(0.5).add(0.5);
+      const fade = smoothstep(900, 7000, length(positionWorld));
+      ringMat.opacityNode = ringSample.a.mul(step(float(1).sub(fade), grain));
       ringMat.alphaTest = 0.5;
 
       const ring = new Mesh(new RingGeometry(inner, outer, 256, 1), ringMat);
@@ -206,6 +214,7 @@ export class Planet {
       };
       ring.onBeforeRender = () => {
         this.group.getWorldPosition(planetCenter.value);
+        ringNormal.value.set(0, 0, 1).applyQuaternion(ring.getWorldQuaternion(_q));
       };
       this.group.add(ring);
     }

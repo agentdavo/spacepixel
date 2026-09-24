@@ -42,6 +42,11 @@ export class FlightHud {
     this.resize(window.innerWidth, window.innerHeight);
   }
 
+  /** The HUD's 2D context, for overlays that draw into the same canvas (one layer, one clear). */
+  get context(): CanvasRenderingContext2D {
+    return this.ctx;
+  }
+
   resize(w: number, h: number): void {
     this.dpr = Math.min(window.devicePixelRatio, 2);
     this.w = w;

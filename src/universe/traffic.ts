@@ -53,7 +53,7 @@ const HAULER_PAINT: Partial<Record<EconFaction, Partial<Livery>>> = {
 export const TRAFFIC_ROLES: Record<TrafficRole, RoleDef> = {
   freighter: {
     label: 'freighter',
-    hulls: { concord: ['civ-freighter', 'ffc-lantern-guard'], choir: ['civ-freighter', 'choir-vesper'], rustwake: ['civ-freighter', 'rw-hauler', 'sb9-warhorse'] },
+    hulls: { concord: ['civ-freighter', 'ffc-lantern-guard'], choir: ['civ-freighter', 'choir-vesper'], rustwake: ['civ-freighter', 'rw-hauler', 'ffc-lantern-guard'] },
     livery: HAULER_PAINT,
     speed: 110,
     laneSpeed: 1700,
@@ -64,7 +64,7 @@ export const TRAFFIC_ROLES: Record<TrafficRole, RoleDef> = {
   },
   tanker: {
     label: 'Ebon tanker',
-    hulls: { concord: ['civ-tanker', 'ffc-lantern-guard'], choir: ['civ-tanker', 'choir-vesper'], rustwake: ['civ-tanker', 'sb9-warhorse'] },
+    hulls: { concord: ['civ-tanker', 'ffc-lantern-guard'], choir: ['civ-tanker', 'choir-vesper'], rustwake: ['civ-tanker', 'choir-vesper'] },
     livery: { concord: { primary: '#e8e2d2', secondary: '#3b2a5a', accent: '#b77bff' }, choir: HAULER_PAINT.choir, rustwake: { primary: '#6e5a4a', secondary: '#2f2a3e', accent: '#b77bff' } },
     speed: 90,
     laneSpeed: 1400,
@@ -220,9 +220,9 @@ export function systemVolume(sys: Pick<StarSystem, 'faction' | 'threat'>): numbe
 
 /** Lawless / border: where Rustwake raiders work the lanes (0..1). */
 export function piracy(sys: Pick<StarSystem, 'faction' | 'threat'>): number {
-  if (sys.faction === 'rustwake') return 0.22;
-  if (sys.faction === 'contested') return 0.34;
-  if (sys.faction === 'concord') return sys.threat > 0.25 ? 0.06 : 0;
+  if (sys.faction === 'rustwake') return 0.12;
+  if (sys.faction === 'contested') return 0.2;
+  if (sys.faction === 'concord') return sys.threat > 0.25 ? 0.04 : 0;
   return 0;
 }
 

@@ -61,6 +61,7 @@ export class StarSystemView {
   /** Ring chunks you can fly through (nearest ringed planet). */
   readonly ringDebris: RingDebris;
   private rings: RingTarget[] = [];
+  private bodyGroups: Group[] = [];
 
   constructor(
     readonly system: StarSystem,
@@ -79,6 +80,7 @@ export class StarSystemView {
       group.rotation.set(...p.tilt);
       this.masses.push({ position: group.position, radius: p.preset.radius });
       this.group.add(group);
+      this.bodyGroups.push(group);
       const body: BodyInstance = { name: p.preset.name, kind, description: p.description ?? '', landmark: p.landmark, position: group.position, radius: p.preset.radius, site: p };
       this.bodies.push(body);
       for (const m of p.moons ?? []) {
@@ -88,12 +90,15 @@ export class StarSystemView {
         mg.position.copy(pos);
         mg.rotation.set(0.2, m.node, 0.1);
         this.group.add(mg);
+        this.bodyGroups.push(mg);
         const mb: BodyInstance = { name: m.preset.name, kind: mk, description: m.description, landmark: m.landmark, position: mg.position, radius: m.preset.radius, parent: body, site: m };
         this.bodies.push(mb);
         this.moons.push({ body: mb, group: mg, moon: m, parent: group.position });
         this.masses.push({ position: mg.position, radius: m.preset.radius });
       }
     }
+    // ?planets=0 hides every body (A/B perf checks).
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('planets') === '0') for (const g of this.bodyGroups) g.visible = false;
     this.ringDebris = new RingDebris([...system.id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 3));
     this.group.add(this.ringDebris.mesh);
 

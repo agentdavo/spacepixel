@@ -35,40 +35,19 @@ const CHATTER: Record<string, string[]> = {
 const _p = new Vector3();
 
 export class ReachHud {
-  private canvas = document.createElement('canvas');
-  private ctx: CanvasRenderingContext2D;
   private w = 1;
   private h = 1;
-  private dpr = 1;
   private hailed: { t: TrafficShip; until: number; line: string } | null = null;
   private banner: { text: string; sub: string; color: string; until: number } | null = null;
   /** 0..1 instrument noise (Dead Zone): markers flicker like the main HUD. */
   navNoise = 0;
 
-  constructor(root: HTMLElement) {
-    this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
-    root.append(this.canvas);
-    this.ctx = this.canvas.getContext('2d')!;
-  }
-
-  private fit(): void {
-    const dpr = Math.min(window.devicePixelRatio, 2);
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    if (w !== this.w || h !== this.h || dpr !== this.dpr) {
-      this.w = w;
-      this.h = h;
-      this.dpr = dpr;
-      this.canvas.width = Math.round(w * dpr);
-      this.canvas.height = Math.round(h * dpr);
-    }
-  }
-
-  clear(): void {
-    this.fit();
-    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.ctx.clearRect(0, 0, this.w, this.h);
-  }
+  /**
+   * Draws into the flight HUD's own canvas (after it has cleared and drawn
+   * for the frame): a second full-screen canvas layer costs a composite
+   * every frame, which software rasterisers feel.
+   */
+  constructor(private ctx: CanvasRenderingContext2D) {}
 
   private project(u: Vector3, world: WorldSpace, cam: PerspectiveCamera): { x: number; y: number; behind: boolean } {
     world.toRender(u, _p).project(cam);
@@ -100,20 +79,25 @@ export class ReachHud {
     navGate: { to: string; name: string; center: Vector3 } | null;
     ringDensity: number;
   }): void {
-    this.clear();
+    this.w = window.innerWidth;
+    this.h = window.innerHeight;
     const c = this.ctx;
+    c.save();
+    c.shadowBlur = 0;
     const { cam, world, player, time } = o;
     const pp = player.flight.position;
     c.font = '12px "Share Tech Mono", monospace';
     c.lineWidth = 1.2;
-    c.shadowColor = 'rgba(0,0,0,0.6)';
-    c.shadowBlur = 3;
+    // No shadowBlur: software canvases pay for it per glyph, every frame.
     const noisy = () => this.navNoise > 0 && Math.random() < this.navNoise * 0.85;
 
     // ── bodies ──────────────────────────────────────────────────────
     const fovScale = this.h / (2 * Math.tan((cam.fov * Math.PI) / 360));
     let nearest: BodyInstance | null = null;
     let nearAlt = Infinity;
+    // Label budget: the biggest discs first; moons only when close.
+    const ranked = [...o.bodies].sort((a, b) => b.radius / Math.max(1, b.position.distanceTo(pp)) - a.radius / Math.max(1, a.position.distanceTo(pp)));
+    const labelled = new Set(ranked.filter((b) => !b.parent || b.position.distanceTo(pp) - b.radius < 150_000).slice(0, 5));
     for (const b of o.bodies) {
       const dist = b.position.distanceTo(pp);
       const alt = dist - b.radius;
@@ -155,6 +139,7 @@ export class ReachHud {
         lx = ex + 34;
         ly = ey - 10;
       }
+      if (!labelled.has(b)) continue;
       const range = alt > 10_000 ? `${(alt / 1000).toFixed(0)} km` : `${(alt / 1000).toFixed(1)} km`;
       c.fillText(`${b.name.toUpperCase()}  ${range}`, lx, ly);
       c.globalAlpha = 0.65;
@@ -179,16 +164,15 @@ export class ReachHud {
     for (const t of o.traffic.ships) {
       if (!t.ship.alive || noisy()) continue;
       const d = t.ship.flight.position.distanceTo(pp);
-      if (d > (t.role === 'pirate' ? 9000 : 5000)) continue;
+      // Raiders already wear hostile brackets; tag the lane traffic (and the hauler in trouble).
+      if (t.role === 'pirate' || d > (t.ambush ? 9000 : 5000)) continue;
       const pt = this.project(t.ship.flight.position, world, cam);
       if (pt.behind || pt.x < 0 || pt.x > this.w || pt.y < 0 || pt.y > this.h) continue;
       const half = Math.max(9, (t.ship.radius * fovScale) / Math.max(d, 1));
-      const col = t.role === 'pirate' ? RED : t.role === 'patrol' ? FLAG_COL[t.flag] : 'rgba(125,255,178,0.8)';
-      c.fillStyle = col;
-      c.globalAlpha = t.role === 'pirate' || t.ambush ? 1 : 0.75;
-      const tag = t.role === 'pirate' ? `RAIDER · ${t.manifest.name.toUpperCase()}` : `${TRAFFIC_ROLES[t.role].prefix} ${t.manifest.name.toUpperCase()}`;
-      c.fillText(tag, pt.x + half + 6, pt.y + half + 2);
-      if (t.ambush && t.role !== 'pirate' && (time * 3) % 1 < 0.6) {
+      c.fillStyle = t.role === 'patrol' ? FLAG_COL[t.flag] : 'rgba(125,255,178,0.8)';
+      c.globalAlpha = t.ambush ? 1 : 0.75;
+      c.fillText(`${TRAFFIC_ROLES[t.role].prefix} ${t.manifest.name.toUpperCase()}`, pt.x + half + 6, pt.y + half + 2);
+      if (t.ambush && (time * 3) % 1 < 0.6) {
         c.fillStyle = RED;
         c.fillText('MAYDAY', pt.x + half + 6, pt.y + half + 15);
       }
@@ -233,6 +217,7 @@ export class ReachHud {
       c.fillText(b.sub, this.w / 2, this.h * 0.28 + 20);
       c.textAlign = 'left';
     }
+    c.restore();
   }
 
   private distress(a: Ambush, pp: Vector3, world: WorldSpace, cam: PerspectiveCamera, time: number, y: number): void {
