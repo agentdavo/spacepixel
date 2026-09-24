@@ -1087,6 +1087,11 @@ export class FlightScene implements GameScene, FlightHostScene {
     const notices = this.campaign ? [] : this.contracts.onDocked(d.id);
     this.lock.target = null;
     this.turrets.recall(this.player);
+    if (this.replay.playing) {
+      // A tape: the dock screen's choices are already on it (ledger, shop, contracts, launch).
+      this.cinema.show('BERTHED // REPLAY', d.name.toUpperCase(), 'DOCK SCREEN — THE PILOT’S CHOICES PLAY FROM THE TAPE');
+      return;
+    }
     this.dockScreen.open({
       notices,
       station: d,
