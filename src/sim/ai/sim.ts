@@ -8,10 +8,17 @@ import { brainOf, PERSONALITIES, setPersonality, type FormationKind } from './st
 import { setAutopilot, updateAI } from './index';
 import { createTurretSolution, turretAim, turretSelectTarget, TURRET_DEFAULTS, type TurretMount } from './Turret';
 import { stationAvoidScenario, wingDockScenario } from './stationSim';
+import { Weapons } from '../Weapons';
+import { Missiles } from '../Missiles';
+import { FighterCollisions } from '../FighterCollisions';
+import { segmentSphere } from '../Combat';
 
 /**
- * Headless AI scenarios (no renderer): FlightModel + AI + stand-in guns at a
- * fixed 60 Hz step, with measurable pass/fail outcomes.
+ * Headless AI scenarios (no renderer): FlightModel + AI at a fixed 60 Hz
+ * step, with measurable pass/fail outcomes. Dogfights fly the real weapons
+ * (Weapons + Missiles: faction guns, damage types, AI missile swarms) and
+ * fighter–fighter collisions; the small behaviour tests keep the stand-in
+ * DebugGuns (one flat laser) so they measure piloting, not loadouts.
  * Run with `node scripts/ai-sim.mjs` (loads this through Vite's SSR loader).
  */
 
@@ -70,6 +77,7 @@ export function formationScenario(kind: FormationKind, seconds = 45, sprint = fa
   setFormation(wing, kind, 40);
   issueOrder(wing, 'formUp', lead);
 
+  const bumps = new FighterCollisions();
   const settle = 15;
   let sum = 0;
   let n = 0;
@@ -82,6 +90,7 @@ export function formationScenario(kind: FormationKind, seconds = 45, sprint = fa
     scriptedLeader(lead.controls, t, sprint, hard);
     updateAI(fleet, DT, t);
     fleet.step(DT);
+    bumps.step(fleet.ships, DT, (sh, d) => fleet.damage(sh, d));
     let worst = 0;
     for (const w of wing) {
       const e = slotWorld(brainOf(w), lead, slot).distanceTo(w.flight.position);
@@ -98,7 +107,7 @@ export function formationScenario(kind: FormationKind, seconds = 45, sprint = fa
   const mean = sum / Math.max(1, n);
   return {
     name: `formation ${kind}${sprint ? ' + leader burner sprints (stress)' : ''}${hard > 0.5 ? ' (stress: leader beyond thrust limits)' : ''}`,
-    metrics: { meanSlotErr: mean.toFixed(2), maxSlotErr: max.toFixed(2), firstAllWithin10m: converged.toFixed(2) },
+    metrics: { meanSlotErr: mean.toFixed(2), maxSlotErr: max.toFixed(2), firstAllWithin10m: converged.toFixed(2), friendlyContacts: bumps.friendlyContacts },
     checks: [
       ...(sprint || hard > 0.5
         ? [info('mean slot error after 15 s (m)', mean, 'stress profile, informational')]
@@ -107,17 +116,96 @@ export function formationScenario(kind: FormationKind, seconds = 45, sprint = fa
             check('converged (all < 10 m) by (s)', converged, '>= 0 && < 20', converged >= 0 && converged < 20),
           ]),
       check('collisions', collisions, '== 0', collisions === 0),
+      check('friendly contacts (collision world)', bumps.friendlyContacts, '== 0', bumps.friendlyContacts === 0),
     ],
   };
 }
 
 // ── B: 4v4 dogfight around a capital ship ───────────────────────────────
-export function dogfightScenario(seed: number, seconds = 120): ScenarioResult {
+
+/**
+ * Real arms for a headless fight: faction guns (Weapons), AI missile swarms
+ * (Missiles) and fighter–fighter collisions, with the counters the checks
+ * read. Friendly fire can't happen in Weapons (bolts skip their own team),
+ * so trigger discipline is measured as bolts that WOULD have hit a wingmate.
+ */
+class Arms {
+  readonly weapons: Weapons;
+  readonly missiles: Missiles;
+  readonly bumps = new FighterCollisions();
+  shots = 0;
+  hits = 0;
+  kills = 0;
+  friendlyLine = 0;
+  missileHits = 0;
+  private flagged = new Float32Array(4096);
+  private a = new Vector3();
+  private d = new Vector3();
+
+  constructor(private fleet: Fleet) {
+    this.weapons = new Weapons(fleet);
+    this.missiles = new Missiles(fleet);
+    fleet.ordnance = this.missiles;
+  }
+
+  step(dt: number): void {
+    const w = this.weapons;
+    this.bumps.step(this.fleet.ships, dt, (s, d) => this.fleet.damage(s, d));
+    w.step(dt);
+    this.missiles.step(dt);
+    for (const e of w.events) {
+      if (e.kind === 'fire' && e.gun && !e.gun.beam) this.shots += e.gun.pellets;
+      else if ((e.kind === 'hit' || e.kind === 'shield') && e.gun && !e.gun.beam) this.hits++;
+      else if (e.kind === 'kill') this.kills++;
+    }
+    for (const e of this.missiles.events) if (e.kind === 'detonate' && !e.intercepted) this.missileHits++;
+    // Would-be friendly hits: live bolts whose next step passes through a wingmate.
+    const ships = this.fleet.ships;
+    for (let i = 0; i < w.life.length; i++) {
+      const life = w.life[i];
+      if (life <= 0) continue;
+      if (this.flagged[i] > 0 && life <= this.flagged[i]) continue; // already counted this bolt
+      this.flagged[i] = 0;
+      this.a.set(w.px[i], w.py[i], w.pz[i]);
+      this.d.set(w.vx[i] * dt, w.vy[i] * dt, w.vz[i] * dt);
+      for (const s of ships) {
+        if (!s.alive || s.id === w.owner[i] || s.radius > 60) continue;
+        const owner = ships.find((o) => o.id === w.owner[i]);
+        if (!owner || owner.team !== s.team) continue;
+        if (segmentSphere(this.a, this.d, s.flight.position, s.radius) <= 1) {
+          this.friendlyLine++;
+          this.flagged[i] = life;
+          break;
+        }
+      }
+    }
+  }
+}
+
+interface DogfightRun {
+  aliveC: number;
+  aliveB: number;
+  seconds: number;
+  arms: Arms;
+  contactT: number;
+  collisions: number;
+  capitalIntrusions: number;
+  minSep: number;
+  avgDist: number;
+  hist: Record<string, number>;
+}
+
+/**
+ * Four Kestrels (an ace lead on autopilot + three veterans) against four
+ * Cantors (Choir zealots), merging head-on beside a parked Cathedral.
+ * `stopOnWipe` ends the run when one side is gone (balance sweeps).
+ */
+function flyDogfight(seed: number, seconds: number, stopOnWipe: boolean): DogfightRun {
   const fleet = new Fleet(new Group());
-  const guns = new DebugGuns();
+  const arms = new Arms(fleet);
   const jit = (k: number) => Math.sin(seed * 12.9898 + k * 78.233) * 120;
 
-  // A Choir Cathedral parked just off the merge point.
+  // A Choir Cathedral parked just off the merge point (an obstacle: its turrets are not registered).
   const cathedral = fleet.spawn('choir-cathedral', 'choir', v(1400 + jit(9), -200, 2200), new Vector3(1, 0, 0.3));
   cathedral.flight.throttle = 0;
   cathedral.flight.velocity.set(0, 0, 0);
@@ -137,6 +225,8 @@ export function dogfightScenario(seed: number, seconds = 120): ScenarioResult {
   const bWing = [v(-40, 150, 4232), v(40, 154, 4232), v(80, 150, 4264)].map((p) => fleet.spawn('choir-cantor', 'choir', p, BACK));
   setFormation(bWing, 'fingerFour', 40);
   issueOrder(bWing, 'formUp', bLead);
+  const sideC = [lead, ...wing];
+  const sideB = [bLead, ...bWing];
 
   let engaged = false;
   let collisions = 0;
@@ -149,9 +239,11 @@ export function dogfightScenario(seed: number, seconds = 120): ScenarioResult {
   const cp = new Vector3();
   const fighters = fleet.ships.filter((s) => s !== cathedral);
   const hist: Record<string, number> = {};
+  contacts.clear();
 
+  let t = 0;
   for (let i = 0, steps = Math.round(seconds / DT); i < steps; i++) {
-    const t = i * DT;
+    t = i * DT;
     // Merge: both flights break and attack once in visual range.
     if (!engaged && lead.flight.position.distanceTo(bLead.flight.position) < 2600) {
       engaged = true;
@@ -161,7 +253,11 @@ export function dogfightScenario(seed: number, seconds = 120): ScenarioResult {
     }
     updateAI(fleet, DT, t);
     fleet.step(DT);
-    guns.step(fleet, DT);
+    arms.step(DT);
+    if (stopOnWipe) {
+      if (!sideC.some((s) => s.alive) || !sideB.some((s) => s.alive)) break;
+      continue;
+    }
 
     collisions += countContacts(fighters);
     const cap = capitalCapsule(cathedral);
@@ -189,37 +285,82 @@ export function dogfightScenario(seed: number, seconds = 120): ScenarioResult {
         if (A.alive && B.alive) minSep = Math.min(minSep, A.flight.position.distanceTo(B.flight.position) - A.radius - B.radius);
       }
   }
-
-  const aliveC = [lead, ...wing].filter((s) => s.alive).length;
-  const aliveB = [bLead, ...bWing].filter((s) => s.alive).length;
-  const avgDist = distSum / Math.max(1, distN);
-  const hitRate = guns.hits / Math.max(1, guns.shots);
   return {
-    name: `4v4 dogfight seed ${seed}`,
+    aliveC: sideC.filter((s) => s.alive).length,
+    aliveB: sideB.filter((s) => s.alive).length,
+    seconds: t,
+    arms,
+    contactT,
+    collisions,
+    capitalIntrusions,
+    minSep,
+    avgDist: distSum / Math.max(1, distN),
+    hist,
+  };
+}
+
+export function dogfightScenario(seed: number, seconds = 120): ScenarioResult {
+  const r = flyDogfight(seed, seconds, false);
+  const a = r.arms;
+  const hitRate = a.hits / Math.max(1, a.shots);
+  const hist = r.hist;
+  return {
+    name: `4v4 dogfight seed ${seed} (real weapons + missiles)`,
     metrics: {
-      contactAt: contactT.toFixed(1),
-      shots: guns.shots,
-      hits: guns.hits,
+      contactAt: r.contactT.toFixed(1),
+      shots: a.shots,
+      hits: a.hits,
       hitRate: `${(hitRate * 100).toFixed(1)}%`,
-      friendlyHits: guns.friendlyHits,
-      kills: guns.kills,
-      survivors: `concord ${aliveC}/4 · choir ${aliveB}/4`,
-      avgDistToTarget: avgDist.toFixed(0),
-      minSeparation: minSep.toFixed(1),
+      friendlyLine: a.friendlyLine,
+      missileHits: a.missileHits,
+      kills: a.kills,
+      survivors: `concord ${r.aliveC}/4 · choir ${r.aliveB}/4`,
+      avgDistToTarget: r.avgDist.toFixed(0),
+      minSeparation: r.minSep.toFixed(1),
       maneuverSeconds: Object.entries(hist)
-        .sort((a, b) => b[1] - a[1])
-        .map(([k, v]) => `${k}:${v.toFixed(0)}`)
+        .sort((x, y) => y[1] - x[1])
+        .map(([k, s]) => `${k}:${s.toFixed(0)}`)
         .join(' '),
     },
     checks: [
-      check('collisions (fighter-fighter)', collisions, '== 0', collisions === 0),
-      check('capital hull intrusions', capitalIntrusions, '== 0', capitalIntrusions === 0),
-      check('shots fired', guns.shots, '>= 200', guns.shots >= 200),
+      check('collisions (fighter-fighter)', r.collisions, '== 0', r.collisions === 0),
+      check('friendly contacts (collision world)', a.bumps.friendlyContacts, '== 0', a.bumps.friendlyContacts === 0),
+      check('capital hull intrusions', r.capitalIntrusions, '== 0', r.capitalIntrusions === 0),
+      check('shots fired', a.shots, '>= 200', a.shots >= 200),
       check('hit rate (%)', hitRate * 100, '5..40', hitRate >= 0.05 && hitRate <= 0.4),
       check('distinct maneuvers used', Object.keys(hist).length, '>= 7', Object.keys(hist).length >= 7),
-      check('friendly hits', guns.friendlyHits, '<= 2% of hits', guns.friendlyHits <= Math.max(1, guns.hits * 0.02)),
-      check('avg distance to target (m)', avgDist, '< 1200', avgDist < 1200),
-      check('kills', guns.kills, '>= 1', guns.kills >= 1),
+      check('bolts through a wingmate (would-be friendly hits)', a.friendlyLine, '<= 2% of hits', a.friendlyLine <= Math.max(1, a.hits * 0.02)),
+      check('avg distance to target (m)', r.avgDist, '< 1200', r.avgDist < 1200),
+      check('kills', a.kills, '>= 1', a.kills >= 1),
+    ],
+  };
+}
+
+/**
+ * Evenly matched 4v4s across many seeds: the side that wins (more survivors
+ * when one side is wiped out or the clock runs out) must not win more than
+ * 75 % of the decided fights. Each fight stops at the wipe.
+ */
+export function dogfightBalanceScenario(seeds = 24, seconds = 120): ScenarioResult {
+  let winC = 0;
+  let winB = 0;
+  let draws = 0;
+  const per: string[] = [];
+  for (let seed = 1; seed <= seeds; seed++) {
+    const r = flyDogfight(seed, seconds, true);
+    if (r.aliveC > r.aliveB) winC++;
+    else if (r.aliveB > r.aliveC) winB++;
+    else draws++;
+    per.push(`${r.aliveC}-${r.aliveB}`);
+  }
+  const decided = Math.max(1, winC + winB);
+  const shareC = winC / decided;
+  return {
+    name: `4v4 balance sweep (${seeds} seeds, Kestrels vs Cantors)`,
+    metrics: { concordWins: winC, choirWins: winB, draws, concordShare: `${(shareC * 100).toFixed(0)}%`, survivorsBySeed: per.join(' ') },
+    checks: [
+      check('Concord share of decided fights (%)', shareC * 100, '25..75', shareC >= 0.25 && shareC <= 0.75),
+      info('draws (both sides left standing)', draws, 'informational'),
     ],
   };
 }
@@ -452,6 +593,7 @@ const SCENARIOS: [string, () => ScenarioResult][] = [
   ['dogfight 1', () => dogfightScenario(1)],
   ['dogfight 2', () => dogfightScenario(2)],
   ['dogfight 3', () => dogfightScenario(3)],
+  ['dogfight balance', () => dogfightBalanceScenario()],
 ];
 
 export function runAll(filter = ''): ScenarioResult[] {

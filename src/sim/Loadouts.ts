@@ -46,7 +46,7 @@ export const SHIP_STATS: Record<string, ShipStats> = {
   'sb9-warhorse': { role: 'heavy strike', hull: 240, shield: 120, shieldRegen: 0.1, shieldDelay: 4, facings: 1, mass: 1.6, agility: 0.62, speed: 0.82, signature: 1.7 },
   'choir-cantor': {
     role: 'interceptor',
-    hull: 90,
+    hull: 110,
     shield: 80,
     shieldRegen: 0.22,
     shieldDelay: 2.5,
@@ -115,7 +115,7 @@ export const GUNS: Record<GunId, GunSpec> = {
   laser: { id: 'laser', name: 'PULSE LASER', type: 'laser', rate: 12, speed: 1600, life: 1.15, damage: 6, pellets: 1, spread: 0, style: 'streak', color: '#4fd8ff', core: '#ffffff', width: 1.6, length: 44, sfx: 'laser', timbre: 'concord' },
   autocannon: { id: 'autocannon', name: 'GU-11 AUTOCANNON', type: 'kinetic', rate: 16, speed: 1250, life: 1.2, damage: 5, pellets: 1, spread: 0.004, style: 'slug', color: '#ffd35a', core: '#fff6d8', width: 1.3, length: 9, sfx: 'cannon', timbre: 'concord' },
   // Zenith Hegemony: the Choir sings.
-  hymn: { id: 'hymn', name: 'HYMN PULSE', type: 'harmonic', rate: 7, speed: 1700, life: 1.05, damage: 9, pellets: 1, spread: 0, style: 'shard', color: '#ff3fb4', core: '#ffe0f4', width: 2.2, length: 26, sfx: 'laser', timbre: 'choir' },
+  hymn: { id: 'hymn', name: 'HYMN PULSE', type: 'harmonic', rate: 7, speed: 1700, life: 1.05, damage: 12, pellets: 1, spread: 0, style: 'shard', color: '#ff3fb4', core: '#ffe0f4', width: 2.2, length: 26, sfx: 'laser', timbre: 'choir' },
   lance: {
     id: 'lance',
     name: 'BEAM-LANCE',
@@ -205,7 +205,7 @@ export const MISSILES: Record<MissileId, MissileSpec> = {
     navN: 4,
     life: 7,
     fuse: 6,
-    damage: 22,
+    damage: 16,
     spiral: 260,
     hp: 0,
     reload: 3,

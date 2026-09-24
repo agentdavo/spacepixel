@@ -29,6 +29,13 @@ export const MISSILE_CAPACITY = 512;
 /** The classic swarm (default spec). */
 export const MICRO_MISSILE: MissileSpec = MISSILES.micro;
 
+/**
+ * AI pilots hold their ordnance longer than the reload: after a salvo the
+ * next one waits `reload + min + rand·spread` seconds. Tuned with the 4v4
+ * seed sweep in `npm run ai-sim` (swarms decide fighter fights fast).
+ */
+export const AI_MISSILE_HOLD = { min: 6, spread: 8 };
+
 export interface MissileEvent {
   kind: 'launch' | 'detonate' | 'expire';
   position: Vector3;
@@ -297,7 +304,7 @@ export class Missiles implements Shootables {
       Missiles.updateLock(lock, s, dt);
       if (lock.locked && s.combat.missileReload <= 0 && this.salvo(s, t)) {
         // AI pilots hold their ordnance longer than the reload.
-        s.combat.missileReload += 6 + this.rand() * 8;
+        s.combat.missileReload += AI_MISSILE_HOLD.min + this.rand() * AI_MISSILE_HOLD.spread;
         lock.progress = 0;
         lock.locked = false;
       }
