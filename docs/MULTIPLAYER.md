@@ -115,7 +115,13 @@ seeded worlds (72 %, ±4.6 %). The matchup sits near the top of the band.
 In the real game, `scripts/replay-check.mjs` flies `?scene=flight` with
 scripted key presses (including wing orders), then reboots into the tape. It
 seeks the first half unrendered and plays the rest through the engine loop.
-Result: 30 s recorded (1,806 ticks, 3 key commands), the first 15 s replayed by seek and the rest rendered: **30/30 checkpoints match, no desync**.
+Results:
+- Flying: 30 s recorded (1,806 ticks, 3 key commands). The first 15 s
+  replayed by seek and the rest rendered: **30/30 checkpoints match, no
+  desync**.
+- `--dock`: starts berthed and works the dock screen first (buy, sell,
+  repair, rearm, launch), then flies. 20 s recorded (7 commands: ledger,
+  hull, launch, key): **20/20 match**.
 
 ### Latency (`scripts/latency.mjs`, SwiftShader)
 
