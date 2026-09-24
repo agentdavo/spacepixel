@@ -23,6 +23,48 @@ Hooks for other owners:
 - Title, prologue and trailer stay on the **Original Score** unless the player
   pinned one, so `make-video` / trailer renders are unchanged.
 
+## Lead session handoff (24 Sep, `claude/vanguard-space-combat-0l3bfi`)
+
+The lead session is stopping here; a project thread continues from this file.
+
+**Done and merged on this branch** (all checks green at `b02c1e6`: `tsc`,
+`npm test` 221/221, `ai-sim`, `balance`, `econ-sim`, `determinism`,
+`flow-check`, `career-check`, `attract-check` 3 cycles):
+
+- Batches 1–2: engine, ink/cel pipeline, flight, AI, campaign (20 episodes).
+- Batch 3: prologue + cinema sequencer, 90 s trailer, attract mode, photo
+  mode, `record` → `make-video` clip pipeline; stations, docking for every
+  hull size (bays, clamp arms, moorings), planetary ports (descent to surface
+  cities), trade, repair/rearm, contracts, free-roam career loop; MP-0
+  (fixed 60 Hz step, seeded RNG, bit-exact replays, kill-cam).
+- Batch 4: combat depth, 28 hulls T1–T6, shipyard + outfitting (398 items),
+  living Reach (planets, moons, traffic, ambushes), people/dialog/voices,
+  collisions, economy balance, integration polish, rough-edges pass.
+- Batch 5: WorldState memory, guilds (5) + 20 arc missions + outposts, world
+  sim (story → economy, player actions, news), the Schedule, the Signal
+  countdown, NPC arcs (7) + rivals (6).
+- Last fixes: attract-loop leaks (planet LOD caches; renderer RenderObjects
+  retaining old scenes).
+
+**Left / known issues** (details in `docs/ROADMAP.md` → Known issues):
+
+- Batch 6 (turrets, shields v2, impacts, subsystems, kill paths): turrets
+  session. The lead's paused batch 6 WIP is listed under Requests.
+- Never flown live, only exercised headless: breaking the Schedule, rival
+  fights end to end (retreat/eject, rival-led ambushes), desert/ice/volcanic
+  surface descents, the traffic/rival encounter mix over a long session.
+- Replay tapes: guild/outpost actions record a full WorldState snapshot
+  (`world` command); migrate to small commands like the world sim's.
+- Balance: story-rule economy effects are hand-tuned; stock T5 loses to a
+  Lantern Guard (by design, may surprise).
+- Perf: everything measured on SwiftShader only; planet LOD savings, first
+  LOD-switch hitch, and all budgets need a real-GPU pass (`npm run perf`).
+- Multiplayer roadmap items 15–20 (headless shard, two-browser flight,
+  Lantern-jump handoff, persistent economy, co-op, playtest):
+  `docs/MULTIPLAYER.md`.
+- Batch 3 items still open: attract/trailer "10 min unattended" is verified
+  (3 cycles); photo mode exists; planetary ports have no contract kinds.
+
 ## Requests
 
 - **Batch 6 overlap, resolved (user, 24 Sep ~10:20).** Batch 6 (turrets,
