@@ -32,6 +32,21 @@ export interface AudioWeaponEvent {
   readonly shooter: AudioShip | null;
   /** Weapon family voice (src/sim/Loadouts.ts GunSpec): 'laser' | 'cannon', with a faction timbre. */
   readonly gun?: { readonly sfx: 'laser' | 'cannon'; readonly timbre: string } | null;
+  /** Damage type of an impact (hit, shield, beam-hit): picks the hull sound. */
+  readonly type?: 'kinetic' | 'laser' | 'harmonic' | 'explosive';
+  /** beam-hit on a shield rather than plating. */
+  readonly shielded?: boolean;
+  /** Facing charge after the event, 0..1 (−1 n/a): a failing facing rings thinner. */
+  readonly strength?: number;
+  /** Destroyed subsystem ('subsystem'). */
+  readonly sub?: { readonly kind: string } | null;
+  /** fire: a turret mount's shot, not the pilot's guns. */
+  readonly turret?: boolean;
+}
+
+/** The hull sound for a hit of damage type `type`. */
+function hullSound(type: AudioWeaponEvent['type']): SfxKind {
+  return type === 'laser' || type === 'harmonic' ? 'hullScorch' : type === 'explosive' ? 'hullCrunch' : 'hullHit';
 }
 
 export interface AudioMissileEvent {
@@ -127,6 +142,7 @@ export class GameAudio {
   private lastRemoteFire = -1;
   private lastPlayerHit = -1;
   private lastBeam = -1;
+  private lastBleed = -1;
   private lastPlayerLaunch = -1;
   private lastRemoteLaunch = -1;
   private lastDetonate = -1;
@@ -285,7 +301,7 @@ export class GameAudio {
       const ev = events[i];
       switch (ev.kind) {
         case 'fire':
-          if (ev.shooter?.isPlayer) {
+          if (ev.shooter?.isPlayer && !ev.turret) {
             if (now - this.lastPlayerFire < 0.03) break;
             this.lastPlayerFire = now;
             this.fireSide = -this.fireSide;
@@ -304,13 +320,27 @@ export class GameAudio {
         case 'beam-hit':
           if (now - this.lastBeam < 0.09) break;
           this.lastBeam = now;
-          sfx.playAtRaw('beamHit', ev.position, eye, 0.8);
+          if (ev.shielded) sfx.playAtRaw('shieldHit', ev.position, eye, 0.55);
+          else sfx.playAtRaw('beamHit', ev.position, eye, 0.8);
           break;
-        case 'subsystem':
-          sfx.playAtRaw('explosionLarge', ev.position, eye, 0.7);
+        case 'subsystem': {
+          // Mounts shear off; generators take their facing's shell with them; hangars, engines and bridges go up.
+          const k = ev.sub?.kind;
+          if (k === 'shieldGen' || k === 'shieldEmitter') sfx.playAtRaw('shieldDown', ev.position, eye, 0.7);
+          if (k === 'hangar' || k === 'engine' || k === 'bridge') sfx.playAtRaw('explosionLarge', ev.position, eye, 0.8);
+          sfx.playAtRaw('mountBlast', ev.position, eye, ev.ship?.isPlayer ? 1 : 0.85);
           break;
+        }
         case 'shield-down':
           sfx.playAtRaw('shieldDown', ev.position, eye, ev.ship?.isPlayer ? 1 : 0.8);
+          break;
+        case 'shield-up':
+          sfx.playAtRaw('shieldUp', ev.position, eye, ev.ship?.isPlayer ? 0.9 : 0.6);
+          break;
+        case 'shield-bleed':
+          if (now - this.lastBleed < 0.12) break;
+          this.lastBleed = now;
+          sfx.playAtRaw(ev.ship?.isPlayer ? 'playerHit' : hullSound(ev.type), ev.position, eye, 0.45);
           break;
         case 'kill':
           if (ev.ship?.isPlayer) sfx.playAtRaw('explosionSmall', ev.position, eye, 1.2, 'concord', 8);
@@ -330,8 +360,9 @@ export class GameAudio {
       const i = hit.idx[k];
       if (i < 0) continue;
       const ev = events[i];
-      if (ev.kind === 'shield') sfx.playAtRaw('shieldHit', ev.position, eye, 0.75);
-      else sfx.playAtRaw('hullHit', ev.position, eye, 0.8);
+      // A failing facing (low charge) rings thinner; plating answers by damage type.
+      if (ev.kind === 'shield') sfx.playAtRaw('shieldHit', ev.position, eye, 0.75 * (ev.strength !== undefined && ev.strength >= 0 ? 0.6 + 0.4 * ev.strength : 1));
+      else sfx.playAtRaw(hullSound(ev.type), ev.position, eye, 0.8);
     }
     if (now - this.lastRemoteFire < 0.02) return;
     for (let k = 0; k < fire.idx.length; k++) {

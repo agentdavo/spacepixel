@@ -22,6 +22,10 @@ export type SfxKind =
   | 'laser'
   | 'cannon'
   | 'shieldDown'
+  | 'shieldUp'
+  | 'hullScorch'
+  | 'hullCrunch'
+  | 'mountBlast'
   | 'hullHit'
   | 'shieldHit'
   | 'beamHit'
@@ -75,6 +79,10 @@ const KIND: Record<SfxKind, KindSpec> = {
   laser: { dur: 0.5, prio: 2, ref: 60 },
   cannon: { dur: 0.3, prio: 2, ref: 60 },
   shieldDown: { dur: 0.9, prio: 5, ref: 300 },
+  shieldUp: { dur: 0.8, prio: 4, ref: 300 },
+  hullScorch: { dur: 0.4, prio: 3, ref: 80 },
+  hullCrunch: { dur: 0.7, prio: 3, ref: 120 },
+  mountBlast: { dur: 1.3, prio: 5, ref: 400 },
   hullHit: { dur: 0.5, prio: 3, ref: 80 },
   shieldHit: { dur: 0.5, prio: 3, ref: 80 },
   beamHit: { dur: 0.2, prio: 2, ref: 120 },
@@ -256,8 +264,20 @@ export class Sfx {
       case 'shieldDown':
         this.shieldDown(slot, t, gain, v);
         break;
+      case 'shieldUp':
+        this.shieldUp(slot, t, gain, v);
+        break;
       case 'hullHit':
         this.hullHit(slot, t, gain, v, false);
+        break;
+      case 'hullScorch':
+        this.hullScorch(slot, t, gain, v);
+        break;
+      case 'hullCrunch':
+        this.hullCrunch(slot, t, gain, v);
+        break;
+      case 'mountBlast':
+        this.mountBlast(slot, t, gain, v);
         break;
       case 'playerHit':
         this.hullHit(slot, t, gain, v * 0.8, true);
@@ -483,7 +503,100 @@ export class Sfx {
     n.connect(hp).connect(ne).connect(out);
   }
 
+  /** A shield facing coming back: the collapse chord run upward, a soft charge-up under it. */
+  private shieldUp(slot: VoiceSlot, t: number, g: number, v: number): void {
+    const out = slot.input;
+    const end = t + 0.75;
+    const env = this.gain();
+    adsr(env.gain, t, 0.14 * g, 0.25, 0.1, 0.8, 0.2, 0.3);
+    for (const f of [1190, 1590, 2385]) {
+      const o = this.osc(slot, 'triangle', f * v * 0.4, t, end);
+      sweep(o.frequency, t, f * v * 0.4, f * v, 0.45);
+      o.connect(env);
+    }
+    env.connect(out);
+    this.send(env, 0.6);
+    const hum = this.osc(slot, 'sawtooth', 60 * v, t, end);
+    sweep(hum.frequency, t, 60 * v, 180 * v, 0.5);
+    const lp = this.filter('lowpass', 600);
+    const he = this.gain();
+    adsr(he.gain, t, 0.08 * g, 0.3, 0.05, 0.6, 0.2, 0.25);
+    hum.connect(lp).connect(he).connect(out);
+  }
+
   // ── impacts ──────────────────────────────────────────────────────────
+  /** Energy on bare plating (laser / harmonic): a hiss and crackle of burning metal over a thin ping. */
+  private hullScorch(slot: VoiceSlot, t: number, g: number, v: number): void {
+    const out = slot.input;
+    const end = t + 0.36;
+    const n = this.noise(slot, t, end);
+    const bp = this.filter('bandpass', 4200 * v, 1.4);
+    sweep(bp.frequency, t, 4800 * v, 2400 * v, 0.3);
+    const ne = this.gain();
+    perc(ne.gain, t, 0.22 * g, 0.002, 0.28);
+    // Crackle: the hiss chopped by a fast square.
+    const chop = this.gain(0.5);
+    const lfo = this.osc(slot, 'square', 47 * v, t, end);
+    const lg = this.gain(0.5);
+    lfo.connect(lg).connect(chop.gain);
+    n.connect(bp).connect(chop).connect(ne).connect(out);
+    const ping = this.osc(slot, 'sine', 1650 * v, t, t + 0.2);
+    const pe = this.gain();
+    perc(pe.gain, t, 0.08 * g, 0.001, 0.12);
+    ping.connect(pe).connect(out);
+    const th = this.osc(slot, 'sine', 180, t, t + 0.2);
+    sweep(th.frequency, t, 190, 70, 0.08);
+    const te = this.gain();
+    perc(te.gain, t, 0.22 * g, 0.002, 0.1);
+    th.connect(te).connect(out);
+  }
+
+  /** Explosive on bare plating: a buckling thud and a spray of debris ticks. */
+  private hullCrunch(slot: VoiceSlot, t: number, g: number, v: number): void {
+    this.hullHit(slot, t, g * 0.8, v * 0.7, false);
+    const out = slot.input;
+    const end = t + 0.65;
+    const n = this.noise(slot, t, end, true);
+    const lp = this.filter('lowpass', 900, 1.5);
+    sweep(lp.frequency, t, 1800 * v, 180, 0.4);
+    const ne = this.gain();
+    perc(ne.gain, t, 0.45 * g, 0.003, 0.5);
+    n.connect(lp).connect(ne).connect(out);
+    this.send(ne, 0.25);
+    const d = this.noise(slot, t + 0.06, end);
+    const hp = this.filter('highpass', 3500);
+    const de = this.gain();
+    for (let i = 0; i < 5; i++) perc(de.gain, t + 0.06 + i * 0.07 * v, (0.12 - i * 0.02) * g, 0.001, 0.02);
+    d.connect(hp).connect(de).connect(out);
+  }
+
+  /** A mount / generator / hangar torn out: a rupture thump, a groaning metal clang, then secondary pops. */
+  private mountBlast(slot: VoiceSlot, t: number, g: number, v: number): void {
+    this.explosionSmall(slot, t, g * 0.8, v * 0.85);
+    const out = slot.input;
+    const end = t + 1.25;
+    // Clang: inharmonic partials bending down (a turret ring shearing).
+    const ce = this.gain();
+    perc(ce.gain, t, 0.16 * g, 0.002, 0.9);
+    for (const [f, k] of [[213, 1], [587, 0.6], [1041, 0.4]] as const) {
+      const o = this.osc(slot, 'triangle', f * v, t, end);
+      sweep(o.frequency, t, f * v, f * v * 0.78, 1.0);
+      const e = this.gain(k);
+      o.connect(e).connect(ce);
+    }
+    ce.connect(out);
+    this.send(ce, 0.4);
+    // Secondaries: ammunition / conduits cooking off.
+    for (let i = 0; i < 3; i++) {
+      const at = t + 0.25 + i * 0.22 * v;
+      const p = this.noise(slot, at, at + 0.14);
+      const bp = this.filter('bandpass', 1200 + 500 * i, 1);
+      const pe = this.gain();
+      perc(pe.gain, at, (0.22 - i * 0.05) * g, 0.002, 0.1);
+      p.connect(bp).connect(pe).connect(out);
+    }
+  }
+
   private hullHit(slot: VoiceSlot, t: number, g: number, v: number, heavy: boolean): void {
     const out = slot.input;
     const end = t + (heavy ? 0.65 : 0.45);

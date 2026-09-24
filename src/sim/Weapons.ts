@@ -77,6 +77,8 @@ export interface WeaponEvent {
   amount?: number;
   /** beam-hit: the contact point is on a shield (a beam's shield contact is mostly reported as beam-hit). */
   shielded?: boolean;
+  /** fire: a turret mount's shot (`muzzleFlash`), not the pilot's own guns. Presentation only (sound). */
+  turret?: boolean;
 }
 
 export interface Beam {
@@ -149,7 +151,7 @@ export class Weapons {
   constructor(readonly fleet: Fleet) {
     this.rng = fleet.rng.fork('weapons');
     for (let i = 0; i < EVENT_POOL; i++) {
-      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, subHp: -1, facing: -1, strength: -1, bleed: 0, type: undefined, amount: 0, shielded: false });
+      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, subHp: -1, facing: -1, strength: -1, bleed: 0, type: undefined, amount: 0, shielded: false, turret: false });
     }
     for (let i = 0; i < 128; i++) {
       this.flashes.push({ kind: 'fire', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1, strength: -1, bleed: 0 });
@@ -190,6 +192,7 @@ export class Weapons {
     e.type = gun?.type;
     e.amount = 0;
     e.shielded = false;
+    e.turret = false;
     this.events.push(e);
     return e;
   }
@@ -316,7 +319,8 @@ export class Weapons {
     const ships = this.fleet.ships;
     for (let i = 0; i < this.flashCount; i++) {
       const q = this.flashes[i];
-      this.emit('fire', q.position, q.normal, q.velocity, null, q.shooter, q.gun);
+      const f = this.emit('fire', q.position, q.normal, q.velocity, null, q.shooter, q.gun);
+      if (f) f.turret = true;
       q.shooter = null;
     }
     this.flashCount = 0;

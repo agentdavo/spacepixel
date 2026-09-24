@@ -4,6 +4,7 @@ import { disposeTree } from '@/core/dispose';
 import { faceAlong, type Fleet, type ShipEntity } from '@/sim/Fleet';
 import type { Weapons } from '@/sim/Weapons';
 import type { Missiles } from '@/sim/Missiles';
+import { CinemaGunnery } from './gunnery';
 import { Capitals } from '@/sim/Capitals';
 import { subsystemPosition, toUniverse } from '@/sim/Combat';
 import { GUNS, MISSILES } from '@/sim/Loadouts';
@@ -152,6 +153,9 @@ export class TrailerStage implements CinemaStage {
   private valiant!: ShipEntity;
   private canticle!: ShipEntity;
   private valiantTurrets: string[] = [];
+  private canticleTurrets: string[] = [];
+  /** Scripted volleys leave the barrels (the battle's Indomitable is Capitals-driven; the rest are posed here). */
+  private readonly gunnery = new CinemaGunnery();
 
   constructor(
     private readonly scene: Scene,
@@ -395,6 +399,7 @@ export class TrailerStage implements CinemaStage {
     this.pose(this.valiant, set.anchor, _z);
     this.pose(this.canticle, _w.set(1300, -60, 700).add(set.anchor), _z);
     this.valiantTurrets = [...this.valiant.model.sockets.entries()].filter(([, o]) => o.userData.kind === 'turret').map(([k]) => k);
+    this.canticleTurrets = [...this.canticle.model.sockets.entries()].filter(([, o]) => o.userData.kind === 'turret').map(([k]) => k);
     const planet = new Planet(PLANETS.castellan);
     planet.group.position.copy(set.anchor).add(_v.set(120_000, -40_000, 300_000));
     planet.group.rotation.set(-0.2, 1.2, 0.2);
@@ -822,8 +827,11 @@ export class TrailerStage implements CinemaStage {
     // The Canticle answers: choir battery shards off its near side.
     const k = Math.floor(t * 9);
     if (Math.floor((t - 1 / 60) * 9) !== k && t > 0.4) {
-      toUniverse(X, -120 + 60 * hash(k), 40 * hash(k + 3), 180 * hash(k + 7), _w);
-      _v.subVectors(toUniverse(V, 60 * hash(k + 11), 20, 120 * hash(k + 13), _u), _w).normalize().multiplyScalar(GUNS.battery.speed);
+      toUniverse(V, 60 * hash(k + 11), 20, 120 * hash(k + 13), _u);
+      const mounts = this.gunnery.bear(X, this.canticleTurrets, _u);
+      if (mounts.length) this.gunnery.muzzle(X, mounts[k % mounts.length], _w);
+      else toUniverse(X, -120 + 60 * hash(k), 40 * hash(k + 3), 180 * hash(k + 7), _w);
+      _v.subVectors(_u, _w).normalize().multiplyScalar(GUNS.battery.speed);
       this.weapons.spawnBolt(_w, _v, 2.2, 5, X, GUNS.battery);
     }
   }
@@ -972,9 +980,11 @@ export class TrailerStage implements CinemaStage {
     const W = this.weapons;
     if (live === 'battle') {
       const I = this.indomitable;
-      const turrets = [...I.model.sockets.entries()].filter(([, o]) => o.userData.kind === 'turret').map(([k]) => k);
+      const all = [...I.model.sockets.entries()].filter(([, o]) => o.userData.kind === 'turret').map(([k]) => k);
+      const turrets = this.gunnery.bear(I, all, this.cathedral.flight.position, false);
       turrets.slice(0, 5).forEach((k) => {
         const b = W.fireBeam(I, k, 9000, 12, 0.9, 0);
+        b.muzzle = this.gunnery.emitter(I, k);
         b.aimTarget = this.cathedral;
       });
       this.boltVolley(I, turrets, this.cathedral, 18, GUNS.railgun);
@@ -982,11 +992,13 @@ export class TrailerStage implements CinemaStage {
     }
     if (live === 'broadside') {
       const V = this.valiant;
-      this.valiantTurrets.slice(0, 4).forEach((k) => {
+      const turrets = this.gunnery.bear(V, this.valiantTurrets, this.canticle.flight.position);
+      turrets.slice(0, 4).forEach((k) => {
         const b = W.fireBeam(V, k, 4000, 6, 0.6, 0);
+        b.muzzle = this.gunnery.emitter(V, k);
         b.aimTarget = this.canticle;
       });
-      this.boltVolley(V, this.valiantTurrets, this.canticle, 14, GUNS.cannon);
+      this.boltVolley(V, turrets, this.canticle, 14, GUNS.cannon);
     }
     void seeking;
   }
@@ -994,7 +1006,9 @@ export class TrailerStage implements CinemaStage {
   private boltVolley(from: ShipEntity, sockets: string[], target: ShipEntity, n: number, gun: (typeof GUNS)[keyof typeof GUNS]): void {
     const c = target.flight.position;
     for (let i = 0; i < n; i++) {
-      this.weapons.socketPosition(from, sockets[i % Math.max(1, sockets.length)] ?? 'hull', _w);
+      const k = sockets[i % Math.max(1, sockets.length)];
+      if (k) this.gunnery.muzzle(from, k, _w);
+      else this.weapons.socketPosition(from, 'hull', _w);
       _v.subVectors(c, _w).normalize().add(_u.set(hash(i) * 0.03, hash(i + 7) * 0.03, hash(i + 13) * 0.03)).normalize().multiplyScalar(Math.max(1600, gun.speed));
       this.weapons.spawnBolt(_w, _v, 3.2, 2, from, gun);
     }

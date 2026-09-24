@@ -17,6 +17,7 @@ import { Monolith, MegaGate, Derelict, Wreckage, Beacon, type SetPiece, type Set
 import type { CinemaStage } from './Cinema';
 import type { Shot } from './timeline';
 import { LightSheet, StarGlint } from './props';
+import { CinemaGunnery } from './gunnery';
 import { SIGNAL_PULSES } from './prologue';
 
 /**
@@ -84,6 +85,8 @@ function withLight(base: LightPreset, patch: Partial<LightPreset>): LightPreset 
 }
 
 export class PrologueStage implements CinemaStage {
+  /** Scripted volleys leave the barrels (TurretRig muzzles, mounts laid on the target). */
+  private readonly gunnery = new CinemaGunnery();
   private readonly sets = new Map<SetId, SetDef>();
   private readonly skies = new Map<string, Backdrop>();
   private readonly glint = new StarGlint('#e6eeff');
@@ -571,14 +574,19 @@ export class PrologueStage implements CinemaStage {
       }
       case 'broadside': {
         // Directorate particle cannons answer from every turret; flak rakes the Cathedral's shield.
-        const turrets = [...this.indomitable.model.sockets.entries()].filter(([, o]) => o.userData.kind === 'turret').map(([k]) => k);
+        const I = this.indomitable;
+        const c = this.cathedral.flight.position;
+        const all = [...I.model.sockets.entries()].filter(([, o]) => o.userData.kind === 'turret').map(([k]) => k);
+        const turrets = this.gunnery.bear(I, all, c);
         turrets.slice(0, 4).forEach((k) => {
-          const b = W.fireBeam(this.indomitable, k, 9000, 12, 0.9, 0);
+          const b = W.fireBeam(I, k, 9000, 12, 0.9, 0);
+          b.muzzle = this.gunnery.emitter(I, k);
           b.aimTarget = this.cathedral;
         });
-        const c = this.cathedral.flight.position;
         for (let i = 0; i < 14; i++) {
-          W.socketPosition(this.indomitable, turrets[i % Math.max(1, turrets.length)] ?? 'hull', _w);
+          const k = turrets[i % Math.max(1, turrets.length)];
+          if (k) this.gunnery.muzzle(I, k, _w);
+          else W.socketPosition(I, 'hull', _w);
           _v.subVectors(c, _w).normalize().add(new Vector3(hash(i) * 0.03, hash(i + 7) * 0.03, hash(i + 13) * 0.03)).normalize().multiplyScalar(2600);
           W.spawnBolt(_w, _v, 3.2, 1, this.indomitable);
         }
