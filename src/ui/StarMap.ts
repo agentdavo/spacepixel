@@ -25,6 +25,10 @@ export class StarMap {
   private hover: string | null = null;
   /** Extra layer drawn over the map (contracts): the context, a system → screen mapper, time. */
   overlay: ((c: CanvasRenderingContext2D, at: (id: string) => { x: number; y: number } | null, time: number) => void) | null = null;
+  /** More layers over the map (the Schedule of Engagements, …), drawn after `overlay`. */
+  readonly layers: ((c: CanvasRenderingContext2D, at: (id: string) => { x: number; y: number } | null, time: number) => void)[] = [];
+  /** Pixels a layer claims at the bottom of the right-hand column (the survey panel stops short). */
+  surveyReserve = 0;
   /** Timetable summaries per system (sailings/h, per-Lantern volume, patrols, piracy). */
   private traffic = new Map<string, TrafficSummary>();
 
@@ -37,7 +41,7 @@ export class StarMap {
       'position:absolute;inset:0;width:100%;height:100%;display:none;z-index:24;pointer-events:auto;cursor:crosshair;background:rgba(3,6,12,0.88)';
     root.append(this.canvas);
     this.ctx = this.canvas.getContext('2d')!;
-    for (const sys of universe.systems.values()) this.traffic.set(sys.id, systemTraffic(universe.seed, sys));
+    this.refreshTraffic();
     this.canvas.addEventListener('pointermove', (e) => (this.hover = this.pick(e.clientX, e.clientY)));
     this.canvas.addEventListener('pointerdown', (e) => {
       const id = this.pick(e.clientX, e.clientY);
@@ -46,8 +50,14 @@ export class StarMap {
     });
   }
 
+  /** Recompute the lane summaries (the world moves traffic and piracy between openings). */
+  refreshTraffic(): void {
+    for (const sys of this.universe.systems.values()) this.traffic.set(sys.id, systemTraffic(this.universe.seed, sys));
+  }
+
   toggle(): void {
     this.open = !this.open;
+    if (this.open) this.refreshTraffic();
     this.canvas.style.display = this.open ? 'block' : 'none';
   }
 
@@ -223,10 +233,12 @@ export class StarMap {
     c.textAlign = 'right';
     c.fillText('[M] close · click a system to plot a route · fly through the marked Lantern to jump · ■ = dockable station · ⚠ = raiders', w - 24, h - 32);
     c.textAlign = 'left';
-    this.overlay?.(c, (id) => {
+    const at = (id: string) => {
       const s = this.universe.systems.get(id);
       return s ? this.toScreen(s) : null;
-    }, time);
+    };
+    this.overlay?.(c, at, time);
+    for (const layer of this.layers) layer(c, at, time);
   }
 
   /** Mean sailings per hour on the lane between two systems (both Lantern ends). */
@@ -262,7 +274,7 @@ export class StarMap {
       if (pl.description) for (const ln of wrap(c, pl.description, width - 18)) lines.push({ text: `   ${ln}`, color: 'rgba(216,208,255,0.7)' });
       for (const m of pl.moons ?? []) lines.push({ text: `   · ${m.preset.name} (${KIND_LABEL[m.preset.kind ?? 'rocky']})`, color: 'rgba(216,208,255,0.6)' });
     }
-    const maxLines = Math.floor((h - 150) / 15);
+    const maxLines = Math.floor((h - 150 - this.surveyReserve) / 15);
     const shown = lines.slice(0, maxLines);
     c.fillRect(x - 12, y - 18, width + 24, shown.length * 15 + 16);
     c.strokeRect(x - 12, y - 18, width + 24, shown.length * 15 + 16);

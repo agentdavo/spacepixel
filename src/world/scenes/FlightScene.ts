@@ -49,6 +49,11 @@ import { Outfitter, bindOutfitter } from '@/game/outfitting/Outfitter';
 import { ShipTurrets } from '@/game/outfitting/turrets';
 import '@/ui/ShipyardTab'; // registers the SHIPYARD dock tab (hulls, your hangar)
 import '@/ui/OutfittingTab'; // registers the OUTFITTING dock tab (slots, items, power)
+import { initWorld, type WorldRuntime } from '@/game/world/live';
+import { greeting, lanternToll } from '@/game/world/sim';
+import type { WorldEvent } from '@/game/world/WorldState';
+import { ScheduleOverlay } from '@/ui/ScheduleOverlay';
+import { SignalCounter } from '@/ui/SignalCounter';
 
 /**
  * Milestones 4–6 + 10–11: one ship flying well, then shooting.
@@ -177,8 +182,14 @@ export class FlightScene implements GameScene, FlightHostScene {
   readonly outfit = new Outfitter();
   /** Fitted turrets, point defence and hangar complements on non-capital hulls. */
   readonly turrets: ShipTurrets;
+  /** The Reach's memory at runtime: story facts, the pilot's deeds, news, the Schedule, the Signal (src/game/world). */
+  readonly worldRt: WorldRuntime;
+  private signal: SignalCounter;
 
   constructor() {
+    // The world's readers go in before anything prices a market or lays a lane.
+    this.worldRt = initWorld(this.universe);
+    this.worldRt.here = () => this.systemId;
     this.systemId = this.universe.start;
     this.view = new StarSystemView(this.universe.systems.get(this.systemId)!, this.scene, this.world.root);
     this.paintPlanes();
@@ -298,6 +309,13 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.starMap.toggle();
     }
     this.contracts = new ContractDesk(this);
+    // The Schedule of Engagements on the star map; the Signal count in the HUD corner.
+    new ScheduleOverlay(this.starMap, this.worldRt, {
+      acceptSchedule: (e) => this.contracts.acceptSchedule(e),
+      booked: () => new Set(this.contracts.book.active.flatMap((k) => (k.schedule ? [k.schedule.id] : []))),
+    });
+    this.signal = new SignalCounter(document.getElementById('ui-root')!);
+    this.worldRt.on((e) => this.onWorldEvent(e));
     this.outfit.bind(this);
     bindOutfitter(this.outfit);
     this.outfit.settle(); // hold size, hangar complement
@@ -345,6 +363,9 @@ export class FlightScene implements GameScene, FlightHostScene {
     // berthed, the world holds still (dt = 0) behind the dock screen.
     const dt = this.docking.frozen ? 0 : this.tactical ? realDt * 0.25 : realDt;
     this.ledger.clock += dt;
+    // The Reach breathes in free flight (held while berthed and through story episodes).
+    if (!this.campaign) this.worldRt.step(dt);
+    this.signal.update(this.worldRt.state, !this.campaign && !this.docking.busy && !this.contracts.rescue.active && !this.tactical, time);
     // Story episodes keep their pacing: no docking unless the mission allows it.
     this.docking.lockout = this.campaign && !this.campaign.mission.allowDocking ? 'DOCKING UNAVAILABLE — EPISODE IN PROGRESS' : null;
 
@@ -427,7 +448,12 @@ export class FlightScene implements GameScene, FlightHostScene {
     // 4b. Mission bookkeeping (kills by faction of the victim).
     for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship) this.kills.set(e.ship.faction, (this.kills.get(e.ship.faction) ?? 0) + 1);
     // Free-roam: shooting a faction's ships costs standing with its stations.
-    if (!this.campaign) for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship && e.shooter === this.player && !this.contracts.owns(e.ship) && e.ship.team !== 'renegade') this.ledger = reputationForKill(this.ledger, e.ship.faction as EconFaction);
+    if (!this.campaign)
+      for (const e of this.weapons.events)
+        if (e.kind === 'kill' && e.ship && e.shooter === this.player && !this.contracts.owns(e.ship) && e.ship.team !== 'renegade') {
+          this.ledger = reputationForKill(this.ledger, e.ship.faction as EconFaction);
+          if (e.ship.faction === 'concord' || e.ship.faction === 'choir' || e.ship.faction === 'rustwake') this.worldRt.kill(this.systemId, e.ship.faction);
+        }
     if (this.mission) {
       this.missionTime += dt;
       const mc = this.missionCtx;
@@ -688,6 +714,14 @@ export class FlightScene implements GameScene, FlightHostScene {
   }
 
   private beginJump(to: string): void {
+    // Free flight pays the Lantern toll: one gram of Ebon at the Reach price — nothing once the gates are in tune.
+    if (!this.campaign) {
+      const toll = lanternToll(this.worldRt.state);
+      if (toll > 0 && this.ledger.credits >= toll) {
+        this.ledger.credits -= toll;
+        this.docking.say(`LANTERN TOLL · 1 g EBON · ${toll} sh`, '#b77bff', 2.5);
+      } else if (toll === 0) this.docking.say('THE LANTERN IS IN TUNE · NO TOLL', '#7dffb2', 2.5);
+    }
     this.audio.stinger('jump');
     this.jumpPhase = 'spool';
     this.jumpT = 0;
@@ -848,7 +882,7 @@ export class FlightScene implements GameScene, FlightHostScene {
   // ── Docking & trade ────────────────────────────────────────────────
 
   private requestDock(): void {
-    this.docking.request((d) => dockingClearance(this.ledger, d.faction));
+    this.docking.request((d) => dockingClearance(this.ledger, d.faction, this.worldRt.attitudeAt(d)));
   }
 
   /** True if any station in this system is within `r` metres of the player. */
@@ -885,6 +919,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.onDocked?.(d.id);
     this.campaign?.runner.onDocked(d.id);
     const notices = this.campaign ? [] : this.contracts.onDocked(d.id);
+    const hello = this.campaign ? '' : greeting(this.worldRt.attitudeAt(d), d.faction);
+    if (hello) notices.unshift({ text: hello, cls: this.worldRt.attitudeAt(d) < 0 ? 'err' : 'ok' });
     this.lock.target = null;
     this.turrets.recall(this.player);
     this.dockScreen.open({
@@ -893,6 +929,8 @@ export class FlightScene implements GameScene, FlightHostScene {
       systemName: this.view.system.name,
       berth: berth(d),
       markets: this.allMarkets(),
+      news: () => (this.campaign ? [] : this.worldRt.news(d.id)),
+      onTrade: (cid, units) => this.worldRt.trade(d.id, cid, units),
       ledger: () => this.ledger,
       setLedger: (l) => {
         this.ledger = l;
@@ -950,7 +988,7 @@ export class FlightScene implements GameScene, FlightHostScene {
   }
 
   /** Jump straight to a system (no transit effect) — captures and dev flags. */
-  private warpTo(id: string): void {
+  warpTo(id: string): void {
     if (id === this.systemId || !this.universe.systems.has(id)) return;
     this.view.dispose();
     this.systemId = id;
@@ -992,9 +1030,26 @@ export class FlightScene implements GameScene, FlightHostScene {
         this.ledger = r.ledger;
         saveLedger(this.ledger);
         this.reachHud.flash(saved ? 'AMBUSH BROKEN' : 'HAULER LOST', `BOUNTY +${r.credits.toLocaleString('en-US')} sh · ${a.victim.flag.toUpperCase()} STANDING ${r.rep >= 0 ? '+' : ''}${r.rep.toFixed(1)}`, saved ? '#7dffb2' : '#ffc46b', t, 5);
+        this.worldRt.ambush(this.systemId, a.victim.flag, a.playerKills, saved);
       } else if (a.position.distanceTo(this.player.flight.position) < 30_000) {
         this.reachHud.flash(saved ? 'RAIDERS DRIVEN OFF' : 'HAULER LOST', `${a.victim.manifest.name.toUpperCase()} · ${saved ? 'the patrol got there first' : `${a.band} took her`}`, saved ? '#7dffb2' : '#ffc46b', t, 4);
       }
+    }
+  }
+
+  /** World events worth a banner: Signal bursts, the Schedule near you, a lane you made safe. */
+  private onWorldEvent(e: WorldEvent): void {
+    const t = this.reachTime;
+    const d = e.data ?? {};
+    if (e.kind === 'signal.burst') {
+      this.signal.flare(t);
+      this.reachHud.flash('SIGNAL INTERCEPT', String(d.line ?? ''), '#b77bff', t, 5);
+    } else if (e.kind === 'schedule.fought' && d.sys === this.systemId) {
+      this.reachHud.flash(`ENGAGEMENT ${d.n}`, `EXPENDITURE WITHIN SCHEDULE · ${d.dir} AND ${d.heg} FIGHTERS · ${d.ebon} g EBON TO MARKET`, '#ffb347', t, 5);
+    } else if (e.kind === 'schedule.broken') {
+      this.reachHud.flash('THE SCHEDULE IS BROKEN', `ENGAGEMENT ${d.n} WAS DECISIVE · EBON SPIKING · CONTINUITY WANTS YOUR NAME`, '#ff5f7a', t, 6);
+    } else if (e.kind === 'lane.safe') {
+      this.reachHud.flash('LANE CLEARED', `HAULERS ARE CALLING THE ${this.universe.systems.get(String(d.sys))?.name.toUpperCase() ?? ''} RUN SAFE AGAIN`, '#7dffb2', t, 5);
     }
   }
 

@@ -16,6 +16,7 @@ import type { FlightScene } from '@/world/scenes/FlightScene';
 import type { PrologueScene } from '@/world/scenes/PrologueScene';
 import { getAudio } from '@/audio';
 import { DynamicResolution } from '@/core/DynamicResolution';
+import { episodeCompleted, syncStory } from '@/game/world/live';
 
 declare global {
   interface Window {
@@ -113,6 +114,8 @@ async function boot(): Promise<void> {
    */
   async function runCampaign(startFree = false): Promise<void> {
     const profile = loadProfile();
+    // Careers from before the world state: every episode already flown counts in the Reach.
+    syncStory(profile.episode);
     if (!startFree && !profile.seenPrologue && profile.episode <= 1) {
       await playPrologue();
       profile.seenPrologue = true;
@@ -139,6 +142,8 @@ async function boot(): Promise<void> {
       if (!flight) flight = (await load(DEFAULT_SCENE)) as FlightScene;
       const result = await flight.startCampaign(m);
       const next = await showDebrief(uiRoot, { title: m.title, debrief: result.outcome === 'success' ? m.debrief : 'The Keeping teaches: what fails can be flown again.', codexUnlocked: result.codex, outcome: result.outcome, episode: m.episode });
+      // Story → sandbox: the episode's facts change the Reach (src/game/world/sim.ts STORY_RULES).
+      if (result.outcome === 'success') episodeCompleted(m.episode);
       if (result.outcome === 'success' && next === 'continue') {
         profile.episode = Math.min(MISSIONS.length + 1, m.episode + 1);
         saveProfile(profile);

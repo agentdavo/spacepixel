@@ -24,6 +24,8 @@ export function evalCond(c: Cond | undefined, w: DialogWorld): boolean {
   if ('stationFaction' in c) return !!w.station && (Array.isArray(c.stationFaction) ? c.stationFaction : [c.stationFaction]).includes(w.station.faction);
   if ('stationKind' in c) return !!w.station && (Array.isArray(c.stationKind) ? c.stationKind : [c.stationKind]).includes(w.station.kind);
   if ('seen' in c) return inRange(w.state.seen[c.seen] ?? 0, c.min ?? 1, c.max);
+  if ('worldFact' in c) return c.is === undefined ? !!w.facts?.[c.worldFact] : w.facts?.[c.worldFact] === c.is;
+  if ('notWorldFact' in c) return !w.facts?.[c.notWorldFact];
   if ('all' in c) return c.all.every((x) => evalCond(x, w));
   if ('any' in c) return c.any.some((x) => evalCond(x, w));
   if ('not' in c) return !evalCond(c.not, w);

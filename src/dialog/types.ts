@@ -21,6 +21,9 @@ export type Cond =
   | { stationFaction: DFaction | DFaction[] }
   | { stationKind: DStationKind | DStationKind[] }
   | { seen: string; min?: number; max?: number }
+  /** A world fact (src/game/world/WorldState.ts: `bastion.fallen`, `continuity.hostile`, …); `is` matches a value. */
+  | { worldFact: string; is?: string | boolean }
+  | { notWorldFact: string }
   | { all: Cond[] }
   | { any: Cond[] }
   | { not: Cond };
@@ -107,4 +110,6 @@ export interface DialogWorld {
   episode: number;
   station?: { id: string; faction: DFaction; kind: DStationKind };
   vars?: Record<string, string>;
+  /** The Reach's facts (world state); missing = none known. */
+  facts?: Readonly<Record<string, string | boolean>>;
 }

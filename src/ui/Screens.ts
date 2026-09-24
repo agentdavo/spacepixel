@@ -2,6 +2,10 @@ import type { MissionDef } from '@/game/Missions';
 import { loadContracts, loadLedger, loadProfile } from '@/game/Profile';
 import { getAudio } from '@/audio';
 import { describeSettings, installSettingsKeys, onSettings } from '@/game/Settings';
+import { loadWorld } from '@/game/world/WorldState';
+import { backfillStory } from '@/game/world/sim';
+import { signalState } from '@/game/world/signal';
+import { labelOf } from './SignalCounter';
 
 /**
  * Milestone 19 — title card and mission briefing. Plain DOM, styled in
@@ -27,12 +31,14 @@ export function titleScreen(root: HTMLElement, opts: TitleOptions = {}): Promise
     { id: 'hangar', label: 'HANGAR / MODEL SHEETS' },
     { id: 'showcase', label: 'SHOWCASE' },
   ];
+  // The Signal, once a career has heard it (Episode 5): the count waits on the title card.
+  const signal = career ? labelOf(signalState(backfillStory(loadWorld(), profile.episode))) : '';
   const el = document.createElement('div');
   el.className = 'title-screen';
   el.innerHTML = `
     <div class="stripe"></div>
     <h1>PROJECT<br/>VANGUARD</h1>
-    <div class="episode">The Lantern Sings</div>
+    <div class="episode">The Lantern Sings</div>${signal ? `<div class="signal-count" style="font:13px 'Share Tech Mono',monospace;color:#b77bff;letter-spacing:0.12em;text-shadow:0 0 8px rgba(183,123,255,0.6);margin:6px 0 10px">${signal}</div>` : ''}
     <ul>${items.map((it, i) => `<li data-i="${i}" class="${i === 0 ? 'active' : ''}">${it.label}</li>`).join('')}</ul>
     <div class="foot">↑↓ SELECT · ENTER CONFIRM · TERRAN DIRECTORATE // 13TH INDEPENDENT SQUADRON "VANGUARD"<br/><span class="settings-line"></span></div>`;
   root.append(el);

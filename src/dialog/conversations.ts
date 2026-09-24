@@ -421,6 +421,55 @@ export const CONVERSATIONS: Conversation[] = [
       menu: ask('idris', 'Is there more, pilot? The Line waits for no one. Except, weekly, for itself.', [ch('The Observance —', 'obs'), ch('Ascension —', 'asc'), LEAVE('Ascend, Captain.')]),
     },
   },
+
+  // ── The Reach remembers (world facts: src/game/world) ───────────────
+  {
+    id: 'pell-decisive',
+    title: 'A Correction Will Be Scheduled',
+    with: 'pell',
+    when: { worldFact: 'continuity.hostile' },
+    priority: 5,
+    entry: [{ node: 'hello' }],
+    nodes: {
+      hello: say('pell', 'Pilot. You made an engagement decisive. Do you know how many forms that generates? Neither do I. Nobody has ever had to fill them in.', 'two'),
+      two: ask('pell', 'I am instructed to note your name. I have noted it. I am also instructed to feel something about it, and I find I do. I\'m not sure it\'s what they meant.', [
+        ch('What happens now?', 'now'),
+        ch('It wasn\'t a war. It was a thermostat.', 'thermo', { if: { worldFact: 'schedule.known' } }),
+        LEAVE('Good day, Inspector.'),
+      ]),
+      now: say('pell', 'A correction. Next quarter\'s Schedule will carry your squadron by name — "costly and visible". The berths with Continuity desks will remember you. Ebon went up eleven percent in an hour.', 'now2'),
+      now2: say('pell', 'The exchange floor priced the war in advance. You have just shown it the price of one nobody scheduled.', undefined, [{ rumour: 'Continuity has a pilot\'s name on a desk at every bastion. Engagements made decisive draw a correction the next quarter.' }]),
+      thermo: say('pell', 'Yes. And you have put your hand on it. I can\'t decide whether that makes you a vandal or the only honest pilot in the Reach.', 'now'),
+    },
+  },
+  {
+    id: 'toma-breath',
+    title: 'The Arithmetic',
+    with: 'toma',
+    when: { all: [{ worldFact: 'oracle.heard' }, { notWorldFact: 'gates.aligned' }] },
+    priority: 4,
+    entry: [{ node: 'hello' }],
+    nodes: {
+      hello: say('toma', 'Everyone\'s doing the sums now. One burst every twenty-five hours fifty-one. Count the primes left. Divide by twenty-four. They\'ve printed it on ration cards in Pelestead.', 'two'),
+      two: ask('toma', 'Fifty-six days, it was, when you came back from the rim. I still stand watch on it. Somebody should be listening when it gets to two.', [
+        ch('What did the pickets hear last?', 'last'),
+        LEAVE('Somebody will be, Ensign.'),
+      ]),
+      last: say('toma', 'The last burst was clean. No drift. Whatever it is, it keeps better time than the Board.', undefined, [{ rumour: 'Null pickets say the Signal keeps better time than the Board of Allocation. Nobody has disputed it.' }]),
+    },
+  },
+  {
+    id: 'toma-counting-up',
+    title: 'Two, Three',
+    with: 'toma',
+    when: { worldFact: 'gates.aligned' },
+    priority: 4,
+    entry: [{ if: { worldFact: 'horizon.open' }, node: 'up' }, { node: 'stopped' }],
+    nodes: {
+      stopped: say('toma', 'It stopped at two. I sat with the headset on for a whole shift afterwards, in case. Then the Null Lantern lit. It doesn\'t go anywhere. It goes somewhere now.'),
+      up: say('toma', 'It\'s counting up. Two, three, five. I asked the picket commander what we do now and he said "listen". First order I\'ve ever been glad of.', undefined, [{ rumour: 'The Null count is climbing: two, three, five. The pickets have stopped logging it as a threat.' }]),
+    },
+  },
 ];
 
 /** Conversations belonging to a person. */

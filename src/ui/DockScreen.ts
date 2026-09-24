@@ -49,6 +49,10 @@ export interface DockContext {
   onLaunch(): void;
   /** Extra opening lines for the dock log (contract settlements, …). */
   notices?: { text: string; cls?: string }[];
+  /** World headlines for the ticker and the concourse (src/game/world/news.ts). */
+  news?(): string[];
+  /** Heard after every trade (units > 0 sold, < 0 bought): the world remembers heavy trading. */
+  onTrade?(cid: CommodityId, units: number): void;
 }
 
 /**
@@ -109,7 +113,7 @@ export class DockScreen {
     el.className = `dock-screen ${ctx.station.faction}`;
     this.el = el;
     this.root.append(el);
-    const ticker = rumours({ station: ctx.station, systemName: ctx.systemName, clock: l.clock, markets: ctx.markets, ledger: l });
+    const ticker = rumours({ station: ctx.station, systemName: ctx.systemName, clock: l.clock, markets: ctx.markets, ledger: l, news: ctx.news?.() });
     el.innerHTML = `
       <div class="dock-head">
         <div>
@@ -203,6 +207,7 @@ export class DockScreen {
     const c = COMMODITY[cid];
     if (r.units) {
       ctx.setLedger(r.ledger);
+      ctx.onTrade?.(cid, dir === 'sell' ? r.units : -r.units);
       this.say(`${dir === 'buy' ? 'BOUGHT' : 'SOLD'} ${r.units} × ${c.name.toUpperCase()} ${dir === 'buy' ? 'FOR' : '—'} ${sh(r.total)}${r.error ? ` · ${r.error}` : ''}`, 'ok');
       getAudio().ui('confirm');
     } else {

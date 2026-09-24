@@ -48,6 +48,9 @@ import { NAMED_CLIENTS, namedContract } from './named';
 import { HireDesk } from '@/game/HireDesk';
 import { dialogHooks } from '@/dialog/state';
 import { RescueBeat } from '@/game/RescueBeat';
+import { worldRuntime } from '@/game/world/live';
+import { boardWeights, payMul } from '@/game/world/sim';
+import { scheduleContract, takeable, type Engagement } from '@/game/world/schedule';
 
 /**
  * Free-roam contracts at runtime: the board, the book, and the live
@@ -96,6 +99,8 @@ class LiveOp {
   readonly pieces: SetPiece[] = [];
   readonly ships: ShipEntity[] = [];
   private departing: { ship: ShipEntity; t: number }[] = [];
+  /** Bystanders (a Schedule's protected conductor): hold station until provoked. */
+  private statics: ShipEntity[] = [];
   private frame: SetPieceFrame;
   reported = false;
 
@@ -185,6 +190,7 @@ class LiveOp {
       s.hull = s.hullMax;
     }
     if (spec.role === 'wing') issueOrder([s], 'engageAtWill', p);
+    if (spec.role === 'static') this.statics.push(s);
     this.ships.push(s);
     this.desk.owned.add(s);
     return s;
@@ -198,6 +204,13 @@ class LiveOp {
 
   /** After AI, before physics: freighters fly their lane at a barge's pace. */
   preStep(dt: number): void {
+    for (const s of this.statics) {
+      if (!s.alive || s.team !== 'neutral' || this.departing.some((d) => d.ship === s)) continue;
+      const c = s.controls;
+      c.pitch = c.yaw = c.roll = 0;
+      c.throttleSet = 0.2;
+      c.fire = c.afterburner = false;
+    }
     for (const e of this.runner.escorts) {
       for (const s of e.ships) {
         if (!s.alive || s.team === 'neutral') continue;
@@ -350,6 +363,8 @@ export class ContractDesk {
 
   /** Open offers at a station (priority orders first). */
   offers(stationId: string): Contract[] {
+    const rt = worldRuntime();
+    const found = rt ? findStation(this.reach, stationId) : null;
     const board = generateBoard({
       reach: this.reach,
       station: stationId,
@@ -358,8 +373,26 @@ export class ContractDesk {
       tier: this.tier(),
       goods: COMMODITIES,
       priority: this.onPriority ? this.priority : null,
+      weights: rt && found ? boardWeights(rt.state, found.system.id) : undefined,
     });
-    return openOffers(board, this.book);
+    // How the posting station regards the pilot moves the fee ±15 %.
+    const mul = rt && found ? payMul(rt.attitudeAt(found.station)) : 1;
+    const priced = mul === 1 ? board : board.map((k) => (k.kind === 'priority' ? k : { ...k, reward: Math.round((k.reward * mul) / 50) * 50 }));
+    return openOffers(priced, this.book);
+  }
+
+  /**
+   * Take a Schedule engagement as ordered (the star map's Schedule panel):
+   * books a staged `sortie` op paid by the Office of Continuity.
+   */
+  acceptSchedule(e: Engagement, io: LedgerIO = this.sceneLedger()): { text: string; ok: boolean } {
+    const rt = worldRuntime();
+    if (!rt || !takeable(rt.state, e)) return { text: `ENGAGEMENT ${e.number} IS CLOSED`, ok: false };
+    if (this.book.active.some((k) => k.schedule?.id === e.id)) return { text: `ENGAGEMENT ${e.number} ALREADY ON YOUR BOOK`, ok: false };
+    const k = scheduleContract(e, this.reach, this.book.clock, rt.state.clock);
+    if (!k) return { text: 'NO SUCH FIELD', ok: false };
+    const err = this.accept(k, io);
+    return err ? { text: `ORDERS · ${err}`, ok: false } : { text: `ORDERS ACCEPTED · ENGAGEMENT ${e.number} · ${e.systemName.toUpperCase()} · ${k.reward.toLocaleString('en-US')} sh`, ok: true };
   }
 
   repostIn(): number {
@@ -431,6 +464,8 @@ export class ContractDesk {
     const receipts = r.receipts ?? [];
     if (!receipts.length) return [];
     for (const x of receipts) this.teardown(x.id);
+    // The station remembers who did the work.
+    for (const x of receipts) if (x.result === 'paid') worldRuntime()?.contractPaid(stationId, x.faction);
     this.setBook(r.book);
     io.setLedger(r.ledger);
     if (this.tracked && !this.book.active.some((k) => k.id === this.tracked)) this.tracked = this.book.active[0]?.id ?? null;
@@ -544,7 +579,20 @@ export class ContractDesk {
       if (op.reported || op.runner.outcome === 'running') continue;
       op.reported = true;
       const k = op.contract;
-      if (op.runner.outcome === 'success') {
+      if (op.runner.outcome === 'success' && k.schedule) {
+        // A Schedule engagement: flown as ordered (paid on docking) or made decisive (voided).
+        const broken = op.runner.flags.has('broken:protected') ? 'protected' : op.runner.flags.has('broken:refused') ? 'refused' : false;
+        worldRuntime()?.scheduleOutcome(k.schedule.id, broken);
+        if (broken) {
+          this.setBook({ ...this.book, active: this.book.active.filter((x) => x.id !== id), failed: this.book.failed + 1 });
+          this.hud.toast(`SCHEDULE BROKEN · ENGAGEMENT ${k.schedule.number} WAS DECISIVE · PAYMENT VOIDED`, '#ff5f7a');
+          if (this.tracked === id) this.tracked = this.book.active[0]?.id ?? null;
+        } else {
+          this.setBook(markReady(this.book, id));
+          this.hud.toast(`ENGAGEMENT ${k.schedule.number} FLOWN AS ORDERED · CONTINUITY PAYS AT ${k.payAtName.toUpperCase()}`, '#7dffb2');
+          if (this.tracked === id) this.track(id);
+        }
+      } else if (op.runner.outcome === 'success') {
         if (op.build.completes) {
           this.setBook(markReady(this.book, id));
           this.hud.toast(`CONTRACT COMPLETE · RETURN TO ${k.payAtName.toUpperCase()} FOR PAYMENT`, '#7dffb2');
@@ -762,6 +810,38 @@ export class ContractDesk {
   // ── Captures ──────────────────────────────────────────────────────────
 
   /**
+   * `?world=ep9&wclock=…&wop=line|map` — take this quarter's first open
+   * engagement as ordered: `line` puts you on the line as the Measure comes
+   * in (spawn delays compressed); `map` opens the star map with it booked.
+   */
+  private stageSchedule(phase: string): void {
+    const s = this.scene;
+    const rt = worldRuntime();
+    const e = rt?.schedule().find((x) => takeable(rt.state, x));
+    if (!rt || !e) return;
+    this.stage = { kind: 'sortie', phase: 'op' };
+    setAutopilot(s.player, false);
+    input.override = null;
+    s.quiet();
+    this.book = { ...this.book, active: [], seen: [] };
+    s.ledger = { ...s.ledger, credits: Math.max(s.ledger.credits, 6400), rep: { concord: 42, choir: -24, rustwake: 12 } };
+    this.acceptSchedule(e);
+    const k = this.book.active[0];
+    if (!k?.op) return;
+    this.tracked = k.id;
+    if (phase === 'map') {
+      this.track(k.id);
+      if (!s.starMap.open) s.starMap.toggle();
+      return;
+    }
+    s.warpTo(k.op.system);
+    s.quiet();
+    const anchor = toU(k.op.center);
+    const pos = anchor.clone().add(_v.set(-300, 120, -900));
+    s.placePlayer(pos, anchor.clone().add(_v.set(600, 500, 5200)).sub(pos).normalize(), 120);
+  }
+
+  /**
    * ?contract=<kind>&cphase=board|op|pay|map — stage a contract for
    * screenshots: `board` berths at the posting station with the CONTRACTS
    * tab open; `op` accepts it and puts you in the middle of the operation
@@ -770,6 +850,7 @@ export class ContractDesk {
    */
   stageFromQuery(): void {
     const q = new URLSearchParams(location.search);
+    if (q.get('wop')) return this.stageSchedule(q.get('wop')!);
     const kind = q.get('contract') as ContractKind | null;
     if (!kind) return;
     const phase = q.get('cphase') ?? 'op';

@@ -15,6 +15,7 @@ import { EXTRAS, hashStr, peopleAt, personById, type Person } from '@/dialog/peo
 import { smallTalk } from '@/dialog/smalltalk';
 import { dialogHooks, loadDialogState, saveDialogState } from '@/dialog/state';
 import type { Conversation, DialogWorld, DFaction, DStationKind, Effect } from '@/dialog/types';
+import { world } from '@/game/world/WorldState';
 
 /**
  * CONCOURSE — the people at a station (a dock tab). Two to four faces:
@@ -239,13 +240,14 @@ class ConcourseTab {
       episode: loadProfile().episode,
       station: { id: st.id, faction: st.faction as DFaction, kind: st.kind as DStationKind },
       vars: this.vars(),
+      facts: world().state.facts,
     };
   }
 
   private vars(): Record<string, string> {
     const p = this.people[this.sel];
     const l = this.ctx.ledger();
-    const lines = rumours({ station: this.ctx.station, systemName: this.ctx.systemName, clock: l.clock, markets: this.ctx.markets, ledger: l });
+    const lines = rumours({ station: this.ctx.station, systemName: this.ctx.systemName, clock: l.clock, markets: this.ctx.markets, ledger: l, news: this.ctx.news?.() });
     const tip = lines.find((x) => x.startsWith('BAND TALK'))?.replace(/^BAND TALK:\s*/, '') ?? 'Nothing\'s moving much. Rations always sell somewhere hungry.';
     const pool = [...lines.filter((x) => !x.startsWith('BAND TALK') && !x.includes(' is long on ')), ...HEARSAY];
     const h = hashStr(`${p?.id ?? ''}:${Math.floor(l.clock / 300)}`);
