@@ -7,10 +7,10 @@ import type { ShipEntity } from '@/sim/Fleet';
  * layout of its facings. Read-only over the damage model — nothing here
  * touches sim state.
  *
- * Shell: capitals use the sim's ellipsoid (`combat.shell`, the surface bolts
- * actually stop on); fighters get a tight ellipsoid hugging the airframe
- * (their sim bubble is a sphere, so impact points are projected onto it).
- * Both are centred on the hull bounding box centre.
+ * Shell: the sim's ellipsoid (`combat.shell`, fitted to clear the hull by
+ * Combat.SHELL_CLEARANCE). Capitals stop bolts on it; fighters draw their
+ * skin on it (their sim bubble is a sphere, so impact points are projected
+ * onto it). Centred on the hull bounding box centre.
  *
  * Facings are data-driven: the number comes from `dmg.facings.length`
  * (0 or 1 = one whole bubble), and their extents are found by probing the
@@ -53,11 +53,7 @@ for (let i = 0; i < PROBES; i++) {
 
 /** Shell half axes (m) around the hull centre. */
 export function shellScale(s: ShipEntity, out: Vector3): Vector3 {
-  const st = s.combat.dmg;
-  if (st.capital) return out.copy(s.combat.shell);
-  // Fighters: a tight skin over the airframe (flat hulls get a little more height).
-  const pad = 0.6 + 0.06 * Math.max(st.halfW, st.halfL);
-  return out.set(Math.max(st.halfW * 1.12, 1) + pad, Math.max(st.halfH * 1.7, 1) + pad, Math.max(st.halfL * 1.1, 1) + pad);
+  return out.copy(s.combat.shell);
 }
 
 /** Facing layout of a ship (cached per damage state; re-probed if the facing count changes). */

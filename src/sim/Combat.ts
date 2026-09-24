@@ -80,7 +80,7 @@ export interface CombatState {
   dmg: DamageState;
   /** Voxel hull (capitals) for exact hits. */
   grid: HullGrid | null;
-  /** Shield shell (capitals): ellipsoid half axes around the hull centre. */
+  /** Shield shell: ellipsoid half axes around the hull centre (capitals stop bolts on it; fighters draw their skin on it). */
   shell: Vector3;
   /** Undamaged flight spec; damage scales the ship's own copy. */
   baseSpec: FlightSpec;
@@ -172,7 +172,7 @@ export function createCombat(blueprintId: string, model: ShipModel, faction: Fac
     loadout,
     dmg,
     grid,
-    shell: new Vector3(h.x * 1.25 + 20, h.y * 1.35 + 20, h.z * 1.1 + 20),
+    shell: fitShell(blueprintId, model, c, h),
     // Flight class follows size (corvettes keep the fighter base the AI and escort routes were tuned on).
     baseSpec: fromYard ? yardFlightSpec(fromYard, KESTREL_SPEC) : flightSpecFor(stats, model.radius > 200),
     gun: 0,
@@ -186,6 +186,75 @@ export function createCombat(blueprintId: string, model: ShipModel, faction: Fac
     reactorEvent: null,
   };
 }
+
+/** Shield clearance over the hull, radially (the shell sits 5–10% outside the furthest plating). */
+export const SHELL_CLEARANCE = 1.075;
+
+/**
+ * Shield shell for a hull: the smallest ellipsoid round the hull centre
+ * (searched over its three half axes) that holds every vertex of the hull,
+ * turrets included, then grown by SHELL_CLEARANCE. A fixed box-ratio
+ * ellipsoid either leaves corners (engine blocks, sponsons, fins) poking
+ * through or balloons everywhere to cover them; this fits the hull the ship
+ * actually has. Cached by blueprint (the fit reads every vertex once).
+ */
+export function fitShell(key: string, model: ShipModel, c: Vector3, h: Vector3): Vector3 {
+  let fit = shellFit.get(key);
+  if (!fit) {
+    fit = new Vector3();
+    const hx = Math.max(h.x, 0.5);
+    const hy = Math.max(h.y, 0.5);
+    const hz = Math.max(h.z, 0.5);
+    model.root.updateMatrixWorld(true);
+    _inv.copy(model.root.matrixWorld).invert();
+    const pts: number[] = [];
+    for (const mesh of model.meshes) {
+      const pos = mesh.geometry.getAttribute('position');
+      if (!pos) continue;
+      _m.multiplyMatrices(_inv, mesh.matrixWorld);
+      for (let i = 0; i < pos.count; i++) {
+        _fp.fromBufferAttribute(pos, i).applyMatrix4(_m);
+        pts.push(Math.abs(_fp.x - c.x) / hx, Math.abs(_fp.y - c.y) / hy, Math.abs(_fp.z - c.z) / hz);
+      }
+    }
+    // Shape search on a reduced set: the furthest beam offset per (height, length) bin, at the bin's outer edge.
+    const B = 40;
+    const far = new Float32Array(B * B);
+    for (let i = 0; i < pts.length; i += 3) {
+      const j = Math.min(B - 1, Math.floor(pts[i + 1] * B));
+      const k = Math.min(B - 1, Math.floor(pts[i + 2] * B));
+      if (pts[i] > far[j * B + k]) far[j * B + k] = pts[i];
+    }
+    const red: number[] = [];
+    for (let j = 0; j < B; j++) for (let k = 0; k < B; k++) if (far[j * B + k] > 0 || j + k === 0) red.push(far[j * B + k], (j + 1) / B, (k + 1) / B);
+    let best = Infinity;
+    for (let ax = 1; ax <= 1.9; ax += 0.05)
+      for (let ay = 1; ay <= 1.9; ay += 0.05)
+        for (let az = 1; az <= 1.9; az += 0.05) {
+          let worst = 0;
+          for (let i = 0; i < red.length; i += 3) {
+            const e = (red[i] / ax) ** 2 + (red[i + 1] / ay) ** 2 + (red[i + 2] / az) ** 2;
+            if (e > worst) worst = e;
+          }
+          const vol = ax * ay * az * worst ** 1.5;
+          if (vol < best) {
+            best = vol;
+            fit.set(ax * hx, ay * hy, az * hz);
+          }
+        }
+    // Exact scale for the chosen shape: the furthest vertex sits SHELL_CLEARANCE inside.
+    let worst = 0;
+    for (let i = 0; i < pts.length; i += 3) {
+      const e = (pts[i] * hx / fit.x) ** 2 + (pts[i + 1] * hy / fit.y) ** 2 + (pts[i + 2] * hz / fit.z) ** 2;
+      if (e > worst) worst = e;
+    }
+    fit.multiplyScalar(Math.sqrt(worst || 1) * SHELL_CLEARANCE);
+    shellFit.set(key, fit);
+  }
+  return fit.clone();
+}
+const shellFit = new Map<string, Vector3>();
+const _fp = new Vector3();
 
 function addCapitalSubsystems(dmg: DamageState, model: ShipModel, id: string, grid: HullGrid, hullMax: number): void {
   const len = Math.max(model.length, 1);
