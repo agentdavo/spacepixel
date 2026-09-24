@@ -140,6 +140,9 @@ export class StarSystemView {
     for (const site of system.stations) {
       const pl = site.planet !== undefined ? system.planets[site.planet] : undefined;
       const st = new StationView(site, SYSTEM_OFFSET, pl && { center: pl.position.clone().add(SYSTEM_OFFSET), radius: pl.preset.radius });
+      // Planetary ports: the city at the foot of this orbital port's tether.
+      const port = system.surfacePorts?.find((sp) => sp.orbital === site.id);
+      if (port && pl) st.surface = { port, preset: pl.preset, planetCenter: pl.position.clone().add(SYSTEM_OFFSET), planetRadius: pl.preset.radius };
       this.stations.push(st);
       this.group.add(st.group);
     }

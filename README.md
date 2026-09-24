@@ -58,7 +58,7 @@ still runs (TSL ink twin), but compute particles are disabled there.
 | M | star map (click a system to plot a route) |
 | H | hail the ship under your nose (name, flag, route, manifest) |
 | U | turret discipline on outfitted hulls: FREE (any hostile in arc) → MY TARGET → HOLD |
-| G | request docking within 5 km of a station / friendly carrier (again to cancel) |
+| G | request docking within 5 km of a station / friendly carrier; below an orbital port, the landing corridor to its surface port (again to cancel) |
 | L | codex / archive |
 | N | mute |
 | F3 | dev panel (perf graph, latency) · F1–F6 G-buffer views |
@@ -86,12 +86,66 @@ to the mouth to the inside of the bay. Wingmen break off to hold points
 outside the corridor while you dock and re-form when you launch. Campaign
 episodes lock docking out unless the mission sets `allowDocking`.
 
+**Every hull size docks.** The berth follows the hull (`src/world/berths/`):
+fighters (≤ 40 m) fly into the hangar bay as above; gunships and corvettes
+(40–200 m) are clamped alongside one of two **gantries** on every station — a
+lattice boom out of the hub, a tower, and a swing arm on its own joint that
+swings out square and clamps the flank while umbilicals reach across; frigates
+(> 200 m) **moor** off a long pylon past the ring, riding on a lit tether while
+a lighter ferries the crew (the dock header shows a lighter pictogram). Friendly
+carriers take fighters in the hangar and corvettes **alongside** on a tether
+(riding the carrier's velocity); frigates are turned away. The approach scales
+with length (`approachProfile`): guidance reaches out further (1 km for a
+Kestrel, 1.6 km for the Resolute, 2.5 km for the Valiant), the capture window
+widens (bounded), a closing-speed cap has to be met (≈190 m/s for a corvette,
+≈155 m/s for a frigate), the corridor gates spread out and the final is a
+slower cubic ease; the hull swings round on the way in so it berths nose out.
+Cutaways frame the whole hull (tracking quarter, planted outboard of the berth, high over
+the arm or tether, a wide orbit berthed) and each class has its own undock:
+lines drop and the arm swings home / the tether reels in, then the drive
+lights. Gantries and pylons are blueprint parts, so they get collision proxies
+and AI avoidance like the rest of the station (`tests/berths.test.ts` puts a
+Bulwark, a Resolute and a Valiant at every berth of every station kind and
+checks hull and corridor clearance). Captures:
+`?scene=flight&dock=auto|berth|launch&own=gs12-bulwark|cr5-resolute|ffl3-valiant[&dockt=S]`.
+
+![Resolute at a clamp gantry](docs/screenshots/ports-clamp.jpg)
+![Valiant moored off the pylon](docs/screenshots/ports-mooring.jpg)
+
+**Planetary ports.** Every orbital port's tether comes down to a city: a
+surface port per inhabited world (seeded, `src/universe/surfacePorts.ts`; key
+worlds are named — Castellan Low City floats in the gas giant's upper bands,
+The Spire stands on the Hesper shelf-sea). Below an orbital port, **G**
+requests the **landing corridor**; fly down beside the tether and guidance
+takes the ship at the entry gate ~2 km above the air. No load screen: entry
+(nose down the tether, a cel plasma sheath over the nose, shake, the planet's
+atmosphere colour filling the frame) → the cloud deck (cel cloud cards streaming
+past, whiteout) → under the whiteout the flight scene swaps the world root for a
+local, kilometre-scale **surface scene** (`src/world/surface/`): a stepped sky
+from the planet's air, the cloud deck overhead, ground painted with the planet's
+own palette (terrain, shelf-sea, dunes and mesas, ice, lava cracks, or a banded
+cloud sea under a floating platform for a gas giant), and a spaceport city —
+apron, pads sized by hull class with chasing rim lights, the tether foot and the
+cable climbing into the clouds, control tower, hangars, instanced city blocks
+with lit window bands and beacons, circling traffic. A long descending glide at
+the city, hover, straight down onto the pad, and the dock screen: surface ports
+are their own station kind (`surface`: food, medicine and luxuries in demand,
+foundry spares and charges cheap) with a market, concourse, shipyard and
+outfitting. Launch reverses it: lift-off, climb-out into the deck, whiteout, and
+up the tether out of the air. Captures:
+`?scene=flight&descent=corridor|entry|clouds|below|glide|final|pad|docked|liftoff|climb|orbit[&port=<id>][&dockt=S]`.
+
+![Entry interface](docs/screenshots/ports-entry.jpg)
+![Below the deck](docs/screenshots/ports-below.jpg)
+![On the pad](docs/screenshots/ports-pad.jpg)
+
 **Balance.** A safe run earns about 1.5–4k sh a hold (a fresh pilot's first
 run, capital-bound, ~1k); the fat margins (up to ~8k) are in contested and
 Hegemony space and the Null Lantern's shadow, where markets pay hazard
 premiums. Per-commodity pressure means a hold of one good sells badly —
 mix the hold. `npm run econ-sim` prints the best routes and asserts the
-bands (`src/game/econSim.ts`, `tests/econ-sim.test.ts`).
+bands (`src/game/econSim.ts`, `tests/econ-sim.test.ts`); surface ports are in
+the scan (a tether run from highport to city is ~1–1.5k a hold).
 
 **Collisions.** Hulls are solid: fighters are spheres, stations and capital
 ships get a few dozen proxy boxes / cylinders / rings built from their

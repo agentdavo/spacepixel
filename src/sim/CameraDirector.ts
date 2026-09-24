@@ -84,7 +84,7 @@ export class CameraDirector {
     s.subject = subject;
     s.t0 = this.time;
     s.until = this.time + duration;
-    s.phase = Math.random() * Math.PI * 2;
+    s.phase = visualRand() * Math.PI * 2;
     if (kind === 'flyby' && ship) this.plantFlyby(ship);
     this.cutCount++;
   }
@@ -211,4 +211,15 @@ export class CameraDirector {
   label(): string {
     return this.shot.kind.toUpperCase();
   }
+}
+
+/**
+ * Presentation-only dice (shot phase): camera framing never feeds the sim, so
+ * it keeps its own little LCG instead of a world stream — and never touches
+ * `Math.random` inside src/sim (tests/no-math-random.test.ts).
+ */
+let _vr = 0x2545f491;
+function visualRand(): number {
+  _vr = (Math.imul(_vr, 1664525) + 1013904223) >>> 0;
+  return _vr / 4294967296;
 }

@@ -8,6 +8,9 @@ import { BayCurtain } from './BayCurtain';
 import { cylinder } from '@/assets/HullKit';
 import { CelMaterial } from '@/render/materials/CelMaterial';
 import { LightPoints, LIGHT_PULSE, LIGHT_STEADY, LIGHT_STROBE, type LightSpec } from './setpieces/LightPoints';
+import { berthLights, stationBerths, type StationBerth } from './berths/sites';
+import type { SurfacePortSite } from '@/universe/Universe';
+import type { PlanetPreset } from './Planet';
 
 /**
  * A dockable station in the world (docking & trade). Universe-positioned
@@ -18,7 +21,9 @@ import { LightPoints, LIGHT_PULSE, LIGHT_STEADY, LIGHT_STROBE, type LightSpec } 
  *    corridor, with a strobing "rabbit" that runs in toward the bay mouth;
  *  - running lights on the rotating ring (they ride the spin joint);
  *  - orbital ports: the landing-corridor tether dropping from the anchor to
- *    the atmosphere, climber lights pulsing down it.
+ *    the atmosphere, climber lights pulsing down it;
+ *  - clamp gantries and the mooring pylon for big hulls (world/berths): arms
+ *    stowed until a hull comes alongside, walkway lights running out.
  *
  * Frame: the station faces +Z = `site.axis` (bay end), +Y = `site.up`.
  * Everything is built with an explicit basis — never Object3D.lookAt with
@@ -51,6 +56,12 @@ export class StationView {
   readonly curtain: BayCurtain;
   private tether: { z: number; len: number } | null = null;
   private proxies: Proxy[] | null = null;
+  /** Clamp gantries and mooring pylon (station frame, metres). */
+  readonly berths: StationBerth[];
+  /** Orbital ports: the planet under the tether and the surface port at its foot (set by StarSystemView). */
+  surface: { port: SurfacePortSite; preset: PlanetPreset; planetCenter: Vector3; planetRadius: number } | null = null;
+  /** Station-frame z of the tether's top (the anchor), metres. */
+  readonly tetherTop = -850;
 
   constructor(
     readonly site: StationSite,
@@ -67,12 +78,14 @@ export class StationView {
     this.group.quaternion.copy(this.quaternion);
     this.bay.copy(this.center).addScaledVector(this.axis, BAY_OFFSET);
 
-    if (site.kind === 'carrier') throw new Error('StationView: carriers dock at their own hangars');
+    if (site.kind === 'carrier' || site.kind === 'surface') throw new Error('StationView: carriers dock at their own hangars; surface ports are reached by descent');
     this.model = buildShip(stationBlueprint(site.kind, site.faction, site.seed));
     this.group.add(this.model.root);
     this.radius = this.model.radius;
     this.spinRate = 1 / (70 + (site.seed % 40)); // rev/s: a minute or two per turn
     this.model.setChannel('spin', (site.seed % 97) / 97);
+    this.berths = stationBerths(site.kind);
+    for (const b of this.berths) if (b.channel) this.model.setChannel(b.channel, 0); // arms stowed
 
     const glow = new Color(site.faction === 'choir' ? '#ff5fd0' : site.faction === 'rustwake' ? '#ffb04f' : '#6fe6ff');
     const specs: LightSpec[] = [];
@@ -103,6 +116,7 @@ export class StationView {
         specs.push({ pos: new Vector3(0, 0, -900 - d), color: '#ffffff', size: 22, mode: LIGHT_STROBE, rate: 0.25, phase: -d / 6000, duty: 0.05, gain: 2.5 });
       }
     }
+    specs.push(...berthLights(site.kind, glow.getStyle()));
     this.lights = new LightPoints(specs, { minPixels: 2, glint: 0.8 });
     this.group.add(this.lights.mesh);
     // The bay's atmosphere curtain, just inside the mouth.

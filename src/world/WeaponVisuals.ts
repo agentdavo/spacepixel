@@ -46,6 +46,11 @@ import { FACTIONS } from '@/assets/Factions';
 import { GUN_LIST, type BoltStyle } from '@/sim/Loadouts';
 import type { ShipEntity } from '@/sim/Fleet';
 
+/** What the renderer reads from the weapons sim (the live Weapons, or the kill-cam's recorded frame). */
+export type BoltSource = Pick<Weapons, 'px' | 'py' | 'pz' | 'vx' | 'vy' | 'vz' | 'life' | 'gun' | 'beams' | 'events'>;
+/** What the renderer reads from the missile sim. */
+export type MissileSource = Pick<Missiles, 'alive' | 'pos' | 'vel' | 'spec' | 'events'>;
+
 /**
  * Renders the weapons sim: laser bolts (one instanced draw per faction
  * colour), beams, muzzle flashes, impact flashes and shield ripples. All in
@@ -119,8 +124,8 @@ export class WeaponVisuals {
   private counts = new Int32Array(GUN_LIST.length);
 
   constructor(
-    private weapons: Weapons,
-    private missiles: Missiles,
+    public weapons: BoltSource,
+    public missiles: MissileSource,
   ) {
     this.group.name = 'weapon-visuals';
 
@@ -296,10 +301,12 @@ export class WeaponVisuals {
     return out.normalize();
   }
 
-  /** Consume this frame's weapon events and draw everything relative to the eye. */
-  update(world: WorldSpace, dt: number): void {
+  /**
+   * Consume one sim tick's weapon + missile events (flashes, shield ripples).
+   * Called after every tick — a frame may run several, or none.
+   */
+  consume(): void {
     const w = this.weapons;
-    const eye = world.eye;
 
     for (const e of w.events) {
       switch (e.kind) {
@@ -331,6 +338,20 @@ export class WeaponVisuals {
           break;
       }
     }
+    for (const e of this.missiles.events) {
+      if (e.kind === 'detonate') this.flash(e.position, 26, 0.3);
+      else if (e.kind === 'launch') this.flash(e.position, 5, 0.08);
+    }
+  }
+
+  /**
+   * Draw everything relative to the eye. `lead` (seconds) extrapolates bolts
+   * and missiles past the last sim tick, matching the ships' render
+   * prediction (FlightScene.present) so shots stay on their muzzles.
+   */
+  update(world: WorldSpace, dt: number, lead = 0): void {
+    const w = this.weapons;
+    const eye = world.eye;
 
     // Bolts → instance matrices (render space), per gun family.
     const counts = this.counts;
@@ -347,7 +368,7 @@ export class WeaponVisuals {
       // Lasers stretch with speed; slugs, shards and pellets keep their shape.
       const len = g.style === 'streak' ? Math.min(g.length, speed * 0.028) : g.length;
       // Centre the bolt half a length behind the head.
-      _p.set(w.px[i] - eye.x, w.py[i] - eye.y, w.pz[i] - eye.z).addScaledVector(_d, -len * 0.5);
+      _p.set(w.px[i] + w.vx[i] * lead - eye.x, w.py[i] + w.vy[i] * lead - eye.y, w.pz[i] + w.vz[i] * lead - eye.z).addScaledVector(_d, -len * 0.5);
       _q.setFromUnitVectors(_z, _d);
       const wd = g.style === 'streak' ? g.width : g.width * 1.4;
       _s.set(wd, wd, len);
@@ -361,17 +382,13 @@ export class WeaponVisuals {
     }
 
     const m = this.missiles;
-    for (const e of m.events) {
-      if (e.kind === 'detonate') this.flash(e.position, 26, 0.3);
-      else if (e.kind === 'launch') this.flash(e.position, 5, 0.08);
-    }
     let mc = 0;
     for (let i = 0; i < MISSILE_CAPACITY; i++) {
       if (!m.alive[i]) continue;
       _d.copy(m.vel[i]);
       const sp = _d.length() || 1;
       _d.divideScalar(sp);
-      _p.subVectors(m.pos[i], eye);
+      _p.subVectors(m.pos[i], eye).addScaledVector(m.vel[i], lead);
       _q.setFromUnitVectors(_z, _d);
       const body = m.spec[i].body;
       _s.set(body.width, body.width, (2.2 + Math.min(10, sp * 0.008)) * body.length);
@@ -405,12 +422,12 @@ export class WeaponVisuals {
       const st = ship.combat.dmg;
       if (st.capital) {
         // Ellipsoid shell around the hull centre, riding the ship's orientation.
-        s.mesh.position.set(st.cx, st.cy, st.cz).applyQuaternion(ship.flight.orientation).add(ship.flight.position).sub(eye);
-        s.mesh.quaternion.copy(ship.flight.orientation);
+        s.mesh.position.set(st.cx, st.cy, st.cz).applyQuaternion(ship.model.root.quaternion).add(ship.model.root.position).sub(eye); // render pose (predicted / kill-cam)
+        s.mesh.quaternion.copy(ship.model.root.quaternion);
         s.mesh.scale.copy(ship.combat.shell);
       } else {
-        s.mesh.position.subVectors(ship.flight.position, eye);
-        s.mesh.quaternion.copy(ship.flight.orientation);
+        s.mesh.position.subVectors(ship.model.root.position, eye);
+        s.mesh.quaternion.copy(ship.model.root.quaternion);
         s.mesh.scale.setScalar(ship.radius * 1.35);
       }
     }
@@ -421,7 +438,7 @@ export class WeaponVisuals {
       const fx = this.beams[bi++];
       const len = b.origin.distanceTo(b.end);
       _q.setFromUnitVectors(_z, b.dir);
-      _p.subVectors(b.origin, eye);
+      _p.subVectors(b.origin, eye).addScaledVector(b.owner.flight.velocity, lead);
       const pulse = 0.85 + 0.15 * Math.sin(b.life * 60);
       const fade = Math.min(1, b.life * 4, (b.maxLife - b.life) * 8);
       for (const [mesh, wmul] of [

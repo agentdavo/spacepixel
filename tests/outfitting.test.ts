@@ -281,7 +281,9 @@ test('applyFit on a live ship: stats, pools, flight, loadout; fitted turrets fir
   const c = fleet.spawn('choir-cantor', 'choir', new Vector3(60, 250, 500), new Vector3(0, 0, 1));
   c.flight.velocity.set(0, 0, 0);
   let fired = 0;
-  for (let i = 0; i < 180; i++) {
+  // Ten seconds: scattered flak at a small target lands ~0.4 rounds/s, so a
+  // shorter window only passes on a lucky dice stream (the world seed's).
+  for (let i = 0; i < 600; i++) {
     c.flight.velocity.set(0, 0, 0);
     g.flight.velocity.set(0, 0, 0);
     k.alive = false;
@@ -293,6 +295,7 @@ test('applyFit on a live ship: stats, pools, flight, loadout; fitted turrets fir
   assert.ok(c.shield < c.shieldMax || c.hull < c.hullMax, 'turret rounds landed on the Cantor');
   assert.equal(turrets.status(g).mounts, 2);
   turrets.mode = 'hold';
+  weapons.life.fill(0); // rounds already in the air aren't the turrets' HOLD to recall
   const before = c.shield + c.hull;
   c.shield = c.shieldMax;
   for (let i = 0; i < 120; i++) {

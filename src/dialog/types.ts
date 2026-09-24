@@ -8,7 +8,7 @@
  */
 export type DFaction = 'concord' | 'choir' | 'rustwake';
 export type DCommodity = 'ebon' | 'relics' | 'cores' | 'spares' | 'rations' | 'munitions' | 'medical' | 'luxury';
-export type DStationKind = 'refinery' | 'salvage' | 'bastion' | 'freeport' | 'orbital' | 'carrier';
+export type DStationKind = 'refinery' | 'salvage' | 'bastion' | 'freeport' | 'orbital' | 'carrier' | 'surface';
 
 export type Cond =
   | { flag: string }
