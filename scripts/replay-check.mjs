@@ -2,7 +2,7 @@
 /**
  * In-browser replay check: the real game, recorded and played back.
  *
- *   node scripts/replay-check.mjs [--seconds 20] [--port 5394] [--query 'traffic=0']
+ *   node scripts/replay-check.mjs [--seconds 20] [--port 5394] [--query 'traffic=0'] [--dock]
  *
  * 1. Boots `?scene=flight&shot=1` (fixed 1/60 frames, one sim tick each) and
  *    flies it with scripted key presses (stick, trigger, missiles, target
@@ -13,6 +13,10 @@
  *    through the engine's fixed-step loop, rendering, to the end.
  * Pass: every checkpoint of the playback matches the recording bit-for-bit
  * (the deck's SYNC count), no desync.
+ *
+ * --dock starts berthed (`dock=docked&cargo=demo`) and works the dock screen
+ * first — buy, sell, repair, rearm, launch — so the tape carries dock-screen
+ * commands (ledger, hull, launch) before the flying.
  */
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
@@ -22,6 +26,7 @@ const opt = (n, d) => (args.includes(`--${n}`) ? args[args.indexOf(`--${n}`) + 1
 const seconds = Number(opt('seconds', '20'));
 const port = Number(opt('port', '5394'));
 const extra = opt('query', '');
+const dock = args.includes('--dock');
 const [width, height] = opt('size', '640x360').split('x').map(Number);
 
 const server = await createServer({ server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: null }, logLevel: 'warn' });
@@ -36,8 +41,16 @@ try {
   const logs = [];
   page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
-  await page.goto(`http://127.0.0.1:${port}/?scene=flight&shot=1&demo=0&hud=0&killcam=0${extra ? '&' + extra : ''}`, { waitUntil: 'commit' });
-  await page.waitForFunction(() => window.__VANGUARD__?.error || window.__VANGUARD__?.hooks?.replay?.state?.().tick > 30, null, { timeout: 600_000, polling: 250 });
+  await page.goto(`http://127.0.0.1:${port}/?scene=flight&shot=1&demo=0&hud=0&killcam=0${dock ? '&dock=docked&cargo=demo' : ''}${extra ? '&' + extra : ''}`, { waitUntil: 'commit' });
+  await page.waitForFunction(() => window.__VANGUARD__?.error || (window.__VANGUARD__?.hooks?.replay && window.__VANGUARD__.frame() > 30), null, { timeout: 600_000, polling: 250 });
+  if (dock) {
+    // Berthed: the world holds still; the dock screen's market / repair / launch.
+    for (const key of ['ArrowRight', 'ArrowRight', 'ArrowDown', 'ArrowLeft', 'KeyR', 'KeyE', 'Enter']) {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(400);
+    }
+    await page.waitForFunction(() => window.__VANGUARD__.hooks.replay.state().tick > 240, null, { timeout: 600_000, polling: 250 });
+  }
   // Scripted flying: hold keys for spans of ticks.
   const plan = [
     ['ArrowUp', 1.0],

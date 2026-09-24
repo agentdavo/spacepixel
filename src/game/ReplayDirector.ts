@@ -28,7 +28,9 @@ import { copyControls, parseReplay, REPLAY_HZ, REPLAY_VERSION, ReplayCursor, Rep
  *
  * Cinema / trailer API (window.__VANGUARD__.hooks.replay, or the director
  * itself): `load(file, seek?)` reboots into a tape; `seek(seconds)` (forward;
- * backward reloads), `run()`, `pause()`, `speed`, `state()`.
+ * backward reloads), `run()`, `pause()`, `speed`, `state()`. Without a
+ * reload: `beginInPagePlayback(file, seek)`, then load the flight scene
+ * (an attract reel), and call the returned `restore()` after.
  */
 export interface ReplayHost {
   readonly player: ShipEntity;
@@ -93,7 +95,8 @@ function bootQuery(): string {
  * profile, so every load reads the recorded state and nothing the tape
  * writes (saves, contracts, hangar) touches the real profile.
  */
-export function installStorageShim(snapshot: Record<string, string>): void {
+export function installStorageShim(snapshot: Record<string, string>): () => void {
+  const saved = Object.getOwnPropertyDescriptor(window, 'localStorage');
   const mem = new Map(Object.entries(snapshot));
   const shim: Storage = {
     get length() {
@@ -106,6 +109,37 @@ export function installStorageShim(snapshot: Record<string, string>): void {
     clear: () => mem.clear(),
   };
   Object.defineProperty(window, 'localStorage', { configurable: true, get: () => shim });
+  /** Put the real storage back. */
+  return () => {
+    if (saved) Object.defineProperty(window, 'localStorage', saved);
+    else delete (window as { localStorage?: Storage }).localStorage;
+  };
+}
+
+/** Query flags that change what the flight scene builds (beyond `scene` / `hud`). */
+function worldFlags(boot: string): string[] {
+  return [...new URLSearchParams(boot).keys()].filter((k) => k !== 'scene' && k !== 'hud' && k !== 'quality');
+}
+
+/**
+ * In-page playback without a reload (attract reels, trailers): shim storage
+ * with the tape's profile and hand it to the next flight scene the caller
+ * loads. Returns `restore()` — call it when the reel ends to put the real
+ * profile back. Tapes recorded with world-changing query flags (`demo`,
+ * `dock`, `reach`, …) need the reload path (`hooks.replay.load`); for those
+ * this warns and returns null.
+ */
+export function beginInPagePlayback(f: ReplayFile, seekSeconds = -1): (() => void) | null {
+  const here = new URLSearchParams(location.search);
+  const boot = new URLSearchParams(f.header.boot);
+  const extra = worldFlags(f.header.boot).filter((k) => here.get(k) !== boot.get(k));
+  if (extra.length) {
+    console.warn(`[replay] tape needs query flags ${extra.join(', ')}: use hooks.replay.load (reboot)`);
+    return null;
+  }
+  const restore = installStorageShim(f.header.storage);
+  setPendingReplay(f, seekSeconds);
+  return restore;
 }
 
 /** Read a tape: a slot name (auto, clip-N, session) or a URL. */

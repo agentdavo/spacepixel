@@ -212,7 +212,7 @@ export class FlightScene implements GameScene, FlightHostScene {
   private stageKillCam = (() => {
     const q = new URLSearchParams(location.search);
     const t = Number(q.get('killcam'));
-    return t > 0 ? { at: t, skip: Number(q.get('kcat') ?? 0) || 0, fired: -1 } : null;
+    return t > 0 ? { at: t, skip: Number(q.get('kcat') ?? 0) || 0, fired: -1, killer: null as ShipEntity | null } : null;
   })();
   /** Records every session; plays tapes back (?replay=). */
   readonly replay: ReplayDirector = new ReplayDirector(this, this.seed);
@@ -513,22 +513,32 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
     this.wasBoosting = pf.boosting;
 
-    // 4b'. Capture staging: the nearest hostile gets the kill (?killcam=<t>).
+    // 4b'. Capture staging (?killcam=<t>): 3 s before t the nearest bandit is
+    //      put on the player's six, guns hot; at t it gets the kill.
     const kc = this.stageKillCam;
-    if (kc && kc.fired < 0 && time >= kc.at && this.player.alive) {
-      let best: ShipEntity | null = null;
-      let bd = Infinity;
-      for (const o of this.fleet.enemiesOf(this.player)) {
-        const d = o.flight.position.distanceTo(pf.position);
-        if (d < bd && o.radius < 60) {
-          bd = d;
-          best = o;
+    if (kc && kc.fired < 0 && this.player.alive && time >= kc.at - 3) {
+      if (!kc.killer || !kc.killer.alive) {
+        let bd = Infinity;
+        for (const o of this.fleet.enemiesOf(this.player)) {
+          const d = o.flight.position.distanceTo(pf.position);
+          if (d < bd && o.radius < 60) {
+            bd = d;
+            kc.killer = o;
+          }
+        }
+        const k = kc.killer;
+        if (k) {
+          const kf = k.flight;
+          kf.position.copy(pf.position).addScaledVector(pf.forward(_to), -380).addScaledVector(pf.up(_v), 22);
+          faceAlong(kf.orientation, _to.subVectors(pf.position, kf.position).normalize());
+          kf.velocity.copy(pf.velocity);
+          k.target = this.player;
         }
       }
-      if (best) {
+      if (kc.killer && time >= kc.at) {
         kc.fired = this.simTick;
         this.player.plotArmour = false;
-        this.fleet.hit(this.player, 1e9, 'laser', pf.position, _v.subVectors(best.flight.position, pf.position).normalize(), best);
+        this.fleet.hit(this.player, 1e9, 'laser', pf.position, _v.subVectors(kc.killer.flight.position, pf.position).normalize(), kc.killer);
       }
     }
 

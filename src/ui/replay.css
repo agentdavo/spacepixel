@@ -106,3 +106,8 @@
   transition: opacity 0.2s;
 }
 .replay-toast.show { opacity: 1; }
+
+/* The kill-cam owns the frame: radio portraits, subtitles and the contract canvas step aside. */
+.killcam-on .comms,
+.killcam-on .subs,
+.killcam-on .contract-hud { visibility: hidden; }
