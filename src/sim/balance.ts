@@ -3,7 +3,9 @@ import { Fleet, faceAlong, type ShipEntity } from './Fleet';
 import { Weapons } from './Weapons';
 import { Missiles } from './Missiles';
 import { Capitals } from './Capitals';
-import { chooseGun, gunOf, leadSpeedOf, subsystemPosition, toUniverse } from './Combat';
+import { chooseGun, gunOf, leadSpeedOf, selectSubsystem, subsystemPosition, toUniverse } from './Combat';
+import { FACING, facingOf, syncShield, type Subsystem } from './Damage';
+import { issueOrder, setFormation, updateAI } from './ai';
 import { GUNS, MISSILES, SHIP_STATS, type GunId } from './Loadouts';
 import { leadPoint } from './ai/Pilot';
 import type { Check, ScenarioResult } from './ai/sim';
@@ -21,6 +23,9 @@ import { ShipTurrets } from '@/game/outfitting/turrets';
  *   fighter vs fighter   Kestrel (auto gun switch) vs Cantor     3–8 s
  *   turret               wing of 4 Kestrels vs one capital turret  5–15 s
  *   capital              squadron (4 Kestrel + 2 Warhorse) kills a capital   60–180 s
+ *   subsystems           aimed hits land on the selected mount; a torpedo
+ *                        splashes a turret cluster; an AI wing on "attack my
+ *                        target" kills the lead's pick, then strips exposed mounts
  *
  * Aim error is Gaussian in metres at the target (σ grows with range), so hit
  * rates come out like a skilled player's, not an aimbot's.
@@ -285,7 +290,7 @@ export function turretScenario(): ScenarioResult {
  * torpedoes in whenever they reload. Point defence is off: this is the DPS
  * budget, not a survival test.
  */
-export function capitalKill(capBp: string, maxT = 400): { t: number; torps: number; subsKilled: number } {
+export function capitalKill(capBp: string, maxT = 400): { t: number; torps: number; subsKilled: number; cause: string; wrecks: number } {
   seed = 23;
   const w = world();
   const cap = w.fleet.spawn(capBp, 'choir', ORIGIN.clone(), new Vector3(0, 0, 1));
@@ -323,7 +328,8 @@ export function capitalKill(capBp: string, maxT = 400): { t: number; torps: numb
     w.weapons.step(DT);
     w.missiles.step(DT);
   }
-  return { t: cap.alive ? Infinity : t, torps, subsKilled: st.subsystems.filter((s) => s.destroyed).length };
+  const wrecks = w.fleet.destruction.wrecks.filter((x) => x.ship === cap).length;
+  return { t: cap.alive ? Infinity : t, torps, subsKilled: st.subsystems.filter((s) => s.destroyed).length, cause: st.structure.death ?? 'alive', wrecks };
 }
 
 export function capitalScenario(): ScenarioResult {
@@ -577,8 +583,8 @@ function duelInner(hullId: string, fit: Fit, targetBp: string, range: number, ma
   let intercepted = 0;
   const taken: DuelOut['taken'] = {};
   const hit = w.fleet.hit.bind(w.fleet);
-  w.fleet.hit = (s, amount, type, point, normal, shooter) => {
-    const r = hit(s, amount, type, point, normal, shooter);
+  w.fleet.hit = (s, amount, type, point, normal, shooter, sub) => {
+    const r = hit(s, amount, type, point, normal, shooter, sub);
     if (s === sh) {
       const o = (taken[type] ??= { shield: 0, hull: 0 });
       o.shield += r.shieldDamage;
@@ -658,6 +664,315 @@ export function outfitScenario(): ScenarioResult {
 
 void GUNS;
 
+// ── subsystem targeting ─────────────────────────────────────────────
+
+/** Strip one shield facing and keep it down (a flank someone already worked over): no charge, no regeneration, no transfer into it. */
+function stripFacing(cap: ShipEntity, f: number): void {
+  const st = cap.combat.dmg;
+  st.facings[f] = 0;
+  st.down |= 1 << f;
+  st.cooldown[f] = 999;
+  syncShield(st, cap);
+  cap.sinceHit = 0;
+}
+
+/**
+ * One Kestrel 900 m off a stripped flank, the mount selected (B) and aimed
+ * at (σ = 0.8% of range): share of the bolts that reach the hull which land
+ * on that mount, and the time to kill it.
+ */
+export function aimedShare(capBp: string, socket: string, range = 900, maxT = 60): { share: number; t: number } {
+  seed = 17;
+  const w = world();
+  const cap = w.fleet.spawn(capBp, 'choir', ORIGIN.clone(), new Vector3(0, 0, 1));
+  cap.flight.velocity.set(0, 0, 0);
+  const st = cap.combat.dmg;
+  const sub = st.subsystems.find((s) => s.id === socket)!;
+  const tp = subsystemPosition(cap, sub, new Vector3());
+  const side = new Vector3(Math.sign(sub.x - st.cx) || 1, 0.35, 0.1).normalize();
+  // The facing over the mount, and the one the shots come in through.
+  const over = facingOf(st, sub);
+  const through = facingOf(st, side.clone().multiplyScalar(Math.max(st.halfW, st.halfH) * 2).add(new Vector3(sub.x, sub.y, sub.z)));
+  const s = w.fleet.spawn('vf27-kestrel', 'concord', tp.clone().addScaledVector(side, range), side.clone().negate());
+  s.target = cap;
+  s.combat.gun = 0; // lasers
+  selectSubsystem(s, cap, st.subsystems.indexOf(sub));
+  const zero = new Vector3();
+  let onSub = 0;
+  let onHull = 0;
+  let t = 0;
+  for (; t < maxT && !sub.destroyed; t += DT) {
+    stripFacing(cap, over);
+    stripFacing(cap, through);
+    cap.flight.velocity.set(0, 0, 0);
+    subsystemPosition(cap, sub, tp);
+    hold(s, zero);
+    aimAndFire(s, tp, zero, range * 0.008);
+    w.fleet.step(DT);
+    w.weapons.step(DT);
+    for (const e of w.weapons.events) {
+      if (e.kind !== 'hit' || e.shooter !== s) continue;
+      if (e.sub === sub) onSub++;
+      else onHull++;
+    }
+  }
+  return { share: onSub / Math.max(1, onSub + onHull), t: sub.destroyed ? t : Infinity };
+}
+
+/** One torpedo homed on a mount of a shield-less capital: how many mounts it destroys or damages. */
+export function torpedoSplash(capBp: string, socket: string): { destroyed: number; damaged: number } {
+  seed = 19;
+  const w = world();
+  const cap = w.fleet.spawn(capBp, 'choir', ORIGIN.clone(), new Vector3(0, 0, 1));
+  cap.flight.velocity.set(0, 0, 0);
+  const st = cap.combat.dmg;
+  const sub = st.subsystems.find((s) => s.id === socket)!;
+  const tp = subsystemPosition(cap, sub, new Vector3());
+  const side = new Vector3(Math.sign(sub.x - st.cx) || 1, 0.3, 0).normalize();
+  const bomber = w.fleet.spawn('sb9-warhorse', 'concord', tp.clone().addScaledVector(side, 2200), side.clone().negate(), { isPlayer: true });
+  bomber.target = cap;
+  selectSubsystem(bomber, cap, st.subsystems.indexOf(sub));
+  w.missiles.salvo(bomber, cap, MISSILES.torpedo);
+  const zero = new Vector3();
+  for (let t = 0; t < 15; t += DT) {
+    // Shields down all round: a torpedo curves in, and a standing facing anywhere on its path would take it.
+    for (let f = 0; f < st.facings.length; f++) stripFacing(cap, f);
+    cap.flight.velocity.set(0, 0, 0);
+    hold(bomber, zero);
+    bomber.controls.fire = false;
+    w.fleet.step(DT);
+    w.weapons.step(DT);
+    w.missiles.step(DT);
+  }
+  return { destroyed: st.subsystems.filter((s) => s.destroyed).length, damaged: st.subsystems.filter((s) => !s.destroyed && s.hp < s.hpMax).length };
+}
+
+/**
+ * The player's wing on "attack my target" against a capital with a stripped
+ * port flank and the facing over `socket` down (no return fire: this
+ * measures the brains, not survival). The
+ * lead holds 2.5 km off with `socket` selected; the wing kills it, then (lead
+ * deselects) picks exposed mounts on its own for 60 s.
+ */
+export function wingStrip(capBp: string, socket: string, maxT = 90): { ordered: number; after: number; shielded: number } {
+  seed = 29;
+  const w = world();
+  const cap = w.fleet.spawn(capBp, 'choir', ORIGIN.clone(), new Vector3(0, 0, 1));
+  cap.flight.velocity.set(0, 0, 0);
+  const st = cap.combat.dmg;
+  const sub = st.subsystems.find((s) => s.id === socket)!;
+  const tp = subsystemPosition(cap, sub, new Vector3());
+  const side = new Vector3(Math.sign(sub.x - st.cx) || 1, 0.3, 0).normalize();
+  const leadPos = tp.clone().addScaledVector(side, 2500);
+  const lead = w.fleet.spawn('vf27-kestrel', 'concord', leadPos.clone(), side.clone().negate(), { isPlayer: true, name: 'Vanguard 1' });
+  lead.target = cap;
+  selectSubsystem(lead, cap, st.subsystems.indexOf(sub));
+  const wing = [1, 2, 3].map((i) => w.fleet.spawn('vf27-kestrel', 'concord', leadPos.clone().add(new Vector3(0, i * 40, -i * 50)), side.clone().negate(), { name: `Vanguard ${i + 1}` }));
+  setFormation(wing, 'fingerFour', 40);
+  issueOrder(wing, 'attackMyTarget', lead);
+  const zero = new Vector3();
+  let ordered = Infinity;
+  let shieldedKills = 0;
+  const killed = new Set<Subsystem>();
+  let t = 0;
+  const over = facingOf(st, sub);
+  for (; t < maxT + 60 && cap.alive; t += DT) {
+    stripFacing(cap, FACING.PORT);
+    stripFacing(cap, over);
+    cap.flight.velocity.set(0, 0, 0);
+    lead.flight.position.copy(leadPos);
+    hold(lead, zero);
+    lead.controls.fire = false;
+    if (sub.destroyed && ordered === Infinity) {
+      ordered = t;
+      selectSubsystem(lead, cap, -1);
+    }
+    if (ordered === Infinity && t > maxT) break;
+    if (ordered !== Infinity && t > ordered + 60) break;
+    updateAI(w.fleet, DT, t);
+    w.fleet.step(DT);
+    w.weapons.step(DT);
+    w.missiles.step(DT);
+    for (const e of w.weapons.events) {
+      if (e.kind !== 'subsystem' || e.ship !== cap || !e.sub || killed.has(e.sub)) continue;
+      killed.add(e.sub);
+      // (Mounts the stripped facings don't cover are still under their shields.)
+      if (!e.sub.destroyed || facingOf(st, e.sub) === FACING.PORT || facingOf(st, e.sub) === over) continue;
+      shieldedKills++;
+    }
+  }
+  return { ordered, after: killed.size - (sub.destroyed ? 1 : 0), shielded: shieldedKills };
+}
+
+export function subsystemScenario(): ScenarioResult {
+  const cath = aimedShare('choir-cathedral', 'battery-4');
+  const lg = aimedShare('ffc-lantern-guard', 'main-b', 450);
+  const torp = torpedoSplash('choir-cathedral', 'battery-4');
+  const wing = wingStrip('choir-cathedral', 'battery-4');
+  return {
+    name: 'subsystem targeting (aimed hits, torpedo splash, AI wing on the lead\'s pick)',
+    metrics: {
+      cathedralBattery: `${(cath.share * 100).toFixed(0)}% of hull hits on the selected mount · killed in ${cath.t.toFixed(1)} s`,
+      lanternGuardMain: `${(lg.share * 100).toFixed(0)}% on the mount (450 m) · killed in ${lg.t.toFixed(1)} s`,
+      torpedo: `one torpedo on a shield-less Cathedral's battery: ${torp.destroyed} mounts destroyed · ${torp.damaged} damaged`,
+      wing: `wing kills the lead's pick in ${wing.ordered.toFixed(1)} s · then ${wing.after} more exposed mounts in 60 s (${wing.shielded} through standing shields)`,
+    },
+    checks: [
+      check('aimed hits on a Cathedral battery (% of hull hits)', cath.share * 100, '>= 60', cath.share >= 0.6),
+      check('aimed hits on a Lantern Guard turret (% of hull hits)', lg.share * 100, '>= 40', lg.share >= 0.4),
+      check('one torpedo on a bare hull: mounts destroyed + damaged', torp.destroyed + torp.damaged, '>= 3', torp.destroyed + torp.damaged >= 3),
+      check('wing kills the lead\'s selected mount (s)', wing.ordered, '< 60', wing.ordered < 60),
+      check('… then strips exposed mounts on its own (in 60 s)', wing.after, '>= 1', wing.after >= 1),
+    ],
+  };
+}
+
+// ── kill paths ───────────────────────────────────────────────────────
+
+export type KillPath = 'structural' | 'reactor' | 'bridge';
+
+export interface KillPathResult {
+  t: number;
+  cause: string;
+  torps: number;
+  subsKilled: number;
+  /** Reactor: when the core went critical (s), −1 never. */
+  criticalAt: number;
+  /** Damage the escort parked alongside took after the kill (the reactor's shockwave). */
+  escortDamage: number;
+  wrecks: number;
+  salvage: number;
+}
+
+/**
+ * The squadron (4 Kestrels + 2 Warhorses with torpedoes, like `capitalKill`)
+ * goes for one kill path instead of raking the hull, from the side that path
+ * is reached from (point defence off: the DPS budget):
+ *
+ *   structural  walk fire along the midships only (the spine), torpedoes into it
+ *   reactor     from the core's side (under the keel on the big hulls): drop that
+ *               facing, core the reactor (B-selected: torpedoes too) and keep it
+ *               under fire until the fuse runs out; `vent` = cease fire once it
+ *               goes critical (the crew should vent it)
+ *   bridge      over the command deck: drop the facing, destroy the bridge, keep
+ *               pounding the bow until she strikes
+ *
+ * An escort corvette holds station alongside so a reactor's shockwave has
+ * someone to hit.
+ */
+export function killPath(capBp: string, path: KillPath, maxT = 400, vent = false): KillPathResult {
+  seed = 29;
+  const w = world();
+  const cap = w.fleet.spawn(capBp, 'choir', ORIGIN.clone(), new Vector3(0, 0, 1));
+  cap.flight.velocity.set(0, 0, 0);
+  cap.controls.throttleSet = 0;
+  const st = cap.combat.dmg;
+  const sub = path === 'structural' ? null : (st.subsystems.find((s) => s.kind === path) ?? null);
+  // Where the squadron comes from (ship-local): the core's side of the hull, above the deck for the bridge, abeam for the spine.
+  const dir = new Vector3(1, 0.35, 0).normalize();
+  if (sub) dir.set(0.35, sub.y < st.cy - st.halfH * 0.3 ? -1 : 1, 0).normalize();
+  const R = Math.max(900, Math.min(1500, st.halfW * 3 + 600));
+  const anchor = sub ? new Vector3(sub.x, sub.y, sub.z) : new Vector3(st.cx, st.cy, st.cz);
+  const escort = w.fleet.spawn('ffc-lantern-guard', 'choir', toUniverse(cap, st.cx - st.halfW - 450, st.cy, st.cz, new Vector3()), new Vector3(0, 0, 1));
+  escort.flight.velocity.set(0, 0, 0);
+  const squad: ShipEntity[] = [];
+  ['vf27-kestrel', 'vf27-kestrel', 'vf27-kestrel', 'vf27-kestrel', 'sb9-warhorse', 'sb9-warhorse'].forEach((bp) => {
+    // Scripted (player-flagged): the torpedo work is the Warhorses' alone, on their reload.
+    const s = w.fleet.spawn(bp, 'concord', ORIGIN.clone(), new Vector3(0, 0, 1), { isPlayer: true });
+    s.target = cap;
+    if (bp === 'sb9-warhorse') s.combat.missile = 0; // torpedoes
+    // B on the path's subsystem: torpedoes guide onto it once the facing over it is down.
+    if (sub) selectSubsystem(s, cap, st.subsystems.indexOf(sub));
+    squad.push(s);
+  });
+  const aims = squad.map(() => new Vector3());
+  const zero = new Vector3();
+  let torps = 0;
+  let t = 0;
+  let criticalAt = -1;
+  for (; t < maxT && cap.alive; t += DT) {
+    cap.flight.velocity.set(0, 0, 0);
+    escort.flight.velocity.set(0, 0, 0);
+    if (st.structure.reactor.phase === 'critical' && criticalAt < 0) criticalAt = t;
+    const holdFire = vent && criticalAt >= 0;
+    squad.forEach((s, i) => {
+      // A loose arc on the attack side, drifting slowly.
+      const a = (i / squad.length - 0.5) * 0.9 + Math.sin(t * 0.05) * 0.2;
+      _a.copy(dir).applyAxisAngle(_b.set(0, 0, 1), a * 0.5).add(_e.set(0, 0, Math.sin(a) * 0.6)).normalize();
+      toUniverse(cap, anchor.x + _a.x * R, anchor.y + _a.y * R, anchor.z + _a.z * R, s.flight.position);
+      hold(s, zero);
+      if (Math.floor(t) !== Math.floor(t - DT) || t === 0) {
+        if (sub) toUniverse(cap, sub.x, sub.y, sub.z, aims[i]);
+        // The spine: anywhere along the midships third, on the side facing the squadron.
+        else toUniverse(cap, st.cx + dir.x * st.halfW * 0.6, st.cy + (rand() - 0.3) * st.halfH, st.cz + (rand() - 0.5) * (st.halfL / 1.6), aims[i]);
+      }
+      if (holdFire) {
+        s.controls.fire = false;
+        return;
+      }
+      chooseGun(s, cap);
+      aimAndFire(s, aims[i], zero, sub ? 4 : 8);
+      if (s.combat.loadout.missiles[s.combat.missile] === 'torpedo' && s.combat.missileReload <= 0 && w.missiles.salvo(s, cap)) torps++;
+    });
+    w.fleet.step(DT);
+    w.weapons.step(DT);
+    w.missiles.step(DT);
+    if (vent && st.structure.reactor.phase === 'vented') break;
+  }
+  const cause = !cap.alive ? (st.structure.death ?? 'hull') : st.structure.reactor.phase === 'vented' ? 'vented' : 'alive';
+  // Let a shockwave finish crossing the escort (fire has stopped: the target is gone).
+  const e0 = escort.hull + escort.shield;
+  for (const s of squad) s.controls.fire = false;
+  for (let k = 0; k < 180; k++) {
+    w.fleet.step(DT);
+    w.weapons.step(DT);
+  }
+  const D = w.fleet.destruction;
+  const mine = D.wrecks.filter((x) => x.ship === cap);
+  return {
+    t: cause === 'alive' ? Infinity : t,
+    cause,
+    torps,
+    subsKilled: st.subsystems.filter((s) => s.destroyed).length,
+    criticalAt,
+    escortDamage: Math.max(0, e0 - (escort.alive ? escort.hull + escort.shield : 0)),
+    wrecks: mine.length,
+    salvage: mine.reduce((n, x) => n + x.salvage.relics + x.salvage.cores + x.salvage.spares, 0),
+  };
+}
+
+export function killPathScenario(): ScenarioResult {
+  const caps = ['choir-cathedral', 'bb-indomitable', 'cvs07-hesperus-dawn'];
+  const paths: KillPath[] = ['structural', 'reactor', 'bridge'];
+  const metrics: Record<string, string> = {};
+  const checks: Check[] = [];
+  const fmt = (r: KillPathResult) =>
+    `${r.t.toFixed(0)} s · ${r.cause}${r.criticalAt >= 0 ? ` (critical at ${r.criticalAt.toFixed(0)} s)` : ''} · ${r.torps} torpedoes · ${r.subsKilled} subsystems down · ${r.wrecks} wreck pieces, ${r.salvage} salvage lots${r.escortDamage ? ` · escort took ${r.escortDamage.toFixed(0)}` : ''}`;
+  const pieces: Record<string, number> = { structural: 2, reactor: 1, bridge: 1 };
+  for (const bp of caps) {
+    for (const p of paths) {
+      const r = killPath(bp, p);
+      metrics[`${short(bp)} ${p}`] = fmt(r);
+      checks.push(check(`${short(bp)} ${p} kill (s)`, r.t, `30..150 by that path, ${pieces[p]} wreck piece(s)`, r.t >= 30 && r.t <= 150 && r.cause === p && r.wrecks === pieces[p]));
+      if (p === 'reactor') checks.push(check(`${short(bp)} reactor shockwave hits the escort`, r.escortDamage, '> 0', r.escortDamage > 0));
+    }
+    // Hull depletion: the squadron rakes the whole hull (capitalKill): the rolling chain, three sections.
+    const h = capitalKill(bp);
+    metrics[`${short(bp)} hull`] = `${h.t.toFixed(0)} s · ${h.cause} · ${h.wrecks} wreck pieces`;
+    checks.push(check(`${short(bp)} hull depletion (s)`, h.t, '60..180 by the hull, 3 sections', h.t >= 60 && h.t <= 180 && h.cause === 'hull' && h.wrecks === 3));
+  }
+  const lg = paths.map((p) => killPath('ffc-lantern-guard', p));
+  lg.forEach((r, i) => {
+    metrics[`lanternGuard ${paths[i]}`] = fmt(r);
+    checks.push(check(`Lantern Guard ${paths[i]} kill (s)`, r.t, '8..60 by that path', r.t >= 8 && r.t <= 60 && r.cause === paths[i]));
+  });
+  // Stop shooting a critical core and the crew vents it: she lives, browned out.
+  const vented = killPath('choir-cathedral', 'reactor', 400, true);
+  metrics['cathedral reactor, fire lifted at critical'] = `${vented.cause} ${vented.t.toFixed(0)} s after the start`;
+  checks.push(check('lift fire from a critical core → the crew vents it', vented.cause === 'vented' ? 1 : 0, '== 1', vented.cause === 'vented'));
+  return { name: 'kill paths (squadron: 4 Kestrels + 2 Warhorses, going for one way to kill her)', metrics, checks };
+}
+
 const SCENARIOS: [string, () => ScenarioResult][] = [
   ['damage types', damageTypeScenario],
   ['fighter', fighterScenario],
@@ -666,6 +981,8 @@ const SCENARIOS: [string, () => ScenarioResult][] = [
   ['effects', effectsScenario],
   ['swarm', swarmScenario],
   ['outfit', outfitScenario],
+  ['subsystem', subsystemScenario],
+  ['killpath', killPathScenario],
 ];
 
 export function runAll(filter = ''): ScenarioResult[] {

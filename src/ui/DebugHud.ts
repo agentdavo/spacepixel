@@ -44,17 +44,18 @@ export class DebugHud implements Updatable {
         e.preventDefault();
         this.expanded = !this.expanded;
       }
+      // Ink and boil toggles only while the F3 panel is open: B and I are flight keys (subsystem targeting).
       const fn = /^F([1-6])$/.exec(e.code);
       if (fn) {
         e.preventDefault();
         this.view = VIEWS[Number(fn[1]) - 1];
         this.ink.setView(this.view);
-      } else if (e.key === 'i' || e.key === 'I') {
+      } else if (this.expanded && (e.key === 'i' || e.key === 'I')) {
         this.ink.settings.enabled = !this.ink.settings.enabled;
         this.ink.applySettings();
       } else if (e.key === 'c' || e.key === 'C') {
         this.game.cycleCamera?.();
-      } else if (e.key === 'b' || e.key === 'B') {
+      } else if (this.expanded && (e.key === 'b' || e.key === 'B')) {
         this.ink.settings.boilAmount = this.ink.settings.boilAmount > 0 ? 0 : 0.35;
         this.ink.applySettings();
       }
@@ -103,7 +104,8 @@ export class DebugHud implements Updatable {
       <div>VIEW     <b>${this.view.toUpperCase()}</b> · INK <b>${s.enabled ? 'ON' : 'OFF'}</b> · BOIL <b>${s.boilAmount > 0 ? 'ON' : 'OFF'}</b></div>
       <div class="keys">[F1-F6] view  [I] ink  [B] boil  [C] camera</div>
       <div class="keys">mouse/arrows steer · Q/E roll · W/S throttle · SHIFT burner · Z assist · X stop</div>
-      <div class="keys">SPACE guns · R gun · F salvo · Y missile · T target · B subsystem · J cruise · V cam · M map · TAB tactical · 1-4 wing orders</div>`;
+      <div class="keys">SPACE guns · R gun · F salvo · Y missile · T target · B subsystem · J cruise · V cam · M map · TAB tactical · 1-4 wing orders</div>
+      <div class="keys">. shields fwd / next facing · , shields aft / prev facing · / shield AUTO on-off</div>`;
     this.el.append(this.graph);
     this.shotEl.textContent = this.game.cameraLabel?.() ?? this.sceneName.toUpperCase();
   }

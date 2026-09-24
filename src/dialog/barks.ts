@@ -13,6 +13,8 @@ export type BarkKind =
   | 'wing-down' // a wingman is lost
   | 'enemy-taunt' // an enemy on the open band
   | 'enemy-down' // an enemy's last words
+  | 'mount-player' // the Point shot a turret / lance / hangar off a hull: a wingman calls it
+  | 'mount-wing' // a wingman knocked out a subsystem
   | 'order-form' // the Point ordered "form on me": the lead wingman answers
   | 'order-attack' // "attack my target"
   | 'order-free' // "engage at will"
@@ -82,6 +84,22 @@ export const BARK_LINES: Record<BarkKind, Partial<Record<string, string[]>> & { 
     rustwake: ['Nothing personal, pilot. It\'s the gas.', 'Nice paint. I\'ll wear it.', 'Everything in the black is salvage eventually.'],
     concord: ['Renegade, you are expenditure now.', 'This is Continuity. Stand down.'],
     any: ['Break off, pilot.'],
+  },
+  'mount-player': {
+    kade: ['{name}\'s down. Good. Next mount on that side.', 'That\'s their {name} gone. Keep stripping that flank.'],
+    jackpot: ['Ha! {name}, gone! Do the next one, I\'ll count!', 'Oh, you took the {name} off! Clean!'],
+    candle: ['{name} is silent. The flank is opening.'],
+    sparrow: ['You got the {name}! It stopped shooting!'],
+    salt: ['{name}\'s scrap. One less gun on us.'],
+    any: ['{name} destroyed.'],
+  },
+  'mount-wing': {
+    kade: ['{name} is down. Moving to the next.', 'Scratch their {name}.'],
+    jackpot: ['{name}, splashed! That\'s a mount, that counts!'],
+    candle: ['Their {name} is quiet now.'],
+    sparrow: ['I — I got the {name}! It worked!'],
+    salt: ['{name}\'s off the hull.'],
+    any: ['{name} destroyed.'],
   },
   'enemy-down': {
     choir: ['I am unwitnessed—', 'Measure, I cannot—', '(sung) Out of the dust—'],
@@ -159,6 +177,8 @@ export const BARK_PRIORITY: Record<BarkKind, number> = {
   'wing-down': 2,
   'enemy-taunt': 0,
   'enemy-down': 0,
+  'mount-player': 0,
+  'mount-wing': 0,
   // Answers to the Point's own orders cut in: the player just asked.
   'order-form': 1,
   'order-attack': 1,
@@ -178,6 +198,8 @@ export const BARK_COOLDOWN: Record<BarkKind, number> = {
   'wing-down': 3,
   'enemy-taunt': 30,
   'enemy-down': 16,
+  'mount-player': 12,
+  'mount-wing': 15,
   'order-form': 2,
   'order-attack': 2,
   'order-free': 2,

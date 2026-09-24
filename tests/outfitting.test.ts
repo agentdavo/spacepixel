@@ -283,8 +283,10 @@ test('applyFit on a live ship: stats, pools, flight, loadout; fitted turrets fir
   const c = fleet.spawn('choir-cantor', 'choir', new Vector3(60, 250, 500), new Vector3(0, 0, 1));
   c.flight.velocity.set(0, 0, 0);
   let fired = 0;
-  // Ten seconds: scattered flak at a small target lands ~0.4 rounds/s, so a
+  let landed = 0;
+  // Ten seconds: scattered rounds at a small target land ~0.3 rounds/s, so a
   // shorter window only passes on a lucky dice stream (the world seed's).
+  // Count the hits themselves — the Cantor's shield regenerates between them.
   for (let i = 0; i < 600; i++) {
     c.flight.velocity.set(0, 0, 0);
     g.flight.velocity.set(0, 0, 0);
@@ -292,9 +294,13 @@ test('applyFit on a live ship: stats, pools, flight, loadout; fitted turrets fir
     turrets.step(1 / 60, c);
     fleet.step(1 / 60);
     weapons.step(1 / 60);
-    for (const ev of weapons.events) if (ev.kind === 'fire' || ((ev.kind === 'hit' || ev.kind === 'shield') && ev.shooter === g)) fired++;
+    for (const ev of weapons.events) {
+      if (ev.kind === 'fire' && ev.shooter === g) fired++;
+      if ((ev.kind === 'hit' || ev.kind === 'shield') && ev.shooter === g && ev.ship === c) landed++;
+    }
   }
-  assert.ok(c.shield < c.shieldMax || c.hull < c.hullMax, 'turret rounds landed on the Cantor');
+  assert.ok(fired > 0, 'the turrets fired (muzzle flashes)');
+  assert.ok(landed > 0, 'turret rounds landed on the Cantor');
   assert.equal(turrets.status(g).mounts, 2);
   turrets.mode = 'hold';
   weapons.life.fill(0); // rounds already in the air aren't the turrets' HOLD to recall
@@ -306,7 +312,6 @@ test('applyFit on a live ship: stats, pools, flight, loadout; fitted turrets fir
     weapons.step(1 / 60);
   }
   assert.ok(c.shield + c.hull >= Math.min(before, c.shieldMax + c.hull) - 1e-6, 'HOLD: turrets silent');
-  void fired;
 });
 
 test('warships leave the yard with Mk II kit that really counts (base numbers assume Mk I)', () => {

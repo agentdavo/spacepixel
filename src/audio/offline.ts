@@ -29,7 +29,7 @@ export interface RenderStats {
   wav: string;
 }
 
-interface Ev {
+interface Ev extends Pick<AudioWeaponEvent, 'type' | 'shielded' | 'strength' | 'sub' | 'turret'> {
   kind: AudioWeaponEvent['kind'];
   position: { x: number; y: number; z: number };
   ship: AudioShip | null;
@@ -59,7 +59,7 @@ interface Sim {
   /** Did something cross time `x` during this frame? */
   at(x: number): boolean;
   every(period: number, from?: number, to?: number): boolean;
-  fire(kind: Ev['kind'], x: number, y: number, z: number, shooter: AudioShip | null, ship?: AudioShip | null): void;
+  fire(kind: Ev['kind'], x: number, y: number, z: number, shooter: AudioShip | null, ship?: AudioShip | null, extra?: Partial<Ev>): void;
   missile(kind: MEv['kind'], x: number, y: number, z: number, shooter: AudioShip | null, target?: AudioShip | null): void;
 }
 
@@ -373,6 +373,23 @@ export const SCENARIOS: Record<string, Scenario> = {
       if (s.t > 3.4 && s.t < 4.6) s.fire('beam-hit', 200, 50, -400, CATHEDRAL, WING);
     },
   },
+  // Batch 6: hull hits by damage type, shield bleed / collapse / return, subsystems destroyed, a player turret shot.
+  'sfx-batch6': {
+    seconds: 8,
+    tick: (s) => {
+      if (s.at(0.1)) s.fire('hit', 0, 0, -60, PLAYER, CANTOR, { type: 'laser' });
+      if (s.at(0.5)) s.fire('hit', 0, 0, -60, PLAYER, CANTOR, { type: 'kinetic' });
+      if (s.at(0.9)) s.fire('hit', 0, 0, -60, PLAYER, CANTOR, { type: 'explosive' });
+      if (s.at(1.3)) s.fire('shield', 40, 0, -60, PLAYER, CANTOR, { strength: 0.1 });
+      if (s.at(1.6)) s.fire('shield-bleed', 40, 0, -60, PLAYER, CANTOR, { type: 'laser' });
+      if (s.at(2.0)) s.fire('shield-down', 40, 0, -60, PLAYER, CANTOR);
+      if (s.at(3.0)) s.fire('shield-up', 40, 0, -60, PLAYER, CANTOR);
+      if (s.at(4.0)) s.fire('subsystem', -80, 0, -200, PLAYER, CATHEDRAL, { sub: { kind: 'turret' } });
+      if (s.at(5.3)) s.fire('subsystem', 80, 0, -300, PLAYER, CATHEDRAL, { sub: { kind: 'hangar' } });
+      if (s.at(6.8)) s.fire('beam-hit', 0, 0, -120, CATHEDRAL, PLAYER, { shielded: true });
+      if (s.at(7.2)) s.fire('fire', 20, 10, -40, PLAYER, null, { turret: true });
+    },
+  },
   'sfx-explosions': {
     seconds: 8,
     tick: (s) => {
@@ -530,8 +547,8 @@ export async function renderScenario(name: string, sampleRate = 44100): Promise<
       const b = Math.floor((this.t + this.frame.dt - from) / period);
       return b > a || this.t === from;
     },
-    fire(kind, x, y, z, shooter, ship = null) {
-      this.w.push({ kind, position: { x, y, z }, ship, shooter });
+    fire(kind, x, y, z, shooter, ship = null, extra) {
+      this.w.push({ ...extra, kind, position: { x, y, z }, ship, shooter });
     },
     missile(kind, x, y, z, shooter, target = null) {
       this.m.push({ kind, position: { x, y, z }, target, shooter });

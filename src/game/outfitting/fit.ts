@@ -377,6 +377,9 @@ export function computeFit(e: CatalogEntry, fit: Fit): FitResult {
     shieldDelay: base.shieldDelay * (sh ? ratio(sh.delay, sh0?.delay, 1) : 1),
     mass: base.mass * mass,
   };
+  // Facing transfer rate (× class rate): only written when the fit moves it off the hull's own (stock fits stay number-for-number).
+  const transfer = (base.shieldTransfer ?? 1) * (sh ? ratio(sh.transfer, sh0?.transfer, 1) : 1);
+  if (transfer !== (base.shieldTransfer ?? 1) || base.shieldTransfer !== undefined) stats.shieldTransfer = transfer;
   const flight = {
     speed: ratio(en?.speed, en0?.speed, 0.4),
     accel: ratio(en?.accel, en0?.accel, 0.3) / mass,

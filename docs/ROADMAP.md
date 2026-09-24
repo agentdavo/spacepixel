@@ -150,16 +150,16 @@ modifiers, an event log), is read and written by everything below.
 | 7 | Persistent NPC arcs that advance while you're away | ≥ 6 arcs | ✅ 7 arcs (Odile, Magpie, Pell, Nadia, Toma, Dalca & Pieter, Maud), 7 arc jobs, THREADS tab |
 | 8 | Rivals: named aces and bounty targets that remember and escalate | ≥ 5 rivals | ✅ 6 rivals (2 can be turned), grudge meters, tiers, world-log memory in their lines |
 
-## Batch 6 — guns you can see, shields you can break, ships that die well (carried by the turrets session on `claude/ship-turrets-shields-weapons-8lz4su`; see docs/SESSIONS.md)
+## Batch 6 — guns you can see, shields you can break, ships that die well (carried by the batch 6 project thread on `claude/project-thread-dl05kd`, draft PR #1; see docs/SESSIONS.md)
 
 | # | Milestone | Pass/fail | Status |
 |---|---|---|---|
-| 1 | Articulated turret rigs on every turreted hull and station: traverse/elevation limits and rates, own-hull arc blocking, recoil | turrets slew before they fire; determinism holds | 🔧 |
-| 2 | Identifiable origins: every bolt, beam and missile leaves a barrel, emitter or launcher cell (muzzle flash, hatches, tubes) | no shot from a hull centre | 🔧 |
-| 3 | Shields v2: fighter fore/aft with power shifting; big hulls by facing incl. dorsal/ventral; generators per facing; bleed-through; collapse and reboot | unit-tested; balance bands hold | 🔧 |
-| 4 | Impacts: faction shield flares (hex / crystal / scrap), collapse shatter; hull hits per weapon family (scorch, sparks, shatter, craters, trenches) with persistent decals and per-surface audio | readable at chase distance | 🔧 |
-| 5 | Subsystems v2: everything targetable once its facing is down (turrets, launchers, lances, PD, engines, generators, bridge, sensors, hangars, reactor; station batteries and arms) | exposure rules tested | 🔧 |
-| 6 | Kill paths: structural break-up, reactor detonation, bridge kill (drifting wreck), rolling chain; wrecks stay as salvage | each path in `npm run balance` bands | 🔧 |
+| 1 | Articulated turret rigs on every turreted hull and station: traverse/elevation limits and rates, own-hull arc blocking, recoil | turrets slew before they fire; determinism holds | ✅ 87 mounts / 17 designs rigged traverse + elevation (`src/sim/TurretRig.ts`); size-scaled slew, per-mount arcs masked by superstructure, 2° fire gate, idle scan, recoil, wreck pose · `tests/turret-rig.test.ts` |
+| 2 | Identifiable origins: every bolt, beam and missile leaves a barrel, emitter or launcher cell (muzzle flash, hatches, tubes) | no shot from a hull centre | ✅ bolts leave alternating barrel tips, beams the emitter tip, missiles/torpedoes their launcher sockets; muzzle flashes scale per mount; trailer / prologue broadsides from the barrels (`src/cinema/gunnery.ts`) |
+| 3 | Shields v2: fighter fore/aft with power shifting; big hulls by facing incl. dorsal/ventral; generators per facing; bleed-through; collapse and reboot | unit-tested; balance bands hold | ✅ fighters fore/aft, capitals 4 / 6 facings (dorsal/ventral), trim `.` `,` `/` AUTO with lossy transfer, per-facing emitters, bleed below 15 %, collapse cooldown, explosive splash · `tests/combat.test.ts` |
+| 4 | Impacts: faction shield flares (hex / crystal / scrap), collapse shatter; hull hits per weapon family (scorch, sparks, shatter, craters, trenches) with persistent decals and per-surface audio | readable at chase distance | 🔧 faction shells (Concord hex, Choir crystal facets, Rustwake holed scrap plates; `stage=impacts&faction=`) with ripples per facing (strength-driven, harmonic crackle), collapse shatter, regen sweep, beam splash; hull hits per damage type; ship-local cooling hull marks + beam cut lines (`src/world/ImpactDecals.ts`); subsystem blasts + fire columns. impact sounds by damage type, shield return, mount blasts. Left: on-screen check of hull marks, tuning |
+| 5 | Subsystems v2: everything targetable once its facing is down (turrets, launchers, lances, PD, engines, generators, bridge, sensors, hangars, reactor; station batteries and arms) | exposure rules tested | 🔧 exposure by facing, hit spheres before plating, B / Shift+B / I pick, torpedo blast splash (70 % cap), hangar cook-offs, damage control, AI strips mounts (bombers → emitters/gen/engines), brackets + kill feed + barks · `tests/subsystems.test.ts`. Reactor (brownout below half: slower regen, fire and lances; destroyed → CRITICAL), sensors (lock range and coordination), launchers (no salvoes); bridge and reactor are citadels (no splash); blown / drooped mount wrecks. Left: station batteries (bastion has no sim turrets; the lead's `StationDefence` model is unwired and not ported) |
+| 6 | Kill paths: structural break-up, reactor detonation, bridge kill (drifting wreck), rolling chain; wrecks stay as salvage | each path in `npm run balance` bands | ✅ bow / midships / stern sections (`src/sim/Structure.ts`): rake the spine → broken in two (two burning pieces); core destroyed → CRITICAL fuse vs crew venting, hits near the core set the vent back → detonation (flash, shockwave that damages ships it crosses, one charred piece); bridge gone under 35 % hull → she strikes and drifts dark whole; hull depletion → rolling chain, three sections. Wrecks persist as salvage (`src/game/salvage.ts`), cleared on jumps. HUD keel bars + callouts, blown gun houses, debris (`src/world/DestructionFx.ts`, `src/world/destruction/`), `stage=kill&path=…` · `npm run balance` killpath · `tests/destruction.test.ts` |
 
 ## Known issues
 
@@ -212,7 +212,12 @@ Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
   micro-missiles; Resolute Mk III vs Lantern Guard ~78 s / 49 % hull, Valiant
   Mk III vs Vesper ~68 s / 52 % hull, swarm vs PD bands (`npm run balance`);
   Cantor shield 80 → 95 brings the 96-seed dogfight sweep from 69 % to 53 %
-  Concord (`npm run ai-sim`).
+  Concord (`npm run ai-sim`). Directional shields (fore / aft halves on
+  fighters, 4 / 6 facings with emitters on capitals, trim + transfer, bleed,
+  collapse cooldown) pushed it to 74 %; the Choral ward (Cantor shield 110,
+  1.5× transfer) brings it back to 54 % (51 % with the turret rigs merged).
+  With both: Resolute Mk III vs Lantern Guard ~74 s / 43 % hull, Valiant
+  Mk III vs Vesper ~78 s / 44 %.
 - **Stock warship fits** — an all-Mk I Resolute lost a solo duel with a
   Lantern Guard (0 % hull) and a stock Valiant scraped past a Vesper with
   ~18 % hull. Both now leave the yard with Mk II kit (`STOCK_OVERRIDE` in

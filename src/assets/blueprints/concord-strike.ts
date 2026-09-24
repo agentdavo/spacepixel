@@ -442,6 +442,7 @@ export const WARHORSE: Blueprint = {
       pos: [0, 1.25, -15.3],
       rot: [0, 180, 0],
       socket: { id: 'tail-gun', kind: 'turret' },
+      rig: { traverse: [-140, 140], elevation: [-10, 80] }, // the tail fins forward
       shape: { kind: 'turret', radius: 0.55, height: 0.6, barrels: 2, barrelLength: 1.4, barrelRadius: 0.07 },
     },
     // Dorsal turret.
@@ -452,6 +453,7 @@ export const WARHORSE: Blueprint = {
       pos: [0, 2.72, 3.4],
       rot: [0, 12, 0],
       socket: { id: 'dorsal-turret', kind: 'turret' },
+      rig: { traverse: [-170, 170], elevation: [-6, 85] },
       shape: { kind: 'turret', radius: 0.85, height: 0.85, barrels: 2, barrelLength: 2.4, barrelRadius: 0.1 },
     },
     // High-mounted cranked wing.

@@ -8,15 +8,100 @@ pull before touching their files, and open PRs into the lead branch.
 | Area | Owner (project thread · branch) | Files |
 |---|---|---|
 | Engine, world, campaign, merges, this file | **Vanguard lead** thread · `claude/vanguard-space-combat-0l3bfi` | everything not listed below |
-| Turrets, shields, weapon impacts, subsystems, kill paths (batch 6) | **Turrets, shields and subsystems** thread · `claude/project-thread-dl05kd` (continues `claude/ship-turrets-shields-weapons-8lz4su`) | `src/sim/turrets/**`, `src/sim/Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, weapon/impact FX + SFX |
+| Turrets, shields, weapon impacts, subsystems, kill paths (batch 6) | **Turrets, shields and subsystems** thread · `claude/project-thread-dl05kd` (took over from the turrets session 24 Sep ~10:40; draft PR #1 into the lead branch) | `src/sim/TurretRig.ts`, `Subsystems.ts`, `Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, `src/fx/impacts.ts`, `src/world/{WeaponVisuals,CombatFx,ImpactDecals,ShieldGeometry}.ts`, impact SFX, `src/cinema/gunnery.ts` |
 | Character voices, chat, soundtrack | **Soundtrack and voices** thread (continues `claude/ova-soundtrack-voices`) | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
 | Kessen mecha race (design approved 24 Sep; now in code) | **Kessen mecha race** thread · `claude/project-thread-t748fw` (continues `claude/mecha-race-design-qtw680`) | `src/kessen/**`, `src/world/scenes/KessenTestScene.ts` (+ its one line in `scenes/index.ts`), `tests/kessen.test.ts`, `docs/KESSEN.md`, `docs/concepts/kessen/**`, `scripts/concepts/kessen/**` |
 | Gameplay polish: stock warship fits, bridge bow view, off-screen edge arrows | **Spacepixel gameplay improvements** thread · `claude/project-thread-k48ga1` (PRs into the lead branch) | stock fits in `src/game/outfitting/fit.ts` + outfit bands in `src/sim/balance.ts`; camera framing in `src/game/shipyard/flight.ts`, `Outfitter.frame`, `shipyardFlight.ts`, V-key handling in `FlightScene`/`DogfightScene`; edge arrows in `src/ui/edgePlacement.ts` (new), `HudLabels.ts`, and the arrow code in `FlightHud`, `ContractHud`, `ReachHud` |
 
-Paused lead batch 6 work (unverified, for the turrets thread to mine) is on
-origin: `worktree-agent-a9181dba8d1e07ff0` (turret rigs + muzzles),
-`worktree-agent-ad2e6ed36bfec934d` (shields v2 + impact decals),
-`worktree-agent-a936121b44b53858f` (subsystems v2 + kill paths, wrecks).
+The paused lead batch 6 worktrees (`worktree-agent-*`) have been ported onto
+`claude/project-thread-dl05kd`; nothing left to mine there.
+
+## Batch 6 handover (turrets session, 24 Sep; now owned by the batch 6 project thread on `claude/project-thread-dl05kd`): done / left
+
+Everything below is merged on `claude/ship-turrets-shields-weapons-8lz4su`,
+which also carries `claude/vanguard-space-combat-0l3bfi` up to b917a5d.
+Typecheck clean, 258 tests, `npm run determinism`, `balance`, `ai-sim` all
+pass (4v4 sweep 51 % Concord). Milestone status is in ROADMAP *Batch 6*.
+
+**Done**
+- Turret rigs (`src/sim/TurretRig.ts`, `ShipBuilder` auto-rig, `Part.rig`):
+  every turret socket gets a traverse joint (`<socket>`) and elevation joint
+  (`<socket>/el`); slew, arcs, fire gate, barrel-tip muzzles, recoil, wreck
+  pose. `turretWorldPosition(ship, socket, out)`; subsystem id = socket id.
+  Missiles launch from launcher sockets; `Weapons.muzzleFlash()` queues
+  turret 'fire' events.
+- Shields v2 (`Damage.ts`): FACING FORE/AFT/PORT/STBD/DORSAL/VENTRAL,
+  `ShipStats.facings` 1 | 2 | 4 | 6, `facingOf` / `facingUp` /
+  `facingStrength`, trim + transfer (keys `.` `,` `/`), shield emitters
+  (`kind: 'shieldEmitter'`, `facing`), bleed, collapse cooldown, splash.
+- Subsystems (`src/sim/Subsystems.ts`): exposure, aimed hit spheres,
+  `Fleet.blast` splash, hangar cook-off, damage control, AI stripping,
+  B / Shift+B / I picking, HUD brackets + kill feed.
+- Impact FX (`src/fx/impacts.ts`, `src/world/ShieldGeometry.ts`,
+  `ImpactDecals.ts`, `WeaponVisuals.ts`, `CombatFx.ts`). Test stage:
+  `?scene=combat&stage=impacts&side=hull|shield|collapse|regen|subsystem&cam=0|1|2`.
+
+**Done since, by the project thread** (`claude/project-thread-dl05kd`)
+- Impact audio: `hullScorch` / `hullCrunch` / `hullHit` by damage type,
+  thinner shield hits on a failing facing, shielded beams, bleed, `shieldUp`,
+  `mountBlast` by `sub.kind`; player turret shots flagged `WeaponEvent.turret`
+  and played as turret fire. `audio-render --only sfx-batch6`.
+- Trailer / prologue broadsides fire from barrel tips (`src/cinema/gunnery.ts`).
+- Faction shield shells: Choir crystal facets, Rustwake bent / holed scrap
+  plates (`WeaponVisuals` `style` uniform; `?scene=combat&stage=impacts&side=shield&faction=choir`).
+- Subsystems v2 finished: `reactor` (brownout below half hp: regen, fire
+  rate and lance cooldown scale by `powerLevel`; destroyed → CRITICAL),
+  `sensors` (lock range and AI coordination × `CapitalEffects.sensors`),
+  `launcher` (was `missile`; all gone → no salvoes). Bridge / reactor are
+  citadels (no torpedo splash). Knocked-out mounts carry `sub.wreck`
+  `'droop' | 'blown'` (explosive or >30 % of hp in one hit blows the house off).
+- Kill paths (ported from the lead's `worktree-agent-a936121b44b53858f` onto
+  our Damage / Fleet model): `src/sim/Structure.ts` (pure: sections, reactor
+  fuse vs vent, shockwave, `settleDeath`), `src/sim/Destruction.ts` (wreck
+  pieces, shockwave damage), `src/game/salvage.ts` (wrecks as salvage, cleared
+  on jumps), `src/world/DestructionFx.ts` + `src/world/destruction/`
+  (HullSplit, DebrisField, MountWrecks; rigged turrets droop by
+  `TurretRig.wreckDrive`, blown ones throw a merged gun house). HUD keel bars
+  and callouts. `npm run balance` killpath, `tests/destruction.test.ts`,
+  test stage `?scene=combat&stage=kill&path=reactor|structural|bridge|hull`
+  (`&t=` seconds after the kill, `&ship=`, `&cam=`). Structure state is in
+  `StateHash`.
+
+**Left**
+- Screenshot-verify and tune: hull marks (`ImpactDecals`, TSL instanced
+  shader rewritten, final look unconfirmed), capital facing outline / low-cell
+  density, collapse, regen, fire columns, beam cut lines. Faction shell
+  styles (crystal Choir, scrap Rustwake). Run `npm run perf` on a GPU.
+- Station batteries (bastion turrets are visual-only `scanPose`; the lead's
+  `StationDefence` is an unwired pure model and was not ported).
+- Kill paths: wreck pieces only for capitals (fighters / gunships keep the
+  wing-shear death); pieces do not collide; launchers only on capitals.
+- Balance watch: stock Valiant vs Vesper now loses ~1–2 / 10 seeds (INFO);
+  Cantor shield 110 + 1.5× transfer offsets fore/aft halves.
+- Turret drive state is not in `StateHash` (it reaches the world via bolts).
+
+**Events for the voices session** (`WeaponEvent`, `src/sim/Weapons.ts`)
+- `shield` (facing held; `facing`, `strength` 0..1, `bleed`),
+  `shield-bleed` (leak to hull), `shield-down` (facing collapsed),
+  `shield-up` (facing coming back). Fighters report facing 0 fore / 1 aft.
+- `subsystem` with `sub.kind` turret | lance | hangar | engine | shieldGen |
+  shieldEmitter | bridge (+ `sub.facing` on emitters); also fired for splash
+  and cook-off kills. `hit` / `beam-hit` carry the struck `sub` and optional
+  `subHp`, `type`, `amount`, `shielded`.
+- `subsystem` also for `sub.kind` launcher | sensors | reactor, with
+  `sub.wreck` 'droop' | 'blown' on mounts.
+- `reactor-critical` (core breached, fuse lit; `shooter` did it) and
+  `reactor-vented` (crew vented in time). Current audio: critical →
+  shieldDown + mountBlast; vented → shieldUp.
+- `kill` carries `cause` hull | structural | reactor | bridge. Audio:
+  reactor → two explosionLarge + shieldDown, structural → hullCrunch +
+  explosionLarge, bridge → a lone mountBlast (she goes dark), hull → as before.
+  Suggested barks: "her core's going critical", "she's venting", "she's
+  broken her back", "she's struck — drifting dead".
+- Existing barks: `mount-player`, `mount-wing` (`src/dialog/barks.ts`).
+  Suggested: `shield-down` on the player → wingman "your shields are down",
+  shieldGen destroyed on a capital → "their shields are gone", hangar
+  cook-off → Cantor / station control alarm.
 
 ## Soundtrack backend (landed)
 

@@ -181,6 +181,7 @@ function salvage(r: () => number, faction: FactionId): Part[] {
 }
 
 function bastion(r: () => number): Part[] {
+  // Armour-box faces: each mount clears its own face, the fore and aft pairs mask each other.
   const tur = (pos: Vec3, rot: Vec3, id: string): Part => ({
     name: id,
     paint: 'primary',
@@ -188,6 +189,7 @@ function bastion(r: () => number): Part[] {
     pos,
     rot,
     socket: { id, kind: 'turret' },
+    rig: { traverse: [-160, 160], elevation: [-5, 85] },
     shape: { kind: 'turret', radius: 0.45, height: 0.45, barrels: 2, barrelLength: 1.3, barrelRadius: 0.06 },
   });
   return [

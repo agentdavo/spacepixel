@@ -89,6 +89,19 @@ function fireRamp(step: Node, pal: Node): Node {
   return byPal(pal, warm, plasma, magenta);
 }
 
+/**
+ * Cooling ramp for embers. step 0 = white-hot … 4 = dull. Warm: molten metal
+ * (yellow → orange → red → oxblood); plasma: ionised blue-white → violet;
+ * magenta: Choir crystal fire.
+ */
+function emberRamp(step: Node, pal: Node): Node {
+  const ramp = (cols: Node[]): Node => select(step.lessThan(0.5), cols[0], select(step.lessThan(1.5), cols[1], select(step.lessThan(2.5), cols[2], select(step.lessThan(3.5), cols[3], cols[4]))));
+  const warm = ramp([c3('#fff6d0', 3.2), c3('#ffc53a', 2.2), c3('#ff6a1a', 1.5), c3('#c8241c', 0.85), c3('#5a1216', 0.45)]);
+  const plasma = ramp([c3('#ffffff', 3.2), c3('#b8f4ff', 2.2), c3('#4fb8ff', 1.5), c3('#3a4cff', 0.9), c3('#281a6a', 0.45)]);
+  const magenta = ramp([c3('#ffffff', 3.2), c3('#ffc8f0', 2.2), c3('#ff5ad0', 1.5), c3('#a8209c', 0.9), c3('#3a1040', 0.45)]);
+  return byPal(pal, warm, plasma, magenta);
+}
+
 interface Decoded {
   P: Node;
   V: Node;
@@ -355,7 +368,7 @@ function createOpaque(g: ParticleGpu): MeshBasicNodeMaterial {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Additive glow pass: SPARK, FLASH, RING, SHIELD, GLINT
+// Additive glow pass: SPARK, FLASH, RING, SHIELD, GLINT, EMBER, ARC, SHARD
 // ─────────────────────────────────────────────────────────────────────────
 
 function createGlow(g: ParticleGpu): MeshBasicNodeMaterial {
@@ -379,7 +392,14 @@ function createGlow(g: ParticleGpu): MeshBasicNodeMaterial {
     const rFlash = d.s0.mul(float(0.55).add(min(t.mul(5), 1).mul(0.45))).mul(float(1).sub(smoothstep(0.6, 1.0, t).mul(0.35)));
     const rRing = mix(d.s0, d.s1, ease(t, 2.5));
     const rSpark = d.s0.mul(float(1).sub(t.mul(0.7)));
-    let r: Node = select(kind.equal(PK.FLASH), rFlash, select(kind.equal(PK.RING), rRing, select(kind.equal(PK.SPARK), rSpark, d.s0)));
+    // Embers swell a little as they spread, then shrink as they cool; arcs and shards lerp s0 → s1.
+    const rEmber = mix(d.s0, d.s1, ease(t, 2)).mul(float(1).sub(smoothstep(0.75, 1.0, t).mul(0.4)));
+    const rLerp = mix(d.s0, d.s1, t);
+    let r: Node = select(
+      kind.equal(PK.FLASH),
+      rFlash,
+      select(kind.equal(PK.RING), rRing, select(kind.equal(PK.SPARK), rSpark, select(kind.equal(PK.EMBER), rEmber, select(kind.equal(PK.ARC).or(kind.equal(PK.SHARD)), rLerp, d.s0)))),
+    );
 
     const c = d.P.xyz.add(g.uAnchorOffset).toVar();
     const dist = max(length(c), 1e-3);
@@ -388,19 +408,30 @@ function createGlow(g: ParticleGpu): MeshBasicNodeMaterial {
     const up = camWorld.element(1).xyz;
     const pix = dist.mul(2).div(projMatrix.element(1).y.mul(screenSize.y));
 
-    // Oriented planes (tilted shock ring, shield hex) — normal lives in V.xyz.
+    // Oriented planes (tilted shock ring, shield hex, surface arcs, shield shards) — normal lives in V.xyz.
     const nLen = length(d.V.xyz);
-    const oriented = nLen.greaterThan(0.5).and(kind.equal(PK.RING).or(kind.equal(PK.SHIELD)));
+    const isArc = kind.equal(PK.ARC);
+    const isShard = kind.equal(PK.SHARD);
+    const oriented = nLen.greaterThan(0.5).and(kind.equal(PK.RING).or(kind.equal(PK.SHIELD)).or(isArc).or(isShard));
     const n = d.V.xyz.div(max(nLen, 1e-4));
     const helper = select(abs(n.y).lessThan(0.95), vec3(0, 1, 0), vec3(1, 0, 0));
-    const t1 = normalize(cross(n, helper));
-    const t2 = cross(n, t1);
-    const axX = select(oriented, t1, right);
-    const axY = select(oriented, t2, up);
+    const t1o = normalize(cross(n, helper));
+    const t2o = cross(n, t1o);
+    // Shards tumble about their in-plane axis (stepped on twos like the rest of the cel effects).
+    const tumble = select(isShard, fract(d.seed.mul(5.7)).sub(0.5).mul(16.0).mul(floor(d.age.mul(STEP_HZ)).div(STEP_HZ)), float(0));
+    const t2 = t2o.mul(cos(tumble)).add(n.mul(sin(tumble)));
+    // Arcs and shards: a per-particle in-plane rotation so a burst doesn't line up.
+    const spin = select(isArc.or(isShard), d.seed.mul(6.2831853), float(0));
+    const cs = cos(spin);
+    const sn = sin(spin);
+    const bx = select(oriented, t1o, right);
+    const by = select(oriented, t2, up);
+    const axX = bx.mul(cs).add(by.mul(sn));
+    const axY = by.mul(cs).sub(bx.mul(sn));
 
     // Camera-facing glows are pulled toward the eye so they sit in front of
     // the fireball volume (and don't clip into hulls), keeping angular size.
-    const pushable = oriented.not().and(kind.equal(PK.FLASH).or(kind.equal(PK.RING)).or(kind.equal(PK.GLINT)));
+    const pushable = oriented.not().and(kind.equal(PK.FLASH).or(kind.equal(PK.RING)).or(kind.equal(PK.GLINT)).or(kind.equal(PK.EMBER)).or(isArc));
     const push = select(pushable, min(r.mul(0.9), dist.mul(0.5)), float(0));
     const cP = c.sub(ray.mul(push));
     r = max(r.mul(dist.sub(push).div(dist)), pix.mul(1.5));
@@ -429,6 +460,8 @@ function createGlow(g: ParticleGpu): MeshBasicNodeMaterial {
   const t: Node = vA.w;
   const seed: Node = vB.x;
   const pal: Node = vB.y;
+  const pxR: Node = vB.z;
+  const age: Node = vB.w;
   const is = (k: number): Node => abs(kind.sub(k)).lessThan(0.5);
 
   mat.colorNode = Fn((): Node => {
@@ -479,7 +512,44 @@ function createGlow(g: ParticleGpu): MeshBasicNodeMaterial {
     const gs = pow(abs(cos(a.mul(2))), 40).mul(0.85).add(0.15);
     const glint = select(dd.lessThan(0.22), core.mul(3), midC.mul(1.6)).mul(select(dd.lessThan(gs), float(1), float(0)));
 
-    return select(is(PK.SPARK), spark, select(is(PK.FLASH), flash, select(is(PK.RING), ring, select(is(PK.SHIELD), shield, glint))));
+    // EMBER — lumpy disc in two cel bands; the heat steps down its ramp as it cools.
+    const eLump = sin(a.mul(3).add(seed.mul(40))).mul(0.06).add(0.9);
+    const eInner = dd.lessThan(eLump.mul(0.5));
+    const heat = t.mul(4.6).add(select(eInner, float(-0.7), float(0.3))).add(seed.sub(0.5).mul(0.5));
+    const ember = emberRamp(clamp(floor(heat), 0, 4), pal).mul(select(dd.lessThan(eLump), float(1), float(0))).mul(float(1).sub(smoothstep(0.8, 1.0, t)));
+
+    // ARC — a jagged bolt across the quad, re-drawn on twos (fresh shape every step), with a fork.
+    const fr = floor(age.mul(STEP_HZ * 2));
+    const ks = seed.mul(91.7).add(fr.mul(7.31));
+    const env = float(1).sub(uv.x.mul(uv.x));
+    const zig = (k: Node, f: number): Node => sin(uv.x.mul(f).add(fract(k).mul(40))).mul(fract(k.mul(1.37)).mul(0.5).add(0.5));
+    const path = zig(ks, 9.1).mul(0.22).add(zig(ks.add(0.31), 23.7).mul(0.1)).add(zig(ks.add(0.73), 51.3).mul(0.05)).mul(env);
+    const fork = path.add(uv.x.add(0.2).max(0).mul(zig(ks.add(0.5), 13.3).mul(0.6).add(0.25))).add(zig(ks.add(0.9), 37.1).mul(0.06));
+    const px = max(float(1.2).div(max(pxR, 1)), 0.035);
+    const dLine = abs(uv.y.sub(path));
+    const dFork = select(uv.x.greaterThan(-0.2), abs(uv.y.sub(fork)), float(9));
+    const dArc = min(dLine, dFork.mul(1.4));
+    const on = fract(sin(ks.mul(12.9898)).mul(43758.5453)).greaterThan(0.22);
+    const inX = abs(uv.x).lessThan(0.95);
+    const arc = select(dArc.lessThan(px.mul(0.55)), core.mul(3.2), select(dArc.lessThan(px.mul(1.6)), midC.mul(1.8), select(dArc.lessThan(px.mul(3.2)), outerC.mul(0.6), vec3(0))))
+      .mul(select(on.and(inX), float(1), float(0)))
+      .mul(float(1).sub(t.mul(0.5)));
+
+    // SHARD — one hexagon tile: bright rim, faint fill, flickering out as it dies.
+    const hq: Node = abs(uv);
+    const he = max(hq.x.mul(0.5).add(hq.y.mul(0.8660254)), hq.x);
+    const flick = select(t.greaterThan(0.6), fract(sin(floor(age.mul(STEP_HZ * 2)).add(seed.mul(17)).mul(12.9898)).mul(43758.5453)).greaterThan(0.45), he.greaterThan(-1));
+    const shard = select(he.lessThan(0.86), select(he.greaterThan(0.7), core.mul(2.2), midC.mul(0.45)), vec3(0)).mul(select(flick, fade, float(0)));
+
+    return select(
+      is(PK.SPARK),
+      spark,
+      select(
+        is(PK.FLASH),
+        flash,
+        select(is(PK.RING), ring, select(is(PK.SHIELD), shield, select(is(PK.EMBER), ember, select(is(PK.ARC), arc, select(is(PK.SHARD), shard, glint))))),
+      ),
+    );
   })();
   mat.mrtNode = noInkMRT();
   return mat;

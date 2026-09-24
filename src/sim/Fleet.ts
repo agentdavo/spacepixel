@@ -4,10 +4,12 @@ import type { FactionId, Livery } from '@/assets/Blueprint';
 import type { ShipModel } from '@/assets/ShipBuilder';
 import { assets } from '@/assets/AssetLibrary';
 import { FlightModel } from './FlightModel';
-import { createCombat, damageShip, stepCombat, type CombatState } from './Combat';
+import { createCombat, damageShip, settleDeath, stepCombat, subsystemPosition, toLocal, type CombatState } from './Combat';
+import { Destruction } from './Destruction';
 import type { DamageType } from './Loadouts';
-import type { HitResult, Subsystem } from './Damage';
+import { checkStrike, type HitResult, type Subsystem } from './Damage';
 import { DEFAULT_WORLD_SEED, Rng } from './Rng';
+import { HANGAR_SECONDARY, splashSubsystems } from './Subsystems';
 
 /**
  * Every ship in a battle — player, wingmen, bandits — is a ShipEntity driven
@@ -62,8 +64,19 @@ export interface ShipEntity {
   rng: Rng;
 }
 
-/** Consequences of a hit that FX / audio / HUD care about (emitted through `Fleet.onEvent`). */
-export type HitEventKind = 'kill' | 'subsystem' | 'shield-down';
+/**
+ * Consequences of a hit that FX / audio / HUD care about (emitted through
+ * `Fleet.onEvent`):
+ *
+ *   kill              any death; how is `ship.combat.dmg.structure.death`
+ *                     (hull · structural · reactor · bridge; WeaponEvent.cause)
+ *   subsystem         a mount destroyed (`sub.kind`, `sub.wreck` droop / blown)
+ *   shield-down       a facing collapsed
+ *   shield-bleed      a failing facing let part of the hit through (HitResult.bleed)
+ *   reactor-critical  a capital's core was breached: the fuse is lit (`shooter` did it)
+ *   reactor-vented    the crew vented a critical core in time (she lives, browned out)
+ */
+export type HitEventKind = 'kill' | 'subsystem' | 'shield-down' | 'shield-bleed' | 'reactor-critical' | 'reactor-vented';
 
 /**
  * Anything that can be shot down (torpedoes, micro-missiles). Registered by the
@@ -96,19 +109,22 @@ const _up = new Vector3(0, 1, 0);
 export class Fleet {
   readonly ships: ShipEntity[] = [];
   private nextId = 1;
-  /** Hit consequences (kills, subsystems destroyed, shield facings down) — the weapons system listens. */
-  onEvent: ((kind: HitEventKind, ship: ShipEntity, point: Vector3, normal: Vector3, shooter: ShipEntity | null, sub: Subsystem | null, facing: number) => void) | null = null;
+  /** Hit consequences (kills, subsystems destroyed, shield facings down / bleeding) — the weapons system listens. `hit`: the result that caused it. */
+  onEvent: ((kind: HitEventKind, ship: ShipEntity, point: Vector3, normal: Vector3, shooter: ShipEntity | null, sub: Subsystem | null, facing: number, hit?: HitResult) => void) | null = null;
   /** Shoot-down-able ordnance (set by Missiles). */
   ordnance: Shootables | null = null;
 
   /** The world's root PRNG; every system and entity forks its own stream from it (Rng.ts). */
   readonly rng: Rng;
+  /** Kill paths' aftermath: wreck pieces (salvage) and reactor shockwaves. Stepped with the fleet. */
+  readonly destruction: Destruction;
 
   constructor(
     private root: Group,
     seed = DEFAULT_WORLD_SEED,
   ) {
     this.rng = new Rng(seed);
+    this.destruction = new Destruction(this);
   }
 
   /** Next entity id (replays record it so a resync after a berth allocates the same ids). */
@@ -176,12 +192,36 @@ export class Fleet {
         s.model.setChannel('radar', (this.clock * 0.15) % 1);
       }
       stepCombat(s, dt);
+      const re = s.combat.reactorEvent;
+      if (re === 'vented') this.onEvent?.('reactor-vented', s, s.flight.position, _n.set(0, 1, 0), null, null, -1);
+      if ((re === 'detonated' || s.combat.dmg.structure.pending) && this.settle(s, null)) continue;
       s.flight.step(s.controls, dt);
       s.sinceHit += dt;
       s.model.root.position.copy(s.flight.position);
       s.model.root.quaternion.copy(s.flight.orientation);
       s.model.setThrottle(s.flight.boosting ? 1.55 : 0.25 + s.flight.throttle * 0.9);
     }
+    this.destruction.step(dt);
+  }
+
+  /** Ship by id (kill credit for delayed deaths), or null. */
+  byId(id: number): ShipEntity | null {
+    if (!id) return null;
+    for (const o of this.ships) if (o.id === id) return o;
+    return null;
+  }
+
+  /**
+   * A delayed kill path came due outside a hit (the reactor's fuse ran out):
+   * settle it, credit whoever lit it, announce it and leave the wreck.
+   */
+  private settle(s: ShipEntity, shooter: ShipEntity | null): boolean {
+    if (!settleDeath(s)) return false;
+    const S = s.combat.dmg.structure;
+    const by = shooter ?? this.byId(S.reactor.by || S.lastBy);
+    this.onEvent?.('kill', s, s.flight.position, _n.set(0, 1, 0), by, null, -1);
+    this.destruction.onKill(s, S.death ?? 'hull', by);
+    return true;
   }
 
   enemiesOf(s: ShipEntity): ShipEntity[] {
@@ -200,23 +240,90 @@ export class Fleet {
 
   /**
    * Located damage: `point` (universe) picks the shield facing, subsystem or
-   * zone (see Damage.ts). Emits kill / subsystem / shield-down through
-   * `onEvent`. The result is shared scratch — read it immediately.
+   * zone (see Damage.ts); `sub` = an aimed hit's subsystem (Combat.raycastShip).
+   * Emits kill / subsystem / shield-down through `onEvent`; a destroyed hangar
+   * cooks off (`cookOff`). The result is shared scratch — read it immediately.
    */
-  hit(s: ShipEntity, amount: number, type: DamageType, point: Vector3 | null, normal: Vector3 | null, shooter: ShipEntity | null): HitResult & { killed: boolean } {
-    const r = damageShip(s, amount, type, point);
+  hit(s: ShipEntity, amount: number, type: DamageType, point: Vector3 | null, normal: Vector3 | null, shooter: ShipEntity | null, sub: Subsystem | null = null): HitResult & { killed: boolean } {
+    const r = damageShip(s, amount, type, point, sub, shooter);
     const ev = this.onEvent;
     if (ev) {
       const p = point ?? s.flight.position;
       const n = normal ?? _n.set(0, 1, 0);
-      if (r.facingCollapsed) ev('shield-down', s, p, n, shooter, null, r.facing);
-      if (r.subsystemDestroyed && r.subsystem) ev('subsystem', s, p, n, shooter, r.subsystem, r.facing);
+      if (r.bleed > 0) ev('shield-bleed', s, p, n, shooter, null, r.facing, r);
+      if (r.facingCollapsed) ev('shield-down', s, p, n, shooter, null, r.facing, r);
+      if (r.subsystemDestroyed && r.subsystem) {
+        ev('subsystem', s, p, n, shooter, r.subsystem, r.facing);
+        this.critical(s, r.subsystem, p, shooter);
+      }
       if (r.killed) ev('kill', s, s.flight.position, n, shooter, null, -1);
     }
+    if (r.killed) {
+      const killed = r.killed;
+      this.destruction.onKill(s, s.combat.dmg.structure.death ?? 'hull', shooter);
+      r.killed = killed; // (shared scratch: a shockwave may have hit someone in between)
+    }
+    if (r.subsystemDestroyed && r.subsystem?.kind === 'hangar' && this.cookOff(s, r.subsystem, shooter, 1)) r.killed = true;
     return r;
+  }
+
+  /** A destroyed reactor that went critical: announce the lit fuse. */
+  private critical(s: ShipEntity, sub: Subsystem, p: Vector3, shooter: ShipEntity | null): void {
+    if (sub.kind === 'reactor' && s.combat.dmg.structure.reactor.phase === 'critical') this.onEvent?.('reactor-critical', s, p, _n.set(0, 1, 0), shooter, sub, -1);
+  }
+
+  /**
+   * Blast splash (Subsystems.splashSubsystems): a warhead that burst on the
+   * plating at `point` (universe) damages every intact subsystem of `s` within
+   * `radius`, except `skip` (the one the direct hit struck). Destroyed mounts
+   * emit 'subsystem'; a hangar among them cooks off. Returns true if the
+   * chain killed the ship.
+   */
+  blast(s: ShipEntity, point: Vector3, radius: number, amount: number, type: DamageType, shooter: ShipEntity | null, skip: Subsystem | null = null, depth = 0): boolean {
+    const st = s.combat.dmg;
+    if (!s.alive || radius <= 0 || !st.subsystems.length || depth >= BLAST_DEPTH) return false;
+    toLocal(s, point, _l);
+    const out = _blasts[depth];
+    if (splashSubsystems(st, s, _l.x, _l.y, _l.z, radius, amount, type, skip, out) <= 0) return false;
+    s.combat.damaged = true;
+    s.sinceHit = 0;
+    let killed = false;
+    for (let i = 0; i < out.length; i++) {
+      const sub = out[i];
+      if (this.onEvent) {
+        subsystemPosition(s, sub, _sp[depth]);
+        this.onEvent('subsystem', s, _sp[depth], _n.subVectors(_sp[depth], s.flight.position).normalize(), shooter, sub, -1);
+        this.critical(s, sub, _sp[depth], shooter);
+      }
+      if (sub.kind === 'hangar' && this.cookOff(s, sub, shooter, depth + 1)) killed = true;
+    }
+    // A splash can finish the bridge of a hull already under half: she strikes.
+    if (!killed && s.alive && s.combat.dmg.structure.pending === 'bridge' && this.settle(s, shooter)) killed = true;
+    return killed;
+  }
+
+  /**
+   * A destroyed hangar's secondary explosion: fuel and ordnance on the deck go
+   * up — hull damage (HANGAR_SECONDARY.hull × its max hp) and a splash on the
+   * mounts around it. Returns true if that killed the ship.
+   */
+  private cookOff(s: ShipEntity, hangar: Subsystem, shooter: ShipEntity | null, depth: number): boolean {
+    if (!s.alive || depth >= BLAST_DEPTH) return false;
+    s.hull -= hangar.hpMax * HANGAR_SECONDARY.hull;
+    s.combat.damaged = true;
+    s.sinceHit = 0;
+    checkStrike(s.combat.dmg, s);
+    if (this.settle(s, shooter)) return true;
+    subsystemPosition(s, hangar, _sp[depth]);
+    return this.blast(s, _sp[depth], hangar.radius * HANGAR_SECONDARY.radius, hangar.hpMax * HANGAR_SECONDARY.splash, 'explosive', shooter, hangar, depth);
   }
 }
 
+/** Hangar cook-offs chain at most this deep (a hangar's blast can set off its neighbour, not the whole deck). */
+const BLAST_DEPTH = 3;
+const _blasts: Subsystem[][] = [[], [], []];
+const _sp = [new Vector3(), new Vector3(), new Vector3()];
+const _l = new Vector3();
 const _n = new Vector3();
 
 export function faceAlong(q: Quaternion, dir: Vector3): Quaternion {

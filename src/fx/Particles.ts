@@ -58,7 +58,7 @@ const BATCHES = 1024;
  * ── Storage ──────────────────────────────────────────────────────────────
  * A fixed-capacity ring buffer of particles in four vec4 storage buffers:
  *   P  pos.xyz (anchor-relative, m) · age (s, negative = still delayed)
- *   V  vel.xyz (m/s; plane normal for RING/SHIELD) · life (s)
+ *   V  vel.xyz (m/s; plane normal for RING/SHIELD/ARC/SHARD) · life (s)
  *   B  base vel.xyz (drag target, inherited from the emitter) · kind + 16·palette
  *   S  size0 · size1 · seed · drag
  * Particles are written in spawn order, so the ring is chronological and the
@@ -448,7 +448,7 @@ export class Particles {
 
     const isOriented = (kp: Node): Node => {
       const k = kp.add(0.5).mod(16).floor();
-      return k.equal(PK.RING).or(k.equal(PK.SHIELD));
+      return k.equal(PK.RING).or(k.equal(PK.SHIELD)).or(k.equal(PK.ARC)).or(k.equal(PK.SHARD));
     };
 
     return Fn(() => {

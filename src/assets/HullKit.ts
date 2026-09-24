@@ -232,15 +232,28 @@ function merge(list: BufferGeometry[]): BufferGeometry | undefined {
   return mergeGeometries(clean, false) ?? undefined;
 }
 
-/** Composite gun turret on y = 0 facing +Z. Returns hull + barrels (trim). */
-export function turret(
+/**
+ * A turret split for articulation: the traversing `mount` (base ring +
+ * housing, part paint) and the elevating `guns` (a mantlet in part paint,
+ * barrels + muzzle rings as trim). `pivot` is the trunnion the guns elevate
+ * about; `tips` the barrel muzzles at rest. Turret frame: stands on y = 0,
+ * barrels along +Z.
+ */
+export interface TurretSplit {
+  mount: ShapeParts;
+  guns: ShapeParts;
+  pivot: Vector3;
+  tips: Vector3[];
+}
+
+export function turretSplit(
   radius: number,
   height: number,
   barrels = 2,
   barrelLength = radius * 2.2,
   barrelRadius = radius * 0.11,
   housing?: [number, number, number],
-): ShapeParts {
+): TurretSplit {
   const baseH = height * 0.35;
   const base = lathe(
     [
@@ -263,6 +276,7 @@ export function turret(
   ]);
   house.translate(0, baseH + hh / 2, -hd * 0.08);
   const trims: BufferGeometry[] = [];
+  const tips: Vector3[] = [];
   const spacing = Math.min(hw * 0.8 / Math.max(barrels - 1, 1), barrelRadius * 3.2);
   const by = baseH + hh * 0.42;
   for (let i = 0; i < barrels; i++) {
@@ -272,8 +286,32 @@ export function turret(
     const muzzle = cylinder(barrelRadius * 1.25, barrelRadius * 1.25, barrelLength * 0.12, 8);
     muzzle.translate(x, by, hd * 0.35 + barrelLength * 0.94);
     trims.push(b, muzzle);
+    tips.push(new Vector3(x, by, hd * 0.35 + barrelLength));
   }
-  return { main: merge([base, house])!, trim: merge(trims) };
+  // Mantlet: the gun shield the barrels leave the housing through (it elevates with them).
+  const mw = (barrels - 1) * spacing + barrelRadius * 4;
+  const mh = Math.min(hh * 0.7, barrelRadius * 3.4);
+  const mantlet = box(Math.min(mw, hw * 0.9), mh, hd * 0.24, Math.min(mw, mh) * 0.2);
+  mantlet.translate(0, by, hd * 0.34);
+  return {
+    mount: { main: merge([base, house])! },
+    guns: { main: mantlet, trim: merge(trims) },
+    pivot: new Vector3(0, by, hd * 0.2),
+    tips,
+  };
+}
+
+/** Composite gun turret on y = 0 facing +Z (one rigid piece). Returns hull + barrels (trim). */
+export function turret(
+  radius: number,
+  height: number,
+  barrels = 2,
+  barrelLength = radius * 2.2,
+  barrelRadius = radius * 0.11,
+  housing?: [number, number, number],
+): ShapeParts {
+  const t = turretSplit(radius, height, barrels, barrelLength, barrelRadius, housing);
+  return { main: merge([t.mount.main, t.guns.main])!, trim: t.guns.trim };
 }
 
 /** Seeded scatter of boxes over a w × d patch (XZ plane, standing on y = 0). */

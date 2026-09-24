@@ -22,15 +22,22 @@ import {
 } from './Loadouts';
 import {
   DAMAGE_MUL,
+  FACING_AXIS,
+  FACING_NAMES,
   addSubsystem,
+  adoptShield,
   applyHit,
   capitalEffects,
+  createCapitalEffects,
   createDamageState,
   createHitResult,
+  facingOf,
+  facingUp,
   fighterEffects,
   regenShields,
   resetDamage,
-  shieldFacing,
+  setShieldCapacity,
+  stepShieldPower,
   type CapitalEffects,
   type DamageState,
   type FighterEffects,
@@ -42,6 +49,10 @@ import { CATALOG_BY_ID } from '@/game/shipyard/catalog';
 import { statsFromCatalog } from '@/game/shipyard/combatStats';
 import { flightSpecFor as yardFlightSpec } from '@/game/shipyard/flight';
 import { hullGridFor, raycastGrid, surfaceTop, type GridHit, type HullGrid } from './HullGrid';
+import { settleDeath, stepReactor } from './Structure';
+
+export { settleDeath };
+import { nextSubsystem, repairSubsystems, segmentSubsystem, subsystemExposed, subsystemNearestRay, type SegmentSubHit } from './Subsystems';
 
 /**
  * Glue between the pure damage model (Damage.ts), the data tables
@@ -69,21 +80,25 @@ export interface CombatState {
   dmg: DamageState;
   /** Voxel hull (capitals) for exact hits. */
   grid: HullGrid | null;
-  /** Shield shell (capitals): ellipsoid half axes around the hull centre. */
+  /** Shield shell: ellipsoid half axes around the hull centre (capitals stop bolts on it; fighters draw their skin on it). */
   shell: Vector3;
   /** Undamaged flight spec; damage scales the ship's own copy. */
   baseSpec: FlightSpec;
   /** Selected gun / missile (index into the loadout). */
   gun: number;
   missile: number;
-  /** Selected subsystem on the current target (player sub-targeting, key B); −1 = none. */
+  /** Selected subsystem on `subShip` (player sub-targeting, B / Shift+B / I; the fighter brain on a capital); −1 = none. */
   subTarget: number;
+  /** Id of the ship `subTarget` indexes into (a new target starts unselected); 0 = none. */
+  subShip: number;
   /** Seconds until the next missile salvo. */
   missileReload: number;
   /** Anything to repair (reset on respawn). */
   damaged: boolean;
   fx: FighterEffects;
   cap: CapitalEffects;
+  /** Reactor crisis resolved this step ('vented' / 'detonated') for Fleet to announce; null otherwise. */
+  reactorEvent: 'vented' | 'detonated' | null;
 }
 
 const _m = new Matrix4();
@@ -94,9 +109,9 @@ const _v = new Vector3();
 const _w = new Vector3();
 const _q = new Quaternion();
 
-/** Capital for combat purposes: facings, subsystems, voxel hull (corvettes included). */
+/** Capital for combat purposes: 4+ shield facings, subsystems, voxel hull (corvettes included). */
 export function isCapitalModel(model: ShipModel): boolean {
-  return (SHIP_STATS[model.blueprint.id]?.facings ?? 1) === 4 || model.radius > 200;
+  return (SHIP_STATS[model.blueprint.id]?.facings ?? 1) >= 4 || model.radius > 200;
 }
 
 /** Flight spec for a design: class base × stats multipliers (+ exact overrides). */
@@ -146,25 +161,100 @@ export function createCombat(blueprintId: string, model: ShipModel, faction: Fac
   } else modelBox(model, _box);
   const c = _box.getCenter(new Vector3());
   const h = _box.getSize(new Vector3()).multiplyScalar(0.5);
-  const dmg = createDamageState(capital, stats.shield, stats.hull, { cx: c.x, cy: c.y, cz: c.z, halfW: h.x, halfH: h.y, halfL: h.z }, stats.shieldRegen, stats.shieldDelay);
+  // Hulls that fly and take hits as fighters (sphere hits, gunships, small corvettes) get at most the fore / aft halves.
+  const dmg = createDamageState(capital, stats.shield, stats.hull, { cx: c.x, cy: c.y, cz: c.z, halfW: h.x, halfH: h.y, halfL: h.z }, stats.shieldRegen, stats.shieldDelay, capital ? stats.facings : Math.min(stats.facings, 2), stats.shieldTransfer);
   if (capital && grid) addCapitalSubsystems(dmg, model, blueprintId, grid, stats.hull);
+  else if (model.radius >= MOUNT_MIN_RADIUS) addMountSubsystems(dmg, model, stats.hull);
+  // Every ship starts with its shield officer on (the player's keys take over: , . /).
+  dmg.trimAuto = true;
   return {
     stats,
     loadout,
     dmg,
     grid,
-    shell: new Vector3(h.x * 1.25 + 20, h.y * 1.35 + 20, h.z * 1.1 + 20),
+    shell: fitShell(blueprintId, model, c, h),
     // Flight class follows size (corvettes keep the fighter base the AI and escort routes were tuned on).
     baseSpec: fromYard ? yardFlightSpec(fromYard, KESTREL_SPEC) : flightSpecFor(stats, model.radius > 200),
     gun: 0,
     missile: 0,
     subTarget: -1,
+    subShip: 0,
     missileReload: 0,
     damaged: false,
     fx: fighterEffects(dmg, 1),
-    cap: capitalEffects(dmg),
+    cap: capitalEffects(dmg, createCapitalEffects()),
+    reactorEvent: null,
   };
 }
+
+/** Shield clearance over the hull, radially (the shell sits 5–10% outside the furthest plating). */
+export const SHELL_CLEARANCE = 1.075;
+
+/**
+ * Shield shell for a hull: the smallest ellipsoid round the hull centre
+ * (searched over its three half axes) that holds every vertex of the hull,
+ * turrets included, then grown by SHELL_CLEARANCE. A fixed box-ratio
+ * ellipsoid either leaves corners (engine blocks, sponsons, fins) poking
+ * through or balloons everywhere to cover them; this fits the hull the ship
+ * actually has. Cached by blueprint (the fit reads every vertex once).
+ */
+export function fitShell(key: string, model: ShipModel, c: Vector3, h: Vector3): Vector3 {
+  let fit = shellFit.get(key);
+  if (!fit) {
+    fit = new Vector3();
+    const hx = Math.max(h.x, 0.5);
+    const hy = Math.max(h.y, 0.5);
+    const hz = Math.max(h.z, 0.5);
+    model.root.updateMatrixWorld(true);
+    _inv.copy(model.root.matrixWorld).invert();
+    const pts: number[] = [];
+    for (const mesh of model.meshes) {
+      const pos = mesh.geometry.getAttribute('position');
+      if (!pos) continue;
+      _m.multiplyMatrices(_inv, mesh.matrixWorld);
+      for (let i = 0; i < pos.count; i++) {
+        _fp.fromBufferAttribute(pos, i).applyMatrix4(_m);
+        pts.push(Math.abs(_fp.x - c.x) / hx, Math.abs(_fp.y - c.y) / hy, Math.abs(_fp.z - c.z) / hz);
+      }
+    }
+    // Shape search on a reduced set: the furthest beam offset per (height, length) bin, at the bin's outer edge.
+    const B = 40;
+    const far = new Float32Array(B * B);
+    for (let i = 0; i < pts.length; i += 3) {
+      const j = Math.min(B - 1, Math.floor(pts[i + 1] * B));
+      const k = Math.min(B - 1, Math.floor(pts[i + 2] * B));
+      if (pts[i] > far[j * B + k]) far[j * B + k] = pts[i];
+    }
+    const red: number[] = [];
+    for (let j = 0; j < B; j++) for (let k = 0; k < B; k++) if (far[j * B + k] > 0 || j + k === 0) red.push(far[j * B + k], (j + 1) / B, (k + 1) / B);
+    let best = Infinity;
+    for (let ax = 1; ax <= 1.9; ax += 0.05)
+      for (let ay = 1; ay <= 1.9; ay += 0.05)
+        for (let az = 1; az <= 1.9; az += 0.05) {
+          let worst = 0;
+          for (let i = 0; i < red.length; i += 3) {
+            const e = (red[i] / ax) ** 2 + (red[i + 1] / ay) ** 2 + (red[i + 2] / az) ** 2;
+            if (e > worst) worst = e;
+          }
+          const vol = ax * ay * az * worst ** 1.5;
+          if (vol < best) {
+            best = vol;
+            fit.set(ax * hx, ay * hy, az * hz);
+          }
+        }
+    // Exact scale for the chosen shape: the furthest vertex sits SHELL_CLEARANCE inside.
+    let worst = 0;
+    for (let i = 0; i < pts.length; i += 3) {
+      const e = (pts[i] * hx / fit.x) ** 2 + (pts[i + 1] * hy / fit.y) ** 2 + (pts[i + 2] * hz / fit.z) ** 2;
+      if (e > worst) worst = e;
+    }
+    fit.multiplyScalar(Math.sqrt(worst || 1) * SHELL_CLEARANCE);
+    shellFit.set(key, fit);
+  }
+  return fit.clone();
+}
+const shellFit = new Map<string, Vector3>();
+const _fp = new Vector3();
 
 function addCapitalSubsystems(dmg: DamageState, model: ShipModel, id: string, grid: HullGrid, hullMax: number): void {
   const len = Math.max(model.length, 1);
@@ -174,7 +264,7 @@ function addCapitalSubsystems(dmg: DamageState, model: ShipModel, id: string, gr
   const add = (kind: SubsystemKind, sid: string, p: Vector3, radius?: number) => {
     const t = SUBSYSTEM_TUNING[kind];
     const n = (counts[kind] = (counts[kind] ?? 0) + 1);
-    const single = kind === 'shieldGen' || kind === 'bridge';
+    const single = kind === 'shieldGen' || kind === 'bridge' || kind === 'sensors' || kind === 'reactor';
     addSubsystem(dmg, {
       id: sid,
       kind,
@@ -188,12 +278,12 @@ function addCapitalSubsystems(dmg: DamageState, model: ShipModel, id: string, gr
       hpMax: Math.max(40, hullMax * t.hp),
     });
   };
-  const kinds: Record<string, SubsystemKind> = { turret: 'turret', beam: 'lance', hangar: 'hangar' };
+  const kinds: Record<string, SubsystemKind> = { turret: 'turret', beam: 'lance', hangar: 'hangar', missile: 'launcher' };
   const layout = CAPITAL_LAYOUT[id] ?? DEFAULT_LAYOUT;
   for (const [sid, o] of model.sockets) {
     const kind = kinds[o.userData.kind as string];
     if (!kind) continue;
-    _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, o.matrixWorld));
+    mountCentre(model, sid, _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, o.matrixWorld)));
     add(kind, sid, _v);
   }
   model.engines.forEach((e, i) => {
@@ -206,6 +296,122 @@ function addCapitalSubsystems(dmg: DamageState, model: ShipModel, id: string, gr
   if (bridgeSocket) add('bridge', 'bridge', _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, bridgeSocket.matrixWorld)));
   else add('bridge', 'bridge', onTop(layout.bridge.x, layout.bridge.z));
   add('shieldGen', 'shield-gen', onTop(layout.shieldGen.x, layout.shieldGen.z));
+  // Sensors: the radar joint when the model has one, else a mast on the spine.
+  const radar = model.articulations.get('radar');
+  const sn = layout.sensors ?? DEFAULT_LAYOUT.sensors!;
+  add('sensors', 'sensors', radar ? _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, radar.node.matrixWorld)) : onTop(sn.x, sn.z));
+  // The reactor core, on the deck or (big hulls) the keel.
+  const rc = layout.reactor ?? DEFAULT_LAYOUT.reactor!;
+  add('reactor', 'reactor', rc.below ? onKeel(grid, (b.minX + b.maxX) / 2 + rc.x * (b.maxX - b.minX) * 0.5, (b.minZ + b.maxZ) / 2 + rc.z * (b.maxZ - b.minZ) * 0.5, _w) : onTop(rc.x, rc.z));
+  addShieldEmitters(dmg, grid, len, hullMax);
+}
+
+/** The hull's underside at (x, z) (ship-local): a grid ray straight up from below the keel. */
+function onKeel(grid: HullGrid, x: number, z: number, out: Vector3): Vector3 {
+  const b = grid.box;
+  const bottom = b.minY - grid.cell * 2;
+  const span = b.maxY + grid.cell - bottom;
+  return raycastGrid(grid, x, bottom, z, 0, span, 0, _eh) ? out.set(x, bottom + span * _eh.t, z) : out.set(x, b.minY, z);
+}
+
+const _eh: GridHit = { t: 0, nx: 0, ny: 0, nz: 0 };
+const _ef = new Vector3();
+/** Offsets across the face (fractions of the half extents: along the hull / up the face, then the other way) tried in turn for an emitter's spot. */
+const EMITTER_SLIDE = [0, 0, 0.3, 0, -0.3, 0, 0, 0.3, 0, -0.3, 0.55, 0, -0.55, 0, 0, 0.55, 0, -0.55, 0.3, 0.3, -0.3, -0.3, 0.8, 0, -0.8, 0];
+
+/**
+ * One shield emitter per facing (4+ facings): dropped onto the plating that
+ * faces that way by a grid raycast inward along the facing's axis (bow and
+ * stern on the centreline, flanks amidships, deck and keel on the midline),
+ * slid across the face until the spot belongs to that facing's region (so
+ * fire has to come through that facing to reach it) and clears the other
+ * subsystems. Knocking one out keeps its facing down (Damage.ts).
+ */
+function addShieldEmitters(dmg: DamageState, grid: HullGrid, len: number, hullMax: number): void {
+  const n = dmg.facings.length;
+  if (n < 4) return;
+  const t = SUBSYSTEM_TUNING.shieldEmitter;
+  const radius = Math.max(t.radius * len * (len < 400 ? 1.6 : 1), 2.5) + grid.cell * 0.75;
+  const b = grid.box;
+  const c = [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, (b.minZ + b.maxZ) / 2];
+  const h = [(b.maxX - b.minX) / 2, (b.maxY - b.minY) / 2, (b.maxZ - b.minZ) / 2];
+  const pad = grid.cell * 2;
+  const o = [0, 0, 0];
+  const d = [0, 0, 0];
+  for (let f = 0; f < n; f++) {
+    const a = FACING_AXIS[f];
+    const ax = a[0] ? 0 : a[1] ? 1 : 2;
+    // Slide along the hull's length on the flanks / deck / keel, up the face at bow and stern.
+    const across = ax === 2 ? 1 : 2;
+    const other = 3 - ax - across;
+    let fallback = 0; // 0 none · 1 any hit · 2 a hit in the facing's own region
+    let placed = false;
+    for (let i = 0; i < EMITTER_SLIDE.length; i += 2) {
+      o[0] = c[0];
+      o[1] = c[1];
+      o[2] = c[2];
+      o[ax] += a[ax] * (h[ax] + pad);
+      o[across] += EMITTER_SLIDE[i] * h[across];
+      o[other] += EMITTER_SLIDE[i + 1] * h[other];
+      d[0] = d[1] = d[2] = 0;
+      d[ax] = -a[ax] * (h[ax] * 2 + pad * 2);
+      if (!raycastGrid(grid, o[0], o[1], o[2], d[0], d[1], d[2], _eh)) continue;
+      _v.set(o[0] + d[0] * _eh.t, o[1] + d[1] * _eh.t, o[2] + d[2] * _eh.t);
+      const own = facingOf(dmg, _v) === f;
+      const clear = !dmg.subsystems.some((s) => Math.hypot(s.x - _v.x, s.y - _v.y, s.z - _v.z) < (s.radius + radius) * 0.6);
+      if (own && clear) {
+        placed = true;
+        break;
+      }
+      const rank = own ? 2 : 1;
+      if (rank > fallback) {
+        fallback = rank;
+        _ef.copy(_v);
+      }
+    }
+    if (!placed) {
+      if (fallback) _v.copy(_ef);
+      else _v.set(c[0] + a[0] * h[0], c[1] + a[1] * h[1], c[2] + a[2] * h[2]);
+    }
+    addSubsystem(dmg, { id: `emitter-${FACING_NAMES[f].toLowerCase()}`, kind: 'shieldEmitter', label: `${FACING_NAMES[f]} ${t.label}`, x: _v.x, y: _v.y, z: _v.z, radius, hpMax: Math.max(40, hullMax * t.hp), facing: f });
+  }
+}
+
+/**
+ * A rigged turret's subsystem sits at the centre of the mount on its turning
+ * axis (as TurretRig.turretWorldPosition reports it), not on the deck plate
+ * under it, so its hit sphere wraps the gun house. Others keep the socket.
+ */
+function mountCentre(model: ShipModel, sid: string, p: Vector3): Vector3 {
+  const t = model.turrets.get(sid);
+  if (!t) return p;
+  const lift = _w.subVectors(t.pivot, t.base).dot(t.up) * 0.8;
+  return p.copy(t.base).addScaledVector(t.up, lift);
+}
+
+/** Non-capital hulls at least this big (model radius, m: gunships and up) get their turret / beam / hangar mounts as subsystems. */
+const MOUNT_MIN_RADIUS = 25;
+
+/**
+ * Gunships, cruisers and haulers that fly on the fighter model (no facings,
+ * no voxel hull) still carry turrets: each turret / beam / hangar socket is a
+ * subsystem, hit through its aimed sphere (raycastShip) once the bubble is
+ * down, and a destroyed one goes quiet (ShipTurrets).
+ */
+function addMountSubsystems(dmg: DamageState, model: ShipModel, hullMax: number): void {
+  const len = Math.max(model.length, 1);
+  model.root.updateMatrixWorld(true);
+  _inv.copy(model.root.matrixWorld).invert();
+  const counts: Partial<Record<SubsystemKind, number>> = {};
+  const kinds: Record<string, SubsystemKind> = { turret: 'turret', beam: 'lance', hangar: 'hangar' };
+  for (const [sid, o] of model.sockets) {
+    const kind = kinds[o.userData.kind as string];
+    if (!kind) continue;
+    const t = SUBSYSTEM_TUNING[kind];
+    const n = (counts[kind] = (counts[kind] ?? 0) + 1);
+    mountCentre(model, sid, _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, o.matrixWorld)));
+    addSubsystem(dmg, { id: sid, kind, label: `${t.label} ${n}`, x: _v.x, y: _v.y, z: _v.z, radius: Math.max(t.radius * len * 1.6, 2.5), hpMax: Math.max(40, hullMax * t.hp) });
+  }
 }
 
 export function combatOf(s: ShipEntity): CombatState {
@@ -248,14 +454,10 @@ export function chooseGun(s: ShipEntity, target: ShipEntity | null): void {
   const guns = s.combat.loadout.guns;
   if (guns.length < 2 || !target) return;
   const dist = target.flight.position.distanceTo(s.flight.position);
-  // Capitals: the facing between us and the hull is what matters.
+  // The facing between us and the hull is what matters (a fighter's aft half when we're on its six).
+  // Keep stripping until it is really down: a live facing gets charge shunted into it.
   const st = target.combat.dmg;
-  let up: boolean;
-  if (st.capital) {
-    toLocal(target, s.flight.position, _v);
-    const f = shieldFacing(_v.x - st.cx, _v.z - st.cz, st.halfW, st.halfL);
-    up = st.facings[f] > st.facingMax * 0.03;
-  } else up = target.shield > target.shieldMax * 0.05;
+  const up = st.facings.length ? facingUp(st, facingOf(st, toLocal(target, s.flight.position, _v)), 0.005) : false;
   const layer = up ? 'shield' : 'hull';
   let best = s.combat.gun;
   let bs = -1;
@@ -285,24 +487,25 @@ export function stepCombat(s: ShipEntity, dt: number): void {
     resetDamage(st, s);
     c.damaged = false;
   }
-  if (st.capital) {
-    // A scene refilled `shield` directly: spread it over the facings.
-    let sum = 0;
-    for (const f of st.facings) sum += f;
-    if (s.shield > sum + 1) {
-      const each = Math.min(st.facingMax, s.shield / st.facings.length);
-      for (let i = 0; i < st.facings.length; i++) st.facings[i] = Math.max(st.facings[i], each);
-      st.down = 0;
-    }
-  }
+  // A scene resized or refilled / drained the pools directly: carry it into the facings.
+  if (Math.abs(s.shieldMax - st.facingMax * st.facings.length) > 1e-6 * Math.max(1, s.shieldMax)) setShieldCapacity(st, s, s.shieldMax);
+  adoptShield(st, s);
+  // Shield power: AI ships (and the player on autopilot) trim toward incoming fire; the player trims by hand or AUTO.
+  stepShieldPower(st, s, dt, !s.isPlayer || (s.brain as { autopilot?: boolean } | null)?.autopilot === true);
   regenShields(st, s, s.sinceHit, dt);
+  if (st.subsystems.length) repairSubsystems(st, s.sinceHit, dt);
   if (st.tether > 0) st.tether = Math.max(0, st.tether - dt);
   if (c.missileReload > 0) c.missileReload = Math.max(0, c.missileReload - dt);
+  // Reactor crisis: the crew vents a critical core, or the fuse runs out (Fleet settles the kill).
+  c.reactorEvent = stepReactor(st.structure, dt);
+  if (c.reactorEvent) st.version++;
 
   const spec = s.flight.spec;
   const base = c.baseSpec;
   if (st.capital) {
     capitalEffects(st, c.cap);
+    // Sensors shot away: locks take longer (Missiles reads range from cap.sensors).
+    c.fx.lockMul = 1 / c.cap.sensors;
     return;
   }
   const fx = fighterEffects(st, s.hull / s.hullMax, c.fx);
@@ -326,10 +529,12 @@ export interface ShipRayHit {
   local: Vector3;
   /** Hit the shield shell (capitals) / an up bubble (fighters). */
   onShield: boolean;
+  /** Aimed hit: the segment entered this intact subsystem's hit sphere (Subsystems.AIM_SPHERE) before the plating. */
+  sub: Subsystem | null;
 }
 
 export function createRayHit(): ShipRayHit {
-  return { t: 2, point: new Vector3(), normal: new Vector3(), local: new Vector3(), onShield: false };
+  return { t: 2, point: new Vector3(), normal: new Vector3(), local: new Vector3(), onShield: false, sub: null };
 }
 
 const _lo = new Vector3();
@@ -338,12 +543,16 @@ const _gh: GridHit = { t: 0, nx: 0, ny: 0, nz: 0 };
 
 /**
  * Swept segment a → a + d (universe) against a ship: its shield bubble or
- * shell, else (capitals) the voxel hull. `pad` fattens the target (beams).
- * Writes `out` and returns true on a hit.
+ * shell, else (capitals) the voxel hull. Where the shield is down, each
+ * intact subsystem's aimed-hit sphere is tested before the plating
+ * (Subsystems.segmentSubsystem): a hit sets `out.sub` so the damage routes to
+ * that mount. `pad` fattens the target (beams). Writes `out` and returns
+ * true on a hit.
  */
 export function raycastShip(s: ShipEntity, a: Vector3, d: Vector3, pad: number, out: ShipRayHit): boolean {
   const c = s.combat;
   const f = s.flight;
+  out.sub = null;
   if (!c.dmg.capital || !c.grid) {
     const t = segmentSphere(a, d, f.position, s.radius + pad);
     if (t > 1) return false;
@@ -351,7 +560,21 @@ export function raycastShip(s: ShipEntity, a: Vector3, d: Vector3, pad: number, 
     out.point.copy(a).addScaledVector(d, t);
     out.normal.subVectors(out.point, f.position).normalize();
     toLocal(s, out.point, out.local);
-    out.onShield = s.shield > 0;
+    const st = c.dmg;
+    out.onShield = st.facings.length > 0 && st.facings[facingOf(st, out.local)] > 0;
+    if (!out.onShield && st.subsystems.length) {
+      // Through a down facing: mounts sit inside the bounding sphere, so look along the whole chord this step.
+      _lo.copy(out.local);
+      const dl = Math.max(d.length(), 1e-6);
+      _ld.copy(d).applyQuaternion(_q.copy(f.orientation).invert()).multiplyScalar((dl + 2 * (s.radius + pad)) / dl);
+      const sub = segmentSubsystem(st.subsystems, _lo.x, _lo.y, _lo.z, _ld.x, _ld.y, _ld.z, pad, 1, _sh);
+      if (sub) {
+        out.local.copy(_lo).addScaledVector(_ld, _sh.c);
+        toUniverse(s, out.local.x, out.local.y, out.local.z, out.point);
+        subNormal(s, sub, out);
+        out.sub = sub;
+      }
+    }
     return true;
   }
   // Broad phase: full bounding sphere.
@@ -375,10 +598,9 @@ export function raycastShip(s: ShipEntity, a: Vector3, d: Vector3, pad: number, 
     if (t <= 1) {
       const lx = _lo.x + _ld.x * t;
       const lz = _lo.z + _ld.z * t;
-      const facing = shieldFacing(lx - st.cx, lz - st.cz, st.halfW, st.halfL);
-      if (st.facings[facing] > 0) {
+      out.local.set(lx, _lo.y + _ld.y * t, lz);
+      if (st.facings[facingOf(st, out.local)] > 0) {
         out.t = t;
-        out.local.set(lx, _lo.y + _ld.y * t, lz);
         out.point.copy(a).addScaledVector(d, t);
         // Ellipsoid normal: gradient of the implicit surface.
         out.normal.set((lx - st.cx) / (sx * sx), (out.local.y - st.cy) / (sy * sy), (lz - st.cz) / (sz * sz)).normalize().applyQuaternion(f.orientation);
@@ -387,7 +609,23 @@ export function raycastShip(s: ShipEntity, a: Vector3, d: Vector3, pad: number, 
       }
     }
   }
-  if (!raycastGrid(c.grid, _lo.x, _lo.y, _lo.z, _ld.x, _ld.y, _ld.z, _gh)) return false;
+  const onGrid = raycastGrid(c.grid, _lo.x, _lo.y, _lo.z, _ld.x, _ld.y, _ld.z, _gh);
+  const tg = onGrid ? _gh.t : 1;
+  // Aimed hits: a mount's hit sphere stands proud of the plating, so a shot at a
+  // small turret on a big hull lands on it rather than skipping past to the hull.
+  const sub = st.subsystems.length ? segmentSubsystem(st.subsystems, _lo.x, _lo.y, _lo.z, _ld.x, _ld.y, _ld.z, pad, tg, _sh) : null;
+  if (sub) {
+    // Report the closest pass to the mount (never beyond the plating) so impacts read on the turret, not in the air.
+    const t = _sh.c;
+    out.t = t;
+    out.local.copy(_lo).addScaledVector(_ld, t);
+    out.point.copy(a).addScaledVector(d, t);
+    subNormal(s, sub, out);
+    out.onShield = false;
+    out.sub = sub;
+    return true;
+  }
+  if (!onGrid) return false;
   out.t = _gh.t;
   out.local.copy(_lo).addScaledVector(_ld, _gh.t);
   out.point.copy(a).addScaledVector(d, _gh.t);
@@ -397,6 +635,15 @@ export function raycastShip(s: ShipEntity, a: Vector3, d: Vector3, pad: number, 
 }
 
 const ORIGIN = new Vector3();
+
+const _sh: SegmentSubHit = { t: 0, c: 0 };
+
+/** World normal for an aimed hit: out of the mount through the impact point. */
+function subNormal(s: ShipEntity, sub: Subsystem, out: ShipRayHit): void {
+  out.normal.set(out.local.x - sub.x, out.local.y - sub.y, out.local.z - sub.z);
+  if (out.normal.lengthSq() < 1e-9) out.normal.set(out.local.x - s.combat.dmg.cx, out.local.y - s.combat.dmg.cy, out.local.z - s.combat.dmg.cz);
+  out.normal.normalize().applyQuaternion(s.flight.orientation);
+}
 
 export function toLocal(s: ShipEntity, universe: Vector3, out: Vector3): Vector3 {
   return out.subVectors(universe, s.flight.position).applyQuaternion(_q.copy(s.flight.orientation).invert());
@@ -410,44 +657,69 @@ export function subsystemPosition(s: ShipEntity, sub: Subsystem, out: Vector3): 
   return toUniverse(s, sub.x, sub.y, sub.z, out);
 }
 
-/** The player's selected subsystem on `target`, if still intact. */
+/** The shooter's selected subsystem on `target`, if still intact. */
 export function selectedSubsystem(shooter: ShipEntity, target: ShipEntity | null): Subsystem | null {
   if (!target) return null;
-  const i = shooter.combat.subTarget;
+  const c = shooter.combat;
+  if (c.subShip !== target.id) return null;
+  const i = c.subTarget;
   const subs = target.combat.dmg.subsystems;
   return i >= 0 && i < subs.length && !subs[i].destroyed ? subs[i] : null;
 }
 
-/** Cycle to the next intact subsystem on the shooter's target (B). −1 after the last. */
-export function cycleSubsystem(shooter: ShipEntity): void {
-  const subs = shooter.target?.combat.dmg.subsystems ?? [];
-  if (!subs.length) {
-    shooter.combat.subTarget = -1;
+/** Select subsystem `index` (−1 = none) on `target` for the shooter. */
+export function selectSubsystem(shooter: ShipEntity, target: ShipEntity | null, index: number): void {
+  const c = shooter.combat;
+  c.subTarget = target ? index : -1;
+  c.subShip = target && index >= 0 ? target.id : 0;
+}
+
+/** Is this subsystem of `s` exposed — the shield over it down (Subsystems.subsystemExposed)? */
+export function isExposed(s: ShipEntity, sub: Subsystem): boolean {
+  return subsystemExposed(s.combat.dmg, s.shield, sub);
+}
+
+/**
+ * Cycle the shooter's subsystem selection on its target (B forward, Shift+B
+ * back): exposed mounts first, then protected ones; past either end → none.
+ */
+export function cycleSubsystem(shooter: ShipEntity, dir: 1 | -1 = 1): void {
+  const t = shooter.target;
+  if (!t || !t.combat.dmg.subsystems.length) {
+    selectSubsystem(shooter, null, -1);
     return;
   }
-  let i = shooter.combat.subTarget;
-  for (let n = 0; n <= subs.length; n++) {
-    i++;
-    if (i >= subs.length) {
-      shooter.combat.subTarget = -1;
-      return;
-    }
-    if (!subs[i].destroyed) {
-      shooter.combat.subTarget = i;
-      return;
-    }
-  }
-  shooter.combat.subTarget = -1;
+  const cur = shooter.combat.subShip === t.id ? shooter.combat.subTarget : -1;
+  selectSubsystem(shooter, t, nextSubsystem(t.combat.dmg, t.shield, cur, dir));
+}
+
+/** Crosshair pick (I / middle mouse) reaches this far off the nose (rad). */
+export const SUB_PICK_CONE = 0.2;
+
+/**
+ * Select the target's subsystem nearest the shooter's crosshair (its nose
+ * line), exposed ones preferred; keeps the current pick if nothing is within
+ * SUB_PICK_CONE. Returns whether the selection changed.
+ */
+export function pickSubsystemAtCrosshair(shooter: ShipEntity): boolean {
+  const t = shooter.target;
+  if (!t || !t.combat.dmg.subsystems.length) return false;
+  toLocal(t, shooter.flight.position, _v);
+  shooter.flight.forward(_w).applyQuaternion(_q.copy(t.flight.orientation).invert());
+  const i = subsystemNearestRay(t.combat.dmg, t.shield, _v.x, _v.y, _v.z, _w.x, _w.y, _w.z, SUB_PICK_CONE);
+  if (i < 0 || (shooter.combat.subShip === t.id && shooter.combat.subTarget === i)) return false;
+  selectSubsystem(shooter, t, i);
+  return true;
 }
 
 const _hit = createHitResult();
 
 /**
  * Damage a ship. `point` (universe) routes the hit to a facing / subsystem /
- * zone; null spreads it generically. Handles plot armour and death. The
+ * zone; null spreads it generically. `sub` = an aimed hit's subsystem (raycastShip). Handles plot armour and death. The
  * returned result is shared scratch — read it before the next call.
  */
-export function damageShip(s: ShipEntity, amount: number, type: DamageType, point: Vector3 | null): HitResult & { killed: boolean } {
+export function damageShip(s: ShipEntity, amount: number, type: DamageType, point: Vector3 | null, sub: Subsystem | null = null, by: ShipEntity | null = null): HitResult & { killed: boolean } {
   const r = _hit as HitResult & { killed: boolean };
   r.killed = false;
   if (!s.alive) {
@@ -455,19 +727,16 @@ export function damageShip(s: ShipEntity, amount: number, type: DamageType, poin
     r.hullDamage = r.shieldDamage = 0;
     r.subsystem = null;
     r.subsystemDestroyed = r.facingCollapsed = false;
+    r.strength = -1;
+    r.bleed = r.splash = 0;
     return r;
   }
   s.sinceHit = 0;
   const local = point ? toLocal(s, point, _lo) : null;
-  applyHit(s.combat.dmg, s, { amount, type, local }, r);
+  if (by && by !== s) s.combat.dmg.structure.lastBy = by.id;
+  applyHit(s.combat.dmg, s, { amount, type, local, sub }, r);
   if (r.hullDamage > 0 || r.subsystem) s.combat.damaged = true;
-  if (s.plotArmour) s.hull = Math.max(s.hull, s.hullMax * 0.15);
-  if (s.hull <= 0) {
-    s.hull = 0;
-    s.alive = false;
-    s.model.root.visible = false;
-    r.killed = true;
-  }
+  r.killed = settleDeath(s);
   return r;
 }
 

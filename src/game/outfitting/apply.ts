@@ -2,12 +2,14 @@ import type { Object3D } from 'three';
 import type { ShipEntity } from '@/sim/Fleet';
 import { KESTREL_SPEC, type FlightSpec } from '@/sim/FlightModel';
 import { flightSpecFor as simFlightSpec } from '@/sim/Combat';
+import { rescaleStructure } from '@/sim/Structure';
 import { flightSpecFor as yardFlightSpec } from '@/game/shipyard/flight';
 import { buildShip } from '@/assets/ShipBuilder';
 import type { Blueprint, Part } from '@/assets/Blueprint';
 import type { CatalogEntry } from '@/game/shipyard/catalog';
 import { baseStats, computeFit, slotSockets, slotsFor, stockFit, type Fit, type FitResult } from './fit';
 import { item, SIZE_RANK, type GunItem, type MissileItem } from './items';
+import { TRANSFER_RATE, setShieldCapacity, syncShield } from '@/sim/Damage';
 
 /**
  * Runtime side of a fit: push hull + fit into a live ShipEntity — combat
@@ -52,16 +54,19 @@ export function applyFit(ship: ShipEntity, e: CatalogEntry, fit: Fit): FitResult
   const hf = ship.hullMax > 0 ? ship.hull / ship.hullMax : 1;
   ship.hullMax = r.stats.hull;
   ship.hull = Math.max(1, hf * ship.hullMax);
-  ship.shieldMax = r.stats.shield;
-  ship.shield = ship.shieldMax;
   const d = c.dmg;
   d.shieldRegen = r.stats.shieldRegen;
   d.shieldDelay = r.stats.shieldDelay;
+  d.transfer = (d.capital ? TRANSFER_RATE.capital : TRANSFER_RATE.small) * (r.stats.shieldTransfer ?? 1);
   d.zoneHp = r.stats.hull * 0.45;
-  if (d.capital) {
-    d.facingMax = r.stats.shield / 4;
-    d.facings.fill(d.facingMax);
-  }
+  // Sections follow the fitted hull (keeping their damage fraction): the spine is a share of the hull.
+  rescaleStructure(d.structure, r.stats.hull);
+  // Re-size every facing, then fill them (the split follows the ship's shield trim).
+  setShieldCapacity(d, ship, r.stats.shield);
+  d.cooldown.fill(0);
+  for (let i = 0; i < d.facings.length; i++) d.facings[i] = d.facingCap[i];
+  d.down = 0;
+  syncShield(d, ship);
   fitVisuals(ship, e, fit);
   return r;
 }

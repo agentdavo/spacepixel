@@ -9,6 +9,7 @@ import { CameraDirector, type Subject } from '@/sim/CameraDirector';
 import { Fleet, faceAlong, type ShipEntity } from '@/sim/Fleet';
 import { FlightModel } from '@/sim/FlightModel';
 import { DEFAULT_WORLD_SEED } from '@/sim/Rng';
+import { stepTrim, trimLabel } from '@/sim/Damage';
 import { hashWorld, StateHasher } from '@/sim/StateHash';
 import type { ReplayCommand } from '@/sim/Replay';
 import { ReplayDirector, worldSeedFor } from '@/game/ReplayDirector';
@@ -21,6 +22,7 @@ import { EventTap } from '../EventTap';
 import { Weapons } from '@/sim/Weapons';
 import { Missiles, type LockState } from '@/sim/Missiles';
 import { Capitals } from '@/sim/Capitals';
+import { selectedSubsystem } from '@/sim/Combat';
 import { loadProfile } from '@/game/Profile';
 import { WeaponVisuals } from '../WeaponVisuals';
 import { CombatFx } from '../CombatFx';
@@ -39,6 +41,7 @@ import type { StarSystem } from '@/universe/Universe';
 import type { Universe } from '@/universe/Universe';
 import { FlightHud } from '@/ui/FlightHud';
 import { CombatHud } from '@/ui/CombatHud';
+import { SALVAGE_RANGE, SALVAGE_SPEED, claimSalvage, lots, salvageRate, stepSalvage } from '@/game/salvage';
 import { StarMap } from '@/ui/StarMap';
 import { postFx } from '@/render/post/PostFx';
 import { MissionRunner, type MissionContext, type MissionDef } from '@/game/Missions';
@@ -251,6 +254,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   private viewFlight = new FlightModel();
   private hasher = new StateHasher();
   private _ledger: TradeLedger = loadLedger();
+  /** Wreck salvage in reach this tick (the HUD prompt), null = none. */
+  private salvageView: CombatHud['salvage'] = null;
 
   /** Shares, cargo, standing, missile rails — persisted by Profile.ts. */
   get ledger(): TradeLedger {
@@ -558,6 +563,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     // 4. Weapons + missiles sim.
     this.weapons.step(dt);
     this.missiles.step(dt);
+    // 4'. Salvage: flying slow and close to a wreck piece cuts its lot into the hold.
+    this.stepSalvage(dt);
 
     // 4a. Campaign episode: runner, set pieces, chatter.
     if (this.campaign) {
@@ -628,6 +635,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (!this.fastForward) {
       if (this.fxOn) this.combatFx.consume(dt);
       this.visuals.consume();
+      this.combatHud.consume(this.weapons.events, this.player, this.simTime);
       this.radio.update(dt, {
         player: this.player,
         ships: this.fleet.ships,
@@ -655,6 +663,39 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.simTime += dt;
     this.replay.afterTick();
     this.inTick = false;
+  }
+
+  /**
+   * Salvage (sim tick): the nearest wreck piece in reach is cut while the
+   * player holds slow and close (src/game/salvage.ts); a finished lot goes
+   * into the hold — what doesn't fit stays aboard for another pass.
+   */
+  private stepSalvage(dt: number): void {
+    const p = this.player;
+    const D = this.fleet.destruction;
+    const w = p.alive && !this.docking.busy ? D.nearest(p.flight.position, SALVAGE_RANGE * 3) : null;
+    if (!w) {
+      this.salvageView = null;
+      return;
+    }
+    const dist = Math.max(0, w.position.distanceTo(p.flight.position) - w.ship.model.length * D.extentFrac(w) * 0.5);
+    const rel = _to.subVectors(p.flight.velocity, w.velocity).length();
+    const rate = salvageRate(w.salvage, dist, rel);
+    const y = w.salvage;
+    const what = `${w.ship.name.toUpperCase()} — ${w.cause === 'bridge' ? 'STRUCK HULL' : w.cause === 'reactor' ? 'BLAST-CHARRED SECTION' : 'WRECK SECTION'}`;
+    const hint = dist > SALVAGE_RANGE ? `CLOSE TO ${SALVAGE_RANGE} m (${Math.round(dist)} m)` : rel > SALVAGE_SPEED ? `MATCH HER DRIFT (${Math.round(rel)} m/s)` : '';
+    if (stepSalvage(w, rate, dt)) {
+      const r = claimSalvage(this.ledger, y);
+      const got = Object.entries(r.got)
+        .map(([k, n]) => `${n} ${k.toUpperCase()}`)
+        .join(' · ');
+      this.ledger = r.ledger;
+      w.salvage = r.left;
+      if (lots(r.left) === 0) w.taken = true;
+      else w.salvaged = 0;
+      this.contracts.toast(got ? `SALVAGED · ${got}${lots(r.left) ? ' · HOLD FULL' : ''}` : 'SALVAGE · HOLD FULL', got ? '#7dffb2' : '#ff5f7a');
+    }
+    this.salvageView = w.taken ? null : { label: what, lots: `${w.salvage.relics} RELICS · ${w.salvage.cores} CORES · ${w.salvage.spares} SPARES`, progress: w.salvaged, working: rate > 0, hint };
   }
 
   /**
@@ -755,6 +796,10 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
     this.combatHud.turrets = this.turrets.status(this.player);
     this.combatHud.hangar = this.turrets.hangarStatus(this.player);
+    // A reactor detonation whites the view out, fading with distance.
+    const blast = this.combatFx.destruction;
+    this.combatHud.flash = blast.screenFlash * Math.max(0, 1 - blast.lastBlast.distanceTo(pf.position) / 9000);
+    this.combatHud.salvage = this.salvageView;
     this.combatHud.draw(this.player, this.lock.target, this.camera, this.world, time, !this.tactical && this.jumpPhase === 'none');
     this.hud.drawStatus(this.view.system.name, pf.cruise, this.jumpPhase !== 'none' ? `LANTERN TRANSIT → ${this.universe.systems.get(this.jumpTo)?.name ?? ''}` : '');
     if (this.jumpPhase === 'none' && !this.tactical) this.drawDockHud(time);
@@ -907,6 +952,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     const sys = this.systemFor(m.system);
     if (sys.id !== this.systemId) {
       this.view.dispose();
+      // Wrecks stay in their system (the sim forgets them when we leave it).
+      this.fleet.destruction.clear();
       this.systemId = sys.id;
       this.view = new StarSystemView(sys, this.scene, this.world.root);
       this.paintPlanes();
@@ -1051,6 +1098,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     const from = this.systemId;
     this.jumps++;
     this.view.dispose();
+    this.fleet.destruction.clear();
     this.systemId = this.jumpTo;
     this.view = new StarSystemView(this.universe.systems.get(this.systemId)!, this.scene, this.world.root);
     this.paintPlanes();
@@ -1301,6 +1349,7 @@ export class FlightScene implements GameScene, FlightHostScene {
   warpTo(id: string): void {
     if (id === this.systemId || !this.universe.systems.has(id)) return;
     this.view.dispose();
+    this.fleet.destruction.clear();
     this.systemId = id;
     this.view = new StarSystemView(this.universe.systems.get(id)!, this.scene, this.world.root);
     this.paintPlanes();
@@ -1587,8 +1636,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     return `${shot} · ${f.flightAssist ? 'FA ON' : 'FA OFF'}${this.cinematic ? ' · CINEMATIC' : ''}`;
   }
 
-  /** Keys that change the world (dock request, turret mode, tactical slow-mo, wing orders): recorded on the tape. */
-  private static readonly SIM_KEYS = new Set(['KeyG', 'KeyU', 'Tab', 'Digit1', 'Digit2', 'Digit3', 'Digit4']);
+  /** Keys that change the world (dock request, turret mode, tactical slow-mo, wing orders, shield trim): recorded on the tape. */
+  private static readonly SIM_KEYS = new Set(['KeyG', 'KeyU', 'Tab', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Comma', 'Period', 'Slash']);
 
   /** V: cycle camera · K: cinematic auto-cutaways. (T / F go through input.) */
   private onKey(code: string): void {
@@ -1632,6 +1681,15 @@ export class FlightScene implements GameScene, FlightHostScene {
         const m = this.turrets.cycleMode();
         this.docking.say(`TURRETS: ${m === 'free' ? 'FREE — ENGAGE ANY HOSTILE IN ARC' : m === 'target' ? 'MY TARGET ONLY' : 'HOLD FIRE'}`, m === 'hold' ? '#ffc46b' : '#7dffb2', 2.5);
       }
+    } else if (code === 'Comma' || code === 'Period' || code === 'Slash') {
+      // Shield trim: . forward / next facing · , aft / previous facing · / the shield officer (AUTO) on / off.
+      const st = this.player.combat.dmg;
+      if (code === 'Slash') {
+        const auto = !st.trimAuto;
+        stepTrim(st, 0);
+        st.trimAuto = auto;
+      } else stepTrim(st, code === 'Period' ? 1 : -1);
+      this.docking.say(`SHIELDS: ${trimLabel(st)}`, '#6fe6ff', 2);
     } else if (code === 'KeyK') {
       this.cinematic = !this.cinematic;
     } else if (code === 'KeyM') {
@@ -1645,7 +1703,9 @@ export class FlightScene implements GameScene, FlightHostScene {
       const labels = ['FORM ON ME', 'ATTACK MY TARGET', 'ENGAGE AT WILL', 'COVER ME'];
       const i = Number(code.slice(5)) - 1;
       this.wingOrder = orders[i];
-      this.orderStatus = `VANGUARD 1 → WING: "${labels[i]}"   · COPY, LEAD.`;
+      // With a subsystem selected, "attack my target" means that mount (the wing's brains follow the lead's pick).
+      const sub = i === 1 ? selectedSubsystem(this.player, this.player.target) : null;
+      this.orderStatus = `VANGUARD 1 → WING: "${labels[i]}${sub ? ` — ${sub.label}` : ''}"   · COPY, LEAD.`;
       this.onWingOrder?.(this.wingOrder);
       this.radio.order(this.wingOrder, !!this.lock.target);
     }

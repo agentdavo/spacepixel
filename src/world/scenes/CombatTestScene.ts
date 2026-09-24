@@ -1,3 +1,4 @@
+import type { FactionId } from '@/assets/Blueprint';
 import { PerspectiveCamera, Scene, Vector3 } from 'three';
 import type { FrameContext } from '@/core/Engine';
 import type { GameScene } from '../GameScene';
@@ -6,7 +7,7 @@ import { Fleet, faceAlong, type ShipEntity } from '@/sim/Fleet';
 import { Weapons } from '@/sim/Weapons';
 import { Missiles } from '@/sim/Missiles';
 import { Capitals } from '@/sim/Capitals';
-import { subsystemPosition, toUniverse } from '@/sim/Combat';
+import { createRayHit, raycastShip, selectSubsystem, subsystemPosition, toUniverse } from '@/sim/Combat';
 import { GUNS, MISSILES } from '@/sim/Loadouts';
 import { WeaponVisuals } from '../WeaponVisuals';
 import { CombatFx } from '../CombatFx';
@@ -26,7 +27,25 @@ import { CombatHud } from '@/ui/CombatHud';
  *   stage=smoke     a crippled Kestrel trailing black smoke, a Cantor on its six
  *   stage=weapons   every gun family firing at a Lantern Guard, a torpedo inbound
  *                   and its point defence shooting at it
- *   &ship=<id>      capital for stage=capital (default choir-cathedral)
+ *   stage=impacts   weapon impacts on an Indomitable's port side, per damage type:
+ *                   a laser Kestrel, an autocannon Kestrel, a hymn Cantor, a lance
+ *                   Cantor sweeping and a micro-missile salvo. &side=hull (port facing
+ *                   down: molten spots, sparks, arcs, cut line, warheads) · shield
+ *                   (port facing weak: ripples, facing outline, flicker) · collapse
+ *                   (the facing fails; freezes &after=S later) · regen (a collapsed
+ *                   facing comes back) · subsystem (a hangar and an engine blow)
+ *   stage=kill      a capital dying by one kill path (Structure.ts / Destruction.ts),
+ *                   &path=reactor (the white flash and shock ring reaching her
+ *                   escort) · structural (the spine snaps, two burning halves
+ *                   spin apart) · bridge (she strikes: the whole hull dark and
+ *                   drifting) · hull (the rolling chain, then three sections).
+ *                   &t=S (or &kt=S, for record.mjs which owns &t) seconds after the death at capture (default per path;
+ *                   under 0.7 the death plays live, else it happens in the
+ *                   fast-forward and the wreck burns live); &ship=<id>
+ *                   (default choir-cathedral)
+ *   &ship=<id>      capital for stage=capital (default choir-cathedral) or
+ *                   stage=impacts (default bb-indomitable; &faction=choir|rustwake
+ *                   picks the shield shell style)
  *   &freeze=S       stop the sim S seconds into the live section (screenshots)
  *   &cam=0..2       alternate framings
  *
@@ -36,7 +55,11 @@ import { CombatHud } from '@/ui/CombatHud';
 const ORIGIN = new Vector3(2_400_000, 150_000, -1_100_000);
 const DT = 1 / 60;
 
-type Stage = 'capital' | 'shield' | 'smoke' | 'weapons';
+type Stage = 'capital' | 'shield' | 'smoke' | 'weapons' | 'impacts' | 'kill';
+type KillStagePath = 'reactor' | 'structural' | 'bridge' | 'hull';
+
+/** Default seconds after the death for each path's capture. */
+const KILL_T: Record<KillStagePath, number> = { reactor: 0.45, structural: 18, bridge: 6, hull: 12 };
 
 interface Scripted {
   ship: ShipEntity;
@@ -73,14 +96,25 @@ export class CombatTestScene implements GameScene {
   private camMode: number;
   private eyeFn: (t: number, eye: Vector3, look: Vector3) => void = () => {};
   private freezeOnCollapse = false;
+  /** Seconds past a facing collapse to freeze at (freezeOnCollapse). */
+  private collapseAfter = 0.1;
+  /** Live-section weapon event counts (label readout). */
+  private tally: Record<string, number> = {};
+  /** Scripted one-offs at live-section times (s). */
+  private timed: { at: number; fn: () => void }[] = [];
+  /** …and at fast-forward times (s). */
+  private preTimed: { at: number; fn: () => void }[] = [];
+  private killPath: KillStagePath | null = null;
   /** Keep fast-forwarding while this holds (bounded by 4 × pre). */
   private preUntil: (() => boolean) | null = null;
+  /** &hud=0: no combat HUD (clean captures). */
+  private hudOn = new URLSearchParams(location.search).get('hud') !== '0';
   /** &fx=0: no particles (inspect the hull paint alone). */
   private fxOn = new URLSearchParams(location.search).get('fx') !== '0';
 
   constructor() {
     const q = new URLSearchParams(location.search);
-    this.stage = (['capital', 'shield', 'smoke', 'weapons'] as const).find((s) => s === q.get('stage')) ?? 'capital';
+    this.stage = (['capital', 'shield', 'smoke', 'weapons', 'impacts', 'kill'] as const).find((s) => s === q.get('stage')) ?? 'capital';
     this.freeze = Number(q.get('freeze') ?? NaN);
     this.camMode = Number(q.get('cam') ?? 0) || 0;
     LightRig.apply(LIGHT_PRESETS.meridian);
@@ -91,10 +125,21 @@ export class CombatTestScene implements GameScene {
     if (this.stage === 'capital') pre = this.setupCapital(q.get('ship') ?? 'choir-cathedral');
     else if (this.stage === 'shield') pre = this.setupShield();
     else if (this.stage === 'smoke') pre = this.setupSmoke();
+    else if (this.stage === 'kill') {
+      const path = (['reactor', 'structural', 'bridge', 'hull'] as const).find((x) => x === q.get('path')) ?? 'reactor';
+      pre = this.setupKill(path, Number(q.get('kt') ?? q.get('t') ?? KILL_T[path]), q.get('ship') ?? 'choir-cathedral');
+    } else if (this.stage === 'impacts') pre = this.setupImpacts(q.get('side') ?? 'hull', Number(q.get('after') ?? 0.1), q.get('ship') ?? 'bb-indomitable', (q.get('faction') ?? 'concord') as FactionId);
     else pre = this.setupWeapons();
 
     // Fast-forward (no FX): the fight settles into shape.
-    for (let t = 0; t < pre || (this.preUntil?.() && t < pre * 8); t += DT) this.step(DT, false);
+    for (let t = 0; t < pre || (this.preUntil?.() && t < pre * 8); t += DT) {
+      for (let i = this.preTimed.length - 1; i >= 0; i--) {
+        if (t < this.preTimed[i].at) continue;
+        this.preTimed[i].fn();
+        this.preTimed.splice(i, 1);
+      }
+      this.step(DT, false);
+    }
     window.__VANGUARD__ = { ...window.__VANGUARD__, ready: false, frame: () => 0, backend: '', hooks: { ...window.__VANGUARD__?.hooks, scene: this } };
   }
 
@@ -145,6 +190,7 @@ export class CombatTestScene implements GameScene {
     st.facings.fill(st.facingMax * 0.7);
     st.facings[2] = 0;
     st.down = 0b0100;
+    st.cooldown[2] = 1e3; // stays down: no regen, no charge shunted back in (Damage.ts)
     cap.shield = st.facings.reduce((a, b) => a + b, 0);
     cap.sinceHit = 0;
 
@@ -161,7 +207,7 @@ export class CombatTestScene implements GameScene {
     this.player = wing[0];
     this.player.isPlayer = true;
     this.player.target = cap;
-    this.player.combat.subTarget = st.subsystems.indexOf(aimAt);
+    selectSubsystem(this.player, cap, st.subsystems.indexOf(aimAt));
     // Close on the wrecked port batteries and hangar (z ≈ −200…−450 m), looking down and aft.
     this.eyeFn = (t, eye, look) => {
       if (this.camMode === 1) {
@@ -260,7 +306,7 @@ export class CombatTestScene implements GameScene {
       return s;
     });
     const wh = ships[5];
-    wh.combat.subTarget = -1;
+    selectSubsystem(wh, lg, -1);
     this.missiles.salvo(wh, lg, MISSILES.torpedo);
     this.player = ships[0];
     this.player.isPlayer = true;
@@ -272,6 +318,180 @@ export class CombatTestScene implements GameScene {
     };
     void GUNS;
     return 0.9;
+  }
+
+  private setupImpacts(side: string, after: number, id: string, faction: FactionId): number {
+    const cap = this.fleet.spawn(id, faction, ORIGIN.clone(), new Vector3(0, 0, 1), { name: 'Target' });
+    cap.team = 'renegade';
+    cap.flight.velocity.set(0, 0, 0);
+    cap.plotArmour = true;
+    this.target = cap;
+    const st = cap.combat.dmg;
+    const PORT = 2;
+    const setFacing = (f: number, frac: number) => {
+      st.facings[f] = st.facingMax * frac;
+      if (frac <= 0) st.down |= 1 << f;
+      cap.shield = st.facings.reduce((a, b) => a + b, 0);
+    };
+    if (side === 'hull' || side === 'subsystem') setFacing(PORT, 0);
+    else if (side === 'shield') setFacing(PORT, 0.3);
+    else if (side === 'collapse') setFacing(PORT, 0.04);
+    else if (side === 'regen') {
+      setFacing(PORT, 0);
+      cap.sinceHit = 99;
+    }
+    // The strike line, 600 m off the port side, each gun on its own patch of
+    // plating: aim points are found by raycasting the hull from that side.
+    const lineUp: [string, number, number, (t: number) => number][] = [
+      ['vf27-kestrel', 0, 0.3, () => 0], // laser
+      ['vf27-kestrel', 1, 0.12, () => 0], // autocannon
+      ['choir-cantor', 0, -0.06, () => 0], // hymn (harmonic)
+      ['choir-cantor', 1, -0.24, (t) => Math.sin(t * 2.4) * 0.07], // beam lance, sweeping
+    ];
+    const probeHit = createRayHit();
+    const plating = (z: number, out: Vector3): Vector3 => {
+      const from = toUniverse(cap, st.cx + st.halfW * 4, st.cy - st.halfH * 0.4, st.cz + st.halfL * z, new Vector3());
+      const dir = new Vector3(-st.halfW * 8, 0, 0).applyQuaternion(cap.flight.orientation);
+      const facings = st.facings.slice();
+      st.facings.fill(0); // probe the plating, not the shell
+      const hit = raycastShip(cap, from, dir, 0, probeHit);
+      st.facings.splice(0, facings.length, ...facings);
+      return hit ? out.copy(probeHit.point) : toUniverse(cap, st.cx, st.cy, st.cz + st.halfL * z, out);
+    };
+    const mid = plating(0.03, new Vector3());
+    const fire = side !== 'regen' && side !== 'subsystem';
+    lineUp.forEach(([bp, gun, z, sweep], i) => {
+      const at = toUniverse(cap, st.cx + st.halfW + 600, st.cy + st.halfH * (0.3 + i * 0.25), st.cz + st.halfL * z, new Vector3());
+      const s = this.fleet.spawn(bp, bp.startsWith('choir') ? 'choir' : 'concord', at, new Vector3(-1, 0, 0), { name: `${bp} ${i}`, plotArmour: true });
+      s.team = 'concord';
+      s.combat.gun = gun;
+      this.scripted.push({
+        ship: s,
+        aim: () => plating(z + sweep(this.simT), new Vector3()),
+        speed: 0,
+        fire: (t) => fire && (gun === 1 && bp === 'choir-cantor' ? t % 0.8 < 0.5 : true),
+      });
+      if (i === 0) this.player = s;
+    });
+    this.player.isPlayer = true;
+    this.player.target = cap;
+    if (fire) {
+      // A micro-missile swarm from further out (explosive).
+      const wh = this.fleet.spawn('sb9-warhorse', 'concord', toUniverse(cap, st.cx + st.halfW + 900, st.cy + st.halfH * 2.5, st.cz - st.halfL * 0.1, new Vector3()), new Vector3(-1, 0, 0), { name: 'Warhorse', plotArmour: true });
+      wh.team = 'concord';
+      this.scripted.push({ ship: wh, aim: () => cap.flight.position, speed: 0, fire: () => false });
+      this.missiles.salvo(wh, cap, MISSILES.micro);
+    }
+    if (side === 'collapse') {
+      this.freezeOnCollapse = true;
+      this.collapseAfter = after;
+    }
+    if (side === 'subsystem') {
+      const blow = (kind: string, at: number) => {
+        const sub = st.subsystems.find((x) => x.kind === kind && !x.destroyed);
+        if (sub) this.timed.push({ at, fn: () => this.fleet.hit(cap, sub.hpMax * 3, 'explosive', subsystemPosition(cap, sub, new Vector3()), null, null) });
+      };
+      blow('hangar', 0.05);
+      blow('engine', 0.35);
+      blow('turret', 0.6);
+    }
+    const view = Number(new URLSearchParams(location.search).get('cam') ?? 0) || 0;
+    const side3 = new Vector3(1, 0.35, 0.25).applyQuaternion(cap.flight.orientation).normalize();
+    this.eyeFn = (_t, eye, look) => {
+      if (view === 1) {
+        // Close on the struck plating.
+        eye.copy(mid).addScaledVector(side3, 330);
+        look.copy(mid);
+      } else if (view === 2) {
+        // Over the stern (engines, hangar).
+        toUniverse(cap, st.cx + st.halfW * 3.2, st.cy + st.halfH * 3.5, st.cz - st.halfL * 1.5, eye);
+        toUniverse(cap, st.cx, st.cy, st.cz - st.halfL * 0.45, look);
+      } else {
+        eye.copy(mid).addScaledVector(side3, 900);
+        look.copy(mid);
+      }
+    };
+    return side === 'regen' || side === 'subsystem' ? 0.02 : 0.7;
+  }
+
+  /**
+   * stage=kill: a capital, shields down, dies by `path` `after` seconds
+   * before the capture. A Kestrel wing (the player's) stands off her flank;
+   * a Vesper escorts her (the reactor's shockwave reaches it).
+   */
+  private setupKill(path: KillStagePath, after: number, id: string): number {
+    this.killPath = path;
+    const cap = this.fleet.spawn(id, 'choir', ORIGIN.clone(), new Vector3(1, 0, 0.25).normalize(), { name: 'Cathedral Ascendant' });
+    cap.flight.velocity.set(0, 0, 0);
+    cap.controls.throttleSet = 0;
+    this.target = cap;
+    const st = cap.combat.dmg;
+    const L = st.halfL;
+    const escort = this.fleet.spawn('choir-vesper', 'choir', toUniverse(cap, st.cx - st.halfW * 4, st.cy, st.cz + L * 0.4, new Vector3()), new Vector3(0, 0, 1).applyQuaternion(cap.flight.orientation), { name: 'Vesper' });
+    escort.flight.velocity.set(0, 0, 0);
+    this.scripted.push({ ship: escort, aim: () => null, speed: 0, fire: () => false });
+    const start = toUniverse(cap, st.cx + st.halfW * 4, st.cy + st.halfH * 1.5, st.cz + L * 0.2, new Vector3());
+    const wing = this.spawnWing('vf27-kestrel', 'concord', 4, start, new Vector3(-1, -0.2, 0).normalize().applyQuaternion(cap.flight.orientation), 70);
+    wing.forEach((s) => this.scripted.push({ ship: s, aim: () => (cap.alive ? cap.flight.position : null), speed: 20, fire: () => false }));
+    this.player = wing[0];
+    this.player.isPlayer = true;
+    this.player.target = cap;
+    // The shields are long gone; a few mounts already wrecked.
+    const drop = () => {
+      st.facings.fill(0);
+      st.cooldown.fill(1e3);
+      cap.shield = 0;
+      cap.sinceHit = 0;
+    };
+    drop();
+    const by = this.player;
+    const at = (x: number, y: number, z: number) => toUniverse(cap, x, y, z, new Vector3());
+    const hitSub = (kind: string) => {
+      const sub = st.subsystems.find((x) => x.kind === kind && !x.destroyed);
+      if (sub) this.fleet.hit(cap, sub.hp / 1.6 + 1, 'explosive', subsystemPosition(cap, sub, new Vector3()), null, by, sub);
+    };
+    const kill = () => {
+      drop();
+      if (path === 'structural') {
+        const mid = st.structure.sections[1];
+        mid.hp = mid.hpMax * 0.02;
+        for (let i = 0; i < 40 && cap.alive; i++) this.fleet.hit(cap, 900, 'explosive', at(st.cx + st.halfW * 0.5, st.cy, st.cz + ((i % 5) - 2) * 30), null, by);
+      } else if (path === 'reactor') {
+        hitSub('reactor');
+        // The fuse is nearly out (the wing kept the core under fire).
+        st.structure.reactor.t = Math.min(st.structure.reactor.t, 0.05);
+      } else if (path === 'bridge') {
+        cap.hull = cap.hullMax * 0.3;
+        hitSub('bridge');
+      } else {
+        cap.hull = cap.hullMax * 0.004;
+        for (let i = 0; i < 8 && cap.alive; i++) this.fleet.hit(cap, cap.hullMax * 0.01, 'kinetic', at(st.cx + st.halfW, st.cy, st.cz + (i - 4) * L * 0.1), null, by);
+      }
+    };
+    // Earlier battle damage (visible on the wreck): two batteries and a hangar.
+    this.preTimed.push({
+      at: 0,
+      fn: () => {
+        for (const k of ['turret', 'turret', 'hangar']) hitSub(k);
+      },
+    });
+    let pre = 0.2;
+    if (after < 0.7) {
+      this.timed.push({ at: 0.02, fn: kill });
+      this.freeze = 0.02 + after;
+    } else {
+      pre = after;
+      this.preTimed.push({ at: 0.1, fn: kill });
+    }
+    // Broadside, far enough to hold the whole hull (and the pieces as they part).
+    const far = path === 'structural' || path === 'hull' ? 2.6 : path === 'reactor' ? 2.4 : 1.8;
+    this.eyeFn = (_t, eye, look) => {
+      if (this.camMode === 1) {
+        toUniverse(cap, st.cx + L * far * 0.7, st.cy - L * 0.35, st.cz + L * far * 0.7, eye);
+      } else toUniverse(cap, st.cx + L * far, st.cy + L * 0.45, st.cz + L * 0.15, eye);
+      look.copy(cap.flight.position);
+    };
+    return pre;
   }
 
   // ── sim ──────────────────────────────────────────────────────────────
@@ -298,12 +518,19 @@ export class CombatTestScene implements GameScene {
     this.weapons.step(dt);
     this.missiles.step(dt);
     if (fx && this.fxOn) this.combatFx.consume(dt);
-    if (this.freezeOnCollapse && fx && this.weapons.events.some((e) => e.kind === 'shield-down') && !Number.isFinite(this.freeze)) this.freeze = this.liveT + 0.1;
+    this.hud.consume(this.weapons.events, this.player, this.simT);
+    if (fx) for (const e of this.weapons.events) this.tally[e.kind] = (this.tally[e.kind] ?? 0) + 1;
+    if (this.freezeOnCollapse && fx && this.weapons.events.some((e) => e.kind === 'shield-down') && !Number.isFinite(this.freeze)) this.freeze = this.liveT + this.collapseAfter;
   }
 
   update({ dt }: FrameContext): void {
     if (!this.frozen) {
       this.liveT += dt;
+      for (let i = this.timed.length - 1; i >= 0; i--) {
+        if (this.liveT < this.timed[i].at) continue;
+        this.timed[i].fn();
+        this.timed.splice(i, 1);
+      }
       this.step(dt, true);
       if (Number.isFinite(this.freeze) && this.liveT >= this.freeze) this.frozen = true;
     }
@@ -316,7 +543,11 @@ export class CombatTestScene implements GameScene {
     this.visuals.consume();
     this.visuals.update(this.world, vdt);
     this.combatFx.update(vdt, this.world.eye);
-    this.hud.draw(this.player, this.target, this.camera, this.world, this.simT, this.stage === 'capital' || this.stage === 'shield');
+    if (this.hudOn) {
+      const blast = this.combatFx.destruction;
+      this.hud.flash = blast.screenFlash * Math.max(0, 1 - blast.lastBlast.distanceTo(this.world.eye) / 9000);
+      this.hud.draw(this.player, this.target, this.camera, this.world, this.simT, this.stage !== 'smoke' && this.stage !== 'weapons');
+    }
   }
 
   resize(w: number, h: number): void {
@@ -326,6 +557,9 @@ export class CombatTestScene implements GameScene {
   }
 
   cameraLabel(): string {
-    return `COMBAT · ${this.stage.toUpperCase()}${this.frozen ? ' · FROZEN' : ''}`;
+    const t = this.tally;
+    const n = this.stage === 'impacts' ? ` · hit ${t.hit ?? 0} · shield ${t.shield ?? 0} · beam ${t['beam-hit'] ?? 0} · ${this.combatFx.decals.count} marks` : '';
+    const k = this.killPath ? ` · ${this.killPath.toUpperCase()} · ${this.fleet.destruction.wrecks.length} wreck pieces` : '';
+    return `COMBAT · ${this.stage.toUpperCase()}${n}${k}${this.frozen ? ' · FROZEN' : ''}`;
   }
 }
