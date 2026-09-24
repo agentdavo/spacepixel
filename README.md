@@ -519,8 +519,8 @@ Utility numbers are ratios against the Mk I version of the hull's stock item
 (`baselineFit`), so a stock Kestrel is exactly the Kestrel the balance was
 tuned on, and every hull's Mk I fit leaves ~20 % power headroom (all-Mk IV
 needs a better reactor). Most hulls leave the yard all Mk I; the Resolute
-and Valiant come with Mk II kit (Resolute: Mk II mounts, driver, shield and
-plate, Mk III torpedoes; Valiant: Mk II rail mounts and shield).
+and Valiant come with Mk II kit (Resolute: Mk II mounts, driver, torpedoes,
+shield and plate; Valiant: Mk II rail mounts and shield).
 
 A fit is applied to the live ship at spawn and after every refit
 (`applyFit`: combat stats, damage pools, loadout with per-gun sockets / Mk
@@ -552,8 +552,8 @@ hit), so PD thins a swarm without stopping it.
 
 **Balance** (`npm run balance`, scenario *outfit*: scripted helm at 1.5 km,
 turrets live on both sides, mean of six seeds): a Mk III Resolute kills a
-Lantern Guard solo in ~78 s with ~49 % hull left (bands 60–120 s, 30–80 %);
-a stock one wins narrowly (~87 s, ~19 % hull; band 5–35 %). A Mk III Valiant
+Lantern Guard solo in ~78 s with ~66 % hull left (bands 60–120 s, 30–80 %);
+a stock one (4 500 hull) wins narrowly (~110 s, ~22 % hull; band 5–35 %). A Mk III Valiant
 beats a Vesper in ~68 s with ~52 % hull left (bands 45–120 s, 30–80 %; stock
 ~81 s, ~24 %, band 15–40 %), six of its seven torpedoes shot down. Scenario *swarm*: three
 12-round swarms from 2.2 km — a Lantern Guard's PD takes ~25 %, a Mk III

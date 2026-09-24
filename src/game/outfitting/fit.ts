@@ -150,12 +150,11 @@ const STOCK_OVERRIDE: Record<string, Fit> = {
   // Warships leave the yard fitted to fight what their tier meets. All Mk I,
   // a stock Resolute lost a solo duel with a Lantern Guard and a stock
   // Valiant barely scraped past a Vesper (npm run balance, outfit scenario).
-  // The Resolute: Mk II mounts, driver and plate, and a Mk III torpedo load —
-  // the VLS is its punch, and at Mk I/II the picket's point defence takes
-  // nearly every torpedo; with it the duel is a narrow win.
+  // The Resolute: Mk II throughout (mounts, driver, torpedoes, shield, plate);
+  // with its catalogue hull (4500) that is a narrow win over a picket.
   'cr5-resolute': {
     'gun:driver': itemId('g-driver', 2),
-    'msl:vls': itemId('m-torp', 3),
+    'msl:vls': itemId('m-torp', 2),
     'tur:main-a': itemId('t-heavy', 2),
     'tur:main-b': itemId('t-heavy', 2),
     'tur:main-v': itemId('t-heavy', 2),

@@ -642,7 +642,7 @@ export function outfitScenario(): ScenarioResult {
       check('Valiant (Mk III fit) wins a duel with a Vesper (s)', valGood.t, '45..120', valGood.t >= 45 && valGood.t <= 120),
       check('… and it costs (hull left %)', valGood.hullLeft * 100, '30..80', valGood.hullLeft >= 0.3 && valGood.hullLeft <= 0.8),
       check('… not on torpedoes alone: the Vesper PD shoots some down', valGood.intercepted, '>= 1', valGood.intercepted >= 1),
-      // The stock fit (Mk II mounts, shield, plate; Resolute: Mk III torpedoes — STOCK_OVERRIDE) holds its tier's line, just.
+      // The stock fit (Mk II mounts, shield; Resolute also driver, torpedoes, plate — STOCK_OVERRIDE) holds its tier's line, just.
       check('Resolute (stock) solo kills a Lantern Guard (s)', resStock.t, '< 300', Number.isFinite(resStock.t) && resStock.t < 300),
       check('… narrowly (hull left %)', resStock.hullLeft * 100, '5..35', resStock.hullLeft >= 0.05 && resStock.hullLeft <= 0.35),
       check('Valiant (stock) wins a duel with a Vesper (s)', valStock.t, '< 300', Number.isFinite(valStock.t) && valStock.t < 300),

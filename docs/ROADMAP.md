@@ -210,14 +210,15 @@ Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
 - **Stock warship fits** — an all-Mk I Resolute lost a solo duel with a
   Lantern Guard (0 % hull) and a stock Valiant scraped past a Vesper with
   ~18 % hull. Both now leave the yard with Mk II kit (`STOCK_OVERRIDE` in
-  `src/game/outfitting/fit.ts`): Resolute Mk II mounts, driver, shield and
-  plate plus a Mk III torpedo load (at Mk I/II the picket's PD takes nearly
-  every torpedo); Valiant Mk II rail mounts and shield. Utility ratios are
+  `src/game/outfitting/fit.ts`): Resolute Mk II mounts, driver, torpedoes,
+  shield and plate; Valiant Mk II rail mounts and shield. Utility ratios are
   now taken against the Mk I stock item (`baselineFit`), so the Mk II kit
-  counts. Stock Resolute vs Lantern Guard ~87 s / ~19 % hull (band 5–35 %,
-  6 of 6 seeds; ~10 of 12 on a wider sweep — still a narrow win), stock
-  Valiant vs Vesper ~81 s / ~24 % hull (band 15–40 %); Mk III fits
-  unchanged and still ~28–30 points better.
+  counts. Mk II alone doesn't save the Resolute (the picket's PD takes
+  nearly every Mk I/II torpedo), so its catalogue hull goes 3000 → 4500.
+  Stock Resolute vs Lantern Guard ~110 s / ~22 % hull (band 5–35 %, 6 of 6
+  seeds; 12 of 12 on a wider sweep at ~32 %), stock Valiant vs Vesper ~81 s /
+  ~24 % hull (band 15–40 %). Mk III Resolute now ~78 s / ~66 % hull (was
+  49 %, band 30–80 % unchanged); Mk III Valiant unchanged.
 - **Valiant bridge camera** — eye 0.16 L above / 0.08 L behind the bridge over
   a forward battery; the mounts sit in the bottom sixth (tested).
 - **Hires** — Magpie (wing) and Brennick (−30 % repairs) verified end to end
