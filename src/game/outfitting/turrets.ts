@@ -4,6 +4,7 @@ import type { Weapons, Beam } from '@/sim/Weapons';
 import type { Capitals } from '@/sim/Capitals';
 import type { Rng } from '@/sim/Rng';
 import { GUNS, type GunSpec, type Loadout, type MountSpec } from '@/sim/Loadouts';
+import type { Subsystem } from '@/sim/Damage';
 import { createTurretSolution, issueOrder, leadPoint, turretAim, turretCanPoint, turretSelectTarget, TURRET_DEFAULTS, type TurretMount, type TurretSolution } from '@/sim/ai';
 import type { ArticulationNode } from '@/assets/ShipBuilder';
 import { CATALOG_BY_ID } from '@/game/shipyard/catalog';
@@ -40,6 +41,8 @@ interface MountRt {
   burst: number;
   beam: Beam | null;
   engaged: boolean;
+  /** The mount as a subsystem (Combat: capitals and gunships); destroyed = silent. */
+  sub: Subsystem | null;
 }
 
 interface ShipRt {
@@ -204,6 +207,7 @@ export class ShipTurrets {
           burst: 0,
           beam: null,
           engaged: false,
+          sub: s.combat.dmg.subsystems.find((x) => x.id === name) ?? null,
         });
       }
     }
@@ -250,6 +254,12 @@ export class ShipTurrets {
     const ord = this.fleet.ordnance;
     const team = s.team;
     for (const g of r.mounts) {
+      if (g.sub?.destroyed) {
+        // Shot off the hull: no fire, no tracking (the wreck pose is the model's).
+        g.engaged = false;
+        if (g.beam?.active) g.beam.active = false;
+        continue;
+      }
       const m = g.mount;
       m.position.copy(g.local).applyQuaternion(f.orientation).add(f.position);
       m.up.copy(g.localUp).applyQuaternion(f.orientation);
@@ -336,6 +346,8 @@ export class ShipTurrets {
 
   private stepHangar(s: ShipEntity, h: HangarRt, dt: number): void {
     if (!s.alive) return;
+    // A wrecked bay launches nothing (its cook-off is Fleet.cookOff's).
+    if (s.combat.dmg.subsystems.some((x) => x.id === 'hangar' && x.destroyed)) return;
     h.cooldown -= dt;
     if (h.cooldown > 0) return;
     // A craft shot down (hull 0) stays down until the carrier docks.

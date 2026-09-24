@@ -12,7 +12,9 @@ import { copyControls, quantizeControls } from '@/sim/Replay';
  * command (with deadzone). Keyboard: W/S throttle, A/D yaw, arrows pitch/yaw,
  * Q/E roll, Shift afterburner, X kill throttle, Z flight-assist toggle,
  * Space/LMB guns, F/RMB missile salvo, T next target, J cruise drive,
- * R next gun, Y next missile type, B next target subsystem.
+ * R next gun, Y next missile type, B next target subsystem (exposed ones
+ * first), Shift+B previous subsystem, I / middle mouse the subsystem nearest
+ * the crosshair.
  * Gamepad: left stick pitch/yaw, right stick X roll, triggers throttle,
  * A/south = afterburner.
  *
@@ -44,6 +46,9 @@ export interface ControlState {
   cycleGun?: boolean;
   cycleMissile?: boolean;
   cycleSub?: boolean;
+  /** Previous target subsystem (Shift+B) · the one nearest the crosshair (I / middle mouse). Edge-triggered. */
+  cycleSubBack?: boolean;
+  pickSub?: boolean;
 }
 
 const DEADZONE = 0.06;
@@ -92,6 +97,8 @@ export class Input {
   private gunEdge = false;
   private missileTypeEdge = false;
   private subEdge = false;
+  private subBackEdge = false;
+  private pickSubEdge = false;
 
   constructor(private target: HTMLElement | Window = window) {
     const t = this.target as Window;
@@ -104,7 +111,11 @@ export class Input {
       if (e.code === 'KeyJ') this.cruiseEdge = true;
       if (e.code === 'KeyR') this.gunEdge = true;
       if (e.code === 'KeyY') this.missileTypeEdge = true;
-      if (e.code === 'KeyB') this.subEdge = true;
+      if (e.code === 'KeyB') {
+        if (e.shiftKey) this.subBackEdge = true;
+        else this.subEdge = true;
+      }
+      if (e.code === 'KeyI') this.pickSubEdge = true;
       if (e.code === 'Tab') e.preventDefault();
       this.mark(e.timeStamp);
     });
@@ -122,6 +133,12 @@ export class Input {
     t.addEventListener('pointerdown', (e) => {
       if (e.button === 2) {
         this.missileEdge = true;
+        this.mark(e.timeStamp);
+        return;
+      }
+      if (e.button === 1) {
+        e.preventDefault(); // no autoscroll
+        this.pickSubEdge = true;
         this.mark(e.timeStamp);
         return;
       }
@@ -162,6 +179,8 @@ export class Input {
     s.cycleGun = this.gunEdge;
     s.cycleMissile = this.missileTypeEdge;
     s.cycleSub = this.subEdge;
+    s.cycleSubBack = this.subBackEdge;
+    s.pickSub = this.pickSubEdge;
 
     // Mouse virtual joystick (adds to keyboard, clamped).
     if (this.mouseActive) {
@@ -203,7 +222,7 @@ export class Input {
    */
   beginTick(first: boolean): ControlState {
     const s = copyControls(this.latest, this.state);
-    if (!first) s.flightAssistToggle = s.missile = s.nextTarget = s.cruise = s.cycleGun = s.cycleMissile = s.cycleSub = false;
+    if (!first) s.flightAssistToggle = s.missile = s.nextTarget = s.cruise = s.cycleGun = s.cycleMissile = s.cycleSub = s.cycleSubBack = s.pickSub = false;
     return s;
   }
 
@@ -216,9 +235,9 @@ export class Input {
   endTicks(ticks: number, drop: boolean): void {
     if (ticks === 0 && !drop) return;
     this.faEdge = this.missileEdge = this.targetEdge = this.cruiseEdge = false;
-    this.gunEdge = this.missileTypeEdge = this.subEdge = false;
+    this.gunEdge = this.missileTypeEdge = this.subEdge = this.subBackEdge = this.pickSubEdge = false;
     const s = this.latest;
-    s.flightAssistToggle = s.missile = s.nextTarget = s.cruise = s.cycleGun = s.cycleMissile = s.cycleSub = false;
+    s.flightAssistToggle = s.missile = s.nextTarget = s.cruise = s.cycleGun = s.cycleMissile = s.cycleSub = s.cycleSubBack = s.pickSub = false;
   }
 }
 

@@ -123,6 +123,8 @@ export interface GunSpec {
   /** Synth voice + timbre for the audio façade. */
   sfx: 'laser' | 'cannon';
   timbre: FactionId;
+  /** Explosive rounds: blast radius (m) that splashes subsystems around a burst on the plating (Subsystems.ts). */
+  blast?: number;
 }
 
 export const GUNS: Record<GunId, GunSpec> = {
@@ -227,6 +229,8 @@ export interface MissileSpec {
   lockRange: number;
   /** Harpoon: seconds the target is tethered (thrust and top speed halved). */
   tether?: number;
+  /** Warhead blast radius (m): a burst on bare plating splashes every subsystem this close (Subsystems.splashSubsystems). */
+  blast?: number;
   /** Body visual: length / thickness multipliers and glow colour. */
   body: { length: number; width: number; color: string };
 }
@@ -246,6 +250,7 @@ export const MISSILES: Record<MissileId, MissileSpec> = {
     life: 7,
     fuse: 6,
     damage: 16,
+    blast: 12,
     spiral: 260,
     // One flak or laser hit: point defence thins a swarm, it can't stop one.
     hp: 5,
@@ -269,6 +274,7 @@ export const MISSILES: Record<MissileId, MissileSpec> = {
     life: 22,
     fuse: 30,
     damage: 800,
+    blast: 150,
     spiral: 0,
     hp: 40,
     reload: 12,
