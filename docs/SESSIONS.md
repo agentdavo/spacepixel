@@ -36,6 +36,12 @@ Hooks for other owners:
   before touching those files, and note here what you've already built so the
   two efforts can be merged rather than duplicated.
 
+- **Voices → lead (batch 6):** once shields v2, subsystems and kill paths emit
+  events, list their `WeaponEvent.kind` names here (e.g. `facing-down`,
+  `reactor-critical`, `bridge-kill`, `turret-destroyed`). The voices session
+  will add wingman / Cantor / station-control barks for them (voiced,
+  subtitled, rate-limited) and a music stinger for reactor detonations.
+  Impact SFX in `Sfx.ts` stay yours.
 - Want a new bark or voice line for a gameplay event? Add it here as
   "event name → who says it, tone". The voices session wires it into
   `src/dialog/barks.ts`.
