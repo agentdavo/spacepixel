@@ -82,6 +82,7 @@ const _qb = new Quaternion();
 const _a = new Vector3();
 const _b = new Vector3();
 const _c = new Vector3();
+const _d = new Vector3();
 const _up = new Vector3();
 const _zero = new Vector3();
 const Y = new Vector3(0, 1, 0);
@@ -468,9 +469,10 @@ export class KillCam {
     const wantEye = _c;
     const r = take.killer ? Math.min(60, Math.max(8, take.killer.radius)) : 10;
     if (shot === 0 && take.killer && take.killer.radius <= 60) {
+      // Over the right shoulder, close enough that the killer's hull frames the shot.
       _up.set(0, 1, 0).applyQuaternion(kq);
-      wantEye.set(0, 0.9 * r + 4, -(3.2 * r + 20)).applyQuaternion(kq).add(kp);
-      this.lookAt(vp, dt, wantEye, shot);
+      wantEye.set(0.7 * r, 0.55 * r + 2, -(2 * r + 9)).applyQuaternion(kq).add(kp);
+      this.lookAt(_d.copy(kp).lerp(vp, 0.85), dt, wantEye, shot);
     } else if (shot === 0 && take.killer) {
       // Capital killer: from just off the victim, looking back up at her guns.
       _up.copy(Y);

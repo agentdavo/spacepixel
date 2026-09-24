@@ -3,7 +3,7 @@
    docking cutaway's .dock-cinema styles (dock.css). */
 
 .killcam.dock-cinema { z-index: 30; }
-.killcam .tc::before { content: '◀◀ '; color: #ff3f5f; animation: none; }
+.dock-cinema.killcam .tc::before { content: '◀◀ '; color: #ff3f5f; animation: none; }
 .killcam-on .dock-cinema:not(.killcam),
 .killcam-on .rescue-stamp { visibility: hidden; }
 

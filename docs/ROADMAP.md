@@ -86,8 +86,8 @@ opens the Reach up around them and gets the game in front of players.
 | 10 | Contracts board — courier, escort, bounty jobs generated from station state | uses the campaign runner | ✅ 8 kinds, seeded boards, runner-driven ops (`src/game/contracts`) |
 | 11 | Free-roam between episodes — the Reach stays open, episodes start from a station | save/resume anywhere docked | ✅ debrief → free flight → priority orders; title CONTINUE |
 | 12 | Ship upgrades & hangar — guns, missiles, shields, engines; livery shop | visible on the model | ✅ |
-| 13 | **MP-0 determinism** — fixed 60 Hz step, seeded RNG, sim/render split | bit-identical 10 min replay | |
-| 14 | Replays + kill-cam from recorded input | replay matches live | |
+| 13 | **MP-0 determinism** — fixed 60 Hz step, seeded RNG, sim/render split | bit-identical 10 min replay | ✅ `npm run determinism`: dogfight · capital battle · traffic ambush, 600/600 checkpoints each, recorded input replays to the bit; 0 `Math.random` in the sim |
+| 14 | Replays + kill-cam from recorded input | replay matches live | ✅ always-on recorder, O saves a clip, `?replay=auto\|clip-N\|<url>` (SYNC checkpoints; `scripts/replay-check.mjs`), kill-cam on death / capital / bounty kills |
 | 15 | Headless shard (Node) + bot clients | 200 ships < 8 ms tick | |
 | 16 | Two-browser flight: prediction, interpolation, lag-compensated hits | < 2 m error at 150 ms RTT | |
 | 17 | Lantern jump = shard handoff | < 3 s inside the tunnel | |
@@ -95,7 +95,11 @@ opens the Reach up around them and gets the game in front of players.
 | 19 | Co-op campaign (up to 4) | episodes playable with 2 | |
 | 20 | Public playtest build + landing page | 100 concurrent | |
 
-Design for 13–20: [docs/MULTIPLAYER.md](MULTIPLAYER.md).
+Design for 13–20: [docs/MULTIPLAYER.md](MULTIPLAYER.md) (MP-0 as built: fixed
+step + render prediction, RNG streams, replay format, kill-cam, what still
+couples).
+
+![Kill-cam](screenshots/replay-killcam.jpg)
 
 ## Batch 4 — the hero's career (first versions: all in)
 
