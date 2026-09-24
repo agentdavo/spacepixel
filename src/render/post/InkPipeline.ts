@@ -1,4 +1,5 @@
 import { Color, Vector4, type Camera, type Scene } from 'three';
+import { disposeNodeTargets } from '@/core/dispose';
 import { RenderPipeline, type WebGPURenderer, type TextureNode } from 'three/webgpu';
 import type { ShaderNode as Node } from '@/render/tsl';
 import {
@@ -223,6 +224,7 @@ export class InkPipeline {
 
   /** Release the scene pass and bloom render targets and the output quad (scene swaps). */
   dispose(): void {
+    disposeNodeTargets(this.nodes.final); // FXAA's convertToTexture RTT, …
     this.scenePass.dispose();
     this.glow.dispose();
     this.pipeline.dispose();

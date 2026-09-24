@@ -1019,6 +1019,7 @@ export class TrailerStage implements CinemaStage {
 
   dispose(): void {
     this.ui.dispose();
+    disposeTree(this.view.group); // before the view unhooks its group from the set
     this.view.dispose();
     for (const s of this.sets.values()) {
       for (const p of s.pieces) p.dispose();

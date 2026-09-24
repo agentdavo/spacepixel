@@ -227,6 +227,13 @@ export class Particles {
     this.object.add(this.driver);
 
     this.trails = new Trails(this);
+    // Scene teardown (core/dispose.ts) finds this and releases the compute pipeline.
+    this.object.userData.dispose = () => this.dispose();
+  }
+
+  /** Release the compute pass (its pipeline and bindings pin the storage buffers). */
+  dispose(): void {
+    (this.computeNode as unknown as { dispose?(): void }).dispose?.();
   }
 
   // ── public API ───────────────────────────────────────────────────────

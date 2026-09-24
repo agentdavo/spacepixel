@@ -15,7 +15,7 @@ import { loadProfile, saveProfile } from '@/game/Profile';
 import type { FlightScene } from '@/world/scenes/FlightScene';
 import type { PrologueScene } from '@/world/scenes/PrologueScene';
 import type { TrailerScene } from '@/world/scenes/TrailerScene';
-import { disposeTree, DISPOSE_PARTS } from '@/core/dispose';
+import { disposeTree, DISPOSE_PARTS, GpuEpoch, releaseRendererCaches } from '@/core/dispose';
 import { PhotoMode } from '@/ui/PhotoMode';
 import { getAudio } from '@/audio';
 import { DynamicResolution } from '@/core/DynamicResolution';
@@ -80,6 +80,7 @@ async function boot(): Promise<void> {
   let debugHud: DebugHud | null = null;
   let current: GameScene | null = null;
   const photo = new PhotoMode(canvas, uiRoot);
+  const gpu = new GpuEpoch(info.renderer as unknown as ConstructorParameters<typeof GpuEpoch>[0]);
 
   /** (Re)build the running scene + its ink pipeline; the old one is torn down (GPU + DOM). */
   async function load(name: string): Promise<GameScene> {
@@ -94,6 +95,8 @@ async function boot(): Promise<void> {
       current = null;
     }
     if (DISPOSE_PARTS.ink) ink?.dispose();
+    if (DISPOSE_PARTS.textures) gpu.flush();
+    releaseRendererCaches(info.renderer);
     ink = null;
     const game = await SCENES[name]();
     current = game;
