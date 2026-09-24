@@ -401,7 +401,7 @@ readable subtitles).
 then the trailer, and so on; any key, click or pad input returns to the
 title. Scene swaps tear the old scene down (GPU buffers, materials, the ink
 pipeline's render targets, DOM), so it runs unattended: `npm run
-attract-check` soaks the loop headless (`?idle=6&reel=24`, 3 cycles ≈ 12 min
+attract-check` soaks the loop headless (`?idle=20&reel=24`, 3 cycles ≈ 12 min
 of unattended play) and checks renderer.info geometries / textures, JS heap
 and DOM size cycle to cycle.
 

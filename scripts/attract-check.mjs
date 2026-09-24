@@ -7,7 +7,7 @@
  * objects (renderer.info.memory: geometries, textures), the JS heap and the
  * DOM size. Then a keypress mid-reel must bring the title back.
  *
- *   node scripts/attract-check.mjs [--port 5403] [--cycles 3] [--reel 24] [--idle 6] [--out <dir>]
+ *   node scripts/attract-check.mjs [--port 5403] [--cycles 3] [--reel 24] [--idle 20] [--out <dir>]
  *
  * PASS when, comparing each title with the one a full cycle earlier (same
  * reel just played) once the first cycle has warmed the caches: geometries and textures are
@@ -26,7 +26,7 @@ const opt = (n, d) => (args.includes(`--${n}`) ? args[args.indexOf(`--${n}`) + 1
 const port = Number(opt('port', 5403));
 const cycles = Number(opt('cycles', 3));
 const reel = Number(opt('reel', 24));
-const idle = Number(opt('idle', 6));
+const idle = Number(opt('idle', 20));
 const out = opt('out', '');
 if (out) mkdirSync(out, { recursive: true });
 const T = 900_000;
@@ -52,7 +52,9 @@ try {
   await page.waitForFunction(() => window.__VANGUARD__?.hooks?.attract, null, { timeout: T, polling: 500 });
 
   const sample = async (label) => {
-    await page.waitForTimeout(1500);
+    // Let the title's backdrop scene draw a few frames first (pipelines compile as they are drawn).
+    const f0 = await page.evaluate(() => window.__VANGUARD__.frame());
+    await page.waitForFunction((f0) => window.__VANGUARD__.frame() >= f0 + 8, f0, { timeout: 120_000, polling: 250 }).catch(() => {});
     return page.evaluate((label) => {
       window.gc?.();
       const v = window.__VANGUARD__;
