@@ -209,8 +209,9 @@ const KIND_MIX: Record<StationKind, [TrafficRole, number][]> = {
   freeport: [['freighter', 4], ['courier', 2], ['tanker', 1], ['liner', 1]],
   bastion: [['courier', 3], ['freighter', 2], ['tanker', 1]],
   carrier: [['courier', 1]],
+  surface: [['liner', 2], ['freighter', 3], ['courier', 2]],
 };
-const KIND_WEIGHT: Record<StationKind, number> = { orbital: 1.4, freeport: 1.25, refinery: 1.0, salvage: 0.85, bastion: 0.55, carrier: 0.3 };
+const KIND_WEIGHT: Record<StationKind, number> = { orbital: 1.4, freeport: 1.25, refinery: 1.0, salvage: 0.85, bastion: 0.55, carrier: 0.3, surface: 1.2 };
 
 /** Traffic volume multiplier by system holder (fewer sailings where it's dangerous). */
 export function systemVolume(sys: Pick<StarSystem, 'faction' | 'threat'>): number {

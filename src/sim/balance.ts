@@ -54,7 +54,9 @@ interface World {
 }
 
 function world(): World {
-  const fleet = new Fleet(new Group());
+  // The world seed follows the scenario's aim-noise seed: every stream (weapons,
+  // missiles, capital fire control, AI) is repeatable per scenario.
+  const fleet = new Fleet(new Group(), seed);
   const weapons = new Weapons(fleet);
   const missiles = new Missiles(fleet);
   const capitals = new Capitals(fleet, weapons);
@@ -350,17 +352,6 @@ export function capitalScenario(): ScenarioResult {
 // ── subsystem effects + torpedo point defence ────────────────────────
 
 export function effectsScenario(): ScenarioResult {
-  // Capitals draws on Math.random (turret cadence, scatter): seed it so the check is repeatable.
-  const random = Math.random;
-  Math.random = rand;
-  try {
-    return effectsInner();
-  } finally {
-    Math.random = random;
-  }
-}
-
-function effectsInner(): ScenarioResult {
   // Torpedoes vs point defence: 6 torpedoes launched one by one at a Lantern Guard with PD live.
   seed = 5;
   const w = world();
@@ -454,51 +445,45 @@ function effectsInner(): ScenarioResult {
  */
 export function swarmVsPd(targetBp: string, hullId: string | null): { launched: number; intercepted: number; hits: number } {
   seed = 13;
-  const random = Math.random;
-  Math.random = rand;
-  try {
-    const w = world();
-    const turrets = new ShipTurrets(w.fleet, w.weapons, w.capitals);
-    let tgt: ShipEntity;
-    if (hullId) {
-      const e = CATALOG_BY_ID[hullId];
-      tgt = w.fleet.spawn(e.blueprint, 'concord', ORIGIN.clone(), new Vector3(1, 0, 0));
-      applyFit(tgt, e, goodFit(hullId));
-    } else {
-      tgt = w.fleet.spawn(targetBp, 'concord', ORIGIN.clone(), new Vector3(1, 0, 0));
-      w.capitals.register(tgt, { launchBlueprint: null });
-    }
-    const shooter = w.fleet.spawn('vf27-kestrel', 'choir', ORIGIN.clone().add(new Vector3(0, 300, 2200)), new Vector3(0, -300, -2200).normalize(), { isPlayer: true });
-    shooter.target = tgt;
-    let intercepted = 0;
-    let hits = 0;
-    let launched = 0;
-    for (let k = 0; k < 3; k++) {
-      w.missiles.salvo(shooter, tgt, MISSILES.micro);
-      for (let t = 0; t < 8; t += DT) {
-        // Station-keeping 2.2 km out, but flying at the target (a swarm comes off a moving fighter).
-        shooter.flight.position.copy(ORIGIN).add(_b.set(0, 300, 2200));
-        hold(shooter, _a.set(0, -300, -2200).normalize().multiplyScalar(160));
-        shooter.controls.fire = false;
-        tgt.flight.velocity.set(0, 0, 0);
-        tgt.flight.position.copy(ORIGIN);
-        w.capitals.step(DT);
-        turrets.step(DT, null);
-        w.fleet.step(DT);
-        w.weapons.step(DT);
-        w.missiles.step(DT);
-        for (const e of w.missiles.events) {
-          if (e.kind === 'launch') launched++;
-          if (e.kind !== 'detonate') continue;
-          if (e.intercepted) intercepted++;
-          else hits++;
-        }
+  const w = world();
+  const turrets = new ShipTurrets(w.fleet, w.weapons, w.capitals);
+  let tgt: ShipEntity;
+  if (hullId) {
+    const e = CATALOG_BY_ID[hullId];
+    tgt = w.fleet.spawn(e.blueprint, 'concord', ORIGIN.clone(), new Vector3(1, 0, 0));
+    applyFit(tgt, e, goodFit(hullId));
+  } else {
+    tgt = w.fleet.spawn(targetBp, 'concord', ORIGIN.clone(), new Vector3(1, 0, 0));
+    w.capitals.register(tgt, { launchBlueprint: null });
+  }
+  const shooter = w.fleet.spawn('vf27-kestrel', 'choir', ORIGIN.clone().add(new Vector3(0, 300, 2200)), new Vector3(0, -300, -2200).normalize(), { isPlayer: true });
+  shooter.target = tgt;
+  let intercepted = 0;
+  let hits = 0;
+  let launched = 0;
+  for (let k = 0; k < 3; k++) {
+    w.missiles.salvo(shooter, tgt, MISSILES.micro);
+    for (let t = 0; t < 8; t += DT) {
+      // Station-keeping 2.2 km out, but flying at the target (a swarm comes off a moving fighter).
+      shooter.flight.position.copy(ORIGIN).add(_b.set(0, 300, 2200));
+      hold(shooter, _a.set(0, -300, -2200).normalize().multiplyScalar(160));
+      shooter.controls.fire = false;
+      tgt.flight.velocity.set(0, 0, 0);
+      tgt.flight.position.copy(ORIGIN);
+      w.capitals.step(DT);
+      turrets.step(DT, null);
+      w.fleet.step(DT);
+      w.weapons.step(DT);
+      w.missiles.step(DT);
+      for (const e of w.missiles.events) {
+        if (e.kind === 'launch') launched++;
+        if (e.kind !== 'detonate') continue;
+        if (e.intercepted) intercepted++;
+        else hits++;
       }
     }
-    return { launched, intercepted, hits };
-  } finally {
-    Math.random = random;
   }
+  return { launched, intercepted, hits };
 }
 
 export function swarmScenario(): ScenarioResult {
@@ -556,25 +541,20 @@ export interface DuelOut {
  * FREE); torpedoes go in on reload.
  */
 export function fittedDuel(hullId: string, fit: Fit, targetBp: string, range = 1500, maxT = 300, seeds = [31, 47, 59, 73, 89, 97]): DuelOut {
-  // Capitals draws on Math.random (turret cadence, scatter): seed it so the bands are repeatable,
-  // and average a few seeds (a capital duel is chaotic: facings, torpedo intercepts).
-  const random = Math.random;
-  Math.random = rand;
-  try {
-    const runs = seeds.map((sd) => duelInner(hullId, fit, targetBp, range, maxT, sd));
-    if (DEBUG) for (const r of runs) console.log(hullId, targetBp, r.t.toFixed(1), (r.hullLeft * 100).toFixed(0), r.torps, r.intercepted);
-    const mean = (f: (d: DuelOut) => number) => runs.reduce((n, d) => n + f(d), 0) / runs.length;
-    const taken: DuelOut['taken'] = {};
-    for (const r of runs)
-      for (const [k, v] of Object.entries(r.taken)) {
-        const o = (taken[k] ??= { shield: 0, hull: 0 });
-        o.shield += v.shield / runs.length;
-        o.hull += v.hull / runs.length;
-      }
-    return { t: mean((d) => d.t), hullLeft: mean((d) => d.hullLeft), power: runs[0].power, torps: Math.round(mean((d) => d.torps)), taken, intercepted: Math.round(mean((d) => d.intercepted)) };
-  } finally {
-    Math.random = random;
-  }
+  // Every stream (capital turret cadence and scatter included) forks from the
+  // world seed, so the bands are repeatable; average a few seeds (a capital
+  // duel is chaotic: facings, torpedo intercepts).
+  const runs = seeds.map((sd) => duelInner(hullId, fit, targetBp, range, maxT, sd));
+  if (DEBUG) for (const r of runs) console.log(hullId, targetBp, r.t.toFixed(1), (r.hullLeft * 100).toFixed(0), r.torps, r.intercepted);
+  const mean = (f: (d: DuelOut) => number) => runs.reduce((n, d) => n + f(d), 0) / runs.length;
+  const taken: DuelOut['taken'] = {};
+  for (const r of runs)
+    for (const [k, v] of Object.entries(r.taken)) {
+      const o = (taken[k] ??= { shield: 0, hull: 0 });
+      o.shield += v.shield / runs.length;
+      o.hull += v.hull / runs.length;
+    }
+  return { t: mean((d) => d.t), hullLeft: mean((d) => d.hullLeft), power: runs[0].power, torps: Math.round(mean((d) => d.torps)), taken, intercepted: Math.round(mean((d) => d.intercepted)) };
 }
 
 function duelInner(hullId: string, fit: Fit, targetBp: string, range: number, maxT: number, sd: number): DuelOut {

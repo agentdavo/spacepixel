@@ -68,6 +68,7 @@ const SUFFIX: Record<StationKind, string[]> = {
   freeport: ['Free Port', 'Exchange', 'Moot'],
   orbital: ['Highport', 'Orbital', 'Skyhook'],
   carrier: ['Carrier'],
+  surface: ['Downport'],
 };
 
 function mulberry32(seed: number) {

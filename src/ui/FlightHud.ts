@@ -535,7 +535,7 @@ export class FlightHud {
    * director diamond 600 m ahead of you on the centreline, and deviation /
    * range / closure readouts. Boxes you're inside light cyan, others amber.
    */
-  drawDockCorridor(bay: Vector3, axis: Vector3, up: Vector3, pos: Vector3, relVel: Vector3, name: string, cam: PerspectiveCamera, world: WorldSpace, time: number): void {
+  drawDockCorridor(bay: Vector3, axis: Vector3, up: Vector3, pos: Vector3, relVel: Vector3, name: string, cam: PerspectiveCamera, world: WorldSpace, time: number, scale = 1): void {
     const c = this.ctx;
     const right = _r.crossVectors(up, axis).normalize();
     const rel = _d.subVectors(pos, bay);
@@ -546,11 +546,12 @@ export class FlightHud {
     const pts: { x: number; y: number }[] = [];
     c.lineWidth = 1.5;
     for (let k = 10; k >= 1; k--) {
-      const d = k * 350;
-      const half = 40 + d * 0.05;
+      // Big hulls (and the descent corridor) fly a longer, wider corridor: `scale`.
+      const d = k * 350 * scale;
+      const half = (40 + d * 0.05) * Math.sqrt(scale);
       const inside = Math.abs(lx) < half && Math.abs(ly) < half * 0.7;
       // Only the gates still ahead of you (and never more than ~2 km of them).
-      if (d > lz - 150 || d < lz - 2200) continue;
+      if (d > lz - 150 * scale || d < lz - 2200 * scale) continue;
       pts.length = 0;
       for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
         corner.copy(bay).addScaledVector(axis, d).addScaledVector(right, sx * half).addScaledVector(up, sy * half * 0.7);

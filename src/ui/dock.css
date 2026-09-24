@@ -102,6 +102,8 @@
 .dock-screen.choir .dock-head .stripe { background: repeating-linear-gradient(90deg, #ff3fa8 0 30px, transparent 30px 37px, #5d4a86 37px 67px, transparent 67px 74px); }
 .dock-screen.rustwake .dock-head .stripe { background: repeating-linear-gradient(90deg, #ffd21f 0 30px, transparent 30px 37px, #b0643a 37px 67px, transparent 67px 74px); }
 .dock-head .kicker { font-size: 11px; letter-spacing: 0.3em; color: var(--fc); }
+.dock-head .dock-lighter { color: #ffd24f; white-space: nowrap; }
+.dock-head .dock-lighter svg { vertical-align: -1px; }
 .dock-head h2 {
   margin: 2px 0 0;
   font-family: var(--font-display);

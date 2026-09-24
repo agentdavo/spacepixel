@@ -5,6 +5,7 @@ import { createTurretSolution, turretAim, turretCanPoint, turretSelectTarget, TU
 import { issueOrder, leadPoint } from './ai';
 import { CAPITAL_LANCE, GUNS, type BatterySpec, type GunSpec } from './Loadouts';
 import { shieldFacing, type Subsystem } from './Damage';
+import type { Rng } from './Rng';
 
 /**
  * Capital ships as combatants: flak turrets on every 'turret' hardpoint
@@ -68,6 +69,8 @@ interface Capital {
   gun: GunSpec;
   battery: BatterySpec | null;
   pdCooldown: number;
+  /** Fire-control dice: this capital's own stream (ship.rng → 'capital'). */
+  rng: Rng;
 }
 
 export interface CapitalOptions {
@@ -128,6 +131,7 @@ export class Capitals {
     const battery = ship.combat.loadout.battery ?? null;
     const isBattery = (id: string) => !!battery && battery.sockets.some((b) => id === b || id === `${b}.L`);
     const subOf = (id: string) => ship.combat.dmg.subsystems.find((x) => x.id === id) ?? null;
+    const rng = ship.rng.fork('capital');
     for (const [id, o] of ship.model.sockets) {
       _m.multiplyMatrices(_inv, o.matrixWorld); // socket → root-local
       const local = new Vector3().setFromMatrixPosition(_m);
@@ -141,7 +145,7 @@ export class Capitals {
           local,
           localUp: up,
           localFwd: fwd,
-          cooldown: Math.random() * 2,
+          cooldown: rng.next() * 2,
           burst: 0,
           mount: { ...TURRET_DEFAULTS, position: new Vector3(), forward: new Vector3(), up: new Vector3(), velocity: new Vector3(), boltSpeed: gun.speed, range: Math.min(2400, gun.speed * gun.life) },
           sol: createTurretSolution(),
@@ -152,13 +156,13 @@ export class Capitals {
           bigTarget: null,
         });
       } else if (kind === 'beam') {
-        lances.push({ sub: subOf(id), socket: id, local, cooldown: 4 + Math.random() * 6, beam: null, target: null });
+        lances.push({ sub: subOf(id), socket: id, local, cooldown: 4 + rng.next() * 6, beam: null, target: null });
       } else if (kind === 'hangar') {
-        hangars.push({ sub: subOf(id), local, localFwd: fwd, cooldown: 3 + Math.random() * 3 });
+        hangars.push({ sub: subOf(id), local, localFwd: fwd, cooldown: 3 + rng.next() * 3 });
       }
     }
     if (opts.gunInterval) this.gunInterval = opts.gunInterval;
-    this.list.push({ ship, guns, lances, hangars, launched: [], launchBlueprint: opts.launchBlueprint ?? null, maxFighters: opts.maxFighters ?? 4, gun, battery, pdCooldown: 0 });
+    this.list.push({ ship, guns, lances, hangars, launched: [], launchBlueprint: opts.launchBlueprint ?? null, maxFighters: opts.maxFighters ?? 4, gun, battery, pdCooldown: 0, rng });
   }
 
   /** Nearest hostile big hull (radius ≥ `minRadius`) the battery can lay on, or null. */
@@ -190,6 +194,7 @@ export class Capitals {
       if (fx.drift) f.flightAssist = false;
       const coord = fx.coordination;
       const gun = c.gun;
+      const rng = c.rng;
       const burst = gun.burst ?? { count: 3, gap: 0.09, interval: 1.6, scatter: 0.03 };
       const interval = (this.gunInterval ?? burst.interval) * (1 + (1 - coord));
 
@@ -244,7 +249,7 @@ export class Capitals {
           const b = c.battery.burst;
           const sc = b.scatter / coord;
           _v.copy(g.sol.aimDir)
-            .add(_w.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(sc))
+            .add(_w.set(rng.centered(), rng.centered(), rng.centered()).multiplyScalar(sc))
             .normalize()
             .multiplyScalar(bigGun.speed)
             .add(f.velocity);
@@ -252,7 +257,7 @@ export class Capitals {
           g.burst++;
           if (g.burst >= b.count) {
             g.burst = 0;
-            g.cooldown = b.interval * (1 + (1 - coord)) * (0.85 + Math.random() * 0.3);
+            g.cooldown = b.interval * (1 + (1 - coord)) * (0.85 + rng.next() * 0.3);
           } else g.cooldown = b.gap;
           continue;
         }
@@ -260,7 +265,7 @@ export class Capitals {
         const scatter = burst.scatter / coord;
         for (let k = 0; k < gun.pellets; k++) {
           _v.copy(g.sol.aimDir)
-            .add(_w.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(scatter + gun.spread))
+            .add(_w.set(rng.centered(), rng.centered(), rng.centered()).multiplyScalar(scatter + gun.spread))
             .normalize()
             .multiplyScalar(gun.speed)
             .add(f.velocity);
@@ -269,7 +274,7 @@ export class Capitals {
         g.burst++;
         if (g.burst >= burst.count) {
           g.burst = 0;
-          g.cooldown = (pd ? Math.min(interval, PD_INTERVAL) : interval) * (0.8 + Math.random() * 0.4);
+          g.cooldown = (pd ? Math.min(interval, PD_INTERVAL) : interval) * (0.8 + rng.next() * 0.4);
         } else g.cooldown = burst.gap;
       }
 
@@ -283,7 +288,7 @@ export class Capitals {
           if (ord.nearestThreat(f.position, s.team, PD_RANGE, _tp, _tv) >= 0 && leadPoint(f.position, f.velocity, _tp, _tv, null, _w, g.speed) > 0) {
             _v.subVectors(_w, f.position)
               .normalize()
-              .add(_w.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.02 / coord))
+              .add(_w.set(rng.centered(), rng.centered(), rng.centered()).multiplyScalar(0.02 / coord))
               .normalize()
               .multiplyScalar(g.speed)
               .add(f.velocity);
@@ -307,7 +312,7 @@ export class Capitals {
         for (const o of this.fleet.ships) {
           if (!o.alive || !hostile(o, s)) continue;
           // No bridge: no fire control — lances take whatever they see first.
-          const d = o.flight.position.distanceTo(_v) * (coord < 1 ? 0.5 + Math.random() : 1);
+          const d = o.flight.position.distanceTo(_v) * (coord < 1 ? 0.5 + rng.next() : 1);
           if (d < bd) {
             bd = d;
             best = o;
@@ -321,7 +326,7 @@ export class Capitals {
         const L = CAPITAL_LANCE;
         l.beam = this.weapons.fireBeam(s, l.socket, LANCE_RANGE, L.width, L.duration, best.radius > 60 ? L.dpsCapital : L.dpsFighter, L.type);
         l.beam.aimTarget = best;
-        l.cooldown = (7 + Math.random() * 5) / (0.55 + 0.45 * coord);
+        l.cooldown = (7 + rng.next() * 5) / (0.55 + 0.45 * coord);
       }
 
       // ── hangars: launch fighters while below the cap ─────────────
@@ -331,7 +336,7 @@ export class Capitals {
           if (h.sub?.destroyed) continue;
           h.cooldown -= dt;
           if (h.cooldown > 0 || c.launched.length >= c.maxFighters) continue;
-          h.cooldown = 6 + Math.random() * 4;
+          h.cooldown = 6 + rng.next() * 4;
           _v.copy(h.local).applyQuaternion(f.orientation).add(f.position);
           _w.copy(h.localFwd).applyQuaternion(f.orientation);
           const fighter = this.fleet.spawn(c.launchBlueprint, s.faction, _v, _w, { name: `${s.name} flight`, team: s.team });

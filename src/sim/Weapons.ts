@@ -4,6 +4,7 @@ import type { FactionId } from '@/assets/Blueprint';
 import { GUNS, GUN_INDEX, GUN_LIST, type DamageType, type GunSpec } from './Loadouts';
 import type { Subsystem } from './Damage';
 import { chooseGun, createRayHit, cycleSubsystem, gunOf, raycastShip } from './Combat';
+import type { Rng } from './Rng';
 
 export type { GunSpec } from './Loadouts';
 export { segmentSphere } from './Combat';
@@ -107,9 +108,11 @@ export class Weapons {
   private eventPool: WeaponEvent[] = [];
   private cooldown = new Map<number, number>();
   private gunSide = new Map<number, number>();
-  private rng = 4242;
+  /** Gun spread / pellet dice: the world's 'weapons' stream (Rng.ts). */
+  readonly rng: Rng;
 
   constructor(readonly fleet: Fleet) {
+    this.rng = fleet.rng.fork('weapons');
     for (let i = 0; i < EVENT_POOL; i++) {
       this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1 });
     }
@@ -123,8 +126,7 @@ export class Weapons {
   }
 
   private rand(): number {
-    this.rng = (this.rng * 16807) % 2147483647;
-    return (this.rng - 1) / 2147483646;
+    return this.rng.next();
   }
 
   private emit(kind: WeaponEventKind, pos: Vector3, normal: Vector3, vel: Vector3, ship: ShipEntity | null, shooter: ShipEntity | null, gun: GunSpec | null = null): WeaponEvent | null {
@@ -147,9 +149,12 @@ export class Weapons {
   socketPosition(s: ShipEntity, socket: string, out: Vector3): Vector3 {
     const o = s.model.sockets.get(socket);
     if (!o) return out.copy(s.flight.position);
-    // Direct children: local position. Nested (articulated) sockets: walk up to the root.
+    // Direct children: local position. Nested (articulated) sockets: walk up to
+    // the root composing each joint's own position / rotation / scale — never
+    // `matrix`, which only the renderer refreshes (a sim read of it would
+    // depend on when the last frame was drawn, and a headless shard has none).
     out.copy(o.position);
-    for (let p = o.parent; p && p !== s.model.root; p = p.parent) out.applyMatrix4(p.matrix);
+    for (let p = o.parent; p && p !== s.model.root; p = p.parent) out.multiply(p.scale).applyQuaternion(p.quaternion).add(p.position);
     return out.applyQuaternion(s.flight.orientation).add(s.flight.position);
   }
 

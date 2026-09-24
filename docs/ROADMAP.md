@@ -82,12 +82,12 @@ opens the Reach up around them and gets the game in front of players.
 | 6 | **Docking** — request within 5 km, ILS corridor, auto-dock under 1 km, launch | hostiles within 10 km block it | ✅ |
 | 7 | **Trade** — commodities, supply/demand per station, cargo, credits | pure, unit-tested economy; `npm run econ-sim` bands (safe 1.5–4k / hold, risky ≤ 9k) | ✅ |
 | 8 | Repair, rearm, reputation per faction | persists in profile | ✅ |
-| 9 | Planetary ports — orbital elevators / descent corridor to the surface port | seamless approach, no load screen | |
+| 9 | Planetary ports — orbital elevators / descent corridor to the surface port | seamless approach, no load screen | ✅ landing corridor → entry → cloud punch-through → local surface scene (world-root swap under the whiteout) → pad; `surface` station kind; every hull size docks (clamp gantries, moorings, carriers alongside) (`src/world/surface`, `src/world/berths`) |
 | 10 | Contracts board — courier, escort, bounty jobs generated from station state | uses the campaign runner | ✅ 8 kinds, seeded boards, runner-driven ops (`src/game/contracts`) |
 | 11 | Free-roam between episodes — the Reach stays open, episodes start from a station | save/resume anywhere docked | ✅ debrief → free flight → priority orders; title CONTINUE |
 | 12 | Ship upgrades & hangar — guns, missiles, shields, engines; livery shop | visible on the model | ✅ |
-| 13 | **MP-0 determinism** — fixed 60 Hz step, seeded RNG, sim/render split | bit-identical 10 min replay | |
-| 14 | Replays + kill-cam from recorded input | replay matches live | |
+| 13 | **MP-0 determinism** — fixed 60 Hz step, seeded RNG, sim/render split | bit-identical 10 min replay | ✅ `npm run determinism`: dogfight · capital battle · traffic ambush, 600/600 checkpoints each, recorded input replays to the bit; 0 `Math.random` in the sim |
+| 14 | Replays + kill-cam from recorded input | replay matches live | ✅ always-on recorder, O saves a clip, `?replay=auto\|clip-N\|<url>` (SYNC checkpoints; `scripts/replay-check.mjs`), kill-cam on death / capital / bounty kills |
 | 15 | Headless shard (Node) + bot clients | 200 ships < 8 ms tick | |
 | 16 | Two-browser flight: prediction, interpolation, lag-compensated hits | < 2 m error at 150 ms RTT | |
 | 17 | Lantern jump = shard handoff | < 3 s inside the tunnel | |
@@ -95,7 +95,11 @@ opens the Reach up around them and gets the game in front of players.
 | 19 | Co-op campaign (up to 4) | episodes playable with 2 | |
 | 20 | Public playtest build + landing page | 100 concurrent | |
 
-Design for 13–20: [docs/MULTIPLAYER.md](MULTIPLAYER.md).
+Design for 13–20: [docs/MULTIPLAYER.md](MULTIPLAYER.md) (MP-0 as built: fixed
+step + render prediction, RNG streams, replay format, kill-cam, what still
+couples).
+
+![Kill-cam](screenshots/replay-killcam.jpg)
 
 ## Batch 4 — the hero's career (first versions: all in)
 
@@ -128,6 +132,23 @@ buy the next hull, take on bigger adversaries.
 | Balance | Kestrel vs Cantor 3–8 s · capital to a squadron 60–180 s · Mk III Resolute vs Lantern Guard 60–120 s / 30–80 % hull · Mk III Valiant vs Vesper 45–120 s / 30–80 % hull · PD thins swarms | `npm run balance` |
 
 ![Shield facing collapse](screenshots/combat-shield.jpg)
+
+## Batch 5 — allegiance & a Reach that remembers (in progress)
+
+The sandbox and the story start talking to each other. One shared memory,
+`src/game/world/WorldState.ts` (facts, counters, decaying per-system/station
+modifiers, an event log), is read and written by everything below.
+
+| # | Milestone | Pass/fail | Status |
+|---|---|---|---|
+| 1 | Guilds: Order of the Keeping, Office of Continuity, Board of Allocation, Rustwake clans, Ascendant Houses — halls, ranks, quartermasters, guild contracts | a rank-up in ~45 min of guild work | 🔧 |
+| 2 | Guild arc missions (hand-written, 3–5 per guild) and conflicting loyalties | arcs complete end to end | 🔧 |
+| 3 | Outposts: restore a hulk as your guild's base | build → upgrade → defend | 🔧 |
+| 4 | World state driven by story flags and player actions: prices, traffic, patrols, station attitude | effects visible within one session | 🔧 |
+| 5 | The Schedule on the star map: fixed engagements to fly or break | breaking one has consequences | 🔧 |
+| 6 | The Signal countdown between chapters | visible, advances with the story | 🔧 |
+| 7 | Persistent NPC arcs that advance while you're away | ≥ 6 arcs | 🔧 |
+| 8 | Rivals: named aces and bounty targets that remember and escalate | ≥ 5 rivals | 🔧 |
 
 ## Known issues
 

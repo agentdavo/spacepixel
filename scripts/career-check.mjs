@@ -10,7 +10,7 @@
  *
  *   node scripts/career-check.mjs [--port 5260] [--size 1280x720]
  *
- * The sim is stepped in-page (FlightScene.update at a fixed 1/30 s, no
+ * The sim is stepped in-page (FlightScene.simStep + update at 60 Hz, no
  * rendering: `?record=30` stops the rAF loop), so flight seconds are cheap
  * even on a software adapter. Prints PASS/FAIL per step; exits non-zero on
  * any failure.
@@ -43,13 +43,19 @@ function install() {
   let frame = 0;
   window.__cc = {
     S,
-    /** Step the flight sim `sec` seconds at 1/30 s; `each` sees every frame. */
+    /**
+     * Step `sec` seconds the way the Engine does at 60 Hz: one fixed sim tick
+     * (FlightScene.simStep, skipped while the sim is paused — berthed) then
+     * one presentation frame (update, no render). `each` sees every tick.
+     */
     sim(sec, each) {
-      const n = Math.round(sec * 30);
+      const n = Math.round(sec * 60);
       for (let i = 0; i < n; i++) {
-        t += 1 / 30;
-        S.update({ dt: 1 / 30, time: t, frame: ++frame });
-        if (each && each() === true) return (i + 1) / 30;
+        t += 1 / 60;
+        const run = S.timeScale() > 0;
+        if (run) S.simStep();
+        S.update({ dt: 1 / 60, time: t, frame: ++frame, alpha: 0, ticks: run ? 1 : 0 });
+        if (each && each() === true) return (i + 1) / 60;
       }
       return sec;
     },

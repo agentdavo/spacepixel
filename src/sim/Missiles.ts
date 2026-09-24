@@ -2,6 +2,7 @@ import { Vector3 } from 'three';
 import type { Fleet, ShipEntity, Shootables, Team } from './Fleet';
 import { MISSILES, type MissileSpec } from './Loadouts';
 import type { Subsystem } from './Damage';
+import type { Rng } from './Rng';
 import { createRayHit, missileOf, raycastShip, segmentSphere, selectedSubsystem, subsystemPosition } from './Combat';
 
 export type { MissileSpec } from './Loadouts';
@@ -89,11 +90,13 @@ export class Missiles implements Shootables {
   readonly events: MissileEvent[] = [];
   private eventPool: MissileEvent[] = [];
   private time = 0;
-  private rng = 12345;
+  /** The world's 'missiles' stream (src/sim/Rng.ts). */
+  readonly rng: Rng;
   /** AI launch control: lock progress per ship id. */
   private aiLock = new Map<number, LockState>();
 
   constructor(private fleet: Fleet) {
+    this.rng = fleet.rng.fork('missiles');
     for (let i = 0; i < MISSILE_CAPACITY; i++) {
       this.pos.push(new Vector3());
       this.vel.push(new Vector3());
@@ -105,8 +108,7 @@ export class Missiles implements Shootables {
   }
 
   private rand(): number {
-    this.rng = (this.rng * 16807) % 2147483647;
-    return (this.rng - 1) / 2147483646;
+    return this.rng.next();
   }
 
   private emit(kind: MissileEvent['kind'], i: number, intercepted = false): void {

@@ -7,6 +7,7 @@ import { FlightModel } from './FlightModel';
 import { createCombat, damageShip, stepCombat, type CombatState } from './Combat';
 import type { DamageType } from './Loadouts';
 import type { HitResult, Subsystem } from './Damage';
+import { DEFAULT_WORLD_SEED, Rng } from './Rng';
 
 /**
  * Every ship in a battle — player, wingmen, bandits — is a ShipEntity driven
@@ -57,6 +58,8 @@ export interface ShipEntity {
   plotArmour: boolean;
   /** Stats, loadout, damage state (shield facings, subsystems, zones) — src/sim/Combat.ts. */
   combat: CombatState;
+  /** This ship's own dice (forked from the world root by id): capital fire control, brain seed. */
+  rng: Rng;
 }
 
 /** Consequences of a hit that FX / audio / HUD care about (emitted through `Fleet.onEvent`). */
@@ -98,7 +101,23 @@ export class Fleet {
   /** Shoot-down-able ordnance (set by Missiles). */
   ordnance: Shootables | null = null;
 
-  constructor(private root: Group) {}
+  /** The world's root PRNG; every system and entity forks its own stream from it (Rng.ts). */
+  readonly rng: Rng;
+
+  constructor(
+    private root: Group,
+    seed = DEFAULT_WORLD_SEED,
+  ) {
+    this.rng = new Rng(seed);
+  }
+
+  /** Next entity id (replays record it so a resync after a berth allocates the same ids). */
+  get nextEntityId(): number {
+    return this.nextId;
+  }
+  set nextEntityId(v: number) {
+    this.nextId = v;
+  }
 
   spawn(blueprintId: string, faction: FactionId, position: Vector3, facing: Vector3, opts: Partial<ShipEntity> = {}, livery?: Partial<Livery>): ShipEntity {
     const model = assets.ship(blueprintId, livery);
@@ -111,8 +130,9 @@ export class Fleet {
     const isCapital = model.radius > 200; // flight / AI / collision class (corvettes fly like big fighters)
     const hullMax = combat.stats.hull;
     const shieldMax = combat.stats.shield;
+    const id = this.nextId++;
     const e: ShipEntity = {
-      id: this.nextId++,
+      id,
       name: `${model.blueprint.name}-${this.nextId}`,
       faction,
       team: faction,
@@ -132,6 +152,7 @@ export class Fleet {
       sweep: 0.3,
       plotArmour: false,
       combat,
+      rng: this.rng.fork(id),
       ...opts,
     };
     this.ships.push(e);

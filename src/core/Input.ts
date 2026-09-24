@@ -1,3 +1,5 @@
+import { copyControls, quantizeControls } from '@/sim/Replay';
+
 /**
  * Input state, sampled once at the start of each frame.
  *
@@ -13,6 +15,15 @@
  * R next gun, Y next missile type, B next target subsystem.
  * Gamepad: left stick pitch/yaw, right stick X roll, triggers throttle,
  * A/south = afterburner.
+ *
+ * Fixed-step sim (MP-0): `sample()` builds `latest` at the top of the frame,
+ * snapped to the replay grid (Replay.quantizeControls — so a recording is
+ * exactly what was flown). Before each 60 Hz sim tick the Engine calls
+ * `beginTick()`, which copies `latest` into `state` (the ControlState the
+ * player's ship holds). Edge-triggered buttons (missile, next target, FA,
+ * cruise, gun / missile / subsystem cycle) are latched until a tick has
+ * consumed them: they fire on the frame's first tick only, and a frame with
+ * no tick (a >60 Hz display between ticks) carries them to the next one.
  */
 export interface ControlState {
   pitch: number; // -1..1 (+ = nose up)
@@ -38,7 +49,19 @@ export interface ControlState {
 const DEADZONE = 0.06;
 
 export class Input {
+  /** What the sim reads this tick (the player's ship holds this object). */
   readonly state: ControlState = {
+    pitch: 0,
+    yaw: 0,
+    roll: 0,
+    throttleDelta: 0,
+    throttleSet: null,
+    afterburner: false,
+    flightAssistToggle: false,
+    fire: false,
+  };
+  /** This frame's fresh sample (quantised); `state` is loaded from it per tick. */
+  readonly latest: ControlState = {
     pitch: 0,
     yaw: 0,
     roll: 0,
@@ -117,9 +140,9 @@ export class Input {
     if (this.pendingInputTime < 0) this.pendingInputTime = ts;
   }
 
-  /** Build this frame's control state. Call first thing in the frame. */
+  /** Build this frame's control state (`latest`). Call first thing in the frame. */
   sample(time: number): ControlState {
-    const s = this.state;
+    const s = this.latest;
     const k = this.keys;
     const axis = (neg: string[], pos: string[]) =>
       (pos.some((c) => k.has(c)) ? 1 : 0) - (neg.some((c) => k.has(c)) ? 1 : 0);
@@ -131,6 +154,7 @@ export class Input {
     s.throttleSet = k.has('KeyX') ? 0 : null;
     s.afterburner = k.has('ShiftLeft') || k.has('ShiftRight');
     s.fire = this.mouseDown || k.has('Space');
+    // Edges stay latched until a sim tick consumes them (endTicks).
     s.flightAssistToggle = this.faEdge;
     s.missile = this.missileEdge;
     s.nextTarget = this.targetEdge;
@@ -138,8 +162,6 @@ export class Input {
     s.cycleGun = this.gunEdge;
     s.cycleMissile = this.missileTypeEdge;
     s.cycleSub = this.subEdge;
-    this.faEdge = this.missileEdge = this.targetEdge = this.cruiseEdge = false;
-    this.gunEdge = this.missileTypeEdge = this.subEdge = false;
 
     // Mouse virtual joystick (adds to keyboard, clamped).
     if (this.mouseActive) {
@@ -167,10 +189,36 @@ export class Input {
     }
 
     if (this.override) this.override(s, time);
+    quantizeControls(s);
 
     this.consumedInputTime = this.pendingInputTime;
     this.pendingInputTime = -1;
     return s;
+  }
+
+  /**
+   * Load this frame's sample into `state` for one sim tick. Edges only on the
+   * frame's first tick (a second tick in the same frame must not fire the
+   * salvo twice).
+   */
+  beginTick(first: boolean): ControlState {
+    const s = copyControls(this.latest, this.state);
+    if (!first) s.flightAssistToggle = s.missile = s.nextTarget = s.cruise = s.cycleGun = s.cycleMissile = s.cycleSub = false;
+    return s;
+  }
+
+  /**
+   * After the frame's ticks: `ticks` > 0 consumed the latched edges; with no
+   * tick they carry to the next frame, unless the sim is paused (`drop`:
+   * berthed, kill-cam) — a missile key pressed on the dock screen must not
+   * fire on launch.
+   */
+  endTicks(ticks: number, drop: boolean): void {
+    if (ticks === 0 && !drop) return;
+    this.faEdge = this.missileEdge = this.targetEdge = this.cruiseEdge = false;
+    this.gunEdge = this.missileTypeEdge = this.subEdge = false;
+    const s = this.latest;
+    s.flightAssistToggle = s.missile = s.nextTarget = s.cruise = s.cycleGun = s.cycleMissile = s.cycleSub = false;
   }
 }
 
