@@ -10,7 +10,7 @@ touching their files.
 | Engine, world, campaign, merges | Vanguard lead · `claude/vanguard-space-combat-0l3bfi` | everything not listed below |
 | Turrets, shields, weapon impacts (batch 6) | turrets session · `claude/ship-turrets-shields-weapons-8lz4su` (the user returned it there on 24 Sep) | `src/sim/turrets/**`, `src/sim/Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, weapon/impact FX + SFX |
 | **Character voices, chat, soundtrack** | voices/score session · `claude/ova-soundtrack-voices` | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
-| **New race: the Kessen (mecha)** — design only so far | mecha-race session · `claude/mecha-race-design-qtw680` | `docs/KESSEN.md`, `docs/concepts/kessen/**`, `scripts/concepts/kessen/**` (no `src/` files touched) |
+| **New race: the Kessen (mecha)**: design only, **handed over 24 Sep** (all work pushed; the session has stopped) | mecha-race session · `claude/mecha-race-design-qtw680`, not merged into the lead branch | `docs/KESSEN.md`, `docs/concepts/kessen/**`, `scripts/concepts/kessen/**` (no `src/` files touched) |
 
 ## Soundtrack backend (landed)
 
@@ -60,3 +60,12 @@ Hooks for other owners:
     anvil, a call-and-response work song, "the Hammer-song") and barks:
     "Standing." (greeting), "Lid up!", "Hammer!", "Drive the spike!", "She
     walked home." (a death, said with pride).
+- **Kessen handover (24 Sep).** Everything is on
+  `claude/mecha-race-design-qtw680`: `docs/KESSEN.md` (the full proposal),
+  eight PNG sheets in `docs/concepts/kessen/`, and the three.js prototype in
+  `scripts/concepts/kessen/` (`mechkit.js` holds the 42-bone rig, 14
+  variants, poses and walk cycle; `node scripts/concepts/kessen/render.mjs`
+  re-renders the sheets). Still open for the user: sign-off on the name
+  ("Kessen" is also a 2000 Koei PS2 title) and whether "5 levels" means five
+  size classes (as drawn) or five upgrade tiers per frame. The next step is
+  implementation, which touches lead-owned files (see the request above).
