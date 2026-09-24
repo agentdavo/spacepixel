@@ -10,9 +10,12 @@
  *   node scripts/attract-check.mjs [--port 5403] [--cycles 3] [--reel 24] [--idle 6] [--out <dir>]
  *
  * PASS when, comparing each title with the one a full cycle earlier (same
- * reel just played), from the second cycle on: geometries and textures are
- * flat (± 2 %), DOM nodes are flat (± 30), the heap grows < 6 MB per cycle,
- * no page errors, and any key returns to the title.
+ * reel just played) once the first cycle has warmed the caches: geometries and textures are
+ * flat (± 2 %), cached render pipelines grow < 5 %, DOM nodes are flat (± 30),
+ * the heap grows < 6 MB per cycle, no page errors, and any key returns to the
+ * title. (three.js stops counting a cached geometry once it has been freed
+ * and re-used, so `geometries` reads low after the first swap — it still
+ * must not climb.)
  */
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
@@ -55,7 +58,7 @@ try {
       const v = window.__VANGUARD__;
       const mem = v.hooks.memory();
       const heap = performance.memory ? performance.memory.usedJSHeapSize / 1048576 : NaN;
-      return { label, geometries: mem.geometries ?? 0, textures: mem.textures ?? 0, heapMB: +heap.toFixed(1), dom: document.getElementsByTagName('*').length, reels: v.hooks.attract.reels };
+      return { label, geometries: mem.geometries ?? 0, textures: mem.textures ?? 0, pipelines: mem.pipelines ?? 0, programs: mem.programs ?? 0, heapMB: +heap.toFixed(1), dom: document.getElementsByTagName('*').length, reels: v.hooks.attract.reels };
     }, label);
   };
   const waitTitle = async (n) => {
@@ -74,17 +77,19 @@ try {
     if (out) await page.screenshot({ path: `${out}/title-${r}.png`, timeout: T });
   }
 
-  // Same-phase comparisons from the second cycle on (index i vs i − 2).
+  // Same-phase comparisons once the first full cycle has warmed the caches (index i vs i − 2, i ≥ 4).
   let worstGeo = 0;
   let worstTex = 0;
   let worstDom = 0;
+  let worstPipe = 0;
   const heapGrowth = [];
-  for (let i = 3; i < samples.length; i++) {
+  for (let i = 4; i < samples.length; i++) {
     const a = samples[i - 2];
     const b = samples[i];
     worstGeo = Math.max(worstGeo, Math.abs(b.geometries - a.geometries) / Math.max(1, a.geometries));
     worstTex = Math.max(worstTex, Math.abs(b.textures - a.textures) / Math.max(1, a.textures));
     worstDom = Math.max(worstDom, Math.abs(b.dom - a.dom));
+    worstPipe = Math.max(worstPipe, (b.pipelines - a.pipelines) / Math.max(1, a.pipelines));
     heapGrowth.push(b.heapMB - a.heapMB);
   }
   const perCycle = heapGrowth.length ? Math.max(...heapGrowth) : 0;
@@ -92,6 +97,7 @@ try {
   check('GPU geometries flat cycle to cycle', worstGeo <= 0.02, `(worst ${(worstGeo * 100).toFixed(1)} %)`);
   check('GPU textures flat cycle to cycle', worstTex <= 0.02, `(worst ${(worstTex * 100).toFixed(1)} %)`);
   check('DOM flat cycle to cycle', worstDom <= 30, `(worst ${worstDom} nodes)`);
+  check('render pipelines flat cycle to cycle', worstPipe <= 0.05, `(worst ${(worstPipe * 100).toFixed(1)} % growth)`);
   check('JS heap growth < 6 MB per cycle', perCycle < 6, `(${heapGrowth.map((x) => x.toFixed(1)).join(', ')} MB)`);
 
   // Any key during an attract reel returns to the title.

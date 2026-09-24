@@ -118,8 +118,14 @@ async function boot(): Promise<void> {
       ...window.__VANGUARD__?.hooks,
       perf: () => engine.perf.summary(),
       step: (n: number) => engine.step(n),
-      /** GPU objects the renderer holds (attract-check leak test). */
-      memory: () => ({ ...(info.renderer.info as unknown as { memory: Record<string, number> }).memory }),
+      /** The renderer itself (leak probes, dev tools). */
+      renderer: () => info.renderer,
+      /** GPU objects the renderer holds (attract-check leak test): info.memory + cached pipelines / programs. */
+      memory: () => {
+        const r = info.renderer as unknown as { info: { memory: Record<string, number> }; _pipelines?: { caches: Map<unknown, unknown>; programs: Record<string, Map<unknown, unknown>> } };
+        const p = r._pipelines;
+        return { ...r.info.memory, pipelines: p?.caches.size ?? 0, programs: p ? Object.values(p.programs).reduce((n, m) => n + m.size, 0) : 0 };
+      },
     },
   };
   console.info(`[vanguard] ${info.backendName} backend · ${info.adapterDescription}`);

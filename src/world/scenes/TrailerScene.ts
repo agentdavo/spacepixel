@@ -114,6 +114,9 @@ export class TrailerScene implements GameScene {
     this.stage.dispose();
     resetPostFx();
     getAudio().autoMood = true;
+    // Let the finished reel be collected (the hook would pin the whole scene).
+    const hooks = window.__VANGUARD__?.hooks;
+    if (hooks?.trailer === this) delete hooks.trailer;
     this.resolveDone();
   }
 

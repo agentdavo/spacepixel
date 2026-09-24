@@ -105,6 +105,9 @@ export class PrologueScene implements GameScene {
     this.stage.dispose();
     resetPostFx();
     getAudio().autoMood = true;
+    // Let the finished reel be collected (the hook would pin the whole scene).
+    const hooks = window.__VANGUARD__?.hooks;
+    if (hooks?.prologue === this) delete hooks.prologue;
     this.resolveDone();
   }
 
