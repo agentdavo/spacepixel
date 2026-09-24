@@ -175,9 +175,8 @@ modifiers, an event log), is read and written by everything below.
 - Planet LOD switches compile the mid / far surface pipeline the first time a
   body crosses a threshold (a one-off hitch per body kind); prewarming them
   with `compileAsync` at system load would hide it.
-- Label declutter hides low-priority labels when the screen is crowded; the
-  arrivals board can end up two rings out from the Lantern on a leader line.
-  Off-screen edge arrows (target, nav, contracts, distress) are not packed yet.
+- Label declutter hides low-priority labels when the screen is crowded (by
+  design: the lowest priorities fade out first).
 - The bridge camera rides high over a forward battery; turrets training up at
   a target overhead still poke their barrels into the bottom of the frame
   (by design — it's the Yamato shot — but a bow-view toggle would help).
@@ -197,6 +196,16 @@ Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
   door outline and the curtain's wide edge glow; all three toned down.
 - **Label declutter** — one placement pass for every world-space label
   (`src/ui/HudLabels.ts`, pure packer `src/ui/labelPlacement.ts`, tested).
+- **Edge arrows** — off-screen target, nav, contract and distress arrows share
+  one track inset round the screen edge and are packed before the labels
+  (`HudLabels.edge()`, pure packer `src/ui/edgePlacement.ts`, tested): true
+  spot where the ray from the centre crosses the track, priority order,
+  bounded slides, HUD panels pushed clear of, same-kind collisions folded
+  into one arrow with a ×N badge, target and nav pinned, eased movement and
+  per-arrow hysteresis. The target arrow pointed the wrong way for ships
+  behind the camera (its angle came from the projected point); fixed. The
+  arrivals board now sits under the nav diamond, one ring out at most
+  (`docs/screenshots/edge-arrows-*.jpg`).
 - **Planet shader LOD** — full / mid / far impostor by disc size
   (`src/world/planets/lod.ts`, tested). Per pixel, a terrestrial world with
   clouds and cities drops from 16 fBm octaves (+ cell noise; + Worley on

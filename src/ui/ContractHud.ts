@@ -7,7 +7,7 @@ import { LABEL_PRIORITY, hudLabels } from './HudLabels';
  * Free-roam contract overlay: its own canvas over the flight HUD, so the
  * flight HUD stays untouched. Top-right objective panel (the campaign panel's
  * spot — contracts are suspended during episodes), OVA-orange nav diamonds
- * with an edge arrow when off-screen, dwell rings, and short toasts.
+ * with an edge arrow when off-screen (queued on the shared edge track), dwell rings, and short toasts.
  */
 export interface HudContract {
   kind: string;
@@ -83,6 +83,8 @@ export class ContractHud {
     c.shadowBlur = 0;
     c.fillStyle = 'rgba(12,6,0,0.55)';
     c.fillRect(x - 12, y - 20, W, h);
+    // Labels and edge arrows keep off it.
+    hudLabels.obstacle(x - 12, y - 20, W, h);
     c.fillStyle = ORANGE;
     c.fillRect(x - 12, y - 20, 3, h);
     c.restore();
@@ -155,29 +157,20 @@ export class ContractHud {
       });
       return;
     }
-    // Off-screen: arrow on an ellipse toward the target.
+    // Off-screen: an arrow on the shared edge track toward the target (packed and drawn by HudLabels.flush,
+    // on the flight HUD's canvas): filled and named for the tracked contract, an outline for the rest.
     world.toRender(pos, _p).applyMatrix4(cam.matrixWorldInverse);
-    const ang = Math.atan2(-_p.y, _p.x);
-    const rx = this.w / 2 - 60;
-    const ry = this.h / 2 - 60;
-    const x = this.w / 2 + Math.cos(ang) * rx;
-    const y = this.h / 2 + Math.sin(ang) * ry;
-    c.save();
-    c.translate(x, y);
-    c.rotate(ang);
-    c.beginPath();
-    c.moveTo(12, 0);
-    c.lineTo(-6, -8);
-    c.lineTo(-2, 0);
-    c.lineTo(-6, 8);
-    c.closePath();
-    primary ? c.fill() : c.stroke();
-    c.restore();
-    if (primary) {
-      c.textAlign = x > this.w / 2 ? 'right' : 'left';
-      c.fillText(`${label}  ${range}`, x + (x > this.w / 2 ? -18 : 18), y + (y > this.h / 2 ? -12 : 20));
-      c.textAlign = 'left';
-    }
+    const col = primary ? ORANGE : 'rgba(255,179,71,0.55)';
+    hudLabels.edge({
+      id: `cte:${label}:${kind}`,
+      dir: { x: _p.x, y: _p.y },
+      color: col,
+      shape: 'notch',
+      fill: primary,
+      kind: 'contract',
+      priority: primary ? LABEL_PRIORITY.contract : LABEL_PRIORITY.contractOther,
+      lines: primary ? [{ text: `${label}  ${range}`, color: col, font: '13px "Share Tech Mono", monospace' }] : undefined,
+    });
   }
 
   /** Beacon dwell zone: dashed ring + progress arc (as the campaign HUD draws it). */
