@@ -2,6 +2,7 @@ import type { Object3D } from 'three';
 import type { ShipEntity } from '@/sim/Fleet';
 import { KESTREL_SPEC, type FlightSpec } from '@/sim/FlightModel';
 import { flightSpecFor as simFlightSpec } from '@/sim/Combat';
+import { rescaleStructure } from '@/sim/Structure';
 import { flightSpecFor as yardFlightSpec } from '@/game/shipyard/flight';
 import { buildShip } from '@/assets/ShipBuilder';
 import type { Blueprint, Part } from '@/assets/Blueprint';
@@ -58,6 +59,8 @@ export function applyFit(ship: ShipEntity, e: CatalogEntry, fit: Fit): FitResult
   d.shieldDelay = r.stats.shieldDelay;
   d.transfer = (d.capital ? TRANSFER_RATE.capital : TRANSFER_RATE.small) * (r.stats.shieldTransfer ?? 1);
   d.zoneHp = r.stats.hull * 0.45;
+  // Sections follow the fitted hull (keeping their damage fraction): the spine is a share of the hull.
+  rescaleStructure(d.structure, r.stats.hull);
   // Re-size every facing, then fill them (the split follows the ship's shield trim).
   setShieldCapacity(d, ship, r.stats.shield);
   d.cooldown.fill(0);

@@ -41,6 +41,7 @@ import type { StarSystem } from '@/universe/Universe';
 import type { Universe } from '@/universe/Universe';
 import { FlightHud } from '@/ui/FlightHud';
 import { CombatHud } from '@/ui/CombatHud';
+import { SALVAGE_RANGE, SALVAGE_SPEED, claimSalvage, lots, salvageRate, stepSalvage } from '@/game/salvage';
 import { StarMap } from '@/ui/StarMap';
 import { postFx } from '@/render/post/PostFx';
 import { MissionRunner, type MissionContext, type MissionDef } from '@/game/Missions';
@@ -252,6 +253,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   private viewFlight = new FlightModel();
   private hasher = new StateHasher();
   private _ledger: TradeLedger = loadLedger();
+  /** Wreck salvage in reach this tick (the HUD prompt), null = none. */
+  private salvageView: CombatHud['salvage'] = null;
 
   /** Shares, cargo, standing, missile rails — persisted by Profile.ts. */
   get ledger(): TradeLedger {
@@ -559,6 +562,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     // 4. Weapons + missiles sim.
     this.weapons.step(dt);
     this.missiles.step(dt);
+    // 4'. Salvage: flying slow and close to a wreck piece cuts its lot into the hold.
+    this.stepSalvage(dt);
 
     // 4a. Campaign episode: runner, set pieces, chatter.
     if (this.campaign) {
@@ -660,6 +665,39 @@ export class FlightScene implements GameScene, FlightHostScene {
   }
 
   /**
+   * Salvage (sim tick): the nearest wreck piece in reach is cut while the
+   * player holds slow and close (src/game/salvage.ts); a finished lot goes
+   * into the hold — what doesn't fit stays aboard for another pass.
+   */
+  private stepSalvage(dt: number): void {
+    const p = this.player;
+    const D = this.fleet.destruction;
+    const w = p.alive && !this.docking.busy ? D.nearest(p.flight.position, SALVAGE_RANGE * 3) : null;
+    if (!w) {
+      this.salvageView = null;
+      return;
+    }
+    const dist = Math.max(0, w.position.distanceTo(p.flight.position) - w.ship.model.length * D.extentFrac(w) * 0.5);
+    const rel = _to.subVectors(p.flight.velocity, w.velocity).length();
+    const rate = salvageRate(w.salvage, dist, rel);
+    const y = w.salvage;
+    const what = `${w.ship.name.toUpperCase()} — ${w.cause === 'bridge' ? 'STRUCK HULL' : w.cause === 'reactor' ? 'BLAST-CHARRED SECTION' : 'WRECK SECTION'}`;
+    const hint = dist > SALVAGE_RANGE ? `CLOSE TO ${SALVAGE_RANGE} m (${Math.round(dist)} m)` : rel > SALVAGE_SPEED ? `MATCH HER DRIFT (${Math.round(rel)} m/s)` : '';
+    if (stepSalvage(w, rate, dt)) {
+      const r = claimSalvage(this.ledger, y);
+      const got = Object.entries(r.got)
+        .map(([k, n]) => `${n} ${k.toUpperCase()}`)
+        .join(' · ');
+      this.ledger = r.ledger;
+      w.salvage = r.left;
+      if (lots(r.left) === 0) w.taken = true;
+      else w.salvaged = 0;
+      this.contracts.toast(got ? `SALVAGED · ${got}${lots(r.left) ? ' · HOLD FULL' : ''}` : 'SALVAGE · HOLD FULL', got ? '#7dffb2' : '#ff5f7a');
+    }
+    this.salvageView = w.taken ? null : { label: what, lots: `${w.salvage.relics} RELICS · ${w.salvage.cores} CORES · ${w.salvage.spares} SPARES`, progress: w.salvaged, working: rate > 0, hint };
+  }
+
+  /**
    * Presentation, once per frame: predict every ship `alpha` of a tick past
    * the last sim state (so motion is smooth at any refresh rate and the
    * player's fresh input shows this frame even between ticks), then camera,
@@ -757,6 +795,10 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
     this.combatHud.turrets = this.turrets.status(this.player);
     this.combatHud.hangar = this.turrets.hangarStatus(this.player);
+    // A reactor detonation whites the view out, fading with distance.
+    const blast = this.combatFx.destruction;
+    this.combatHud.flash = blast.screenFlash * Math.max(0, 1 - blast.lastBlast.distanceTo(pf.position) / 9000);
+    this.combatHud.salvage = this.salvageView;
     this.combatHud.draw(this.player, this.lock.target, this.camera, this.world, time, !this.tactical && this.jumpPhase === 'none');
     this.hud.drawStatus(this.view.system.name, pf.cruise, this.jumpPhase !== 'none' ? `LANTERN TRANSIT → ${this.universe.systems.get(this.jumpTo)?.name ?? ''}` : '');
     if (this.jumpPhase === 'none' && !this.tactical) this.drawDockHud(time);
@@ -909,6 +951,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     const sys = this.systemFor(m.system);
     if (sys.id !== this.systemId) {
       this.view.dispose();
+      // Wrecks stay in their system (the sim forgets them when we leave it).
+      this.fleet.destruction.clear();
       this.systemId = sys.id;
       this.view = new StarSystemView(sys, this.scene, this.world.root);
       this.paintPlanes();
@@ -1053,6 +1097,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     const from = this.systemId;
     this.jumps++;
     this.view.dispose();
+    this.fleet.destruction.clear();
     this.systemId = this.jumpTo;
     this.view = new StarSystemView(this.universe.systems.get(this.systemId)!, this.scene, this.world.root);
     this.paintPlanes();
@@ -1303,6 +1348,7 @@ export class FlightScene implements GameScene, FlightHostScene {
   warpTo(id: string): void {
     if (id === this.systemId || !this.universe.systems.has(id)) return;
     this.view.dispose();
+    this.fleet.destruction.clear();
     this.systemId = id;
     this.view = new StarSystemView(this.universe.systems.get(id)!, this.scene, this.world.root);
     this.paintPlanes();

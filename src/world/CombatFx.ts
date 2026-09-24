@@ -5,6 +5,7 @@ import { TRAIL_MISSILE, type TrailStyle } from '@/fx/Trails';
 import { makeSpawn, resetSpawn } from '@/fx/spawn';
 import { arcs, beamBurn, explosiveHit, harmonicHit, kineticHit, laserHit, shard, shieldSplash, subsystemBurst } from '@/fx/impacts';
 import { DamageFx } from './DamageFx';
+import { DestructionFx, hasKillPaths } from './DestructionFx';
 import { DECAL, ImpactDecals } from './ImpactDecals';
 import { facingAt, facingLayout, sampleFacing, shellDir, shellPoint, shellScale } from './ShieldGeometry';
 import type { WeaponEvent, Weapons } from '@/sim/Weapons';
@@ -108,6 +109,8 @@ export class CombatFx {
   readonly damage: DamageFx;
   /** Hot impact marks and beam cut lines stuck to capital plating. */
   readonly decals = new ImpactDecals();
+  /** How capitals die by their kill path, wreck pieces, blown-off gun houses, debris (Structure / Destruction in the sim). */
+  readonly destruction: DestructionFx;
   private trail = new Int32Array(MISSILE_CAPACITY).fill(-1);
   private chains: Chain[] = [];
   private pops: Pop[] = [];
@@ -128,6 +131,8 @@ export class CombatFx {
     this.damage = new DamageFx(weapons.fleet, this.fx);
     // Drawn with the particles (every scene already adds `fx.object`).
     this.fx.object.add(this.decals.mesh);
+    this.destruction = new DestructionFx(weapons.fleet, this.fx);
+    this.fx.object.add(this.destruction.group);
     for (let i = 0; i < POPS; i++) this.pops.push({ ship: null, t: 0, lx: 0, ly: 0, lz: 0, scale: 0, pal: PAL.WARM });
     for (let i = 0; i < COLUMNS; i++) this.columns.push({ ship: null, sub: null, t: 0, dur: 0, next: 0, nx: 0, ny: 1, nz: 0, r: 0, pal: PAL.WARM, arcs: false });
     for (let i = 0; i < CUTS; i++) this.cuts.push({ shooter: null, ship: null, lx: 0, ly: 0, lz: 0, t: -1 });
@@ -167,6 +172,8 @@ export class CombatFx {
           const s = e.ship;
           if (!s) break;
           this.decals.clearShip(s);
+          // Capitals: DestructionFx plays the kill path (rolling chain, spine snap, reactor flash, a struck hull going dark).
+          if (hasKillPaths(s)) break;
           if (s.radius > 60) {
             // Capital: a rolling chain of section blasts, then the big one.
             this.chains.push({ ship: s, t: 0, next: 0, left: 9 });
@@ -177,7 +184,9 @@ export class CombatFx {
           break;
         }
       }
+      this.destruction.consume(e);
     }
+    this.destruction.step(dt);
 
     // Missile trails: one smoke ribbon per live missile.
     const m = this.missiles;
@@ -602,6 +611,7 @@ export class CombatFx {
   update(dt: number, eye: Vector3): void {
     this.damage.paint();
     this.decals.update(dt, eye);
+    this.destruction.update(dt, eye);
     this.fx.update(dt, eye);
   }
 }
