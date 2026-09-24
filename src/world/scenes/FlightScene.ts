@@ -49,6 +49,7 @@ import { Outfitter, bindOutfitter } from '@/game/outfitting/Outfitter';
 import { ShipTurrets } from '@/game/outfitting/turrets';
 import '@/ui/ShipyardTab'; // registers the SHIPYARD dock tab (hulls, your hangar)
 import '@/ui/OutfittingTab'; // registers the OUTFITTING dock tab (slots, items, power)
+import { GuildRuntime } from '@/game/guilds/GuildRuntime'; // guilds, arcs, outposts (+ the GUILD HALL / OUTPOST dock tabs)
 
 /**
  * Milestones 4–6 + 10–11: one ship flying well, then shooting.
@@ -173,6 +174,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   private wingDock = new WingDocking();
   /** Free-roam contracts: board, accepted jobs, live operations (src/game/contracts). */
   readonly contracts: ContractDesk;
+  /** Guilds, their arcs, and your outpost (src/game/guilds, src/game/outposts). */
+  readonly guilds: GuildRuntime;
   /** Shipyard & outfitting: owned hulls, fits, the active ship (src/game/outfitting). */
   readonly outfit = new Outfitter();
   /** Fitted turrets, point defence and hangar complements on non-capital hulls. */
@@ -298,6 +301,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.starMap.toggle();
     }
     this.contracts = new ContractDesk(this);
+    this.guilds = new GuildRuntime(this);
     this.outfit.bind(this);
     bindOutfitter(this.outfit);
     this.outfit.settle(); // hold size, hangar complement
@@ -305,6 +309,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (q.get('dock')) this.dockFlag(q.get('dock')!, q.get('station') ?? '', q.get('cargo') === 'demo');
     // ?contract=<kind>&cphase=board|op|pay|map: contract captures.
     this.contracts.stageFromQuery();
+    // ?guild=<id>:<rank> · ?outpost=<stage>: guild / outpost captures.
+    this.guilds.stageFromQuery();
     if (q.get('dockui') === '0') this.dockScreen.close();
     // ?reach=body|ring|lane|ambush [&sys=<id>] …: living-Reach captures (world/ReachStage.ts).
     if (q.get('reach')) this.reachFlag(q.get('reach')!, q);
@@ -410,6 +416,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       }
     }
     this.contracts.update(dt, time);
+    this.guilds.update(dt, time);
 
     // 4a'. Radio: wingman / enemy barks and traffic hails.
     this.radio.update(realDt, {
@@ -578,6 +585,10 @@ export class FlightScene implements GameScene, FlightHostScene {
   }
 
   // ── FlightHostScene ────────────────────────────────────────────────
+  /** The current system's view (stations, gates, bodies) — outposts build into it. */
+  get systemView(): StarSystemView {
+    return this.view;
+  }
   currentSystemId(): string {
     return this.systemId;
   }
@@ -884,7 +895,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.cinema.hide();
     this.onDocked?.(d.id);
     this.campaign?.runner.onDocked(d.id);
-    const notices = this.campaign ? [] : this.contracts.onDocked(d.id);
+    const notices = this.campaign ? [] : [...this.contracts.onDocked(d.id), ...this.guilds.onDocked(d.id)];
     this.lock.target = null;
     this.turrets.recall(this.player);
     this.dockScreen.open({
@@ -950,7 +961,7 @@ export class FlightScene implements GameScene, FlightHostScene {
   }
 
   /** Jump straight to a system (no transit effect) — captures and dev flags. */
-  private warpTo(id: string): void {
+  warpTo(id: string): void {
     if (id === this.systemId || !this.universe.systems.has(id)) return;
     this.view.dispose();
     this.systemId = id;
@@ -1114,15 +1125,17 @@ export class FlightScene implements GameScene, FlightHostScene {
    * at `hull` (0..1) and open the dock screen.
    */
   berthAt(stationId: string, hull = 1): boolean {
-    const owner = [...this.universe.systems.values()].find((s) => s.stations.some((st) => st.id === stationId));
+    // Your outpost's berth isn't in the universe's station list (the guild runtime builds it).
+    const owner = [...this.universe.systems.values()].find((s) => s.stations.some((st) => st.id === stationId))?.id ?? this.guilds?.outposts.systemOf(stationId);
     if (!owner) return false;
     this.docking.reset();
     this.dockScreen.close();
     this.cinema.hide();
-    if (owner.id !== this.systemId) {
-      this.warpTo(owner.id);
+    if (owner !== this.systemId) {
+      this.warpTo(owner);
       this.quiet();
     }
+    this.guilds?.outposts.sync();
     const d = this.docking.dockables().find((x) => x.id === stationId);
     if (!d) return false;
     const p = this.player;
