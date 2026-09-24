@@ -251,6 +251,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.docking.onDocked = (d) => this.berthed(d);
     window.addEventListener('pagehide', () => saveLedger(this.ledger));
     this.docking.onLaunched = () => {
+      this.hulls.fighters.immune(this.player); // off the catapult clean
       this.cinema.hide();
       this.director.cut('chase', null, Infinity);
       this.chase.snap(this.player.flight);
@@ -327,6 +328,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.docking.update(this.docking.busy ? realDt : dt);
     // Hulls are solid: bounce / scrape off stations and capitals (not while guidance owns the ship).
     this.hulls.step(dt, this.view.stations, (s) => s.isPlayer && this.docking.busy, this.world.eye);
+    this.hulls.stepFighters(dt, (s) => s.isPlayer && this.docking.busy, this.world.eye);
     for (const b of this.bandits) {
       if (b.ship.alive || b.deadFor < 0) continue;
       b.deadFor += dt;

@@ -2,6 +2,7 @@ import { Vector3 } from 'three';
 import type { Fleet, ShipEntity } from '@/sim/Fleet';
 import { collideBody, impactDamage, makeHost, placeHost, sphereContact, type Body, type CollisionHost, type Contact, type HitEvent } from '@/sim/Collision';
 import { proxiesFromModel } from '@/sim/CollisionProxies';
+import { FighterCollisions } from '@/sim/FighterCollisions';
 import type { Obstacle } from '@/sim/ai';
 import { hostObstacles, proxyObstacles } from '@/sim/ai/Avoid';
 import type { Particles } from '@/fx/Particles';
@@ -34,6 +35,8 @@ export class HullCollisions {
   private evPool: HitEvent[] = [];
   private shakeAmp = 0;
   private shakeT = 0;
+  /** Fighter ↔ fighter spheres (rams, blown merges); launch grace built in. */
+  readonly fighters = new FighterCollisions();
 
   constructor(
     private fleet: Fleet,
@@ -124,6 +127,28 @@ export class HullCollisions {
         if (s.isPlayer) this.kick(Math.min(2.6, 0.25 + hit.impact * 0.02 + hit.slide * 0.004));
         if (!s.alive) break;
       }
+    }
+  }
+
+  /**
+   * Fighters against each other (after `step`): same damage-by-closing-speed
+   * as the hulls, sparks, a knock on the camera when the player is in it.
+   */
+  stepFighters(dt: number, skip: (s: ShipEntity) => boolean, eye: Vector3): void {
+    const w = this.fighters;
+    w.step(this.fleet.ships, dt, (s, d) => this.fleet.damage(s, d), skip);
+    if (!w.events.length) return;
+    const fx = this.fx();
+    const audio = getAudio();
+    for (const e of w.events) {
+      if (fx) {
+        fx.impact(e.point, e.normal, e.a.flight.velocity, PAL.WARM);
+        if (e.impact > 35) fx.explosion(e.point, e.a.flight.velocity, Math.min(8, 2 + e.impact * 0.03), PAL.WARM);
+        for (const s of [e.a, e.b]) if (!s.alive) fx.explosion(s.flight.position, s.flight.velocity, Math.max(10, s.radius * 1.4), PAL.WARM);
+      }
+      const player = e.a.isPlayer || e.b.isPlayer;
+      if (e.impact > 6) audio.playAt(player ? 'playerHit' : 'hullHit', e.point, eye, { gain: Math.min(1.2, 0.3 + e.impact / 120) });
+      if (player) this.kick(Math.min(2.6, 0.25 + e.impact * 0.02));
     }
   }
 
