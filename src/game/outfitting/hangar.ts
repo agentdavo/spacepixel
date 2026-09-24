@@ -173,22 +173,23 @@ export function syncHold(h: Hangar, l: TradeLedger): TradeLedger {
 
 /**
  * Buy `itemId` into `slotId` of ship `uid` (the old item sells back at half
- * price). Checks stock, standing, shares and the power budget.
+ * price). Checks stock, standing, shares and the power budget. A guild
+ * quartermaster (`qm`) sells its own stock at its own price instead.
  */
-export function buyItem(h: Hangar, l: TradeLedger, uid: string, slotId: string, itemId: string, st: StationLike): ShopResult {
+export function buyItem(h: Hangar, l: TradeLedger, uid: string, slotId: string, itemId: string, st: StationLike, qm?: { price: number }): ShopResult {
   const ship = h.ships.find((s) => s.uid === uid);
   const it = item(itemId);
   if (!ship || !it) return { hangar: h, ledger: l, error: 'NO SUCH ITEM' };
   const e = entryOf(ship);
   const slot = slotsFor(e).find((s) => s.id === slotId);
   if (!slot || !fits(it, slot)) return { hangar: h, ledger: l, error: 'DOES NOT FIT THAT SLOT' };
-  if (!stocks(st, it)) return { hangar: h, ledger: l, error: 'NOT STOCKED HERE' };
-  const lock = standingLock(it, l);
+  if (!qm && !stocks(st, it)) return { hangar: h, ledger: l, error: 'NOT STOCKED HERE' };
+  const lock = qm ? null : standingLock(it, l);
   if (lock) return { hangar: h, ledger: l, error: lock.reason };
   if (ship.fit[slotId] === itemId) return { hangar: h, ledger: l, error: 'ALREADY FITTED' };
   const old = item(ship.fit[slotId]);
   const refund = old ? Math.round(old.price * RESALE) : 0;
-  const price = itemPrice(it, st, l);
+  const price = qm ? qm.price : itemPrice(it, st, l);
   if (l.credits + refund < price) return { hangar: h, ledger: l, error: `INSUFFICIENT SHARES — ${sh(price - refund)} NEEDED` };
   const fit = { ...ship.fit, [slotId]: itemId };
   const r = computeFit(e, fit);
