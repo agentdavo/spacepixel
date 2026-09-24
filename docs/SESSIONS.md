@@ -24,6 +24,46 @@ Hooks for other owners:
 - Title, prologue and trailer stay on the **Original Score** unless the player
   pinned one, so `make-video` / trailer renders are unchanged.
 
+## Voices / chat / soundtrack handoff (24 Sep, `claude/ova-soundtrack-voices`)
+
+The voices/score session is stopping here. A project thread continues from
+this file. Everything is merged into `claude/vanguard-space-combat-0l3bfi`.
+
+**Done** (`tsc` clean, `npm test` 227/227 incl. `tests/score.test.ts`, every
+score scenario in `scripts/audio-render.mjs` renders with 0 clipped samples,
+live-checked in Chromium: faction pick, `?score=`, Shift+F7, `?scene=audio`):
+
+- `src/audio/score/`: `rack.ts` (strings / FM / analog / drum-kit patches),
+  `palette.ts` (routes the mood scripts' instrument calls to each score's
+  patches), `scores.ts` (8 scores: palettes, per-mood rewrites, score parts),
+  `catalog.ts` (pure resolver: pinned > episode > special system > faction >
+  original, plus a stable per-system/episode variant).
+- `Music.setScore` crossfade, ensemble chorus (its LFOs are stopped in
+  `Strip.dispose`), swing, per-score reverb rooms, score-aware stings.
+  `GameAudio.setPlace` is called per frame in FlightScene and in `main.ts`
+  (briefing, title).
+- Settings: `soundtrack` field, Shift+F7, `?score=`. The hotkeys now install
+  from the audio layer, so they work in every scene.
+- Original Score (title, prologue, trailer) renders identically to before.
+- Samples: `docs/audio/score-reel.mp3`, `score-reel-cruise.mp3`. README
+  *Soundtrack* section.
+
+**Left / known issues:**
+
+- The mix is tuned from level and spectrum analysis only; nobody has listened
+  to it. Orchestral scores (Cathedral, Long Dark, Anchor) are darker in
+  battle than the synth ones, so the string/timpani levels may want a pass.
+- Only cruise and combat are rendered per score. Title, briefing, dread,
+  sublime, victory and defeat under non-original scores are untested by ear
+  (they run and don't clip in the audio test scene).
+- No per-frame CPU measurement of the heavier scores (Symphony of Gates
+  combat) on a real device. Offline renders run faster than real time on
+  SwiftShader.
+- The batch 6 barks (Requests below) are waiting on event names from the
+  turrets session.
+- Voices and dialog: no changes in this session beyond ownership. The
+  procedural voice, barks and concourse dialog are as the lead left them.
+
 ## Lead session handoff (24 Sep, `claude/vanguard-space-combat-0l3bfi`)
 
 The lead session is stopping here; a project thread continues from this file.
