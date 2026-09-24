@@ -5,6 +5,7 @@ import { PLANETS, type PlanetPreset } from '@/world/Planet';
 import type { ColorStop } from '@/render/materials/PaletteRamp';
 import type { StarSystem, Universe } from './Universe';
 import { placeStations, systemRisk } from './stations';
+import { surveySystem } from './bodies';
 
 /**
  * Seeded Meridian Reach generator. Six hand-placed key systems anchor the
@@ -185,6 +186,8 @@ export function generateUniverse(seed = 1994, count = 22): Universe {
     const risk = systemRisk(sys.threat, sys.faction, nearNull.has(sys.id));
     for (const st of sys.stations) st.risk = risk;
   }
+  // Survey pass: kinds, moons, landmarks, flavour — appended, never moved.
+  for (const sys of systems.values()) surveySystem(seed, sys);
 
   return { seed, systems, start: 'meridian' };
 }
