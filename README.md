@@ -94,6 +94,43 @@ so nothing tunnels at cruise. AI avoidance steers round the same proxies
 
 ![Docked](docs/screenshots/dock-screen.jpg)
 
+## Contracts & free flight
+
+Between episodes the Reach stays open. After a debrief (or **CONTINUE — FREE
+FLIGHT** on the title) you start berthed at a Directorate station; the next
+episode is posted as **PRIORITY ORDERS** on every Directorate board, so the
+story continues when you choose (the star map lists it; **P** on the map plots
+the nearest Directorate berth).
+
+Docked, tab **2 · CONTRACTS** is the station's board: seeded per station, 10
+minutes of free flight per repost, reseeded as your standing climbs and
+matched to your ship's tier. Eight kinds, each with a named client (comms
+portrait) and an OVA mission-brief card:
+
+| Kind | Work | Paid at | Tier I fee |
+|---|---|---|---|
+| Courier | sealed case to a station by a deadline (tier ≥ II: interceptors at the far end) | consignee | 520 + 460/jump |
+| Cargo haul | 2–12 units loaded into your pod here, delivered there (sell one and it's theft) | consignee | 380 + 340/jump + 10 % of cargo value |
+| Escort | see a freighter down a lane to a Lantern or station through 1–2 raids | client | 1,500 |
+| Bounty | find a named raider in the wrecks and kill them (and their wing) | client | 2,300 + 300/jump |
+| Patrol sweep | fly 3–4 nav points in order, clear what's hiding | client | 1,350 + 280/jump |
+| Salvage recovery | survey a wreck or golden-age hulk (dwell), recover its flight core, get clear | client | 1,650 + 300/jump |
+| Reconnaissance | hold an observation point in a dangerous system, then break contact | client | 1,900 + 320/jump |
+| Faction sortie (rare) | join a Directorate picket flight against a Choir Measure | client | 5,200 + 300/jump |
+
+Tier II ×1.75, tier III ×2.8; standing moves fees −12 %…+25 %. Late or
+abandoned jobs cost 30 % of the fee and twice the standing. Up to 5 at once.
+Accepted work in the current system runs through the campaign runner
+alongside normal flight (objective panel top-right, orange nav diamonds,
+**C** tracks the next job and plots its route on the star map); fees are paid
+on docking. Keys on the tab: ↑↓ · **A** accept · **D** decline · **T** turn
+in · **X** abandon. Pure + tested: `src/game/contracts/`,
+`tests/contracts.test.ts`. Captures:
+`?scene=flight&contract=<kind>&cphase=board|op|pay|map`.
+
+![Contracts board](docs/screenshots/contracts-board.jpg)
+![Escort contract in flight](docs/screenshots/contracts-escort.jpg)
+
 ## Scenes (`?scene=`)
 
 `flight` (default game) · `showcase` · `hangar` (model sheets) · `paint`

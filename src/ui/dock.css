@@ -77,7 +77,8 @@
   z-index: 22;
   pointer-events: auto;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* head · tabs · (market body | tab panel) · ticker */
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 14px;
   padding: 20px 26px 14px;
   background: rgba(3, 10, 8, 0.86);

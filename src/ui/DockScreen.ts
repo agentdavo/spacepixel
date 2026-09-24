@@ -44,6 +44,8 @@ export interface DockContext {
   hull(): number;
   setHull(h: number): void;
   onLaunch(): void;
+  /** Extra opening lines for the dock log (contract settlements, …). */
+  notices?: { text: string; cls?: string }[];
 }
 
 /**
@@ -99,6 +101,7 @@ export class DockScreen {
     const l = ctx.ledger();
     this.log = [{ text: `BERTH ${ctx.berth} · ${ctx.station.name.toUpperCase()} · SEALS GREEN. WELCOME ABOARD, VANGUARD.`, cls: 'ok' }];
     if (l.rep[ctx.station.faction] < -20) this.log.push({ text: 'THE DECK CREW WATCHES YOU. TARIFFS APPLY TO THE UNTRUSTED.', cls: 'err' });
+    for (const n of ctx.notices ?? []) this.log.push({ text: n.text, cls: n.cls ?? '' });
     const el = document.createElement('div');
     el.className = `dock-screen ${ctx.station.faction}`;
     this.el = el;

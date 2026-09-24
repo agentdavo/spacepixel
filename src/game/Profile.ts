@@ -83,3 +83,28 @@ export function saveLedger(l: TradeLedger): void {
     /* storage unavailable — trades last for this session only */
   }
 }
+
+// ── Contracts (free-roam career): active jobs, board clock, receipts ──
+// Own key, like the ledger: the campaign loop holds a PilotProfile object for
+// a whole episode, and saving it must never roll contracts back.
+import { newBook, normaliseBook, type ContractBook } from './contracts/contracts';
+
+const CONTRACTS_KEY = 'vanguard.contracts.v1';
+
+export function loadContracts(): ContractBook {
+  try {
+    const raw = localStorage.getItem(CONTRACTS_KEY);
+    if (raw) return normaliseBook(JSON.parse(raw));
+  } catch {
+    /* storage unavailable */
+  }
+  return newBook();
+}
+
+export function saveContracts(b: ContractBook): void {
+  try {
+    localStorage.setItem(CONTRACTS_KEY, JSON.stringify(b));
+  } catch {
+    /* storage unavailable — contracts last for this session only */
+  }
+}

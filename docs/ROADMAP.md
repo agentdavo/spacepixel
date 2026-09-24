@@ -82,8 +82,8 @@ opens the Reach up around them and gets the game in front of players.
 | 7 | **Trade** — commodities, supply/demand per station, cargo, credits | pure, unit-tested economy; `npm run econ-sim` bands (safe 1.5–4k / hold, risky ≤ 9k) | 🔧 |
 | 8 | Repair, rearm, reputation per faction | persists in profile | 🔧 |
 | 9 | Planetary ports — orbital elevators / descent corridor to the surface port | seamless approach, no load screen | |
-| 10 | Contracts board — courier, escort, bounty jobs generated from station state | uses the campaign runner | |
-| 11 | Free-roam between episodes — the Reach stays open, episodes start from a station | save/resume anywhere docked | |
+| 10 | Contracts board — courier, escort, bounty jobs generated from station state | uses the campaign runner | 🔧 8 kinds, seeded boards, runner-driven ops (`src/game/contracts`) |
+| 11 | Free-roam between episodes — the Reach stays open, episodes start from a station | save/resume anywhere docked | 🔧 debrief → free flight → priority orders; title CONTINUE |
 | 12 | Ship upgrades & hangar — guns, missiles, shields, engines; livery shop | visible on the model | |
 | 13 | **MP-0 determinism** — fixed 60 Hz step, seeded RNG, sim/render split | bit-identical 10 min replay | |
 | 14 | Replays + kill-cam from recorded input | replay matches live | |

@@ -21,6 +21,8 @@ export class StarMap {
   open = false;
   destination: string | null = null;
   private hover: string | null = null;
+  /** Extra layer drawn over the map (contracts): the context, a system → screen mapper, time. */
+  overlay: ((c: CanvasRenderingContext2D, at: (id: string) => { x: number; y: number } | null, time: number) => void) | null = null;
 
   constructor(
     root: HTMLElement,
@@ -185,5 +187,9 @@ export class StarMap {
     }
     c.fillStyle = 'rgba(125,255,178,0.7)';
     c.fillText('[M] close · click a system to plot a route · fly through the marked Lantern to jump · ■ = dockable station', w - 760, h - 32);
+    this.overlay?.(c, (id) => {
+      const s = this.universe.systems.get(id);
+      return s ? this.toScreen(s) : null;
+    }, time);
   }
 }
