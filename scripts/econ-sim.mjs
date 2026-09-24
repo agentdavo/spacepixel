@@ -85,6 +85,53 @@ try {
   const perHourSafe = Math.round((s.safe.median * 60) / 5);
   const perHourRisky = Math.round((s.risky.median * 60) / 7);
   console.log(`  INFO  progression: ~${perHourSafe} sh/h safe, ~${perHourRisky} sh/h risky (5 / 7 min a run) → a 20k ship in ~${Math.round((20000 / perHourSafe) * 60)} min safe`);
+
+  // ── World scenarios (src/game/world): how far the story and the pilot move the default Reach ──
+  const W = await server.ssrLoadModule('/src/game/world/sim.ts');
+  const WS = await server.ssrLoadModule('/src/game/world/econScenarios.ts');
+  const T = await server.ssrLoadModule('/src/universe/traffic.ts');
+  const scenario = (name, value, pass, rule) => {
+    if (!pass) failed++;
+    console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${name}: ${value}  (${rule})`);
+  };
+  const pct = (a, b) => `${b >= a ? '+' : ''}${Math.round(((b - a) / a) * 100)}%`;
+
+  // 1. After Episode 19: the Symphony of Gates. Ebon collapses; gate fuel is free.
+  console.log('\n■ Scenario: after Episode 19 (gates aligned)');
+  const post = WS.econShift(W.fastForward(19), markets, hops, 12);
+  const P = WS.POSTGAME;
+  console.log(`    refinery Ebon mid ${Math.round(post.ebon[0])} → ${Math.round(post.ebon[1])} sh a flask (${pct(post.ebon[0], post.ebon[1])}) · Lantern toll ${W.lanternToll(W.fastForward(18))} → ${W.lanternToll(W.fastForward(19))} sh`);
+  console.log(`    mids: ${Object.entries(post.mids).map(([k, [a, b]]) => `${k} ${pct(a, b)}`).join(' · ')}`);
+  console.log(`    best safe ${post.before.safe.median} → ${post.after.safe.median} sh/hold (median) · risky ${post.before.risky.median} → ${post.after.risky.median} · starter ${post.before.starter.median} → ${post.after.starter.median}`);
+  console.log(`    best safe route now  ${fmt(post.after.scans[0].bestSafe)}`);
+  scenario('post-Ep19 refinery Ebon collapses', pct(post.ebon[0], post.ebon[1]), post.ebon[1] <= post.ebon[0] * (1 - P.ebonDrop), `≤ −${P.ebonDrop * 100}%`);
+  scenario('post-Ep19 Ebon leaves the safe trade', `${Math.round(post.ebonInSafe * 100)}% of best holds carry Ebon`, post.ebonInSafe <= P.ebonInSafe, `≤ ${P.ebonInSafe * 100}%`);
+  scenario('post-Ep19 the Reach still pays a living', post.after.safe.median, post.after.safe.median >= P.safeMedianMin, `safe median ≥ ${P.safeMedianMin}`);
+  scenario('post-Ep19 gate fuel is free', W.lanternToll(W.fastForward(19)), W.lanternToll(W.fastForward(19)) === 0 && W.lanternToll(W.fastForward(18)) > 0, 'toll 0 after, > 0 before');
+
+  // 2. After Episode 10: the Bastion falls. Anchorage bids up rations and medical.
+  console.log('\n■ Scenario: after Episode 10 (the Bastion falls)');
+  const anch = markets.filter((m) => m.system === 'anchorage' && !m.id.startsWith('carrier:'));
+  const sysOf = (id) => markets.find((m) => m.id === id)?.system ?? '';
+  const bid = (cid) => WS.meanMid(anch, cid);
+  const r0 = bid('rations');
+  const m0 = bid('medical');
+  const [r1, m1] = WS.withWorld(W.fastForward(10), sysOf, () => [bid('rations'), bid('medical')]);
+  console.log(`    Anchorage rations ${r0.toFixed(0)} → ${r1.toFixed(0)} (${pct(r0, r1)}) · medical ${m0.toFixed(0)} → ${m1.toFixed(0)} (${pct(m0, m1)})`);
+  scenario('post-Ep10 refugee demand at Anchorage', `${pct(r0, r1)} / ${pct(m0, m1)}`, r1 >= r0 * 1.25 && m1 >= m0 * 1.25, 'rations and medical ≥ +25%');
+
+  // 3. The pilot clears a lane: three ambushes broken on the most raided system.
+  const raided = [...u.systems.values()].filter((sy) => sy.faction === 'contested').sort((a, b) => T.systemTraffic(u.seed, b).piracy - T.systemTraffic(u.seed, a).piracy || b.threat - a.threat)[0];
+  console.log(`\n■ Scenario: a cleared lane (${raided.name}, three ambushes broken)`);
+  const t0s = T.systemTraffic(u.seed, raided);
+  let cleared = W.fastForward(0);
+  for (let i = 0; i < 3; i++) cleared = W.actAmbush(cleared, raided.id, 'concord', 3, true);
+  const t1s = WS.withWorld(cleared, sysOf, () => T.systemTraffic(u.seed, raided));
+  console.log(`    sailings ${Math.round(t0s.perHour)} → ${Math.round(t1s.perHour)} /h (${pct(t0s.perHour, t1s.perHour)}) · raid rate ${t0s.piracy.toFixed(2)} → ${t1s.piracy.toFixed(2)} · safe fact: ${!!cleared.facts[`lane.${raided.id}.safe`]}`);
+  scenario('cleared lane: traffic up', pct(t0s.perHour, t1s.perHour), t1s.perHour >= t0s.perHour * 1.2, '≥ +20%');
+  scenario('cleared lane: raids down', `${t0s.piracy.toFixed(2)} → ${t1s.piracy.toFixed(2)}`, t1s.piracy <= t0s.piracy * 0.5, '≤ half');
+  const tHour = WS.withWorld((await server.ssrLoadModule('/src/game/world/WorldState.ts')).tick(cleared, 3 * 3600), sysOf, () => T.systemTraffic(u.seed, raided));
+  scenario('cleared lane: still quieter three hours on', `${tHour.piracy.toFixed(2)}`, tHour.piracy < t0s.piracy, `< ${t0s.piracy.toFixed(2)}`);
   console.log(`\n${failed === 0 ? 'ALL PASS' : `${failed} CHECK(S) FAILED`} · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 } catch (e) {
   console.error(e);

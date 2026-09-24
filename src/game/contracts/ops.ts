@@ -216,6 +216,10 @@ export function buildOp(k: Contract, offset: V3, opts: OpOptions = {}): OpBuild 
       break;
     }
     case 'sortie': {
+      if (k.schedule) {
+        engagement(k, op, at, d, { spawns, setpieces, objectives, chatter, nav, labels });
+        break;
+      }
       setpieces.push({ kind: 'beacon', tag: 'rally', place: at(op.center), params: { label: 'Rally point', color: '#7dffb2' } });
       spawns.push(
         { blueprint: 'vf27-kestrel', faction: 'concord', count: 2, place: at(op.center, [-150, 40, -200]), tag: 'flight', name: 'Picket', role: 'wing' },
@@ -286,6 +290,67 @@ export function buildOp(k: Contract, offset: V3, opts: OpOptions = {}): OpBuild 
     debrief: '',
   };
   return { mission, nav, labels, completes };
+}
+
+/**
+ * A Schedule engagement flown as ordered (src/game/world/schedule.ts): take
+ * station on the line; the Measure arrives on the scheduled minute with its
+ * protected "conductor" standing off; when it has expended its quota,
+ * Allocation orders everyone home and both sides withdraw. Break it by
+ * killing the conductor (`broken:protected`) or by refusing the withdrawal
+ * (`broken:refused`: still on the line 40 s after the order). Either way the
+ * op ends in success; ContractDesk reads the flags and tells the world.
+ */
+function engagement(
+  k: Contract,
+  op: NonNullable<Contract['op']>,
+  at: (v: V3, o?: V3) => Placement,
+  d: (normal: number, staged?: number) => number,
+  out: { spawns: SpawnSpec[]; setpieces: SetPieceSpec[]; objectives: CampaignObjective[]; chatter: ChatterBeat[]; nav: Record<string, string>; labels: Record<string, string> },
+): void {
+  const sch = k.schedule!;
+  const who = k.client;
+  const n = sch.number;
+  out.setpieces.push({ kind: 'beacon', tag: 'line', place: at(op.center), params: { label: `Engagement ${n} — the line`, color: '#ffb347' } });
+  out.spawns.push(
+    { blueprint: 'vf27-kestrel', faction: 'concord', count: 2, place: at(op.center, [-180, 40, -240]), tag: 'flight', name: 'Allocation Picket', role: 'wing' },
+    { blueprint: 'ffc-lantern-guard', faction: 'concord', count: 1, place: at(op.center, [220, -40, -320]), tag: 'flight-guard', name: 'Lantern Guard', role: 'wing' },
+    { blueprint: op.enemy.blueprint, faction: 'choir', count: op.hostiles, place: at(op.center, [600, 500, 5200]), tag: 'measure', name: 'Measure Cantor', role: 'hostile', whenFlag: 'on-station', delay: d(8, 2) },
+    { blueprint: 'choir-vesper', faction: 'choir', count: 1, place: at(op.center, [-1600, 900, 8200]), tag: 'protected', name: sch.protectedName, role: 'static', whenFlag: 'on-station', delay: d(3, 1) },
+  );
+  let orderAt = -1;
+  out.objectives.push(
+    obj('station', `Take station on the line — Engagement ${n}`, (c) => c.distanceTo('line') < 1800, { setsFlag: 'on-station' }),
+    cue('seen', 'measure-seen', (c) => c.alive('measure')),
+    cue('pseen', 'protected-seen', (c) => c.alive('protected')),
+    // Break it: the ship nobody may touch.
+    cue('bp', 'broken:protected', (c) => c.flag('protected-seen') && c.aliveCount('protected') === 0 && !c.flag('depart:protected')),
+    // Break it: stay on the line after the withdrawal order.
+    cue('br', 'broken:refused', (c) => {
+      if (!c.flag('expended') || c.flag('broken:protected')) return false;
+      if (orderAt < 0) orderAt = c.time;
+      return c.time - orderAt > 40 && c.distanceTo('line') < 3000;
+    }),
+    cue('dec1', 'decisive', (c) => c.flag('broken:protected') || c.flag('broken:refused')),
+    obj('expend', `Fly the Schedule — the Measure expends ${sch.quota}`, (c) => c.kills('choir') >= sch.quota || c.flag('decisive'), { setsFlag: 'expended' }),
+    cue('w1', 'depart:measure', (c) => c.flag('expended') && !c.flag('broken:protected')),
+    cue('w2', 'depart:flight', (c) => c.flag('expended')),
+    cue('w3', 'depart:protected', (c) => c.flag('expended') && !c.flag('broken:protected')),
+    obj('withdraw', 'Withdraw on Allocation\'s order — clear the line (6 km)', (c) => c.distanceTo('line') > 6000 || c.flag('decisive')),
+  );
+  out.nav.station = 'line';
+  out.nav.expend = 'measure';
+  out.nav.withdraw = 'line';
+  out.labels.line = `ENGAGEMENT ${n}`;
+  out.chatter.push(
+    beat('s-start', { on: 'start' }, [
+      say(who, sch.correction ? `Engagement ${n}. A correction: the 13th requested by name. "Costly and visible." Take station on the line.` : `Engagement ${n}. Take station on the line and fly the numbers, Vanguard.`),
+      say(who, `The ${sch.protectedName} is not to be engaged. No engagement shall be decisive.`),
+    ]),
+    beat('s-seen', onFlag('measure-seen'), [say('system', 'CHOIR MEASURE ON THE LINE. ON THE SCHEDULED MINUTE.'), hiss('system', '(sung) Be witnessed, be witnessed —')], 2),
+    beat('s-met', onFlag('expended'), [say('system', 'ALLOCATION: EXPENDITURE MET. ENGAGEMENT CONCLUDED. ALL FLIGHTS WITHDRAW.'), say(who, 'That\'s the number. Come home, pilot.')], 2),
+    beat('s-broken', onFlag('decisive'), [say(who, 'That was not on the Schedule.'), hiss('system', '(Treasury band) …a correction will be scheduled.')], 3),
+  );
 }
 
 function taunt(name: string, seed: number): string {

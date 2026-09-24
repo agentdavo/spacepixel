@@ -92,3 +92,17 @@ test('in-system loop exists but is modest', () => {
   const sc = scanRoutes(markets, (a, b) => (a === b ? 0 : Infinity), 900, 0);
   assert.ok(sc.bestSafe && sc.bestSafe.profit > 0 && sc.bestSafe.profit <= BANDS.safeMedian[1], `in-system best ${sc.bestSafe?.profit}`);
 });
+
+test('world scenario: after Episode 19 Ebon collapses out of the trade, and the Reach still pays a living', async () => {
+  const { econShift, POSTGAME } = await import('../src/game/world/econScenarios.ts');
+  const { fastForward } = await import('../src/game/world/sim.ts');
+  const { markets, hops } = reach();
+  const s = econShift(fastForward(19), markets, hops, 4);
+  const line = `refinery Ebon ${Math.round(s.ebon[0])} → ${Math.round(s.ebon[1])} · safe ${s.before.safe.median} → ${s.after.safe.median} · Ebon in ${Math.round(s.ebonInSafe * 100)}% of best holds`;
+  console.log(`  post-Ep19: ${line}`);
+  assert.ok(s.ebon[1] <= s.ebon[0] * (1 - POSTGAME.ebonDrop), line);
+  assert.ok(s.ebonInSafe <= POSTGAME.ebonInSafe, line);
+  assert.ok(s.after.safe.median >= POSTGAME.safeMedianMin, line);
+  // Uninstalled afterwards: the default Reach is back.
+  assert.equal(summarise(markets, hops, 4, 2).safe.median, s.before.safe.median);
+});

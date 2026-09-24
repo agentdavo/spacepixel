@@ -152,6 +152,8 @@ export interface Contract {
   progress?: RunnerSnapshot;
   /** Offered in conversation (src/game/contracts/named.ts), not posted on a board. */
   named?: string;
+  /** A Schedule engagement taken as ordered (src/game/world/schedule.ts): the sortie op flies it staged. */
+  schedule?: { id: string; number: number; quota: number; protectedName: string; correction?: boolean };
 }
 
 export interface Receipt {
@@ -456,6 +458,8 @@ export interface BoardInput {
   goods: readonly Good[];
   /** Pending campaign episode (Directorate stations post it as priority orders). */
   priority?: { episode: number; title: string; tagline: string } | null;
+  /** World-driven multipliers on the station's kind weights (src/game/world/sim.ts boardWeights). */
+  weights?: Partial<Record<ContractKind, number>>;
 }
 
 const KIND_WEIGHTS: Record<StationKind, Partial<Record<ContractKind, number>>> = {
@@ -527,6 +531,7 @@ export function generateBoard(input: BoardInput): Contract[] {
   if (rep < -20) n = Math.min(n, 2);
   const ctx: GenCtx = { input, station, system, rep, rnd, hops: hops(input.reach, system.id), idx: systemIndex(input.reach), epoch };
   const weights = { ...KIND_WEIGHTS[station.kind] };
+  for (const [k, m] of Object.entries(input.weights ?? {}) as [ContractKind, number][]) if (weights[k] !== undefined && m > 0) weights[k] = weights[k]! * m;
   // Sorties: Directorate stations only, trusted pilots in capable ships.
   if (station.faction !== 'concord' || rep < 30 || input.tier < 2) delete weights.sortie;
   for (let k = 0; k < n; k++) {

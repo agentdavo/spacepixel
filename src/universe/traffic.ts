@@ -212,18 +212,41 @@ const KIND_MIX: Record<StationKind, [TrafficRole, number][]> = {
 };
 const KIND_WEIGHT: Record<StationKind, number> = { orbital: 1.4, freeport: 1.25, refinery: 1.0, salvage: 0.85, bastion: 0.55, carrier: 0.3 };
 
+/**
+ * The world's say in the lanes (installed by src/game/world/live.ts; none =
+ * the default Reach): fractional offsets to sailings and patrols, and an
+ * additive raid rate, per system id. Lanes are rebuilt on system entry, so a
+ * change shows the next time the pilot arrives.
+ */
+export interface TrafficWorld {
+  volume(sysId: string): number;
+  piracy(sysId: string): number;
+  patrol(sysId: string): number;
+}
+let trafficWorld: TrafficWorld | null = null;
+export function setTrafficWorld(w: TrafficWorld | null): void {
+  trafficWorld = w;
+}
+
+type SysLike = Pick<StarSystem, 'faction' | 'threat'> & { id?: string };
+
 /** Traffic volume multiplier by system holder (fewer sailings where it's dangerous). */
-export function systemVolume(sys: Pick<StarSystem, 'faction' | 'threat'>): number {
+export function systemVolume(sys: SysLike): number {
   const base = sys.faction === 'concord' ? 1 : sys.faction === 'choir' ? 0.85 : sys.faction === 'rustwake' ? 0.95 : sys.faction === 'contested' ? 0.65 : 0.18;
-  return base * (1 - 0.3 * sys.threat);
+  const world = trafficWorld && sys.id ? Math.max(0.2, 1 + trafficWorld.volume(sys.id)) : 1;
+  return base * (1 - 0.3 * sys.threat) * world;
 }
 
 /** Lawless / border: where Rustwake raiders work the lanes (0..1). */
-export function piracy(sys: Pick<StarSystem, 'faction' | 'threat'>): number {
-  if (sys.faction === 'rustwake') return 0.12;
-  if (sys.faction === 'contested') return 0.2;
-  if (sys.faction === 'concord') return sys.threat > 0.25 ? 0.04 : 0;
-  return 0;
+export function piracy(sys: SysLike): number {
+  const base = sys.faction === 'rustwake' ? 0.12 : sys.faction === 'contested' ? 0.2 : sys.faction === 'concord' ? (sys.threat > 0.25 ? 0.04 : 0) : 0;
+  if (!trafficWorld || !sys.id || sys.faction === 'unknown') return base;
+  return Math.max(0, Math.min(0.5, base + trafficWorld.piracy(sys.id)));
+}
+
+/** Patrol sailings multiplier (world patrol offset; 1 in the default Reach). */
+export function patrolVolume(sys: SysLike): number {
+  return trafficWorld && sys.id ? Math.max(0.3, 1 + trafficWorld.patrol(sys.id)) : 1;
 }
 
 function sysFlag(sys: StarSystem): EconFaction {
@@ -292,10 +315,11 @@ export function systemLanes(seed: number, sys: StarSystem): TrafficLane[] {
   const pf: EconFaction = home?.faction ?? flag;
   const origin = home ?? gates[0];
   if (origin && sys.faction !== 'unknown') {
+    const pv = patrolVolume(sys);
     for (const g of gates) {
       if (g === origin) continue;
-      add(origin, g, 300, [['patrol', 1]], [[pf, 1]], 'patrol');
-      add(g, origin, 320, [['patrol', 1]], [[pf, 1]], 'patrol');
+      add(origin, g, 300 / pv, [['patrol', 1]], [[pf, 1]], 'patrol');
+      add(g, origin, 320 / pv, [['patrol', 1]], [[pf, 1]], 'patrol');
     }
   }
   return lanes;

@@ -256,6 +256,32 @@ export function hazard(spec: MarketSpec): number {
   return clamp(((spec.risk ?? 0) - HAZARD_FLOOR) / (1 - HAZARD_FLOOR), 0, 1);
 }
 
+// ── World readers (installed by src/game/world/live.ts; none = the default Reach) ──
+
+/**
+ * The world's say in a market: lasting story changes (the Bastion's
+ * refugees, the Ebon collapse after the Symphony of Gates), the pilot's
+ * footprint (heavy trading, broken Schedules) and background news. Kept as a
+ * hook so this module stays pure and the balance sim runs the default world.
+ */
+export interface MarketWorld {
+  /** Fractional price offset for `cid` at this market (+0.2 = 20 % dearer). */
+  price(spec: MarketSpec, cid: CommodityId): number;
+  /** −1..1: how this market regards the pilot (cold = tariffs, −0.8 = no berth). */
+  attitude(spec: MarketSpec): number;
+}
+let marketWorld: MarketWorld | null = null;
+export function setMarketWorld(w: MarketWorld | null): void {
+  marketWorld = w;
+}
+/** The installed world's attitude at a market (0 without one). */
+export function marketAttitude(spec: MarketSpec): number {
+  return marketWorld ? marketWorld.attitude(spec) : 0;
+}
+/** Extra spread from a cold attitude: up to +20 % at −1. Warm attitudes never narrow it (no round-trip profit). */
+export const TARIFF_MAX = 0.2;
+export const ATTITUDE_DENY = -0.8;
+
 /** Mid-market price (no spread, no tariff), or NaN if not traded here. */
 export function midPrice(spec: MarketSpec, cid: CommodityId, l: TradeLedger): number {
   const k = KIND_MUL[spec.kind][cid];
@@ -266,7 +292,8 @@ export function midPrice(spec: MarketSpec, cid: CommodityId, l: TradeLedger): nu
   const h = hazard(spec);
   if (h > 0) m *= raw > 1 ? 1 + HAZARD_DEMAND * h : raw < 1 ? 1 - HAZARD_SURPLUS * h : 1;
   const p = Math.exp(-PRESSURE_K * pressureAt(l, spec.id, cid));
-  return COMMODITY[cid].base * m * (1 + drift(spec.id, cid, l.clock)) * p;
+  const wm = marketWorld ? Math.max(0.1, 1 + marketWorld.price(spec, cid)) : 1;
+  return COMMODITY[cid].base * m * (1 + drift(spec.id, cid, l.clock)) * p * wm;
 }
 
 export interface Quote {
@@ -281,7 +308,7 @@ export interface Quote {
 export function quote(spec: MarketSpec, cid: CommodityId, l: TradeLedger): Quote | null {
   const mid = midPrice(spec, cid, l);
   if (!Number.isFinite(mid)) return null;
-  const s = spreadFor(spec.kind, l.rep[spec.faction]);
+  const s = spreadFor(spec.kind, l.rep[spec.faction]) + (marketWorld ? Math.max(0, -marketWorld.attitude(spec)) * TARIFF_MAX : 0);
   const buy = Math.max(2, Math.ceil(mid * (1 + s / 2)));
   const sell = Math.min(buy - 1, Math.max(1, Math.floor(mid * (1 - s / 2))));
   return { id: cid, buy, sell, stance: stance(spec, cid) as Quote['stance'] };
@@ -416,9 +443,10 @@ export function rearm(ledger: TradeLedger, spec: MarketSpec): { ledger: TradeLed
   return { ledger: l, cost };
 }
 
-/** Docking permission from standing. */
-export function dockingClearance(l: TradeLedger, f: EconFaction): { ok: boolean; reason?: string } {
+/** Docking permission from standing (and, when given, the station's world attitude). */
+export function dockingClearance(l: TradeLedger, f: EconFaction, attitude = 0): { ok: boolean; reason?: string } {
   if (l.rep[f] <= DOCK_DENY_REP) return { ok: false, reason: f === 'choir' ? 'UNWITNESSED — THE HEGEMONY DENIES YOU BERTH' : 'STANDING TOO LOW — BERTH DENIED' };
+  if (attitude <= ATTITUDE_DENY) return { ok: false, reason: f === 'concord' ? 'BERTH DENIED — THE OFFICE OF CONTINUITY HAS YOUR NAME' : 'BERTH DENIED — THEY REMEMBER WHAT YOU DID' };
   return { ok: true };
 }
 
@@ -492,12 +520,13 @@ const NEWS: Record<EconFaction | 'any', string[]> = {
 };
 
 /** Ticker lines for a docked station: lore, local market colour, and a price tip. Stable per 5 minutes of play. */
-export function rumours(o: { station: Named; systemName: string; clock: number; markets: readonly Named[]; ledger: TradeLedger }): string[] {
+export function rumours(o: { station: Named; systemName: string; clock: number; markets: readonly Named[]; ledger: TradeLedger; news?: readonly string[] }): string[] {
   const { station, ledger } = o;
   const h = hash(`${station.id}:${Math.floor(o.clock / 300)}`);
   const pickFrom = (list: string[], k: number) => list[(h >>> (k * 3)) % list.length];
-  const lines = [pickFrom(NEWS[station.faction], 0), pickFrom(NEWS.any, 1), pickFrom(NEWS[station.faction], 5)];
-  if (lines[2] === lines[0]) lines.pop();
+  // World headlines (src/game/world/news.ts) lead; the stock colour follows.
+  const lines = [...(o.news ?? []), pickFrom(NEWS[station.faction], 0), pickFrom(NEWS.any, 1), pickFrom(NEWS[station.faction], 5)];
+  if (lines[lines.length - 1] === lines[lines.length - 3]) lines.pop();
 
   // Local colour: what this station is long on.
   const board = marketBoard(station, ledger);
