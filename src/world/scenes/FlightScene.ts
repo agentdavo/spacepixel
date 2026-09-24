@@ -208,11 +208,11 @@ export class FlightScene implements GameScene, FlightHostScene {
   inTick = false;
   /** A replay seek: skip per-tick presentation (particles, barks, cutaways, history). */
   fastForward = false;
-  /** ?killcam=<t>[&kcat=<s>]: captures — the nearest bandit downs the player at t s, the kill-cam opens s seconds in. */
+  /** ?killcam=<t>[&kcat=<s>][&warp=N]: captures — the nearest bandit downs the player at t s (reached N× fast), the kill-cam opens s seconds in. */
   private stageKillCam = (() => {
     const q = new URLSearchParams(location.search);
     const t = Number(q.get('killcam'));
-    return t > 0 ? { at: t, skip: Number(q.get('kcat') ?? 0) || 0, fired: -1, killer: null as ShipEntity | null } : null;
+    return t > 0 ? { at: t, skip: Number(q.get('kcat') ?? 0) || 0, fired: -1, killer: null as ShipEntity | null, warp: Math.max(1, Math.min(16, Number(q.get('warp')) || 1)) } : null;
   })();
   /** Records every session; plays tapes back (?replay=). */
   readonly replay: ReplayDirector = new ReplayDirector(this, this.seed);
@@ -382,7 +382,9 @@ export class FlightScene implements GameScene, FlightHostScene {
   timeScale(): number {
     if (this.killCam?.active) return 0;
     const base = this.docking.frozen ? 0 : this.tactical ? 0.25 : 1;
-    return base * this.replay.timeScale();
+    // ?killcam= captures run the sim ahead to the kill at ?warp=N× (1 frame = N ticks).
+    const warp = this.stageKillCam && this.stageKillCam.fired < 0 ? this.stageKillCam.warp : 1;
+    return base * warp * this.replay.timeScale();
   }
 
   /** Engine: one fixed tick. */

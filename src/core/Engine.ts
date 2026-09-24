@@ -173,8 +173,10 @@ export class Engine {
         if (k >= 1 && k <= 2 && Math.abs(step - k * SIM_DT) < 0.002) step = k * SIM_DT;
       }
       this.acc += step * Math.max(0, scale);
-      if (this.acc > MAX_SUBSTEPS * SIM_DT) {
-        this.acc = MAX_SUBSTEPS * SIM_DT;
+      // A deliberate speed-up (tape ×4, capture warp) raises the cap with it.
+      const cap = MAX_SUBSTEPS * Math.max(1, scale) * SIM_DT;
+      if (this.acc > cap) {
+        this.acc = cap;
         this.droppedFrames++;
       }
       const t = this.tickCtx;
