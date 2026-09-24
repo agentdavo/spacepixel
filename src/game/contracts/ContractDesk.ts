@@ -51,6 +51,7 @@ import { RescueBeat } from '@/game/RescueBeat';
 import { noteContract, type ContractNote } from '@/game/npc/live';
 import { ARC_CLIENTS } from '@/game/npc/people';
 import { tuneRivalMark } from '@/game/rivals/RivalDirector';
+import { GUILD_CAST } from '@/game/guilds/guilds';
 
 /**
  * Free-roam contracts at runtime: the board, the book, and the live
@@ -303,7 +304,12 @@ export class ContractDesk {
   lastReceipts: { station: string; receipts: Receipt[] } | null = null;
   private stage: { kind: ContractKind; phase: string } | null = null;
   private readonly sysNames = new Map<string, string>();
-  private readonly cast: Character[] = [...CAST, ...CLIENTS, ...MARK_CAST, ...NAMED_CLIENTS, ...ARC_CLIENTS];
+  private readonly cast: Character[] = [...CAST, ...CLIENTS, ...MARK_CAST, ...NAMED_CLIENTS, ...GUILD_CAST, ...ARC_CLIENTS];
+  /**
+   * Every settled contract — paid, failed, lapsed or abandoned — with its
+   * receipt (guilds pay merit, arcs advance, outposts hear about raids).
+   */
+  readonly onReceipt = new Set<(k: Contract, r: Receipt) => void>();
   /** People signed on from conversations (mechanic, Magpie's Due). */
   readonly hires: HireDesk;
   /** Free-flight death: the salvage tow cutaway, its bill, the debrief. */
@@ -428,6 +434,7 @@ export class ContractDesk {
     this.teardown(k.id);
     this.setBook(r.book);
     io.setLedger(r.ledger);
+    this.emit([k], r.receipts);
     if (this.tracked === k.id) this.tracked = this.book.active[0]?.id ?? null;
     return r.receipts?.[0] ?? null;
   }
@@ -445,6 +452,7 @@ export class ContractDesk {
     for (const x of receipts) this.teardown(x.id);
     this.setBook(r.book);
     io.setLedger(r.ledger);
+    this.emit(before, receipts);
     if (this.tracked && !this.book.active.some((k) => k.id === this.tracked)) this.tracked = this.book.active[0]?.id ?? null;
     this.lastReceipts = { station: stationId, receipts: [...(this.lastReceipts?.station === stationId ? this.lastReceipts.receipts : []), ...receipts] };
     return receipts;
@@ -469,6 +477,18 @@ export class ContractDesk {
   /** Tell the world (NPC arcs wait on named jobs; rivals hear about bounties). */
   private note(k: Contract, state: ContractNote): void {
     noteContract(k, state, this.sysName, (id) => this.reach.systems.find((x) => x.id === id)?.faction ?? '');
+  }
+
+  private emit(from: readonly Contract[], receipts: readonly Receipt[] | undefined): void {
+    for (const r of receipts ?? []) {
+      const k = from.find((x) => x.id === r.id);
+      if (k) for (const f of this.onReceipt) f(k, r);
+    }
+  }
+
+  /** A toast on the contract HUD (guilds, outposts). */
+  toast(text: string, color = '#ffb347'): void {
+    this.hud.toast(text, color);
   }
 
   private setBook(b: ContractBook): void {
@@ -529,6 +549,7 @@ export class ContractDesk {
           this.teardown(x.id);
           this.hud.toast(`CONTRACT LAPSED · ${x.title.toUpperCase()} · ${x.amount.toLocaleString('en-US')} sh`, '#ff5f7a');
         }
+        this.emit(before, r.receipts);
       } else this.book = r.book;
       this.saveT += dt;
       if (this.saveT > 10) {
@@ -587,6 +608,7 @@ export class ContractDesk {
         s.ledger = r.ledger;
         saveLedger(r.ledger);
         this.setBook(r.book);
+        this.emit([k], r.receipts);
         this.hud.toast(`CONTRACT FAILED · ${k.title.toUpperCase()} · ${(r.receipts?.[0]?.amount ?? 0).toLocaleString('en-US')} sh`, '#ff5f7a');
       }
     }

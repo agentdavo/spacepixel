@@ -54,7 +54,7 @@ import { WingDocking } from '../WingDocking';
 import { PlanetaryPorts } from '../surface/PlanetaryPorts';
 import '@/ui/Concourse'; // registers the CONCOURSE dock tab (people, conversations)
 import { RivalDirector } from '@/game/rivals/RivalDirector';
-import { applyRecordedWorld, recordWorldChanges } from '@/game/npc/live';
+import { recordWorldChanges } from '@/game/npc/live';
 import { FlightRadio } from '@/dialog/FlightRadio';
 import { loadLedger, saveLedger } from '@/game/Profile';
 import { MISSILE_MAX, cargoUsed, dockingClearance, reputationForKill, type EconFaction, type TradeLedger } from '@/game/economy';
@@ -63,6 +63,8 @@ import { Outfitter, bindOutfitter } from '@/game/outfitting/Outfitter';
 import { ShipTurrets } from '@/game/outfitting/turrets';
 import '@/ui/ShipyardTab'; // registers the SHIPYARD dock tab (hulls, your hangar)
 import '@/ui/OutfittingTab'; // registers the OUTFITTING dock tab (slots, items, power)
+import { GuildRuntime } from '@/game/guilds/GuildRuntime';
+import { sanitizeWorld, world } from '@/game/world/WorldState'; // guilds, arcs, outposts (+ the GUILD HALL / OUTPOST dock tabs)
 import '@/ui/ThreadsTab'; // registers the THREADS dock tab (NPC arcs, rivals) — last, so earlier tabs keep their digits
 
 /**
@@ -200,6 +202,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   readonly contracts: ContractDesk;
   /** Named aces and bounty targets who remember you (src/game/rivals). */
   readonly rivals: RivalDirector;
+  /** Guilds, their arcs, and your outpost (src/game/guilds, src/game/outposts). */
+  readonly guilds: GuildRuntime;
   /** Shipyard & outfitting: owned hulls, fits, the active ship (src/game/outfitting). */
   readonly outfit = new Outfitter();
   /** Fitted turrets, point defence and hangar complements on non-capital hulls. */
@@ -385,6 +389,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
     this.contracts = new ContractDesk(this);
     this.rivals = new RivalDirector(this);
+    this.guilds = new GuildRuntime(this);
     // Conversations and the dock screen change the world outside a tick: on the replay tape.
     recordWorldChanges((w) => this.replay.note('world', w));
     this.outfit.bind(this);
@@ -404,6 +409,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
     // ?contract=<kind>&cphase=board|op|pay|map: contract captures.
     this.contracts.stageFromQuery();
+    // ?guild=<id>.<rank> · ?outpost=<stage>: guild / outpost captures.
+    this.guilds.stageFromQuery();
     if (q.get('dockui') === '0') this.dockScreen.close();
     // ?reach=body|ring|lane|ambush [&sys=<id>] …: living-Reach captures (world/ReachStage.ts).
     if (q.get('reach')) this.reachFlag(q.get('reach')!, q);
@@ -537,6 +544,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       }
     }
     this.contracts.update(dt, time);
+    this.guilds.update(dt, time);
     this.rivals.update(dt);
 
     // 4b. Mission bookkeeping (kills by faction of the victim).
@@ -825,6 +833,10 @@ export class FlightScene implements GameScene, FlightHostScene {
   }
 
   // ── FlightHostScene ────────────────────────────────────────────────
+  /** The current system's view (stations, gates, bodies) — outposts build into it. */
+  get systemView(): StarSystemView {
+    return this.view;
+  }
   currentSystemId(): string {
     return this.systemId;
   }
@@ -1149,7 +1161,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.cinema.hide();
     this.onDocked?.(d.id);
     this.campaign?.runner.onDocked(d.id);
-    const notices = this.campaign ? [] : this.contracts.onDocked(d.id);
+    const notices = this.campaign ? [] : [...this.contracts.onDocked(d.id), ...this.guilds.onDocked(d.id)];
     const port = d.cls === 'descent' ? this.ports.markets().find((p) => p.id === d.id) : undefined;
     if (port) notices.unshift({ text: `${port.description.toUpperCase()}`, cls: '' });
     else if (d.cls === 'mooring') notices.unshift({ text: 'MOORED OFF THE PYLON · LIGHTER RUNNING THE CREW ACROSS', cls: 'ok' });
@@ -1235,7 +1247,7 @@ export class FlightScene implements GameScene, FlightHostScene {
   }
 
   /** Jump straight to a system (no transit effect) — captures and dev flags. */
-  private warpTo(id: string): void {
+  warpTo(id: string): void {
     if (id === this.systemId || !this.universe.systems.has(id)) return;
     this.view.dispose();
     this.systemId = id;
@@ -1412,15 +1424,17 @@ export class FlightScene implements GameScene, FlightHostScene {
       p.shield = p.shieldMax;
       return this.ports.berthAt(stationId);
     }
-    const owner = [...this.universe.systems.values()].find((s) => s.stations.some((st) => st.id === stationId));
+    // Your outpost's berth isn't in the universe's station list (the guild runtime builds it).
+    const owner = [...this.universe.systems.values()].find((s) => s.stations.some((st) => st.id === stationId))?.id ?? this.guilds?.outposts.systemOf(stationId);
     if (!owner) return false;
     this.docking.reset();
     this.dockScreen.close();
     this.cinema.hide();
-    if (owner.id !== this.systemId) {
-      this.warpTo(owner.id);
+    if (owner !== this.systemId) {
+      this.warpTo(owner);
       this.quiet();
     }
+    this.guilds?.outposts.sync();
     const d = this.docking.dockables().find((x) => x.id === stationId);
     if (!d) return false;
     const p = this.player;
@@ -1670,7 +1684,8 @@ export class FlightScene implements GameScene, FlightHostScene {
         this.docking.launch();
         break;
       case 'world':
-        applyRecordedWorld(a);
+        // Guild hall / outpost actions (GuildRuntime.setWorld) and conversations (npc/live.ts recordWorldChanges).
+        world().update(() => sanitizeWorld(a));
         break;
       default:
         console.warn(`[replay] unknown command ${cmd.c}`);

@@ -167,7 +167,8 @@ clamped step). At 60 fps that is 1 tick per frame, as before.
   - scene keys: dock request, turret mode, tactical, wing orders
   - episode, free-roam and mission starts
   - dock-screen results: ledger, repair, shipyard/outfitting commit,
-    contract book, hires, launch
+    contract book, hires, launch, and guild hall / outpost actions (a
+    `world` command carrying the shared WorldState after the change)
   On playback, live calls to those entry points are ignored and the tape's
   copy runs at its tick. The dock screen doesn't open on a tape.
 - **Recording is always on** from the moment the flight scene is built.

@@ -18,6 +18,8 @@
  */
 import type { CampaignContext, CampaignMission, CampaignObjective, ChatterBeat, ChatterLine, ChatterTrigger, Placement, SetPieceSpec, SpawnSpec } from '../campaign/types';
 import type { Contract, V3 } from './contracts';
+import { buildArcOp } from '../guilds/arcs.ts';
+import { buildOutpostOp } from '../outposts/defence.ts';
 
 export interface OpBuild {
   mission: CampaignMission;
@@ -57,6 +59,9 @@ function unit(a: V3, b: V3): V3 {
 export function buildOp(k: Contract, offset: V3, opts: OpOptions = {}): OpBuild | null {
   const op = k.op;
   if (!op) return null;
+  // Hand-written guild arc missions and outpost raids carry their own operations.
+  if (k.arc) return buildArcOp(k, offset, opts);
+  if (k.outpost) return buildOutpostOp(k, offset, opts);
   const at = (v: V3, o: V3 = [0, 0, 0]): Placement => ({ at: 'point', point: addV(v, offset), offset: o });
   const d = (normal: number, staged = 2) => (opts.stage ? staged : normal);
   const who = k.client;
