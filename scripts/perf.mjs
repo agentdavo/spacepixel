@@ -4,6 +4,11 @@
  *
  *   node scripts/perf.mjs [--scene flight] [--frames 300] [--size 1280x720]
  *                         [--cpu-budget 4] [--gpu-budget 8] [--port 5198]
+ *                         [--query 'k=v&…'] [--no-demo]
+ *
+ * `--no-demo` drops the scripted autopilot (the ship holds its staged pose:
+ * A/B a fixed view, e.g. `--query 'reach=body&dist=119' --no-demo` with and
+ * without `planetlod=0`).
  *
  * On a software adapter (SwiftShader) GPU numbers are not meaningful — the
  * report says so and budgets are informational. On real hardware a failed
@@ -21,6 +26,7 @@ const cpuBudget = Number(opt('cpu-budget', '4'));
 const gpuBudget = Number(opt('gpu-budget', '8'));
 const port = Number(opt('port', '5198'));
 const extra = opt('query', '');
+const demo = args.includes('--no-demo') ? '' : 'demo=1&';
 
 const server = await createServer({ server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'warn' });
 await server.listen();
@@ -30,7 +36,7 @@ const browser = await chromium.launch({
 let code = 0;
 try {
   const page = await browser.newPage({ viewport: { width, height } });
-  await page.goto(`http://127.0.0.1:${port}/?scene=${scene}&demo=1&hud=0${extra ? '&' + extra : ''}`, { waitUntil: 'commit' });
+  await page.goto(`http://127.0.0.1:${port}/?scene=${scene}&${demo}hud=0${extra ? '&' + extra : ''}`, { waitUntil: 'commit' });
   await page.waitForFunction((n) => window.__VANGUARD__?.error || window.__VANGUARD__?.frame?.() >= n, frames, { timeout: 600_000, polling: 500 });
   const res = await page.evaluate(() => ({
     err: window.__VANGUARD__?.error,
