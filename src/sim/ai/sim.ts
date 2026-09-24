@@ -340,8 +340,13 @@ export function dogfightScenario(seed: number, seconds = 120): ScenarioResult {
  * Evenly matched 4v4s across many seeds: the side that wins (more survivors
  * when one side is wiped out or the clock runs out) must not win more than
  * 75 % of the decided fights. Each fight stops at the wipe.
+ *
+ * 96 seeds: each seed is now a whole world (AI, gun spread and missile dice
+ * all fork from it — src/sim/Rng.ts), and 24 fights carried ±9 % of pure
+ * sampling noise around a ~70 % Concord share (24 seeds read 58 % on the
+ * old fixed dice, 83 % on the seeded ones; 96 read 72 %). ±4.6 % now.
  */
-export function dogfightBalanceScenario(seeds = 24, seconds = 120): ScenarioResult {
+export function dogfightBalanceScenario(seeds = 96, seconds = 120): ScenarioResult {
   let winC = 0;
   let winB = 0;
   let draws = 0;
