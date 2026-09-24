@@ -91,6 +91,8 @@ interface ShieldFx {
   /** 0 hit ripple · 1 collapse flare · 2 regen shimmer. */
   mode: ShaderNode;
   tint: ShaderNode;
+  /** Overall brightness (capital hit ripples are dimmer: many land at once). */
+  gain: ShaderNode;
   life: number;
   maxLife: number;
   ship: ShipEntity | null;
@@ -178,6 +180,7 @@ export class WeaponVisuals {
       const spot: ShaderNode = uniform(0.35);
       const mode: ShaderNode = uniform(0);
       const tint: ShaderNode = uniform(new Color(0.35, 0.85, 1.0));
+      const gain: ShaderNode = uniform(2.2);
       const mat = new MeshBasicNodeMaterial();
       mat.transparent = true;
       mat.depthWrite = false;
@@ -198,12 +201,12 @@ export class WeaponVisuals {
         const hit = patch.mul(lattice.mul(0.9).add(0.2)).add(ring.mul(smoothstep(-0.2, 0.3, toHit)));
         // Collapse: the whole patch flares white-hot then breaks up into lattice shards.
         const shards = lattice.mul(step(0.35, fract(p.x.mul(0.37).add(p.z.mul(0.51)).add(alpha.mul(1.7)))));
-        const collapse = patch.mul(mix(shards.mul(1.4), float(1.6), smoothstep(0.7, 0.95, alpha))).add(ring.mul(1.5));
+        const collapse = patch.mul(mix(shards.mul(1.3).add(lattice.mul(0.25)), float(1.0), smoothstep(0.9, 0.98, alpha))).add(ring.mul(1.4));
         // Regen: a scanning band climbs the shell, drawing the lattice back in.
         const band = float(1).sub(smoothstep(0.0, 0.14, abs(toHit.sub(float(1).sub(alpha.mul(2.2)))))).mul(patch.add(0.15));
         const regen = band.mul(lattice.mul(1.1).add(0.15)).add(patch.mul(lattice).mul(0.25).mul(sin(time.mul(40.0)).mul(0.5).add(0.5)));
         const glow = mode.lessThan(0.5).select(hit, mode.lessThan(1.5).select(collapse, regen));
-        return vec3(tint).mul(glow).mul(alpha).mul(2.2);
+        return vec3(tint).mul(glow).mul(alpha).mul(gain);
       })();
       mat.mrtNode = noInkMRT();
       const mesh = new Mesh(shieldGeo, mat);
@@ -211,7 +214,7 @@ export class WeaponVisuals {
       mesh.renderOrder = 22;
       mesh.frustumCulled = false;
       this.group.add(mesh);
-      this.shields.push({ mesh, hitDir, alpha, spot, mode, tint, life: 0, maxLife: 0.45, ship: null });
+      this.shields.push({ mesh, hitDir, alpha, spot, mode, tint, gain, life: 0, maxLife: 0.45, ship: null });
     }
 
     // ── missile bodies: small hot glows (smoke trails come from the FX engine) ──
@@ -265,6 +268,7 @@ export class WeaponVisuals {
     s.ship = ship;
     s.maxLife = s.life = mode === 0 ? 0.45 : mode === 1 ? 0.7 : 1.1;
     s.mode.value = mode;
+    s.gain.value = mode === 0 && cap ? 1.2 : 2.2;
     const dir = s.hitDir.value as Vector3;
     if (mode === 0 && hitPos) {
       // Direction to the hit in shell-local unit-sphere space.
@@ -272,7 +276,7 @@ export class WeaponVisuals {
       s.spot.value = cap ? 0.8 : 0.35;
     } else if (cap && facing >= 0) {
       dir.copy(FACING_DIR[facing]);
-      s.spot.value = 0.15;
+      s.spot.value = mode === 1 ? 0.3 : 0.15;
     } else {
       dir.set(0, 1, 0);
       s.spot.value = -1.6; // whole bubble
@@ -306,7 +310,7 @@ export class WeaponVisuals {
           this.flash(e.position, 9, 0.2);
           break;
         case 'shield':
-          this.flash(e.position, e.ship?.combat.dmg.capital ? 22 : 6, 0.15);
+          this.flash(e.position, e.ship?.combat.dmg.capital ? 9 : 6, 0.12);
           if (e.ship) this.shield(e.ship, e.position, 0, e.facing);
           break;
         case 'shield-down':

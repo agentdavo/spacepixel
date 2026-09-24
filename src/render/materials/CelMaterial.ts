@@ -213,8 +213,9 @@ export class CelMaterial extends MeshBasicNodeMaterial {
           const band = smoothstep(0.16, 0.2, scorchV).mul(float(1).sub(scorch));
           const sc = screenCoordinate;
           const hatch = step(0.55, fract(sc.x.add(sc.y).mul(1 / 6)));
-          col.mulAssign(float(1).sub(band.mul(hatch).mul(0.5)));
-          const soot = col.mul(0.2).add(vec3(0.035, 0.025, 0.04));
+          col.mulAssign(float(1).sub(band.mul(hatch).mul(0.6)));
+          // Soot: near-black, warm, keeping a trace of the paint so panels still read.
+          const soot = mix(vec3(0.05, 0.035, 0.04), col.mul(0.3), 0.3);
           // Deep scorch: a second, darker cel step toward the middle.
           const deep = smoothstep(0.78, 0.82, scorchV);
           col.assign(mix(col, soot, scorch));

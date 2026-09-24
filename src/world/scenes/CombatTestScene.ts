@@ -225,6 +225,12 @@ export class CombatTestScene implements GameScene {
     this.player.target = bandit;
     this.eyeFn = (_t, eye, look) => {
       const p = k.flight.position;
+      if (this.camMode === 2) {
+        // Plan view from above: the zone scorch pattern.
+        eye.copy(p).add(_v.set(0, 34, -4));
+        look.copy(p);
+        return;
+      }
       if (this.camMode === 1) eye.copy(p).add(_v.set(-26, 9, 34));
       else eye.copy(p).add(_v.set(58, 14, -18));
       look.copy(p).add(_v.set(0, 0, -26));
@@ -233,7 +239,7 @@ export class CombatTestScene implements GameScene {
   }
 
   private setupWeapons(): number {
-    const lg = this.fleet.spawn('ffc-lantern-guard', 'concord', ORIGIN.clone().add(new Vector3(0, 0, 1400)), new Vector3(1, 0, 0), { name: 'Lantern Guard' });
+    const lg = this.fleet.spawn('ffc-lantern-guard', 'concord', ORIGIN.clone().add(new Vector3(0, 30, 720)), new Vector3(1, 0, 0), { name: 'Lantern Guard' });
     lg.team = 'renegade';
     lg.flight.velocity.set(0, 0, 0);
     this.capitals.register(lg, { launchBlueprint: null });
@@ -247,10 +253,10 @@ export class CombatTestScene implements GameScene {
       ['sb9-warhorse', 'concord', 0],
     ];
     const ships = line.map(([bp, f, gun], i) => {
-      const s = this.fleet.spawn(bp, f, ORIGIN.clone().add(new Vector3((i - 2.5) * 70, (i % 2) * 20, i === 4 ? 780 : 0)), new Vector3(0, 0, 1), { name: `${bp} ${i}` });
+      const s = this.fleet.spawn(bp, f, ORIGIN.clone().add(new Vector3((i - 2.5) * 30, (i % 2) * 9, -Math.abs(i - 2.5) * 8)), new Vector3(0, 0, 1), { name: `${bp} ${i}` });
       s.team = 'concord';
       s.combat.gun = gun;
-      this.scripted.push({ ship: s, aim: () => toUniverse(lg, (i - 2.5) * 6, 0, 0, new Vector3()), speed: 0, fire: () => bp !== 'sb9-warhorse' });
+      this.scripted.push({ ship: s, aim: () => toUniverse(lg, (i - 2.5) * 12, 0, 0, new Vector3()), speed: 0, fire: () => bp !== 'sb9-warhorse' });
       return s;
     });
     const wh = ships[5];
@@ -261,8 +267,8 @@ export class CombatTestScene implements GameScene {
     this.player.target = lg;
     this.eyeFn = (_t, eye, look) => {
       // Behind the firing line: bolts of every family stream away to the corvette.
-      eye.copy(ORIGIN).add(_v.set(-250, 55, -170));
-      look.copy(ORIGIN).add(_v.set(70, -10, 520));
+      eye.copy(ORIGIN).add(_v.set(-62, 20, -52));
+      look.copy(ORIGIN).add(_v.set(18, 0, 220));
     };
     void GUNS;
     return 0.9;

@@ -121,7 +121,7 @@ export class DamageFx {
     for (let z = 0; z < 4; z++) {
       const [x, y, zz] = ZONE_POINTS[z];
       const lev = st.zones[z];
-      const r = z === 0 || z === 3 ? st.halfL * 0.62 : st.halfW * 0.75;
+      const r = z === 0 || z === 3 ? st.halfL * 0.62 : st.halfW * 0.9;
       m.marks[z].set(st.cx + x * st.halfW, st.cy + y * st.halfH, st.cz + zz * st.halfL, lev > 0.02 ? r : 0);
       setLevel(m, z, Math.min(1, lev * 1.15));
       any ||= lev > 0.02;
