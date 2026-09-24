@@ -188,25 +188,15 @@ export class FlightHud {
         }
       }
     }
-    // Off-screen / behind: arrow on the screen edge toward the target.
+    // Off-screen / behind: an arrow on the shared edge track toward the target (packed in HudLabels.flush).
     const t = lock.target;
     if (t && t.alive) {
-      world.toRender(t.flight.position, _p).applyMatrix4(cam.matrixWorldInverse);
       const onScreen = this.project(t.flight.position, world, cam);
       const inView = onScreen && onScreen.x > 0 && onScreen.x < this.w && onScreen.y > 0 && onScreen.y < this.h;
       if (!inView) {
-        const ang = Math.atan2(-_p.y, _p.x);
-        const cx = this.w / 2;
-        const cy = this.h / 2;
-        const rr = Math.min(cx, cy) - 40;
-        const x = cx + Math.cos(ang) * rr;
-        const y = cy + Math.sin(ang) * rr;
-        c.fillStyle = PINK;
-        c.beginPath();
-        c.moveTo(x + Math.cos(ang) * 14, y + Math.sin(ang) * 14);
-        c.lineTo(x + Math.cos(ang + 2.5) * 10, y + Math.sin(ang + 2.5) * 10);
-        c.lineTo(x + Math.cos(ang - 2.5) * 10, y + Math.sin(ang - 2.5) * 10);
-        c.fill();
+        // Camera space *after* project(): it reuses _p (NDC flips points behind the camera).
+        world.toRender(t.flight.position, _p).applyMatrix4(cam.matrixWorldInverse);
+        hudLabels.edge({ id: 'edge:target', dir: { x: _p.x, y: _p.y }, color: PINK, shape: 'tri', fill: true, kind: 'target', priority: LABEL_PRIORITY.target, pinned: true });
       }
     }
   }
@@ -234,14 +224,7 @@ export class FlightHud {
       hudLabels.add({ id: 'nav', x: pt.x, y: pt.y, r: 13, lines: [{ text: label, color: cyan, font: F13 }], priority: LABEL_PRIORITY.nav });
     } else {
       world.toRender(universe, _p).applyMatrix4(cam.matrixWorldInverse);
-      const ang = Math.atan2(-_p.y, _p.x);
-      const rr = Math.min(this.w, this.h) / 2 - 70;
-      const x = this.w / 2 + Math.cos(ang) * rr;
-      const y = this.h / 2 + Math.sin(ang) * rr;
-      c.beginPath();
-      c.arc(x, y, 6, 0, Math.PI * 2);
-      c.stroke();
-      c.fillText(label, x - 60, y + 22);
+      hudLabels.edge({ id: 'edge:nav', dir: { x: _p.x, y: _p.y }, color: cyan, shape: 'ring', kind: 'nav', priority: LABEL_PRIORITY.nav, pinned: true, lines: [{ text: label, color: cyan, font: F13 }] });
     }
   }
 
@@ -271,6 +254,7 @@ export class FlightHud {
     let y = HUD.objectivesY;
     c.fillStyle = 'rgba(0,10,6,0.55)';
     c.fillRect(x - 12, y - 20, HUD.objectivesW, 30 + m.def.objectives.length * 20);
+    hudLabels.obstacle(x - 12, y - 20, HUD.objectivesW, 30 + m.def.objectives.length * 20);
     c.fillStyle = '#ffffff';
     c.fillText(fitText(c, `${m.def.episode} · ${m.def.title}`, HUD.objectivesW - 20, 13, 11, '"Share Tech Mono", monospace'), x, y);
     c.font = '13px "Share Tech Mono", monospace';
@@ -429,6 +413,7 @@ export class FlightHud {
     const shown = objectives.filter((o) => o.state !== 'locked').length;
     c.fillStyle = 'rgba(0,10,6,0.55)';
     c.fillRect(x - 12, y - 20, HUD.objectivesW, 30 + shown * 20);
+    hudLabels.obstacle(x - 12, y - 20, HUD.objectivesW, 30 + shown * 20);
     c.fillStyle = '#ffffff';
     c.fillText(fitText(c, title, HUD.objectivesW - 20, 13, 11, '"Share Tech Mono", monospace'), x, y);
     c.font = '13px "Share Tech Mono", monospace';
