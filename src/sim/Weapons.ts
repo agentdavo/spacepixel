@@ -69,6 +69,8 @@ export interface Beam {
   aimTarget: ShipEntity | null;
   /** Fired by a fighter gun (beam-lance). */
   gun: GunSpec | null;
+  /** Ship-frame origin (a turret's emitter muzzle, kept current by its drive); overrides `socket`. */
+  muzzle?: Vector3 | null;
 }
 
 const GUN_SOCKETS = ['gun', 'gun.L'];
@@ -106,6 +108,9 @@ export class Weapons {
   readonly beams: Beam[] = [];
   readonly events: WeaponEvent[] = [];
   private eventPool: WeaponEvent[] = [];
+  /** Queued turret muzzle flashes (see `muzzleFlash`). */
+  private flashes: WeaponEvent[] = [];
+  private flashCount = 0;
   private cooldown = new Map<number, number>();
   private gunSide = new Map<number, number>();
   /** Gun spread / pellet dice: the world's 'weapons' stream (Rng.ts). */
@@ -115,6 +120,9 @@ export class Weapons {
     this.rng = fleet.rng.fork('weapons');
     for (let i = 0; i < EVENT_POOL; i++) {
       this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1 });
+    }
+    for (let i = 0; i < 128; i++) {
+      this.flashes.push({ kind: 'fire', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1 });
     }
     fleet.onEvent = (kind, ship, point, normal, shooter, sub, facing) => {
       const e = this.emit(kind, point, normal, ship.flight.velocity, ship, shooter);
@@ -212,6 +220,22 @@ export class Weapons {
     this.cooldown.set(s.id, cd + 1 / rate);
   }
 
+  /**
+   * A 'fire' event (muzzle flash, gun sound, shot counters) for a shot a
+   * turret system spawned itself: at the barrel muzzle, `dir` along the shot,
+   * `vel` = the carrying ship's (the flash rides the barrel).
+   */
+  muzzleFlash(pos: Vector3, dir: Vector3, vel: Vector3, shooter: ShipEntity, gun: GunSpec): void {
+    // Turret systems step before Weapons (which clears the event list): queue, emit on the next step.
+    if (this.flashCount >= this.flashes.length) return;
+    const e = this.flashes[this.flashCount++];
+    e.position.copy(pos);
+    e.normal.copy(dir).normalize();
+    e.velocity.copy(vel);
+    e.shooter = shooter;
+    e.gun = gun;
+  }
+
   spawnBolt(pos: Vector3, vel: Vector3, life: number, damage: number, owner: ShipEntity, gun: GunSpec = GUNS.laser): void {
     const i = this.head;
     this.head = (this.head + 1) % BOLT_CAPACITY;
@@ -232,10 +256,10 @@ export class Weapons {
   fireBeam(owner: ShipEntity, socket: string | null, length: number, width: number, duration: number, dps: number, type: DamageType = 'harmonic'): Beam {
     let b = this.beams.find((x) => !x.active);
     if (!b) {
-      b = { active: false, owner, socket, origin: new Vector3(), dir: new Vector3(), length, width, life: 0, maxLife: duration, dps, type, faction: owner.faction, team: owner.team, end: new Vector3(), aimTarget: null, gun: null };
+      b = { active: false, owner, socket, origin: new Vector3(), dir: new Vector3(), length, width, life: 0, maxLife: duration, dps, type, faction: owner.faction, team: owner.team, end: new Vector3(), aimTarget: null, gun: null, muzzle: null };
       this.beams.push(b);
     }
-    Object.assign(b, { active: true, owner, socket, length, width, life: duration, maxLife: duration, dps, type, faction: owner.faction, team: owner.team, aimTarget: null, gun: null });
+    Object.assign(b, { active: true, owner, socket, length, width, life: duration, maxLife: duration, dps, type, faction: owner.faction, team: owner.team, aimTarget: null, gun: null, muzzle: null });
     // Place it now so a beam fired this frame draws from the right spot.
     if (socket) this.socketPosition(owner, socket, b.origin);
     else b.origin.copy(owner.flight.position);
@@ -247,6 +271,12 @@ export class Weapons {
   step(dt: number): void {
     this.events.length = 0;
     const ships = this.fleet.ships;
+    for (let i = 0; i < this.flashCount; i++) {
+      const q = this.flashes[i];
+      this.emit('fire', q.position, q.normal, q.velocity, null, q.shooter, q.gun);
+      q.shooter = null;
+    }
+    this.flashCount = 0;
 
     for (const s of ships) {
       if (!s.alive) continue;
@@ -313,7 +343,8 @@ export class Weapons {
         b.active = false;
         continue;
       }
-      if (b.socket) this.socketPosition(b.owner, b.socket, b.origin);
+      if (b.muzzle) b.origin.copy(b.muzzle).applyQuaternion(b.owner.flight.orientation).add(b.owner.flight.position);
+      else if (b.socket) this.socketPosition(b.owner, b.socket, b.origin);
       else b.origin.copy(b.owner.flight.position);
       if (b.aimTarget?.alive) {
         // Sweep toward the target at a limited angular rate (dodgeable).
