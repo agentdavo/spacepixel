@@ -16,8 +16,9 @@ export type { MissileSpec } from './Loadouts';
  * cap, so they curve dramatically and still hit crossing targets. Proximity
  * fuse on fighters; on capitals the warhead goes off where the missile meets
  * the shield shell or the plating, and a selected subsystem is homed on.
- * Torpedoes are slow and have hit points: gunfire and point defence can
- * shoot them down. Harpoons tether a fighter (half thrust) for a few seconds.
+ * Torpedoes and micro-missiles have hit points: gunfire and point defence
+ * can shoot them down (a torpedo takes a burst, a micro-missile one hit —
+ * PD thins a swarm, it can't stop one). Harpoons tether a fighter (half thrust) for a few seconds.
  * Plain arrays, fixed pool.
  *
  * Lock-on: a target held inside the lock cone and range accumulates lock;
@@ -270,7 +271,8 @@ export class Missiles implements Shootables {
         p.copy(_hit.point);
         hit = true;
       }
-    } else if (dist < spec.fuse) {
+    } else if (dist < spec.fuse + Math.max(0, tgt.radius - 10)) {
+      // (Big non-capital hulls — gunships, corvettes — fuse on their skin, not their centre.)
       _hit.normal.subVectors(p, tgt.flight.position).normalize();
       hit = true;
     }
@@ -311,7 +313,7 @@ export class Missiles implements Shootables {
     }
   }
 
-  // ── Shootables (torpedoes) ──────────────────────────────────────────
+  // ── Shootables (torpedoes, micro-missiles) ──────────────────────────────────────
 
   shoot(ax: number, ay: number, az: number, dx: number, dy: number, dz: number, team: Team, damage: number): boolean {
     if (!this.shootable.length) return false;
@@ -321,10 +323,12 @@ export class Missiles implements Shootables {
       const i = this.shootable[k];
       const o = this.owner[i];
       if (!this.alive[i] || (o && o.team === team)) continue;
-      if (segmentSphere(_r, _v, this.pos[i], 6) > 1) continue;
+      // Torpedoes are big; a micro-missile is a pencil (but PD flak is proximity-fused).
+      if (segmentSphere(_r, _v, this.pos[i], this.spec[i].salvo > 1 ? 4 : 6) > 1) continue;
       this.hp[i] -= damage;
       if (this.hp[i] <= 0) {
         // Report the blast on the next missile step (this runs inside the weapons step).
+        this.hp[i] = -1; // < 0 = dying: the flight loop skips it
         this.shootable.splice(k, 1);
         this.dying.push(i);
       }

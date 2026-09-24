@@ -60,7 +60,7 @@ export const SHIP_STATS: Record<string, ShipStats> = {
   'choir-psalter': { role: 'torpedo bomber', hull: 170, shield: 150, shieldRegen: 0.15, shieldDelay: 3.5, facings: 1, mass: 1.4, agility: 0.7, speed: 0.86, signature: 1.5 },
   'rw-scrapjack': { role: 'brawler', hull: 200, shield: 30, shieldRegen: 0.08, shieldDelay: 5, facings: 1, mass: 1.35, agility: 0.8, speed: 0.85, signature: 1.25 },
   // Corvettes fly on the fighter base spec (escort routes and the AI were tuned on it), just heavier.
-  'ffc-lantern-guard': { role: 'picket corvette', hull: 6000, shield: 2400, shieldRegen: 0.04, shieldDelay: 6, facings: 4, mass: 1.25, agility: 0.8, speed: 0.9, signature: 6 },
+  'ffc-lantern-guard': { role: 'picket corvette', hull: 8000, shield: 2400, shieldRegen: 0.04, shieldDelay: 6, facings: 4, mass: 1.25, agility: 0.8, speed: 0.9, signature: 6 },
   'choir-vesper': { role: 'escort corvette', hull: 5000, shield: 3200, shieldRegen: 0.05, shieldDelay: 5, facings: 4, mass: 1.2, agility: 0.85, speed: 0.95, signature: 6 },
   'cvs07-hesperus-dawn': { role: 'carrier', hull: 36000, shield: 7000, shieldRegen: 0.03, shieldDelay: 8, facings: 4, mass: 1, agility: 1, speed: 1, signature: 20 },
   'bb-indomitable': { role: 'dreadnought', hull: 48000, shield: 9000, shieldRegen: 0.03, shieldDelay: 8, facings: 4, mass: 1, agility: 0.8, speed: 0.9, signature: 25 },
@@ -247,7 +247,8 @@ export const MISSILES: Record<MissileId, MissileSpec> = {
     fuse: 6,
     damage: 16,
     spiral: 260,
-    hp: 0,
+    // One flak or laser hit: point defence thins a swarm, it can't stop one.
+    hp: 5,
     reload: 3,
     lockTime: 1.1,
     lockCone: 14,
@@ -325,6 +326,29 @@ export interface Loadout {
   mounts?: MountSpec[];
   /** Point-defence clusters: dps against torpedoes / missiles within ~900 m. */
   pd?: number;
+  /** Capitals: turret sockets that double as an anti-ship battery (Capitals.ts). */
+  battery?: BatterySpec;
+}
+
+/**
+ * A dual-purpose main battery: these turrets shoot flak at fighters and
+ * torpedoes like any other mount, but against a big hull (gunships and up)
+ * they switch to heavy rounds — the shield-breaker while the facing in the
+ * way is up, the hull-breaker once it is down.
+ */
+export interface BatterySpec {
+  /** Socket ids (a mirrored twin `${id}.L` matches too). */
+  sockets: string[];
+  vsShield: GunId;
+  vsHull: GunId;
+  /** Damage multiplier on the gun's own per-round damage. */
+  dmgMul: number;
+  /** Rounds per salvo, gap between them, pause between salvos (s), aim scatter (rad). */
+  burst: { count: number; gap: number; interval: number; scatter: number };
+  /** Engage ships whose collision radius is at least this (m): 15 = gunships and up. */
+  minRadius: number;
+  /** Reach (m). */
+  range: number;
 }
 
 /** One fitted turret (a mirrored pair is one mount with two sockets). */
@@ -351,8 +375,20 @@ export const LOADOUTS: Record<string, Loadout> = {
   'choir-cantor': { guns: ['hymn', 'lance'], missiles: [] },
   'choir-psalter': { guns: ['hymn', 'lance'], missiles: ['torpedo'] },
   'rw-scrapjack': { guns: ['scatter', 'laser'], missiles: ['harpoon', 'micro'] },
-  'ffc-lantern-guard': { guns: [], missiles: [], turret: 'flak' },
-  'choir-vesper': { guns: [], missiles: [], turret: 'battery' },
+  'ffc-lantern-guard': {
+    guns: [],
+    missiles: [],
+    turret: 'flak',
+    battery: { sockets: ['main-a', 'main-b', 'main-c'], vsShield: 'heavylaser', vsHull: 'cannon', dmgMul: 1.7, burst: { count: 2, gap: 0.35, interval: 3.2, scatter: 0.004 }, minRadius: 15, range: 3600 },
+  },
+  'choir-vesper': {
+    guns: [],
+    missiles: [],
+    turret: 'battery',
+    // An escort: a heavy point-defence cluster screens the ships she guards from torpedoes.
+    pd: 8,
+    battery: { sockets: ['emitter-0'], vsShield: 'hymn', vsHull: 'hymn', dmgMul: 4, burst: { count: 3, gap: 0.2, interval: 3, scatter: 0.004 }, minRadius: 15, range: 3600 },
+  },
   'cvs07-hesperus-dawn': { guns: [], missiles: [], turret: 'flak' },
   'bb-indomitable': { guns: [], missiles: [], turret: 'flak' },
   'choir-cathedral': { guns: [], missiles: [], turret: 'battery' },
