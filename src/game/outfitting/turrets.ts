@@ -16,7 +16,7 @@ import { computeFit, stockFit } from './fit';
  * firing reuses Weapons (bolts, beams, bursts).
  *
  * Player turrets are *assisted*: they engage the selected target when it is
- * in their arc, else (FREE) the best hostile they can reach. H cycles
+ * in their arc, else (FREE) the best hostile they can reach. U cycles
  * FREE → TARGET ONLY → HOLD. Turret barbettes on a joint visibly train.
  */
 export type TurretMode = 'free' | 'target' | 'hold';
@@ -72,7 +72,7 @@ const _a = new Vector3();
 const _c = new Vector3();
 
 export class ShipTurrets {
-  /** The player's turret discipline (H). */
+  /** The player's turret discipline (U). */
   mode: TurretMode = 'free';
   private rt = new Map<ShipEntity, ShipRt>();
   private hangars = new Map<ShipEntity, HangarRt>();

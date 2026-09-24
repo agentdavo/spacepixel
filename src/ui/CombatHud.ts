@@ -92,11 +92,11 @@ export class CombatHud {
     const tu = this.turrets;
     const hg = this.hangar;
     if (tu || hg) {
-      // Outfitted hulls: turret discipline [H] and the hangar complement, above the block.
+      // Outfitted hulls: turret discipline [U] and the hangar complement, above the block.
       c.fillStyle = 'rgba(0,10,6,0.45)';
       c.fillRect(x - 12, y - 42, 240, 22);
       let t = '';
-      if (tu && tu.mounts) t += `[H] TURRETS ${tu.engaged}/${tu.mounts} ${tu.mode === 'free' ? 'FREE' : tu.mode === 'target' ? 'TGT' : 'HOLD'}`;
+      if (tu && tu.mounts) t += `[U] TURRETS ${tu.engaged}/${tu.mounts} ${tu.mode === 'free' ? 'FREE' : tu.mode === 'target' ? 'TGT' : 'HOLD'}`;
       if (tu?.pd) t += `${t ? ' · ' : ''}PD`;
       if (hg) t += `${t ? ' · ' : ''}BAY ${hg.up}/${hg.total}`;
       c.fillStyle = tu?.mode === 'hold' ? AMBER : GREEN;

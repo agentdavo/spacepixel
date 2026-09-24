@@ -1,11 +1,10 @@
-import { AdditiveBlending, Color, Group, Mesh, RingGeometry, SphereGeometry, Vector3 } from 'three';
+import { AdditiveBlending, Color, DoubleSide, Group, Mesh, Quaternion, RingGeometry, SphereGeometry, Vector3 } from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import {
   Fn,
   positionLocal,
   positionWorld,
   normalWorld,
-  normalLocal,
   cameraPosition,
   normalize,
   vec2,
@@ -21,12 +20,22 @@ import {
   uniform,
   length,
   mx_fractal_noise_float,
+  mx_noise_float,
+  step,
+  mix,
+  min,
 } from 'three/tsl';
-import { CelMaterial } from '@/render/materials/CelMaterial';
 import { buildPalette, type ColorStop } from '@/render/materials/PaletteRamp';
-import { noInkMRT } from '@/render/materials/InkChannels';
+import { inkMRT, noInkMRT } from '@/render/materials/InkChannels';
 import { LightRig } from '@/render/LightRig';
 import type { ShaderNode } from '@/render/tsl';
+import { planetSurface } from './planets/PlanetMaterial';
+
+/**
+ * Painted body types. `gas` / `ice-giant` read `bands` as latitude bands;
+ * every other kind reads `bands` as a height ramp (0 = lowest, 1 = peaks).
+ */
+export type PlanetKind = 'gas' | 'ice-giant' | 'rocky' | 'desert' | 'ocean' | 'ice' | 'volcanic' | 'burning' | 'lantern' | 'shattered';
 
 export interface PlanetPreset {
   name: string;
@@ -36,6 +45,25 @@ export interface PlanetPreset {
   turbulence: number;
   atmosphere: string;
   ring?: { inner: number; outer: number; bands: ColorStop[]; tilt: number };
+  /** Body type (default `gas`, the original banded giant). */
+  kind?: PlanetKind;
+  /** Noise domain offset, so two worlds of a kind never match. */
+  seed?: number;
+  /** Ocean worlds: height where the sea ends (0..1). */
+  seaLevel?: number;
+  /** 0..1 night-side city lights (inhabited worlds, from station data). */
+  lights?: number;
+  lightColor?: string;
+  /** 0..1 cloud cover (terrestrial kinds). */
+  clouds?: number;
+  /** Emissive colour: lava seas / cracks, black-light veins. */
+  glow?: string;
+  /** A great storm: latitude −1..1, longitude radians, angular size (≈ radians). */
+  storm?: { lat: number; lon: number; size: number; color: string };
+  /** Polar caps from |latitude| (0..1; omit for none). */
+  caps?: number;
+  /** No atmosphere shell or rim band. */
+  airless?: boolean;
 }
 
 export const PLANETS: Record<string, PlanetPreset> = {
@@ -73,69 +101,77 @@ export const PLANETS: Record<string, PlanetPreset> = {
   },
 };
 
+/** Shared planet clock (seconds): cloud decks drift on it. Set by the system view. */
+export const planetClock: ShaderNode = uniform(0);
+let inkSerial = 0;
+const _q = new Quaternion();
+
 /**
- * A cel-shaded gas giant: posterised latitude bands with fBm turbulence,
- * a hard dramatic terminator, a stepped atmospheric limb glow and an
- * optional ring system that receives the planet's shadow analytically.
+ * A painted body: the surface shader (`planets/PlanetMaterial.ts` — banded
+ * giants, terrestrial height-ramp worlds, lava, black-light veins, clouds,
+ * storms, night-side cities), a stepped atmospheric limb glow, and an
+ * optional ring system that receives the planet's shadow and casts its own
+ * back onto the body, both analytically.
  */
 export class Planet {
   readonly group = new Group();
   readonly preset: PlanetPreset;
+  readonly body: Mesh;
+  /** The ring mesh (RingGeometry in its local XY plane), if any. */
+  readonly ring: Mesh | null = null;
 
-  constructor(preset: PlanetPreset = PLANETS.castellan) {
+  constructor(preset: PlanetPreset = PLANETS.castellan, opts: { segments?: number } = {}) {
     this.preset = preset;
     this.group.name = `planet:${preset.name}`;
     const R = preset.radius;
+    const seg = opts.segments ?? 128;
+    const inkId = 9001 + (inkSerial++ % 64) * 3;
+
+    // Ring frame (render space), shared by the ring's and the body's shadow tests.
+    const planetCenter: ShaderNode = uniform(new Vector3());
+    const ringNormal: ShaderNode = uniform(new Vector3(0, 1, 0));
+    const rp = preset.ring;
+    const ringTex = rp ? buildPalette(rp.bands, 1024) : null;
 
     // ── body ──────────────────────────────────────────────────────────
-    const bandTex = buildPalette(preset.bands, 512, true);
-    const lat = normalLocal.y;
-    const turb = mx_fractal_noise_float(positionLocal.div(R).mul(vec3(2.2, 7.0, 2.2)), 4, 2.0, 0.5);
-    const bandU = lat.mul(preset.bandScale).add(turb.mul(preset.turbulence)).add(0.5);
-    const paint = pow(texture(bandTex, vec2(bandU, 0.5)).rgb, vec3(2.2));
-
     const body = new Mesh(
-      new SphereGeometry(R, 128, 64),
-      new CelMaterial({
-        paintNode: paint,
-        ramp: 'dramatic',
-        rimWidth: 0.78,
-        gloss: 0,
-        inkWeight: 0.85,
-        inkId: 9001,
-        haze: 0.2,
+      new SphereGeometry(R, seg, seg / 2),
+      planetSurface(preset, {
+        time: planetClock,
+        inkId,
+        ring: rp && ringTex ? { center: planetCenter, normal: ringNormal, inner: R * rp.inner, outer: R * rp.outer, palette: ringTex } : undefined,
       }),
     );
+    this.body = body;
     this.group.add(body);
 
     // ── atmosphere limb ──────────────────────────────────────────────
-    const atmoColor: ShaderNode = uniform(new Color(preset.atmosphere));
-    const atmo = new MeshBasicNodeMaterial();
-    atmo.transparent = true;
-    atmo.depthWrite = false;
-    atmo.blending = AdditiveBlending;
-    atmo.colorNode = Fn(() => {
-      const N = normalize(normalWorld);
-      const V = normalize(cameraPosition.sub(positionWorld));
-      const fres = float(1).sub(abs(dot(N, V)));
-      const lit = smoothstep(-0.25, 0.35, dot(N, LightRig.keyDirection));
-      // Two posterised glow steps: a broad soft haze + a hot thin limb.
-      const broad = smoothstep(0.55, 0.6, fres).mul(0.35);
-      const limb = smoothstep(0.82, 0.86, fres).mul(0.9);
-      return vec3(atmoColor).mul(broad.add(limb).mul(lit).mul(1.6));
-    })();
-    atmo.mrtNode = noInkMRT();
-    const shell = new Mesh(new SphereGeometry(R * 1.018, 96, 48), atmo);
-    shell.renderOrder = 5;
-    this.group.add(shell);
+    if (!preset.airless) {
+      const atmoColor: ShaderNode = uniform(new Color(preset.atmosphere));
+      const atmo = new MeshBasicNodeMaterial();
+      atmo.transparent = true;
+      atmo.depthWrite = false;
+      atmo.blending = AdditiveBlending;
+      atmo.colorNode = Fn(() => {
+        const N = normalize(normalWorld);
+        const V = normalize(cameraPosition.sub(positionWorld));
+        const fres = float(1).sub(abs(dot(N, V)));
+        const lit = smoothstep(-0.25, 0.35, dot(N, LightRig.keyDirection));
+        // Two posterised glow steps: a broad soft haze + a hot thin limb.
+        const broad = smoothstep(0.55, 0.6, fres).mul(0.35);
+        const limb = smoothstep(0.82, 0.86, fres).mul(0.9);
+        return vec3(atmoColor).mul(broad.add(limb).mul(lit).mul(1.6));
+      })();
+      atmo.mrtNode = noInkMRT();
+      const shell = new Mesh(new SphereGeometry(R * 1.018, Math.round(seg * 0.75), Math.round(seg * 0.375)), atmo);
+      shell.renderOrder = 5;
+      this.group.add(shell);
+    }
 
     // ── ring ─────────────────────────────────────────────────────────
-    if (preset.ring) {
-      const rp = preset.ring;
+    if (rp && ringTex) {
       const inner = R * rp.inner;
       const outer = R * rp.outer;
-      const ringTex = buildPalette(rp.bands, 1024);
-      const planetCenter: ShaderNode = uniform(new Vector3());
       const planetRadius = float(R);
 
       const r01 = length(positionLocal.xy).sub(inner).div(outer - inner);
@@ -147,29 +183,47 @@ export class Planet {
         const toC = planetCenter.sub(P);
         const t = dot(toC, LightRig.keyDirection);
         const d2 = dot(toC, toC).sub(t.mul(t));
-        const shadow = select(t.greaterThan(0.0).and(d2.lessThan(planetRadius.mul(planetRadius))), float(0.12), float(1.0));
-        return pow(ringSample.rgb, vec3(2.2)).mul(float(1).add(detail)).mul(shadow);
+        const inShadow = t.greaterThan(0.0).and(d2.lessThan(planetRadius.mul(planetRadius)));
+        // Sunlit face at full key light; the far face glows through (forward
+        // scatter) a step darker — painted, never black. Planet shadow on top.
+        const V = normalize(cameraPosition.sub(P));
+        const sameSide = dot(ringNormal, LightRig.keyDirection).mul(dot(ringNormal, V)).greaterThan(0.0);
+        const light = mix(LightRig.shadowTint, LightRig.keyColor, select(sameSide, float(1.0), float(0.55)));
+        const lit: ShaderNode = select(inShadow, vec3(LightRig.shadowTint).mul(0.35), light);
+        const col: ShaderNode = pow(ringSample.rgb, vec3(2.2)).mul(float(1).add(detail)).mul(lit);
+        return min(col, vec3(0.97));
       })();
 
-      const ringMat = new CelMaterial({
-        paintNode: ringPaint,
-        ramp: 'dramatic',
-        rimWidth: 2, // no rim on a flat ring
-        gloss: 0,
-        inkWeight: 0.6,
-        inkId: 9100,
-        haze: 0.2,
-        doubleSided: true,
-      });
-      ringMat.opacityNode = ringSample.a.mul(1);
+      const ringMat = new MeshBasicNodeMaterial();
+      ringMat.colorNode = ringPaint;
+      ringMat.side = DoubleSide;
+      ringMat.mrtNode = inkMRT(0.6, inkId + 1, 0.2);
+      // Up close the painted sheet dissolves in blotches (the chunks of
+      // RingDebris take over), so flying the ring plane never meets a floor.
+      const grain = mx_noise_float(positionLocal.xy.mul(1 / 420)).mul(0.5).add(0.5);
+      const fade = smoothstep(900, 7000, length(positionWorld));
+      ringMat.opacityNode = ringSample.a.mul(step(float(1).sub(fade), grain));
       ringMat.alphaTest = 0.5;
 
       const ring = new Mesh(new RingGeometry(inner, outer, 256, 1), ringMat);
       ring.rotation.x = -Math.PI / 2 + rp.tilt;
+      this.ring = ring;
+      body.onBeforeRender = () => {
+        this.group.getWorldPosition(planetCenter.value);
+        ringNormal.value.set(0, 0, 1).applyQuaternion(ring.getWorldQuaternion(_q));
+      };
       ring.onBeforeRender = () => {
-        planetCenter.value.copy(this.group.getWorldPosition(new Vector3()));
+        this.group.getWorldPosition(planetCenter.value);
+        ringNormal.value.set(0, 0, 1).applyQuaternion(ring.getWorldQuaternion(_q));
       };
       this.group.add(ring);
     }
+  }
+
+  /** Unit ring-plane normal in universe axes (after the group's tilt). */
+  ringNormal(out: Vector3): Vector3 {
+    if (!this.ring) return out.set(0, 1, 0);
+    this.ring.updateWorldMatrix(true, false);
+    return out.set(0, 0, 1).applyQuaternion(this.ring.getWorldQuaternion(_q));
   }
 }

@@ -1,7 +1,10 @@
 import { Group, Quaternion, Scene, Vector3 } from 'three';
-import type { StarSystem, GateLink } from '@/universe/Universe';
+import type { StarSystem, GateLink, MoonSite, PlanetSite } from '@/universe/Universe';
 import { Backdrop } from './Backdrop';
-import { Planet } from './Planet';
+import { Planet, planetClock, type PlanetKind } from './Planet';
+import { moonPosition } from '@/universe/bodies';
+import { ShatteredMoon } from './planets/Shattered';
+import { RingDebris, ringColor, type RingTarget } from './planets/RingDebris';
 import { LanternGate } from './LanternGate';
 import { LightRig } from '@/render/LightRig';
 import { AsteroidField } from './AsteroidField';
@@ -27,6 +30,20 @@ export interface GateInstance {
 
 const _z = new Vector3(0, 0, 1);
 
+/** A planet, moon or landmark as the HUD / star map see it (universe space, live). */
+export interface BodyInstance {
+  name: string;
+  kind: PlanetKind;
+  description: string;
+  landmark?: string;
+  /** Universe-space centre (moons: updated every frame). */
+  position: Vector3;
+  radius: number;
+  /** Moons: the planet they circle. */
+  parent?: BodyInstance;
+  site: PlanetSite | MoonSite;
+}
+
 export class StarSystemView {
   readonly group = new Group();
   readonly backdrop: Backdrop;
@@ -37,6 +54,14 @@ export class StarSystemView {
   readonly field: AsteroidField;
   /** Dockable stations (docking & trade). */
   readonly stations: StationView[] = [];
+  /** Every planet, moon and landmark (nav markers, star map survey). */
+  readonly bodies: BodyInstance[] = [];
+  private moons: { body: BodyInstance; group: Group; moon: MoonSite; parent: Vector3 }[] = [];
+  private shattered: ShatteredMoon[] = [];
+  /** Ring chunks you can fly through (nearest ringed planet). */
+  readonly ringDebris: RingDebris;
+  private rings: RingTarget[] = [];
+  private bodyGroups: Group[] = [];
 
   constructor(
     readonly system: StarSystem,
@@ -49,12 +74,33 @@ export class StarSystemView {
     scene.add(this.backdrop.group);
 
     for (const p of system.planets) {
-      const planet = new Planet(p.preset);
-      planet.group.position.copy(p.position).add(SYSTEM_OFFSET);
-      planet.group.rotation.set(...p.tilt);
-      this.masses.push({ position: planet.group.position, radius: p.preset.radius });
-      this.group.add(planet.group);
+      const kind = p.preset.kind ?? 'gas';
+      const group = kind === 'shattered' ? this.addShattered(p) : this.addPlanet(p);
+      group.position.copy(p.position).add(SYSTEM_OFFSET);
+      group.rotation.set(...p.tilt);
+      this.masses.push({ position: group.position, radius: p.preset.radius });
+      this.group.add(group);
+      this.bodyGroups.push(group);
+      const body: BodyInstance = { name: p.preset.name, kind, description: p.description ?? '', landmark: p.landmark, position: group.position, radius: p.preset.radius, site: p };
+      this.bodies.push(body);
+      for (const m of p.moons ?? []) {
+        const mk = m.preset.kind ?? 'rocky';
+        const mg = mk === 'shattered' ? this.addShattered(m) : new Planet(m.preset, { segments: 64 }).group;
+        const pos = moonPosition(group.position, m, 0);
+        mg.position.copy(pos);
+        mg.rotation.set(0.2, m.node, 0.1);
+        this.group.add(mg);
+        this.bodyGroups.push(mg);
+        const mb: BodyInstance = { name: m.preset.name, kind: mk, description: m.description, landmark: m.landmark, position: mg.position, radius: m.preset.radius, parent: body, site: m };
+        this.bodies.push(mb);
+        this.moons.push({ body: mb, group: mg, moon: m, parent: group.position });
+        this.masses.push({ position: mg.position, radius: m.preset.radius });
+      }
     }
+    // ?planets=0 hides every body (A/B perf checks).
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('planets') === '0') for (const g of this.bodyGroups) g.visible = false;
+    this.ringDebris = new RingDebris([...system.id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 3));
+    this.group.add(this.ringDebris.mesh);
 
     for (const link of system.gates) {
       const gate = new LanternGate(420);
@@ -100,9 +146,57 @@ export class StarSystemView {
     worldRoot.add(this.group);
   }
 
-  update(time: number): void {
+  private addPlanet(p: PlanetSite): Group {
+    const planet = new Planet(p.preset);
+    const rp = p.preset.ring;
+    if (rp) {
+      planet.group.rotation.set(...p.tilt);
+      planet.group.updateMatrixWorld(true);
+      this.rings.push({
+        center: planet.group.position,
+        normal: planet.ringNormal(new Vector3()),
+        inner: p.preset.radius * rp.inner,
+        outer: p.preset.radius * rp.outer,
+        bands: rp.bands,
+        color: ringColor(rp.bands),
+      });
+    }
+    return planet.group;
+  }
+
+  private addShattered(p: PlanetSite | MoonSite): Group {
+    const s = new ShatteredMoon(p.preset);
+    this.shattered.push(s);
+    return s.group;
+  }
+
+  /** `eye` (universe) drives the fly-through ring chunks; omit it to keep them hidden. */
+  update(time: number, eye?: Vector3): void {
     this.field.update(time);
     for (const st of this.stations) st.update(time);
+    planetClock.value = time;
+    for (const m of this.moons) moonPosition(m.parent, m.moon, time, m.group.position);
+    for (const s of this.shattered) s.update(time);
+    if (eye) this.ringDebris.update(eye, this.rings);
+  }
+
+  /** Ring plane of a ringed planet (universe space). */
+  ringFrame(b: BodyInstance): RingTarget | undefined {
+    return this.rings.find((r) => r.center === b.position);
+  }
+
+  /** Nearest body surface to `p` (metres above the surface) — nav / HUD. */
+  nearestBody(p: Vector3): { body: BodyInstance; altitude: number } | null {
+    let best: BodyInstance | null = null;
+    let bd = Infinity;
+    for (const b of this.bodies) {
+      const d = b.position.distanceTo(p) - b.radius;
+      if (d < bd) {
+        bd = d;
+        best = b;
+      }
+    }
+    return best ? { body: best, altitude: bd } : null;
   }
 
   gateTo(id: string): GateInstance | undefined {
@@ -111,6 +205,7 @@ export class StarSystemView {
 
   dispose(): void {
     for (const st of this.stations) st.dispose();
+    this.ringDebris.dispose();
     this.group.removeFromParent();
     this.scene.remove(this.backdrop.group);
     this.group.traverse((o) => {

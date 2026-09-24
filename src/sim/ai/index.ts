@@ -19,6 +19,7 @@ export function updateAI(fleet: Pick<Fleet, 'ships'>, dt: number, time: number, 
     if (!s.alive || isCapital(s)) continue;
     if (s.isPlayer && !(isBrain(s.brain) && s.brain.autopilot)) continue;
     const b = brainOf(s);
+    if (b.scripted) continue;
     if (time >= b.nextThink) {
       think(s, b, ships);
       b.nextThink = time + b.personality.reaction * (0.75 + 0.5 * rand(b));
