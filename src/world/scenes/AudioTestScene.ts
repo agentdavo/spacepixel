@@ -5,6 +5,8 @@ import { Backdrop, BACKDROPS } from '../Backdrop';
 import {
   getAudio,
   MOODS,
+  SCORE_IDS,
+  SCORE_INFO,
   type AudioFrame,
   type AudioMissileEvent,
   type AudioShip,
@@ -20,8 +22,9 @@ import {
  * `?scene=audio` — test bench for the procedural audio system.
  *
  * A painted sky and a DOM panel: every SFX (routed through the same
- * GameAudio.update() event path the flight scene uses), every music mood,
- * stingers, intensity, bus volumes, and scripted demos (lock-on, Lantern jump,
+ * GameAudio.update() event path the flight scene uses), every music mood in
+ * every score (with a place variant), stingers, intensity, bus volumes, and
+ * scripted demos (lock-on, Lantern jump,
  * cruise, missile salvo, orbiting gunfire for panning). The listener sits at
  * the universe origin looking down −Z; "left/right" presets pan accordingly.
  */
@@ -202,6 +205,10 @@ export class AudioTestScene implements GameScene {
     const mus = section('Music');
     for (const mood of MOODS) btn(mus, mood, () => a.music.setMood(mood, 2), `mood:${mood}`);
     btn(mus, 'silence', () => a.music.setMood(null, 2));
+    const sco = section('Score');
+    for (const id of SCORE_IDS) btn(sco, SCORE_INFO[id].title, () => a.setScore(id, a.music.variant, 2), `score:${id}`).title = SCORE_INFO[id].blurb;
+    btn(sco, 'next variant', () => a.setScore(a.music.score, a.music.variant + 1, 2));
+    btn(sco, 'home variant', () => a.setScore(a.music.score, 0, 2));
     const st = section('Stingers');
     for (const k of ['victory', 'defeat', 'lock', 'jump'] as StingerKind[]) btn(st, k, () => a.stinger(k), `sting:${k}`);
     slider(st, 'intensity', 0, (v) => (this.intensity = v));
@@ -310,8 +317,10 @@ export class AudioTestScene implements GameScene {
       this.status.textContent =
         `AUDIO ${state}${e.muted ? ' · MUTED' : ''}\n` +
         `mood ${this.audio.music.mood ?? '—'} · intensity ${this.audio.music.level.toFixed(2)}\n` +
+        `score ${this.audio.scoreLabel} · variant ${this.audio.music.variant}\n` +
         `voices ${e.activeVoices()} · jump ${this.jump} · cruise ${p.cruise}${p.locked ? ' · LOCKED' : ''}`;
       for (const m of MOODS) this.buttons.get(`mood:${m}`)?.classList.toggle('on', this.audio.music.mood === m);
+      for (const id of SCORE_IDS) this.buttons.get(`score:${id}`)?.classList.toggle('on', this.audio.music.score === id);
     }
   }
 

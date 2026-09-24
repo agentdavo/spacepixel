@@ -180,6 +180,12 @@ export class Planet {
       this.setLod(planetLodFor(px, this.lod));
     };
     body.onBeforeRender = (renderer, _scene, camera) => lodCheck(renderer as never, camera);
+    // Scene teardown (core/dispose.ts) only reaches the attached level; free the cached ones too.
+    body.userData.dispose = () => {
+      for (const m of mats) m?.dispose();
+      fullGeo.dispose();
+      farGeo?.dispose();
+    };
 
     // ── atmosphere limb ──────────────────────────────────────────────
     if (!preset.airless) {

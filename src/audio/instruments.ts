@@ -10,18 +10,18 @@ import { Rng, adsr, mtof, perc, pulseWave, sweep } from './dsp';
  * around −18 dBFS RMS before the music bus.
  */
 export class Instruments {
-  private rng = new Rng(0xbe11);
-  private pulse: PeriodicWave;
+  protected rng = new Rng(0xbe11);
+  protected pulse: PeriodicWave;
 
   constructor(
-    private ctx: BaseAudioContext,
+    protected ctx: BaseAudioContext,
     private noiseBuf: AudioBuffer,
     private pinkBuf: AudioBuffer,
   ) {
     this.pulse = pulseWave(ctx, 0.25);
   }
 
-  private osc(type: OscillatorType, f: number, t: number, end: number): OscillatorNode {
+  protected osc(type: OscillatorType, f: number, t: number, end: number): OscillatorNode {
     const o = this.ctx.createOscillator();
     o.type = type;
     o.frequency.setValueAtTime(f, t);
@@ -30,7 +30,7 @@ export class Instruments {
     return o;
   }
 
-  private noise(t: number, end: number, pink = false): AudioBufferSourceNode {
+  protected noise(t: number, end: number, pink = false): AudioBufferSourceNode {
     const s = this.ctx.createBufferSource();
     s.buffer = pink ? this.pinkBuf : this.noiseBuf;
     s.loop = true;
@@ -39,13 +39,13 @@ export class Instruments {
     return s;
   }
 
-  private gain(v = 0): GainNode {
+  protected gain(v = 0): GainNode {
     const g = this.ctx.createGain();
     g.gain.value = v;
     return g;
   }
 
-  private filter(type: BiquadFilterType, f: number, q = 0.7): BiquadFilterNode {
+  protected filter(type: BiquadFilterType, f: number, q = 0.7): BiquadFilterNode {
     const b = this.ctx.createBiquadFilter();
     b.type = type;
     b.frequency.value = f;

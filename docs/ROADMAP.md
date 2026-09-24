@@ -150,6 +150,17 @@ modifiers, an event log), is read and written by everything below.
 | 7 | Persistent NPC arcs that advance while you're away | ≥ 6 arcs | ✅ 7 arcs (Odile, Magpie, Pell, Nadia, Toma, Dalca & Pieter, Maud), 7 arc jobs, THREADS tab |
 | 8 | Rivals: named aces and bounty targets that remember and escalate | ≥ 5 rivals | ✅ 6 rivals (2 can be turned), grudge meters, tiers, world-log memory in their lines |
 
+## Batch 6 — guns you can see, shields you can break, ships that die well (carried by the turrets session on `claude/ship-turrets-shields-weapons-8lz4su`; see docs/SESSIONS.md)
+
+| # | Milestone | Pass/fail | Status |
+|---|---|---|---|
+| 1 | Articulated turret rigs on every turreted hull and station: traverse/elevation limits and rates, own-hull arc blocking, recoil | turrets slew before they fire; determinism holds | 🔧 |
+| 2 | Identifiable origins: every bolt, beam and missile leaves a barrel, emitter or launcher cell (muzzle flash, hatches, tubes) | no shot from a hull centre | 🔧 |
+| 3 | Shields v2: fighter fore/aft with power shifting; big hulls by facing incl. dorsal/ventral; generators per facing; bleed-through; collapse and reboot | unit-tested; balance bands hold | 🔧 |
+| 4 | Impacts: faction shield flares (hex / crystal / scrap), collapse shatter; hull hits per weapon family (scorch, sparks, shatter, craters, trenches) with persistent decals and per-surface audio | readable at chase distance | 🔧 |
+| 5 | Subsystems v2: everything targetable once its facing is down (turrets, launchers, lances, PD, engines, generators, bridge, sensors, hangars, reactor; station batteries and arms) | exposure rules tested | 🔧 |
+| 6 | Kill paths: structural break-up, reactor detonation, bridge kill (drifting wreck), rolling chain; wrecks stay as salvage | each path in `npm run balance` bands | 🔧 |
+
 ## Known issues
 
 - WebGL2 fallback lines are softer than the WGSL path.

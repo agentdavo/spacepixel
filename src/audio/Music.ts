@@ -1,6 +1,9 @@
 import type { AudioEngine } from './AudioEngine';
-import { Instruments } from './instruments';
 import { Rng, makeImpulse } from './dsp';
+import { OvaRack } from './score/rack';
+import { PatchedIns, type InsLike } from './score/palette';
+import { SCORE_INFO, variantShape, type ScoreId } from './score/catalog';
+import { SCORES, type ScoreDef } from './score/scores';
 
 /**
  * Generative OVA score.
@@ -18,21 +21,29 @@ import { Rng, makeImpulse } from './dsp';
  *
  * Moods crossfade (each has its own player and output gain); `setIntensity`
  * adds layers inside a mood (e.g. drums and brass in combat as enemies close).
+ *
+ * Scores (src/audio/score/) sit on top: a score re-orchestrates every mood
+ * (palette of patches, key, tempo, swing, reverb) and layers its own parts
+ * (string ostinati, timpani, slap-bass grooves…); a variant reseeds the
+ * melodies per star system / episode. `setScore` crossfades the running mood
+ * into the new orchestration.
  */
 export type Mood = 'title' | 'briefing' | 'cruise' | 'combat' | 'sublime' | 'dread' | 'victory' | 'defeat';
 export const MOODS: readonly Mood[] = ['title', 'briefing', 'cruise', 'combat', 'sublime', 'dread', 'victory', 'defeat'];
 export type StingerKind = 'victory' | 'defeat' | 'lock' | 'jump';
 
-type Ch = 'pad' | 'brass' | 'arp' | 'bass' | 'bell' | 'drums' | 'choir' | 'drone';
-const CHANNELS: readonly Ch[] = ['pad', 'brass', 'arp', 'bass', 'bell', 'drums', 'choir', 'drone'];
+export type Ch = 'pad' | 'brass' | 'arp' | 'bass' | 'bell' | 'drums' | 'choir' | 'drone' | 'strings' | 'lead';
+const CHANNELS: readonly Ch[] = ['pad', 'brass', 'arp', 'bass', 'bell', 'drums', 'choir', 'drone', 'strings', 'lead'];
 
-const MAJOR = [0, 2, 4, 5, 7, 9, 11] as const;
-const MINOR = [0, 2, 3, 5, 7, 8, 10] as const;
-const LYDIAN = [0, 2, 4, 6, 7, 9, 11] as const;
-const PHRYGIAN = [0, 1, 3, 5, 7, 8, 10] as const;
-type Scale = readonly number[];
+export const MAJOR = [0, 2, 4, 5, 7, 9, 11] as const;
+export const MINOR = [0, 2, 3, 5, 7, 8, 10] as const;
+export const LYDIAN = [0, 2, 4, 6, 7, 9, 11] as const;
+export const PHRYGIAN = [0, 1, 3, 5, 7, 8, 10] as const;
+export const DORIAN = [0, 2, 3, 5, 7, 9, 10] as const;
+export const MIXOLYDIAN = [0, 2, 4, 5, 7, 9, 10] as const;
+export type Scale = readonly number[];
 
-interface Chord {
+export interface Chord {
   /** Scale degree of the root, 0-based (0 = I). */
   d: number;
   bars?: number;
@@ -46,7 +57,7 @@ const mod = (a: number, n: number) => ((a % n) + n) % n;
 // ════════════════════════════════════════════════════════════════════════
 // Harmony
 // ════════════════════════════════════════════════════════════════════════
-class Harmony {
+export class Harmony {
   key = 60;
   scale: Scale = MAJOR;
   rootDeg = 0;
@@ -248,17 +259,48 @@ class Melody {
 // ════════════════════════════════════════════════════════════════════════
 // Channel strip + mood player
 // ════════════════════════════════════════════════════════════════════════
-class Strip {
+export class Strip {
   readonly out: GainNode;
   readonly ch: Record<Ch, GainNode>;
   /** Input of the choir formant bank (routes into ch.choir). */
   readonly formant: GainNode;
   private f1: BiquadFilterNode;
   private f2: BiquadFilterNode;
+  /** Ensemble-chorus LFOs (stopped on dispose). */
+  private lfos: OscillatorNode[] = [];
 
-  constructor(ctx: BaseAudioContext, dest: AudioNode, verb: AudioNode, levels: Partial<Record<Ch, number>>, sends: Partial<Record<Ch, number>>) {
+  constructor(
+    ctx: BaseAudioContext,
+    dest: AudioNode,
+    verb: AudioNode,
+    levels: Partial<Record<Ch, number>>,
+    sends: Partial<Record<Ch, number>>,
+    chorus: Partial<Record<Ch, number>> = {},
+  ) {
     this.out = ctx.createGain();
     this.out.connect(dest);
+    // Juno-style stereo ensemble: two modulated delays panned apart, fed per channel.
+    let chorusIn: GainNode | null = null;
+    for (const c of CHANNELS) if ((chorus[c] ?? 0) > 0) chorusIn = chorusIn ?? ctx.createGain();
+    if (chorusIn) {
+      for (const [delay, rate, pan] of [
+        [0.0115, 0.52, -0.75],
+        [0.0165, 0.83, 0.75],
+      ] as const) {
+        const d = ctx.createDelay(0.05);
+        d.delayTime.value = delay;
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = rate;
+        const lg = ctx.createGain();
+        lg.gain.value = 0.0028;
+        lfo.connect(lg).connect(d.delayTime);
+        lfo.start();
+        this.lfos.push(lfo);
+        const pn = ctx.createStereoPanner();
+        pn.pan.value = pan;
+        chorusIn.connect(d).connect(pn).connect(this.out);
+      }
+    }
     const ch = {} as Record<Ch, GainNode>;
     for (const c of CHANNELS) {
       const g = ctx.createGain();
@@ -269,6 +311,12 @@ class Strip {
         const sg = ctx.createGain();
         sg.gain.value = s;
         g.connect(sg).connect(verb);
+      }
+      const cz = chorus[c] ?? 0;
+      if (cz > 0 && chorusIn) {
+        const cg = ctx.createGain();
+        cg.gain.value = cz;
+        g.connect(cg).connect(chorusIn);
       }
       ch[c] = g;
     }
@@ -305,12 +353,27 @@ class Strip {
   layer(c: Ch, v: number, t: number, tc = 0.4): void {
     this.ch[c].gain.setTargetAtTime(v, t, tc);
   }
+
+  dispose(): void {
+    for (const o of this.lfos) {
+      try {
+        o.stop();
+      } catch {
+        /* already stopped */
+      }
+      o.disconnect();
+    }
+    this.lfos.length = 0;
+    this.out.disconnect();
+  }
 }
 
-const DEFAULT_LEVELS: Record<Ch, number> = { pad: 0.55, brass: 0.7, arp: 0.5, bass: 0.8, bell: 0.6, drums: 0.8, choir: 0.7, drone: 0.7 };
-const DEFAULT_SENDS: Record<Ch, number> = { pad: 0.35, brass: 0.25, arp: 0.2, bass: 0.02, bell: 0.5, drums: 0.12, choir: 0.6, drone: 0.3 };
+const DEFAULT_LEVELS: Record<Ch, number> = { pad: 0.55, brass: 0.7, arp: 0.5, bass: 0.8, bell: 0.6, drums: 0.8, choir: 0.7, drone: 0.7, strings: 0.75, lead: 0.6 };
+const DEFAULT_SENDS: Record<Ch, number> = { pad: 0.35, brass: 0.25, arp: 0.2, bass: 0.02, bell: 0.5, drums: 0.12, choir: 0.6, drone: 0.3, strings: 0.45, lead: 0.35 };
 
-interface MoodDef {
+export type StepFn = (p: MoodPlayer, s: number, t: number) => void;
+
+export interface MoodDef {
   bpm: number;
   seed: number;
   scale: Scale;
@@ -324,10 +387,15 @@ interface MoodDef {
   /** Starts at full level with no fade (stings). */
   instant?: boolean;
   step(p: MoodPlayer, s: number, t: number): void;
+  /** Score-specific parts layered after `step` (string ostinati, timpani, grooves). */
+  extra?: StepFn;
+  /** Delay of odd 16ths as a fraction of a 16th (0 = straight, ~0.15 = city-pop shuffle). */
+  swing?: number;
 }
 
-class MoodPlayer {
+export class MoodPlayer {
   readonly strip: Strip;
+  readonly ins: PatchedIns;
   readonly harm = new Harmony();
   readonly mel = new Melody();
   readonly rng: Rng;
@@ -347,6 +415,8 @@ class MoodPlayer {
   private cycleBars: number;
   endAt = Infinity;
   melOn = false;
+  private swingT: number;
+  private leadCh: GainNode;
 
   constructor(
     readonly music: Music,
@@ -355,9 +425,15 @@ class MoodPlayer {
     ctx: BaseAudioContext,
     start: number,
     fade: number,
+    readonly score: ScoreDef,
+    verb: AudioNode,
   ) {
-    this.strip = new Strip(ctx, music.moodBus!, music.verbIn!, def.levels ?? {}, def.sends ?? {});
+    this.strip = new Strip(ctx, music.moodBus!, verb, def.levels ?? {}, def.sends ?? {}, score.chorus);
+    this.ins = new PatchedIns(music.rack!, score.palette, this.strip.ch, () => this.harm.root);
     this.D = 60 / def.bpm / 4;
+    this.swingT = (def.swing ?? 0) * this.D;
+    // Bell melodies keep the bell channel's mix (the original score is unchanged).
+    this.leadCh = score.palette.lead === 'bell' ? this.strip.ch.bell : this.strip.ch.lead;
     this.rng = new Rng(def.seed);
     this.nextTime = start;
     let bars = 0;
@@ -371,8 +447,9 @@ class MoodPlayer {
     }
   }
 
-  get ins(): Instruments {
-    return this.music.ins!;
+  /** The raw rack, for score parts that ask for a specific patch. */
+  get rack(): OvaRack {
+    return this.music.rack!;
   }
   get ch(): Record<Ch, GainNode> {
     return this.strip.ch;
@@ -398,9 +475,10 @@ class MoodPlayer {
     if (this.nextTime < now - 0.25) this.nextTime = now + 0.02;
     while (this.nextTime < until && this.nextTime < this.endAt) {
       const s = this.stepN % 16;
-      const t = this.nextTime;
+      const t = s % 2 === 1 ? this.nextTime + this.swingT : this.nextTime;
       if (s === 0) this.newBar();
       this.def.step(this, s, t);
+      this.def.extra?.(this, s, t);
       this.playMelody(s, t);
       this.stepN++;
       this.nextTime += this.D;
@@ -445,7 +523,7 @@ class MoodPlayer {
     for (let i = 0; i < mel.n; i++) {
       if (mel.s[i] !== s) continue;
       const len = mel.l[i] * this.D;
-      this.ins.bell(this.ch.bell, t, mel.m[i], 0.55 + (s % 4 === 0 ? 0.25 : 0), Math.min(2.2, 0.5 + len * 2));
+      this.ins.lead(this.leadCh, t, mel.m[i], 0.55 + (s % 4 === 0 ? 0.25 : 0), len);
     }
   }
 
@@ -495,7 +573,7 @@ function inPattern(p: readonly number[], s: number): boolean {
   return false;
 }
 
-const DEFS: Record<Mood, MoodDef> = {
+export const DEFS: Record<Mood, MoodDef> = {
   // Heroic, slow build: pad → bells → bass/arp → brass + drums, then a whole-step key change.
   title: {
     bpm: 88,
@@ -749,7 +827,7 @@ const DEFS: Record<Mood, MoodDef> = {
 };
 
 // ── stings ─────────────────────────────────────────────────────────────
-function victoryFanfare(ins: Instruments, st: Strip, t: number, D: number, key: number): void {
+function victoryFanfare(ins: InsLike, st: Strip, t: number, D: number, key: number): void {
   const br = st.ch.brass;
   const dr = st.ch.drums;
   const chord = (at: number, notes: readonly number[], dur: number, vel: number, bright = 1.2) => {
@@ -783,7 +861,7 @@ function victoryFanfare(ins: Instruments, st: Strip, t: number, D: number, key: 
   ins.bell(st.ch.bell, t3 + D, key + 31, 0.6, 2.5);
 }
 
-function defeatSting(ins: Instruments, st: Strip, t: number, D: number, key: number): void {
+function defeatSting(ins: InsLike, st: Strip, t: number, D: number, key: number): void {
   const br = st.ch.brass;
   const chord = (at: number, notes: readonly number[], dur: number, vel: number) => {
     for (const n of notes) ins.brass(br, at, key + n, dur, vel, 0.45, 0.15);
@@ -805,15 +883,20 @@ function defeatSting(ins: Instruments, st: Strip, t: number, D: number, key: num
 // Music
 // ════════════════════════════════════════════════════════════════════════
 export class Music {
-  ins: Instruments | null = null;
+  rack: OvaRack | null = null;
   /** Mixes all mood players (and stings) into the engine's music bus. */
   moodBus: GainNode | null = null;
-  verbIn: ConvolverNode | null = null;
   private players: MoodPlayer[] = [];
   private current: MoodPlayer | null = null;
   private sting: Strip | null = null;
+  private stingIns: PatchedIns | null = null;
+  private stingScore: ScoreDef | null = null;
+  /** One convolver per score room, built on first use. */
+  private verbs = new Map<string, ConvolverNode>();
   private wanted: Mood | null = null;
   private wantedFade = 0;
+  private scoreDef: ScoreDef = SCORES.classic;
+  private scoreVariant = 0;
   private target = 0;
   /** Smoothed intensity, 0..1. */
   level = 0;
@@ -828,21 +911,13 @@ export class Music {
 
   private init(ctx: BaseAudioContext): void {
     const e = this.engine;
-    this.ins = new Instruments(ctx, e.noise!, e.pink!);
+    this.rack = new OvaRack(ctx, e.noise!, e.pink!);
     this.moodBus = ctx.createGain();
     // Clean up sub-rumble and leave room for SFX bass.
     const hp = ctx.createBiquadFilter();
     hp.type = 'highpass';
     hp.frequency.value = 32;
     this.moodBus.connect(hp).connect(e.music!);
-    const verb = ctx.createConvolver();
-    verb.normalize = false;
-    verb.buffer = makeImpulse(ctx, 3.4, 0x0a5, 0.55, 0.03);
-    const ret = ctx.createGain();
-    ret.gain.value = 0.32;
-    verb.connect(ret).connect(this.moodBus);
-    this.verbIn = verb;
-    this.sting = new Strip(ctx, this.moodBus, verb, {}, {});
     if (e.live && typeof setInterval !== 'undefined') this.timer = setInterval(() => this.pump(), 50);
     if (this.wanted) {
       const m = this.wanted;
@@ -851,14 +926,88 @@ export class Music {
     }
   }
 
+  /** The reverb room for a score (the original 3.4 s hall unless the score books another). */
+  private verbFor(sc: ScoreDef): ConvolverNode {
+    const ctx = this.engine.ctx!;
+    const room = sc.verb ?? { seconds: 3.4, brightness: 0.55, ret: 0.32 };
+    const key = `${room.seconds}/${room.brightness}/${room.ret}`;
+    let v = this.verbs.get(key);
+    if (!v) {
+      v = ctx.createConvolver();
+      v.normalize = false;
+      v.buffer = makeImpulse(ctx, room.seconds, 0x0a5, room.brightness, 0.03);
+      const ret = ctx.createGain();
+      ret.gain.value = room.ret;
+      v.connect(ret).connect(this.moodBus!);
+      this.verbs.set(key, v);
+    }
+    return v;
+  }
+
   get mood(): Mood | null {
     return this.wanted ?? this.current?.mood ?? null;
+  }
+
+  /** The score now orchestrating the music. */
+  get score(): ScoreId {
+    return this.scoreDef.id;
+  }
+
+  get variant(): number {
+    return this.scoreVariant;
+  }
+
+  /** Human title of the current score. */
+  get scoreTitle(): string {
+    return SCORE_INFO[this.scoreDef.id].title;
+  }
+
+  /**
+   * Re-orchestrate: switch score (and per-place variant). The running mood
+   * crossfades over `fade` seconds into the same mood in the new score;
+   * stings (victory/defeat) finish in the score they started in.
+   */
+  setScore(id: ScoreId, variant = 0, fade = 3): void {
+    const sc = SCORES[id] ?? SCORES.classic;
+    const v = sc.variants === false ? 0 : variant;
+    if (sc === this.scoreDef && v === this.scoreVariant) return;
+    this.scoreDef = sc;
+    this.scoreVariant = v;
+    const cur = this.current;
+    if (!cur || cur.def.instant || !this.engine.ctx || !this.rack) return;
+    cur.fadeOut(this.engine.ctx.currentTime, fade);
+    this.current = null;
+    this.setMood(cur.mood, fade);
+  }
+
+  /** The mood's definition as this score + variant orchestrates it. */
+  private resolve(mood: Mood): MoodDef {
+    const base = DEFS[mood];
+    const sc = this.scoreDef;
+    const patch = sc.moods?.[mood] ?? {};
+    const vs = variantShape(this.scoreVariant);
+    const tr = sc.transpose + vs.transpose;
+    const extra = patch.extra === null ? undefined : (patch.extra ?? sc.extra);
+    return {
+      ...base,
+      bpm: (patch.bpm ?? base.bpm) * sc.tempo * vs.tempo,
+      seed: base.seed + sc.seed + vs.seed,
+      keys: (patch.keys ?? base.keys).map((k) => k + tr),
+      scale: patch.scale ?? base.scale,
+      prog: patch.prog ?? base.prog,
+      levels: { ...sc.levels, ...base.levels, ...patch.levels },
+      sends: { ...sc.sends, ...base.sends, ...patch.sends },
+      melody: patch.melody === null ? undefined : (patch.melody ?? base.melody),
+      step: patch.step ?? base.step,
+      extra,
+      swing: patch.swing ?? sc.swing,
+    };
   }
 
   /** Crossfade to `mood` over `fade` seconds (null = fade to silence). */
   setMood(mood: Mood | null, fade = 2.5): void {
     const ctx = this.engine.ctx;
-    if (!ctx || !this.ins) {
+    if (!ctx || !this.rack) {
       this.wanted = mood;
       this.wantedFade = fade;
       return;
@@ -868,8 +1017,8 @@ export class Music {
     if (this.current) this.current.fadeOut(now, fade);
     this.current = null;
     if (!mood) return;
-    const def = DEFS[mood];
-    const p = new MoodPlayer(this, mood, def, ctx, now + 0.06, def.instant ? 0 : fade);
+    const def = this.resolve(mood);
+    const p = new MoodPlayer(this, mood, def, ctx, now + 0.06, def.instant ? 0 : fade, this.scoreDef, this.verbFor(this.scoreDef));
     this.players.push(p);
     this.current = p;
     this.pump();
@@ -880,21 +1029,40 @@ export class Music {
     this.target = v < 0 ? 0 : v > 1 ? 1 : v;
   }
 
+  /** The sting strip, re-orchestrated when the score changes. */
+  private stingRig(): { st: Strip; ins: PatchedIns } | null {
+    const ctx = this.engine.ctx;
+    if (!ctx || !this.rack || !this.moodBus) return null;
+    if (!this.sting || this.stingScore !== this.scoreDef) {
+      // The previous sting strip may still be ringing out: leave it connected a while.
+      const old = this.sting;
+      if (old) setTimeout(() => old.dispose(), 6000);
+      const sc = this.scoreDef;
+      this.sting = new Strip(ctx, this.moodBus, this.verbFor(sc), sc.levels ?? {}, sc.sends ?? {}, sc.chorus);
+      const st = this.sting;
+      this.stingIns = new PatchedIns(this.rack, sc.palette, st.ch, () => (this.current ? this.current.harm.root : 50));
+      this.stingScore = sc;
+    }
+    return { st: this.sting, ins: this.stingIns! };
+  }
+
   /** One-shot musical sting over the current mood, in its key. */
   stinger(kind: StingerKind): void {
     const ctx = this.engine.ctx;
-    const ins = this.ins;
-    const st = this.sting;
-    if (!ctx || !ins || !st || !this.engine.running) return;
+    if (!ctx || !this.engine.running) return;
+    const rig = this.stingRig();
+    if (!rig) return;
+    const { st, ins } = rig;
     const t = ctx.currentTime + 0.03;
     const key = this.current ? this.current.key : 62;
     const k = key + 12 * Math.round((62 - key) / 12);
+    const tr = this.scoreDef.transpose;
     switch (kind) {
       case 'victory':
-        victoryFanfare(ins, st, t, 60 / 126 / 4, 60);
+        victoryFanfare(ins, st, t, 60 / 126 / 4, 60 + tr);
         break;
       case 'defeat':
-        defeatSting(ins, st, t, 60 / 66 / 4, 48);
+        defeatSting(ins, st, t, 60 / 66 / 4, 48 + tr);
         break;
       case 'lock':
         ins.bell(st.ch.bell, t, k + 19, 0.6, 0.8);
@@ -910,7 +1078,7 @@ export class Music {
   /** Schedule notes up to now + lookahead. Called per frame and by a 50 ms timer. */
   pump(): void {
     const ctx = this.engine.ctx;
-    if (!ctx || !this.ins) return;
+    if (!ctx || !this.rack) return;
     const now = ctx.currentTime;
     const dt = this.lastPump < 0 ? 0 : Math.max(0, now - this.lastPump);
     this.lastPump = now;
@@ -920,7 +1088,7 @@ export class Music {
     for (let i = this.players.length - 1; i >= 0; i--) {
       const p = this.players[i];
       if (now > p.endAt + 8) {
-        p.strip.out.disconnect();
+        p.strip.dispose();
         this.players.splice(i, 1);
         continue;
       }

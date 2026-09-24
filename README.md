@@ -218,9 +218,9 @@ prologue's captions (now voiced by a narrator keyed to them), station
 conversations and cutscenes; the typewriter follows the voice. Optional
 Japanese second line where the script has one.
 
-**Settings (anywhere):** **F7** voice synth / speech / off · **F8** subtitle
-size S / M / L / off · **F9** Japanese line on/off. URL: `?voice=`, `?subs=0`,
-`?subsize=l`, `?jp=0`.
+**Settings (anywhere):** **F7** voice synth / speech / off · **Shift+F7**
+soundtrack · **F8** subtitle size S / M / L / off · **F9** Japanese line on/off.
+URL: `?voice=`, `?score=`, `?subs=0`, `?subsize=l`, `?jp=0`.
 
 **Concourse.** A dock tab (`src/ui/Concourse.ts`, key 2) with the 2–4 people
 at the station: fourteen recurring named people who travel the Reach on
@@ -244,6 +244,49 @@ Listen: [docs/audio/voice-radio.wav](docs/audio/voice-radio.wav) ·
 [docs/audio/voice-prologue-opening.wav](docs/audio/voice-prologue-opening.wav).
 
 ![Concourse](docs/screenshots/people-concourse-lucan.jpg)
+
+## Soundtrack: eight OVA scores
+
+The score is generative (a 16th-note sequencer per mood: title, briefing,
+cruise, combat, sublime, dread, victory, defeat), and a **score** re-orchestrates
+it like a different composer's soundtrack album. Each score is a studio palette
+plus arrangement rules (`src/audio/score/`):
+
+| Score | Plays in | Sound |
+|---|---|---|
+| **Castellan Fleet March** · 艦隊行進曲 | Concord space | string section doubling Juno pads, JP-8 brass layered with horns, synth lead, 909; spiccato string ostinato and timpani in battle |
+| **Cathedral Liturgy** · 聖歌の空 | Choir space | glass pads, choir, harp, cello, solo violin, orchestral percussion; tremolo strings, orchestra hits and timpani in a minor-key battle |
+| **Rustwake Nights** · 錆の街のブルース | Rustwake space | city-pop noir: Dorian i7–IV7 vamp, DX7 e-piano comping, FM slap bass, alto sax, LinnDrum + clap, swing |
+| **Border Line** · 境界線 | contested systems | Solina strings, sequencer synth bass, ORCH5 stabs, Simmons tom fills |
+| **The Long Dark** · 長い闇 | Null Lantern, the Dead Zone, unknown space | glass pads, flute, low string tremolo, a timpani heartbeat, long dark hall |
+| **The Anchor** · 錨 | the Monolith | divisi strings, choir, celesta, suspended-cymbal swells |
+| **Symphony of Gates** · 門の交響曲 | the Nexus, the finale | everything: strings, hybrid brass, choir, timpani, 909 and synths |
+| **Original Score** · オリジナル・サウンドトラック | title, attract reels | the first-pressing DX / JP-8 / gated-drum score |
+
+**The rack** (`src/audio/score/rack.ts`, Web Audio nodes only): bowed string
+section with bow filter and delayed vibrato, tremolo, pizzicato, harp, cello,
+Solina; Juno pulse pad, DX "glass" pad, DX7 tine e-piano, celesta; horns and
+the Fairlight orchestra hit; FM alto sax, portamento synth lead, flute, solo
+violin; FM slap bass and resonant synth bass. Drums: 909, 707 and LinnDrum
+kits, clap, metallic hats, Simmons toms, tuned timpani, orchestral snare,
+shaker, tambourine, cowbell and suspended cymbal. Juno-style stereo ensemble
+chorus runs per channel.
+
+**Different everywhere.** Every campaign episode has its own score
+(`EPISODE_SCORES`). Outside a mission, a special system's score wins, then
+the system's faction's. Each star system and episode also gets a stable
+**variant**: a key shift, a ±4 % tempo nudge and new melody seeds. Two Concord
+systems sound like the same album but play different tunes. Jumping through
+a Lantern crossfades into the next system's score as you leave the tunnel.
+
+**Pick your own.** **Shift+F7** cycles *auto* → each score (the choice is
+kept per browser); `?score=rustwake` pins one for captures. `?scene=audio` has
+every score × mood, plus variant buttons.
+
+Listen: [docs/audio/score-reel.mp3](docs/audio/score-reel.mp3) (all eight in
+battle, 7 s each) · [docs/audio/score-reel-cruise.mp3](docs/audio/score-reel-cruise.mp3).
+Renders: `node scripts/audio-render.mjs --only score-<id>-cruise,score-<id>-combat,score-tour,score-reel`.
+The resolver is tested in `tests/score.test.ts`.
 
 ## Threads & rivals
 
@@ -737,7 +780,8 @@ anime portraits, codex unlocks, eyecatches and debriefs.
 
 **Sound.** Web Audio synthesis only: faction weapons, explosions, engine and
 jump loops, lock tones, radio; a generative OVA-style score with moods that
-follow the fight and the story.
+follow the fight and the story, orchestrated by eight scores that follow the
+galaxy and the episode (see *Soundtrack* above).
 
 ## Layout
 
@@ -751,7 +795,7 @@ src/
   world/     sky, planets, gates, dust, asteroids, set pieces, scenes
   universe/  seeded Meridian Reach + special locations
   game/      campaign data, runner, session, missions, profile
-  audio/     synthesis engine, SFX, generative music
+  audio/     synthesis engine, SFX, generative music, score/ (rack, palettes, eight scores), voice/
   ui/        HUD, star map, comms, codex, eyecatch, screens
   cinema/    cutscene sequencer + the prologue (shots, sets, overlay)
 tests/       node:test suites (runner + campaign data)

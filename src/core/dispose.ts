@@ -135,13 +135,17 @@ export class GpuEpoch {
 
 /**
  * Drop the renderer's per-scene caches that outlive a scene swap: render lists
- * (their pooled items keep every object of the last frame reachable) and the
- * render contexts keyed by MRT id (a new ink pipeline, a new key). Both are
- * rebuilt on the next render. Reaches into three.js internals, guarded.
+ * (their pooled items keep every object of the last frame reachable), the
+ * render contexts keyed by MRT id (a new ink pipeline, a new key) and the
+ * render objects. All are rebuilt on the next render. Reaches into three.js internals, guarded.
  */
 export function releaseRendererCaches(renderer: unknown): void {
-  const r = renderer as { _renderLists?: { lists?: object }; _renderContexts?: { dispose?(): void } };
+  const r = renderer as { _renderLists?: { lists?: object }; _renderContexts?: { dispose?(): void }; _objects?: { dispose?(): void } };
   const lists = r._renderLists;
   if (lists?.lists) lists.lists = new (lists.lists.constructor as new () => object)();
   r._renderContexts?.dispose?.();
+  // Render objects are cached in chain maps keyed through the renderer's persistent
+  // default LightsNode; each keeps its node-builder state, whose pass nodes hold the
+  // old scene graph. Dispose them all (rebuilt on the next draw).
+  r._objects?.dispose?.();
 }

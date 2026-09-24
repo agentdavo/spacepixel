@@ -3,7 +3,7 @@ import { CONCOURSE_PERSON, TRAILER } from '@/cinema/trailer';
 import { narrationCues } from '@/cinema/narration';
 import { intensityAt, soundTimes, type Shot } from '@/cinema/timeline';
 import { hashStr, personById } from '@/dialog/people';
-import { GameAudio, type AudioFrame, type AudioMissileEvent, type AudioShip, type AudioWeaponEvent, type Mood } from './index';
+import { GameAudio, SCORE_IDS, type AudioFrame, type AudioMissileEvent, type AudioShip, type AudioWeaponEvent, type Mood, type ScoreId } from './index';
 import { CAST_VOICES, VoiceBox, npcVoice, planFor, registerVoice, type VoiceChannel } from './voice';
 
 /**
@@ -76,6 +76,66 @@ const music = (mood: Mood, seconds: number, intensity: number, rampTo?: number):
   },
   tick: (s) => {
     if (rampTo !== undefined) s.frame.combatIntensity = intensity + (rampTo - intensity) * Math.min(1, s.t / seconds);
+  },
+});
+
+/** A mood in a given score (and place variant). */
+const scored = (id: ScoreId, mood: Mood, seconds: number, intensity: number, rampTo?: number, variant = 0): Scenario => {
+  const base = music(mood, seconds, intensity, rampTo);
+  return {
+    ...base,
+    setup: (s) => {
+      s.audio.setScore(id, variant, 0.1);
+      base.setup!(s);
+    },
+  };
+};
+
+/** Every score's cruise and combat (combat ramps 0.2 → 1 so each layer enters). */
+const SCORE_SCENARIOS: Record<string, Scenario> = {};
+for (const id of SCORE_IDS) {
+  SCORE_SCENARIOS[`score-${id}-cruise`] = scored(id, 'cruise', 20, 0.1);
+  SCORE_SCENARIOS[`score-${id}-combat`] = scored(id, 'combat', 16, 0.2, 1);
+}
+
+/**
+ * A flight across the Reach: cruise in Concord space, jump to Rustwake, fight
+ * in contested space, then the Dead Zone: each crossfade is a score switch.
+ */
+const tour = (): Scenario => ({
+  seconds: 40,
+  setup: (s) => {
+    s.audio.autoMood = false;
+    s.audio.setPlace('anchorage', 'concord', null, 0.1);
+    s.audio.music.setMood('cruise', 0.1);
+    s.frame.combatIntensity = 0.1;
+  },
+  tick: (s) => {
+    if (s.at(10)) s.audio.setPlace('rustwake', 'rustwake');
+    if (s.at(20)) {
+      s.audio.setPlace('zephacis', 'contested');
+      s.audio.music.setMood('combat', 2);
+      s.frame.combatIntensity = 0.8;
+    }
+    if (s.at(30)) {
+      s.audio.setPlace('deadzone', 'unknown');
+      s.audio.music.setMood('dread', 3);
+      s.frame.combatIntensity = 0.3;
+    }
+  },
+});
+
+/** The eight scores back to back, 7 s of each in battle (docs/audio/score-reel). */
+const reel = (mood: Mood, each: number, intensity: number): Scenario => ({
+  seconds: SCORE_IDS.length * each + 2,
+  setup: (s) => {
+    s.audio.autoMood = false;
+    s.audio.setScore(SCORE_IDS[0], 0, 0.1);
+    s.audio.music.setMood(mood, 0.1);
+    s.frame.combatIntensity = intensity;
+  },
+  tick: (s) => {
+    for (let k = 1; k < SCORE_IDS.length; k++) if (s.at(k * each)) s.audio.setScore(SCORE_IDS[k], 0, 0.8);
   },
 });
 
@@ -165,6 +225,10 @@ const voices = (lines: VLine[], gap = 0.6, setup?: (s: Sim) => void, extra?: (s:
 };
 
 export const SCENARIOS: Record<string, Scenario> = {
+  ...SCORE_SCENARIOS,
+  'score-tour': tour(),
+  'score-reel': reel('combat', 7, 0.85),
+  'score-reel-cruise': reel('cruise', 9, 0.1),
   'voice-radio': voices([
     ['kade', 'Vanguard, form on me. Nobody breaks formation until I say the word.'],
     ['jackpot', 'Pool is open, people! Two shares says I splash the first Cantor.'],

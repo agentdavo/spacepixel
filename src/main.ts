@@ -226,6 +226,8 @@ async function boot(): Promise<void> {
         if (!m) return; // unreachable: with nothing pending, free flight never ends
       }
       await showEyecatch(uiRoot, { chapter: m.chapter, episode: m.episode, title: m.title, tagline: m.tagline });
+      // The briefing already plays in the episode's score.
+      getAudio().setPlace(m.system, null, m.episode, 1);
       getAudio().music.setMood('briefing', 2);
       await briefingScreen(uiRoot, briefingOf(m));
       if (!flight) flight = (await load(DEFAULT_SCENE)) as FlightScene;
@@ -256,6 +258,8 @@ async function boot(): Promise<void> {
   const attractStats = { reels: 0, titles: 0 };
   window.__VANGUARD__!.hooks = { ...window.__VANGUARD__!.hooks, attract: attractStats };
   for (;;) {
+    // The title (and the attract reels) play the original score unless the player pinned one.
+    getAudio().setPlace(null, null, null, 1);
     getAudio().music.setMood('title');
     attractStats.titles++;
     const choice = await titleScreen(uiRoot, { idleMs });

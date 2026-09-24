@@ -1,11 +1,16 @@
+import { SOUNDTRACK_SETTINGS, describeSoundtrack, type SoundtrackSetting } from '@/audio/score/catalog';
+
 /**
- * Player settings for voices and subtitles. Per-viewer conveniences, kept in
- * localStorage (every access guarded) with URL overrides for captures:
+ * Player settings for voices, subtitles and the soundtrack. Per-viewer
+ * conveniences, kept in localStorage (every access guarded) with URL
+ * overrides for captures:
  *
  *   ?voice=synth|speech|off   ?subs=0|1   ?subsize=s|m|l   ?jp=0|1
+ *   ?score=auto|classic|concord|choir|rustwake|contested|deadzone|monolith|nexus
  *
- * Hotkeys (anywhere): F7 voice mode · F8 subtitle size / off · F9 second
- * language line. Listeners (`onSettings`) re-apply CSS and voice state.
+ * Hotkeys (anywhere): F7 voice mode · Shift+F7 soundtrack · F8 subtitle
+ * size / off · F9 second language line. Listeners (`onSettings`) re-apply
+ * CSS, voice state and the score.
  */
 export type VoiceMode = 'synth' | 'speech' | 'off';
 export type SubSize = 's' | 'm' | 'l';
@@ -16,10 +21,12 @@ export interface GameSettings {
   subSize: SubSize;
   /** Show the second-language (Japanese flavour) line where the script has one. */
   subSecond: boolean;
+  /** 'auto' follows the galaxy / episode; a score id pins that score everywhere. */
+  soundtrack: SoundtrackSetting;
 }
 
 const KEY = 'vanguard.settings.v1';
-const DEFAULTS: GameSettings = { voice: 'synth', subtitles: true, subSize: 'm', subSecond: true };
+const DEFAULTS: GameSettings = { voice: 'synth', subtitles: true, subSize: 'm', subSecond: true, soundtrack: 'auto' };
 
 const VOICES: VoiceMode[] = ['synth', 'speech', 'off'];
 const SIZES: SubSize[] = ['s', 'm', 'l'];
@@ -34,6 +41,7 @@ function load(): GameSettings {
       if (typeof r.subtitles === 'boolean') s.subtitles = r.subtitles;
       if (SIZES.includes(r.subSize as SubSize)) s.subSize = r.subSize as SubSize;
       if (typeof r.subSecond === 'boolean') s.subSecond = r.subSecond;
+      if (SOUNDTRACK_SETTINGS.includes(r.soundtrack as SoundtrackSetting)) s.soundtrack = r.soundtrack as SoundtrackSetting;
     }
   } catch {
     /* storage unavailable */
@@ -46,6 +54,8 @@ function load(): GameSettings {
     const z = q.get('subsize');
     if (SIZES.includes(z as SubSize)) s.subSize = z as SubSize;
     if (q.get('jp')) s.subSecond = q.get('jp') !== '0';
+    const sc = q.get('score');
+    if (SOUNDTRACK_SETTINGS.includes(sc as SoundtrackSetting)) s.soundtrack = sc as SoundtrackSetting;
   } catch {
     /* no location (tests) */
   }
@@ -77,7 +87,14 @@ export function setSettings(patch: Partial<GameSettings>): void {
 export function describeSettings(s: GameSettings = settings): string {
   const v = s.voice === 'synth' ? 'SYNTH' : s.voice === 'speech' ? 'SPEECH' : 'OFF';
   const sub = s.subtitles ? s.subSize.toUpperCase() : 'OFF';
-  return `VOICE ${v} [F7] · SUBTITLES ${sub} [F8] · 日本語 ${s.subSecond ? 'ON' : 'OFF'} [F9]`;
+  const score = s.soundtrack === 'auto' ? 'AUTO' : s.soundtrack.toUpperCase();
+  return `VOICE ${v} [F7] · SUBTITLES ${sub} [F8] · 日本語 ${s.subSecond ? 'ON' : 'OFF'} [F9] · SCORE ${score} [⇧F7]`;
+}
+
+/** What the score probe reports for 'auto' (set by the audio layer; null before audio exists). */
+let scoreProbe: (() => string | null) | null = null;
+export function setSoundtrackProbe(fn: (() => string | null) | null): void {
+  scoreProbe = fn;
 }
 
 const SCALE: Record<SubSize, string> = { s: '0.82', m: '1', l: '1.3' };
@@ -106,12 +123,20 @@ function toast(text: string): void {
 }
 
 let installed = false;
-/** Install the F7–F9 hotkeys and the CSS variables (idempotent). */
+/** Install the F7–F9 (and Shift+F7) hotkeys and the CSS variables (idempotent). */
 export function installSettingsKeys(): void {
   applyCss();
   if (installed || typeof window === 'undefined') return;
   installed = true;
   window.addEventListener('keydown', (e) => {
+    if (e.code === 'F7' && e.shiftKey) {
+      const next = SOUNDTRACK_SETTINGS[(SOUNDTRACK_SETTINGS.indexOf(settings.soundtrack) + 1) % SOUNDTRACK_SETTINGS.length];
+      setSettings({ soundtrack: next });
+      e.preventDefault();
+      // The score probe answers after the listeners have re-orchestrated.
+      toast(`${describeSoundtrack(next)}${next === 'auto' && scoreProbe?.() ? ` · ${scoreProbe()!.toUpperCase()}` : ''}  [⇧F7]`);
+      return;
+    }
     if (e.code === 'F7') {
       setSettings({ voice: VOICES[(VOICES.indexOf(settings.voice) + 1) % VOICES.length] });
     } else if (e.code === 'F8') {
