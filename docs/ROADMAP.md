@@ -133,7 +133,7 @@ buy the next hull, take on bigger adversaries.
 
 ![Shield facing collapse](screenshots/combat-shield.jpg)
 
-## Batch 5 — allegiance & a Reach that remembers (in progress)
+## Batch 5 — allegiance & a Reach that remembers (first versions: all in)
 
 The sandbox and the story start talking to each other. One shared memory,
 `src/game/world/WorldState.ts` (facts, counters, decaying per-system/station
@@ -205,3 +205,8 @@ Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
 - **Hires** — Magpie (wing) and Brennick (−30 % repairs) verified end to end
   by `npm run career-check` (new profile → free flight → hires → contract →
   launch → formation + fight → dock → repair → shipyard → reload).
+
+- Replay tapes carry two kinds of out-of-tick world change: the world sim's
+  small commands (`world-trade`, `world-take`, `world-episode`) and the
+  guilds' `world` command, which snapshots the whole WorldState (a few KB
+  per guild/outpost action). Migrate guild actions to small commands.
