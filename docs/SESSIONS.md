@@ -42,6 +42,8 @@ pass (4v4 sweep 51 % Concord). Milestone status is in ROADMAP *Batch 6*.
   `mountBlast` by `sub.kind`; player turret shots flagged `WeaponEvent.turret`
   and played as turret fire. `audio-render --only sfx-batch6`.
 - Trailer / prologue broadsides fire from barrel tips (`src/cinema/gunnery.ts`).
+- Faction shield shells: Choir crystal facets, Rustwake bent / holed scrap
+  plates (`WeaponVisuals` `style` uniform; `?scene=combat&stage=impacts&side=shield&faction=choir`).
 
 **Left**
 - Screenshot-verify and tune: hull marks (`ImpactDecals`, TSL instanced
