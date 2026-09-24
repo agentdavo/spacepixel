@@ -4,6 +4,8 @@ import { narrationCues } from '@/cinema/narration';
 import { intensityAt, soundTimes, type Shot } from '@/cinema/timeline';
 import { hashStr, personById } from '@/dialog/people';
 import { GameAudio, SCORE_IDS, type AudioFrame, type AudioMissileEvent, type AudioShip, type AudioWeaponEvent, type Mood, type ScoreId } from './index';
+import { clipsSettled, loadClips } from './voice/Recorded';
+import { BANTER, barkLine } from '@/dialog/barks';
 import { CAST_VOICES, VoiceBox, npcVoice, planFor, registerVoice, type VoiceChannel } from './voice';
 
 /**
@@ -239,6 +241,18 @@ export const SCENARIOS: Record<string, Scenario> = {
     ['psalm', 'Be witnessed, Vanguard. Break the Observance and I will break you.'],
     ['system', 'SERVICE WILL RESUME SHORTLY. THANK YOU FOR YOUR PATIENCE.'],
   ]),
+  // Wing orders answered (keys 1–4, then 2 with no lock), then two quiet-leg exchanges.
+  'voice-wing-chat': voices(
+    [
+      ...(['order-form', 'order-attack', 'order-free', 'order-cover', 'order-no-target'] as const).map((k, i) => {
+        const who = ['kade', 'jackpot', 'sparrow', 'salt', 'candle'][i];
+        return [who, barkLine(k, who, 0)] as VLine;
+      }),
+      ...BANTER[0].map(([w, t]) => [w, t] as VLine),
+      ...BANTER[4].map(([w, t]) => [w, t] as VLine),
+    ],
+    0.5,
+  ),
   'voice-cast': voices(
     [
       ['oyelaran', 'Tell her the lines go somewhere. Go where the light is. Keep the light.'],
@@ -266,9 +280,9 @@ export const SCENARIOS: Record<string, Scenario> = {
   // Radio over a dogfight: the voice must sit on top of guns + combat score.
   'voice-mix': voices(
     [
-      ['kade', 'Break left, Point! Two on your six!'],
-      ['jackpot', 'Splash one! That is mine, write it down!'],
-      ['sparrow', 'I am hit, I am hit — still flying!'],
+      ['kade', 'Point, you\'re hit. Break, break!'],
+      ['jackpot', 'Splash! Write it down, write it down!'],
+      ['sparrow', 'I\'m hit, I\'m hit — still flying!'],
     ],
     0.5,
     (s) => {
@@ -286,6 +300,11 @@ export const SCENARIOS: Record<string, Scenario> = {
 
   prologue: prologue(),
   trailer: trailer(),
+  // The trailer under Symphony of Gates instead of the Original Score (render it as trailer-ova+cast).
+  'trailer-ova': (() => {
+    const t = trailer();
+    return { ...t, setup: (s) => (t.setup!(s), s.audio.setScore('nexus', 0, 0.1)) };
+  })(),
   // The prologue soundtrack with its narration voice track (what the cold open sounds like now).
   'voice-prologue': (() => {
     const base = prologue();
@@ -473,7 +492,9 @@ export const SCENARIOS: Record<string, Scenario> = {
 };
 
 export async function renderScenario(name: string, sampleRate = 44100): Promise<RenderStats> {
-  const sc = SCENARIOS[name];
+  // "<scenario>+cast": the same scenario with the recorded voices.
+  const cast = name.endsWith('+cast');
+  const sc = SCENARIOS[cast ? name.slice(0, -5) : name];
   if (!sc) throw new Error(`unknown scenario ${name}`);
   const seconds = sc.seconds;
   const length = Math.ceil(seconds * sampleRate);
@@ -481,7 +502,8 @@ export async function renderScenario(name: string, sampleRate = 44100): Promise<
   const audio = new GameAudio({ context: ctx });
   audio.autoMood = false;
   const voice = new VoiceBox(audio);
-  voice.modeOverride = 'synth';
+  voice.modeOverride = cast ? 'cast' : 'synth';
+  if (cast) await loadClips();
   const zero = { x: 0, y: 0, z: 0 };
   const sim: Sim = {
     t: 0,
@@ -533,7 +555,9 @@ export async function renderScenario(name: string, sampleRate = 44100): Promise<
     ctx.suspend(when).then(() => {
       sim.t = when;
       step();
-      ctx.resume();
+      // Recorded lines fetch their clip on first use: hold the render until it lands.
+      if (cast) void clipsSettled().then(() => ctx.resume());
+      else ctx.resume();
     });
   }
   const buf = await ctx.startRendering();

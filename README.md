@@ -199,7 +199,21 @@ in · **X** abandon. Pure + tested: `src/game/contracts/`,
 
 ## People, voices & subtitles
 
-**Voices.** Every speaking character has a procedural voice (`src/audio/voice`):
+**Voices.** Every written line is recorded ahead of time by neural voices
+(Piper, run offline) and ships as a clip in `public/voice/`; the game plays
+it through the channel it needs (a driven cockpit radio with carrier hiss and
+squelch, a dry room, the narrator's hall). Cast voices are hand-picked
+(`src/audio/voice/neural.ts`); everyone else draws a stable voice from a pool
+by sex, with a small pitch and pace offset. About 1,000 clips, one voice per
+speaker. Lines filled in at runtime (a freighter's name) and the machine
+voices (station SYSTEM, the Oracle) use the procedural voice.
+Re-record after writing lines: `npm run voices` (needs `pip install piper-tts
+numpy lameenc` and the Piper models named in `neural.ts`, from
+huggingface.co/rhasspy/piper-voices, in `$PIPER_MODELS`). It only records what
+changed. Offline renders take `+cast`:
+`node scripts/audio-render.mjs --only voice-wing-chat+cast`.
+
+**Procedural voice.** Every speaking character also has a procedural voice (`src/audio/voice`):
 a planner turns the line into syllables and phoneme-ish segments — vowels as
 formant targets, consonants as frication / bursts / nasals, a phrase melody
 that falls, rises on questions and sings the Hymn in prime intervals — and a
@@ -217,7 +231,7 @@ prologue's captions (now voiced by a narrator keyed to them), station
 conversations and cutscenes; the typewriter follows the voice. Optional
 Japanese second line where the script has one.
 
-**Settings (anywhere):** **F7** voice synth / speech / off · **Shift+F7**
+**Settings (anywhere):** **F7** voice cast / synth / speech / off · **Shift+F7**
 soundtrack · **F8** subtitle size S / M / L / off · **F9** Japanese line on/off.
 URL: `?voice=`, `?score=`, `?subs=0`, `?subsize=l`, `?jp=0`.
 
@@ -235,11 +249,14 @@ campaign advances. Captures:
 `?scene=flight&dock=docked&docktab=concourse&talk=odile&talkpath=0`.
 
 **Barks.** In flight, wingmen call splashes, hits, missiles and losses;
-Cantors taunt on the open band; passing traffic hails — all voiced,
+Cantors taunt on the open band; passing traffic hails; the lead wingman
+answers your wing orders (1–4) in character, and on a long quiet leg the
+wing chats among itself — all voiced,
 subtitled and rate-limited (`src/dialog/barks.ts`, `FlightRadio.ts`;
 `?radio=0` for a quiet HUD; `?bark=<kind>` fires one for captures). Station
 control talks you down the docking corridor in the cutaway's letterbox.
-Listen: [docs/audio/voice-radio.wav](docs/audio/voice-radio.wav) ·
+Listen: [docs/audio/voice-wing-chat.mp3](docs/audio/voice-wing-chat.mp3) (recorded) ·
+[docs/audio/voice-radio.wav](docs/audio/voice-radio.wav) (procedural) ·
 [docs/audio/voice-prologue-opening.wav](docs/audio/voice-prologue-opening.wav).
 
 ![Concourse](docs/screenshots/people-concourse-lucan.jpg)

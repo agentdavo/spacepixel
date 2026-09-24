@@ -4,7 +4,7 @@ import { advance, applyEffects, begin, choicesAt, entryNode, evalCond, fill, new
 import { CONVERSATIONS, conversationsWith } from '../src/dialog/conversations.ts';
 import { EXTRAS, PEOPLE_SLOT, ROSTER, localPerson, peopleAt, whereIs, type StationRef } from '../src/dialog/people.ts';
 import { smallTalk } from '../src/dialog/smalltalk.ts';
-import { BarkLimiter, barkLine, trafficCargo, trafficHail, type BarkKind } from '../src/dialog/barks.ts';
+import { BANTER, BarkLimiter, barkLine, orderKind, pickBanter, trafficCargo, trafficHail, type BarkKind } from '../src/dialog/barks.ts';
 import { MAX_CPS, cps, lineHold, readTime, scheduleCues, typeDuration } from '../src/ui/subtitleTiming.ts';
 import { numberWords, planUtterance, revealAt, sample, syllabify } from '../src/audio/voice/plan.ts';
 import { CAST_VOICES, NARRATOR, npcVoice } from '../src/audio/voice/voices.ts';
@@ -269,6 +269,42 @@ test('barks: cooldowns, a global gap and a rolling cap; urgent calls skip the ga
   assert.match(barkLine('wing-down', 'kade', 1, { name: 'JACKPOT' }), /JACKPOT/);
   assert.ok(barkLine('enemy-taunt', 'choir', 3).length > 3);
   assert.ok(trafficHail('Anselm\'s Patience', 'concord', trafficCargo('Anselm\'s Patience', 'concord'), 'Anchorage').includes('Anselm'));
+});
+
+test('wing orders get a spoken answer from each wingman, and banter only uses who is flying', () => {
+  const wing = ['kade', 'jackpot', 'candle', 'sparrow', 'salt'];
+  const orders = ['formUp', 'attackMyTarget', 'engageAtWill', 'coverMe'] as const;
+  const kinds = new Set(orders.map((o) => orderKind(o, true)));
+  assert.equal(kinds.size, 4);
+  assert.equal(orderKind('attackMyTarget', false), 'order-no-target');
+  const lines: string[] = [];
+  for (const k of [...kinds, 'order-no-target' as const]) for (const w of wing) for (let n = 0; n < 4; n++) lines.push(barkLine(k, w, n));
+  // Personal lines, not the generic fallback.
+  assert.notEqual(barkLine('order-cover', 'jackpot', 0), barkLine('order-cover', 'any', 0));
+  // Answers cut in after a bark, and the player can't spam them.
+  const lim = new BarkLimiter();
+  assert.ok(lim.allow('engage', 0));
+  assert.ok(lim.allow('order-form', 0.5), 'an answer skips the global gap');
+  assert.ok(!lim.allow('order-form', 1), 'but not its own cooldown');
+  const ids = new Set(CAST.map((c) => c.id));
+  for (const ex of BANTER) {
+    assert.ok(ex.length >= 2 && ex.length <= 3);
+    for (const [who, text] of ex) {
+      assert.ok(ids.has(who), who);
+      lines.push(text);
+    }
+  }
+  for (const t of lines) assert.ok(cps(t, lineHold(t, 0)) < MAX_CPS, t);
+  // Only speakers in the air; fresh exchanges before repeats.
+  assert.equal(pickBanter([], new Set(), 0), -1);
+  const i = pickBanter(['sparrow', 'salt'], new Set(), 3);
+  assert.ok(BANTER[i].every(([w]) => w === 'sparrow' || w === 'salt'));
+  const used = new Set<number>();
+  for (let n = 0; n < BANTER.length; n++) {
+    const k = pickBanter(wing, used, n);
+    assert.ok(!used.has(k), 'repeat before the pool ran out');
+    used.add(k);
+  }
 });
 
 // ── voice ───────────────────────────────────────────────────────────────
