@@ -10,7 +10,7 @@ pull before touching their files, and open PRs into the lead branch.
 | Engine, world, campaign, merges, this file | **Vanguard lead** thread · `claude/vanguard-space-combat-0l3bfi` | everything not listed below |
 | Turrets, shields, weapon impacts, subsystems, kill paths (batch 6) | **Turrets, shields and subsystems** thread · `claude/project-thread-dl05kd` (took over from the turrets session 24 Sep ~10:40; draft PR #1 into the lead branch) | `src/sim/TurretRig.ts`, `Subsystems.ts`, `Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, `src/fx/impacts.ts`, `src/world/{WeaponVisuals,CombatFx,ImpactDecals,ShieldGeometry}.ts`, impact SFX, `src/cinema/gunnery.ts` |
 | Character voices, chat, soundtrack | **Soundtrack and voices** thread (continues `claude/ova-soundtrack-voices`) | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
-| Kessen mecha race (design) | **Kessen mecha race** thread · `claude/project-thread-t748fw` (continues `claude/mecha-race-design-qtw680`) | `docs/KESSEN.md`, Kessen concepts |
+| Kessen mecha race (design approved 24 Sep; now in code) | **Kessen mecha race** thread · `claude/project-thread-t748fw` (continues `claude/mecha-race-design-qtw680`) | `src/kessen/**`, `src/world/scenes/KessenTestScene.ts` (+ its one line in `scenes/index.ts`), `tests/kessen.test.ts`, `docs/KESSEN.md`, `docs/concepts/kessen/**`, `scripts/concepts/kessen/**` |
 
 The paused lead batch 6 worktrees (`worktree-agent-*`) have been ported onto
 `claude/project-thread-dl05kd`; nothing left to mine there.
@@ -219,3 +219,32 @@ The lead session is stopping here; a project thread continues from this file.
 - Want a new bark or voice line for a gameplay event? Add it here as
   "event name → who says it, tone". The voices session wires it into
   `src/dialog/barks.ts`.
+- **Kessen (mecha race) → all, 24 Sep:** a proposal for a fourth race, the
+  Kessen: a mecha-piloting people from Kessendra, reached through the
+  Timetable Graveyard at Anchorage. See `docs/KESSEN.md` and the eight sheets
+  in `docs/concepts/kessen/`. **The user approved the design on 24 Sep** (the
+  name may still change, so it lives behind one id). The Kessen thread is
+  building it self-contained in `src/kessen/` first, with no `FactionId`
+  change yet (that union feeds many `Record<FactionId, …>` tables in
+  outfitting and the shipyard). Later it will need:
+  - **lead:** `FactionId` `kessen` and a livery in `Factions.ts`; a skeletal
+    path for walkers (there is no `SkinnedMesh` in `src/` yet; proposal:
+    rigid-part bone skinning, instanced per Stature); Couplings
+    (magnet-walk on capital hulls) and boarding as a batch-6 subsystem kill
+    path. The mecha session will ask here before touching any of those files.
+  - **voices / score:** a ninth score for the Kessen (steel percussion,
+    anvil, a call-and-response work song, "the Hammer-song") and barks:
+    "Standing." (greeting), "Lid up!", "Hammer!", "Drive the spike!", "She
+    walked home." (a death, said with pride).
+- **Kessen handover (24 Sep).** Everything is on
+  `claude/mecha-race-design-qtw680`: `docs/KESSEN.md` (the full proposal),
+  eight PNG sheets in `docs/concepts/kessen/`, and the three.js prototype in
+  `scripts/concepts/kessen/` (`mechkit.js` holds the 42-bone rig, 14
+  variants, poses and walk cycle; `node scripts/concepts/kessen/render.mjs`
+  re-renders the sheets). Still open for the user: sign-off on the name
+  ("Kessen" is also a 2000 Koei PS2 title) and whether "5 levels" means five
+  size classes (as drawn) or five upgrade tiers per frame. The next step is
+  implementation, which touches lead-owned files (see the request above).
+  **Answered (user, 24 Sep):** keep "Kessen" for now (it may be renamed
+  later) and five size classes. The Kessen project thread now carries the
+  work on `claude/project-thread-t748fw` (see the table).
