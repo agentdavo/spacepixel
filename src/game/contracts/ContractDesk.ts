@@ -48,6 +48,7 @@ import { NAMED_CLIENTS, namedContract } from './named';
 import { HireDesk } from '@/game/HireDesk';
 import { dialogHooks } from '@/dialog/state';
 import { RescueBeat } from '@/game/RescueBeat';
+import { GUILD_CAST } from '@/game/guilds/guilds';
 
 /**
  * Free-roam contracts at runtime: the board, the book, and the live
@@ -298,7 +299,12 @@ export class ContractDesk {
   lastReceipts: { station: string; receipts: Receipt[] } | null = null;
   private stage: { kind: ContractKind; phase: string } | null = null;
   private readonly sysNames = new Map<string, string>();
-  private readonly cast: Character[] = [...CAST, ...CLIENTS, ...MARK_CAST, ...NAMED_CLIENTS];
+  private readonly cast: Character[] = [...CAST, ...CLIENTS, ...MARK_CAST, ...NAMED_CLIENTS, ...GUILD_CAST];
+  /**
+   * Every settled contract — paid, failed, lapsed or abandoned — with its
+   * receipt (guilds pay merit, arcs advance, outposts hear about raids).
+   */
+  readonly onReceipt = new Set<(k: Contract, r: Receipt) => void>();
   /** People signed on from conversations (mechanic, Magpie's Due). */
   readonly hires: HireDesk;
   /** Free-flight death: the salvage tow cutaway, its bill, the debrief. */
@@ -421,18 +427,21 @@ export class ContractDesk {
     this.teardown(k.id);
     this.setBook(r.book);
     io.setLedger(r.ledger);
+    this.emit([k], r.receipts);
     if (this.tracked === k.id) this.tracked = this.book.active[0]?.id ?? null;
     return r.receipts?.[0] ?? null;
   }
 
   /** Pay out everything deliverable at `stationId` (or just `only`). */
   turnIn(stationId: string, io: LedgerIO, only?: string): Receipt[] {
+    const before = this.book.active;
     const r = settleAt(this.book, io.ledger(), stationId, only);
     const receipts = r.receipts ?? [];
     if (!receipts.length) return [];
     for (const x of receipts) this.teardown(x.id);
     this.setBook(r.book);
     io.setLedger(r.ledger);
+    this.emit(before, receipts);
     if (this.tracked && !this.book.active.some((k) => k.id === this.tracked)) this.tracked = this.book.active[0]?.id ?? null;
     this.lastReceipts = { station: stationId, receipts: [...(this.lastReceipts?.station === stationId ? this.lastReceipts.receipts : []), ...receipts] };
     return receipts;
@@ -452,6 +461,18 @@ export class ContractDesk {
       notes.push({ text: `PRIORITY ORDERS WAITING — EPISODE ${String(this.priority.episode).padStart(2, '0')}. SEE CONTRACTS.`, cls: 'ok' });
     if (this.stage?.phase === 'board' || this.stage?.phase === 'pay') window.setTimeout(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit2' })), 30);
     return notes;
+  }
+
+  private emit(from: readonly Contract[], receipts: readonly Receipt[] | undefined): void {
+    for (const r of receipts ?? []) {
+      const k = from.find((x) => x.id === r.id);
+      if (k) for (const f of this.onReceipt) f(k, r);
+    }
+  }
+
+  /** A toast on the contract HUD (guilds, outposts). */
+  toast(text: string, color = '#ffb347'): void {
+    this.hud.toast(text, color);
   }
 
   private setBook(b: ContractBook): void {
@@ -498,6 +519,7 @@ export class ContractDesk {
     }
     const frozen = s.docking.frozen;
     if (!frozen && dt > 0) {
+      const before = this.book.active;
       const r = tickBook(this.book, s.ledger, dt);
       if (r.receipts?.length) {
         s.ledger = r.ledger;
@@ -507,6 +529,7 @@ export class ContractDesk {
           this.teardown(x.id);
           this.hud.toast(`CONTRACT LAPSED · ${x.title.toUpperCase()} · ${x.amount.toLocaleString('en-US')} sh`, '#ff5f7a');
         }
+        this.emit(before, r.receipts);
       } else this.book = r.book;
       this.saveT += dt;
       if (this.saveT > 10) {
@@ -563,6 +586,7 @@ export class ContractDesk {
         s.ledger = r.ledger;
         saveLedger(r.ledger);
         this.setBook(r.book);
+        this.emit([k], r.receipts);
         this.hud.toast(`CONTRACT FAILED · ${k.title.toUpperCase()} · ${(r.receipts?.[0]?.amount ?? 0).toLocaleString('en-US')} sh`, '#ff5f7a');
       }
     }

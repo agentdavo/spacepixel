@@ -24,8 +24,9 @@ import { GUNS, MISSILES, type GunId, type GunSpec, type MissileId } from '../../
 
 export type SlotKind = 'gun' | 'missile' | 'turret' | 'shield' | 'armour' | 'engine' | 'reactor' | 'bay' | 'hangar';
 export type WeaponSize = 'S' | 'M' | 'L';
-export type Mk = 1 | 2 | 3 | 4;
-export type MakerId = 'anchorage' | 'castellan' | 'aegis' | 'hesper' | 'cantus' | 'tey' | 'graveyard';
+/** Mk V is relic-grade: only guild quartermasters stock it (GUILD_ITEMS below). */
+export type Mk = 1 | 2 | 3 | 4 | 5;
+export type MakerId = 'anchorage' | 'castellan' | 'aegis' | 'hesper' | 'cantus' | 'tey' | 'graveyard' | 'cloister' | 'continuity' | 'allocation' | 'moot' | 'houses';
 
 export interface Maker {
   id: MakerId;
@@ -44,16 +45,22 @@ export const MAKERS: Record<MakerId, Maker> = {
   cantus: { id: 'cantus', name: 'Cantus Resonance Forge', short: 'CANTUS', faction: 'choir', blurb: 'Batteries, resonant plate and reactors tuned a fifth apart.' },
   tey: { id: 'tey', name: 'Clan Tey Salvage', short: 'TEY', faction: 'rustwake', blurb: 'Pulled out of the Graveyard, stripped, welded, sold. Every one a little different.' },
   graveyard: { id: 'graveyard', name: 'Graveyard Breakers', short: 'BREAKERS', faction: 'rustwake', blurb: 'Drives and drivers from golden-age hulks. They run hot. They run.' },
+  // Guild quartermasters (relic-grade Mk V, rank-locked; src/game/guilds).
+  cloister: { id: 'cloister', name: 'Cloister of the Keeping', short: 'CLOISTER', faction: 'concord', blurb: 'Golden-age originals the wardens have kept running for centuries. Sealed. Do not open.' },
+  continuity: { id: 'continuity', name: 'Office of Continuity Stores', short: 'CONTINUITY', faction: 'concord', blurb: 'Issued, never sold. Signed for twice. Nothing in the Office’s stores has a serial number.' },
+  allocation: { id: 'allocation', name: 'Board of Allocation Depot', short: 'ALLOCATION', faction: 'concord', blurb: 'The Board’s own fittings, allocated to officers who make the quota.' },
+  moot: { id: 'moot', name: 'Moot-Hold Breakers’ Stall', short: 'MOOT', faction: 'rustwake', blurb: 'The best of a hundred hulks, marked with clan paint. Sold only to the marked.' },
+  houses: { id: 'houses', name: 'Foundry-Gardens of the Houses', short: 'HOUSES', faction: 'choir', blurb: 'Crystal grown for one House’s ships, sung into shape. A gift, which is to say a debt.' },
 };
 
-export const MK_LABEL = ['', 'MK I', 'MK II', 'MK III', 'MK IV'] as const;
+export const MK_LABEL = ['', 'MK I', 'MK II', 'MK III', 'MK IV', 'MK V'] as const;
 
 /** Per-Mk multipliers (index 1..4). */
-const MK_PERF = [0, 1, 1.15, 1.3, 1.45];
-const MK_DMG = [0, 1, 1.12, 1.25, 1.4];
-const MK_POWER = [0, 1, 1.15, 1.3, 1.5];
-const MK_PRICE = [0, 1, 2.4, 5, 9];
-const MK_RELOAD = [0, 1, 0.92, 0.85, 0.78];
+const MK_PERF = [0, 1, 1.15, 1.3, 1.45, 1.6];
+const MK_DMG = [0, 1, 1.12, 1.25, 1.4, 1.55];
+const MK_POWER = [0, 1, 1.15, 1.3, 1.5, 1.6];
+const MK_PRICE = [0, 1, 2.4, 5, 9, 13];
+const MK_RELOAD = [0, 1, 0.92, 0.85, 0.78, 0.72];
 
 /** House style per faction: performance, power draw, price. */
 const HOUSE: Record<FactionId, { perf: number; power: number; price: number }> = {
@@ -83,6 +90,8 @@ interface ItemBase {
   power: number;
   requires?: { faction: FactionId; standing: number };
   blurb: string;
+  /** Guild quartermaster stock: the guild and the rank that unlocks it. */
+  guild?: { id: string; rank: number };
 }
 
 export interface GunItem extends ItemBase {
@@ -174,7 +183,7 @@ const r = (n: number) => Math.round(n / 10) * 10;
 const r1 = (n: number) => Math.round(n * 100) / 100;
 
 function requires(f: FactionId, mk: Mk): ItemBase['requires'] {
-  const s = STANDING[f][mk <= 2 ? 0 : mk - 2];
+  const s = STANDING[f][mk <= 2 ? 0 : Math.min(2, mk - 2)];
   return s > -100 ? { faction: f, standing: s } : undefined;
 }
 
@@ -406,7 +415,64 @@ function buildItems(): Item[] {
 }
 
 export const ITEMS: Item[] = buildItems();
-export const ITEM_BY_ID: Record<string, Item> = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
+
+// ── guild quartermaster stock (relic-grade Mk V) ───────────────────────
+
+/**
+ * Guild-exclusive items: Mk V, one family per rank reward, sold only by a
+ * guild's quartermaster (rank-locked, discounted by rank). Kept out of ITEMS
+ * so no station yard ever stocks them; ITEM_BY_ID knows them, so a fit that
+ * carries one computes, saves and flies like any other. Utility families
+ * come in every class (the slot's class must match).
+ */
+function buildGuildItems(): Item[] {
+  const out: Item[] = [];
+  const mk: Mk = 5;
+  const tag = (it: Item, id: string, rank: number): Item => ({ ...it, requires: undefined, guild: { id, rank } });
+  const gun = (key: string, name: string, size: WeaponSize, guns: GunId[], maker: MakerId, price: number, power: number, blurb: string, g: string, rank: number) =>
+    out.push(tag({ ...base(key, name, 'gun', mk, maker, price, power, blurb), kind: 'gun', size, guns, dmg: MK_DMG[mk] }, g, rank));
+  const rack = (key: string, name: string, size: WeaponSize, missiles: MissileId[], maker: MakerId, price: number, power: number, salvo: number, blurb: string, g: string, rank: number) =>
+    out.push(tag({ ...base(key, name, 'missile', mk, maker, price, power, blurb), kind: 'missile', size, missiles, dmg: MK_DMG[mk], reload: MK_RELOAD[mk], salvo }, g, rank));
+  const util = (kind: 'shield' | 'armour' | 'engine' | 'reactor', key: string, label: string, maker: MakerId, blurb: string, g: string, rank: number) => {
+    const f = MAKERS[maker].faction;
+    const p = MK_PERF[mk];
+    for (let c = 1; c <= 5; c++) {
+      const k = `${key}-c${c}`;
+      const name = `C${c} ${label}`;
+      if (kind === 'shield')
+        out.push(tag({ ...base(k, name, kind, mk, maker, 800 * CLASS_PRICE(c), SHIELD_POWER[c], blurb), kind, cls: c, capacity: r1(p * (f === 'choir' ? 1.1 : 1)), regen: r1(1.45 * (f === 'choir' ? 1.2 : 1)), delay: 0.8 }, g, rank));
+      else if (kind === 'armour') out.push(tag({ ...base(k, name, kind, mk, maker, 600 * CLASS_PRICE(c), 0, blurb), kind, cls: c, hull: r1(p * (f === 'rustwake' ? 1.08 : 1)), mass: r1(f === 'rustwake' ? 1.18 : 1.1) }, g, rank));
+      else if (kind === 'engine') out.push(tag({ ...base(k, name, kind, mk, maker, 900 * CLASS_PRICE(c), ENGINE_POWER[c], blurb), kind, cls: c, speed: r1(f === 'concord' ? 1.26 : 1.22), accel: r1(1.45 * HOUSE[f].perf), turn: r1(1.16) }, g, rank));
+      else out.push(tag({ ...base(k, name, kind, mk, maker, 1000 * CLASS_PRICE(c), 0, blurb), kind, cls: c, output: r1(p * HOUSE[f].perf) }, g, rank));
+    }
+  };
+  // Order of the Keeping — relic engines, kept not opened.
+  util('reactor', 'q-sealheart', 'SEALED HEART', 'cloister', 'A golden-age reactor core the wardens have kept lit for three hundred years. More power than anything copied since. Never open it.', 'keeping', 3);
+  util('shield', 'q-litany', 'LITANY WARD', 'cloister', 'A shield generator re-blessed at every refit. It comes back up as if someone were counting it in.', 'keeping', 4);
+  util('engine', 'q-relicdrive', 'RELIC DRIVE', 'cloister', 'A timetable-era drive, rebuilt eleven times around a sealed heart. It keeps time better than you do.', 'keeping', 5);
+  // Office of Continuity — quiet, fast, deniable.
+  util('engine', 'q-courier', 'COURIER DRIVE', 'continuity', 'The Office’s post travels faster than anyone else’s. This is why.', 'continuity', 2);
+  gun('q-needle', 'AUDITOR’S NEEDLE', 'S', ['laser'], 'continuity', 1400, 2.8, 'A pulse-laser pair tuned to put holes exactly where the file says.', 'continuity', 3);
+  rack('q-quiet', 'QUIET RAIL', 'S', ['micro', 'torpedo'], 'continuity', 1200, 0.6, 1.25, 'Rails that do not show on a picket’s board until the swarm is already there.', 'continuity', 4);
+  util('shield', 'q-deniable', 'DENIABLE WARD', 'continuity', 'A shield rig that was never issued, to a pilot who was never there.', 'continuity', 5);
+  // Board of Allocation — every gram carried.
+  out.push(tag({ ...base('q-allochold', 'ALLOCATION HOLD', 'bay', mk, 'allocation', 1800, 0, 'Board-pattern racks and a pressure skin: the quota rides in comfort.'), kind: 'bay', role: 'cargo', cargo: 0.45, pd: 0, regen: 0 }, 'allocation', 2));
+  util('armour', 'q-quota', 'QUOTA PLATE', 'allocation', 'Convoy-escort plate from the Board’s own depot. Heavy, like responsibility.', 'allocation', 3);
+  util('reactor', 'q-counting', 'COUNTING-HOUSE PILE', 'allocation', 'The reactor pattern that powers the Counting House. It has never missed a quarter.', 'allocation', 5);
+  // Rustwake clans — the best of a hundred hulks.
+  rack('q-harpoon', 'CLAN HARPOON', 'M', ['harpoon'], 'moot', 1600, 0.8, 1.25, 'A harpoon rack with a clan mark on the breech. Spears a fighter and reels it in.', 'rustwake', 2);
+  gun('q-ember', 'EMBER SCRAP PAIR', 'M', ['scatter', 'laser'], 'moot', 1700, 3.4, 'A scattergun and a laser pulled from the Ember lanes and welded by a Moot-Voice. R swaps.', 'rustwake', 3);
+  util('engine', 'q-hulkdrive', 'GRAVEYARD HULK DRIVE', 'moot', 'The Breakers’ pick of the Graveyard, run hot. It runs.', 'rustwake', 4);
+  util('armour', 'q-breakers', 'BREAKERS’ PLATE', 'moot', 'Plate cut from golden-age hulks: heavy as sin and twice as forgiving.', 'rustwake', 5);
+  // Ascendant Houses — grown for a House's own ships.
+  gun('q-chord', 'CHORD OF THE HOUSE', 'S', ['hymn', 'lance'], 'houses', 1600, 4.2, 'Hymn emitters and a lance, sung to a House’s own key. R swaps.', 'houses', 2);
+  util('shield', 'q-choral', 'CHORAL WARD', 'houses', 'A ward grown in the foundry-gardens for a single Measure. It sings when struck.', 'houses', 3);
+  util('reactor', 'q-harmonic', 'HOUSE HARMONIC CORE', 'houses', 'A core tuned a fifth above anything the Treasury sells. The House will want it back, someday.', 'houses', 5);
+  return out;
+}
+
+export const GUILD_ITEMS: Item[] = buildGuildItems();
+export const ITEM_BY_ID: Record<string, Item> = Object.fromEntries([...ITEMS, ...GUILD_ITEMS].map((i) => [i.id, i]));
 
 export function item(id: string | null | undefined): Item | undefined {
   return id ? ITEM_BY_ID[id] : undefined;
