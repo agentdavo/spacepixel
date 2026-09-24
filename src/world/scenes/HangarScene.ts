@@ -6,8 +6,9 @@ import { Backdrop, BACKDROPS } from '../Backdrop';
 import { LightRig, LIGHT_PRESETS } from '@/render/LightRig';
 import { buildShip, type ShipModel } from '@/assets/ShipBuilder';
 import { BLUEPRINTS } from '@/assets/blueprints';
+import { ShipyardLineups, shipCaption } from './ShipyardLineups';
 
-type Lineup = 'fighters' | 'strike' | 'capital' | 'sweep' | 'sheet';
+type Lineup = 'fighters' | 'strike' | 'capital' | 'sweep' | 'sheet' | `yard:${number}`;
 
 interface Shot {
   name: string;
@@ -57,6 +58,8 @@ export class HangarScene implements GameScene {
   private readonly sheetCache = new Map<string, ShipModel>();
   private sheetShip = '';
   private sheetRadius = 10;
+  /** Shipyard scale charts (cams 6+): progression line, clans, traffic, warships. */
+  private readonly yard: ShipyardLineups;
   shot = 0;
 
   readonly shots: Shot[];
@@ -187,7 +190,12 @@ export class HangarScene implements GameScene {
         },
       },
     ];
-    this.setShot(this.sheetFixed ? this.shots.length - 1 : flags.cam);
+    this.yard = new ShipyardLineups(this.scene);
+    this.yard.lineups.forEach((l, i) =>
+      this.shots.push({ name: l.name, lineup: `yard:${i}`, fov: l.fov, frame: (t) => l.frame(t, this.camera.aspect) }),
+    );
+    const sheetShot = this.shots.findIndex((s) => s.lineup === 'sheet');
+    this.setShot(this.sheetFixed ? sheetShot : flags.cam);
   }
 
   private add(id: string, lineup: Lineup, pos: Vector3, parent?: Object3D): ShipModel | undefined {
@@ -257,7 +265,11 @@ export class HangarScene implements GameScene {
 
   cameraLabel(): string {
     const s = this.shots[this.shot];
-    const extra = s.lineup === 'sheet' && this.sheetShip ? ` · ${BLUEPRINTS[this.sheetShip].designation} ${BLUEPRINTS[this.sheetShip].name.toUpperCase()}` : '';
+    let extra = '';
+    if (s.lineup === 'sheet' && this.sheetShip) {
+      const c = shipCaption(this.sheetShip, this.sheetCache.get(this.sheetShip)?.length ?? 0);
+      extra = ` · ${c.faction} ${c.title} · ${c.sub}`;
+    }
     return `CAM ${this.shot + 1} · ${s.name}${extra}`;
   }
 
@@ -265,6 +277,8 @@ export class HangarScene implements GameScene {
     this.shot = ((i % this.shots.length) + this.shots.length) % this.shots.length;
     const active = this.shots[this.shot].lineup;
     for (const [l, g] of this.groups) g.visible = l === active;
+    const yardIndex = active.startsWith('yard:') ? Number(active.slice(5)) : -1;
+    this.yard?.update(yardIndex, this.camera, 0);
   }
 
   update({ time }: FrameContext): void {
@@ -309,6 +323,8 @@ export class HangarScene implements GameScene {
       this.camera.fov = shot.fov;
       this.camera.updateProjectionMatrix();
     }
+    this.camera.updateMatrixWorld();
+    this.yard.update(shot.lineup.startsWith('yard:') ? Number(shot.lineup.slice(5)) : -1, this.camera, time);
     this.backdrop.follow(this.camera);
   }
 
