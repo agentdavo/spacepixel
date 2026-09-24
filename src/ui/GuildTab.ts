@@ -348,7 +348,9 @@ class GuildTab {
         ${sel.status === 'available' ? `<button class="dock-btn big" data-do="arc" data-arg="${s.id}">TAKE IT ON</button>` : sel.status === 'locked' ? `<b class="st lock">${esc(sel.why ?? 'LOCKED')}</b>` : ''}
         ${s.choice ? '<div class="gh-note">This step ends in a choice with lasting consequences.</div>' : ''}</div>`;
     }
+    // A pending choice is the whole point of the visit: it goes first.
     return `
+      ${pending ? card : ''}
       <h3>${esc(GUILDS[g].short)} ARC</h3>
       ${rows
         .map(
@@ -359,7 +361,7 @@ class GuildTab {
           </div>`,
         )
         .join('')}
-      ${card}`;
+      ${pending ? '' : card}`;
   }
 
   private whereName(s: ArcStep): string {

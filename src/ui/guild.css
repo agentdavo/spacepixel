@@ -133,7 +133,7 @@
 .gh-brief p, .gh-choice p { margin: 7px 0 0; font-size: 12.5px; line-height: 1.5; color: rgba(235, 245, 255, 0.88); }
 .gh-brief p span { margin-right: 4px; }
 .gh-brief p small { display: inline; letter-spacing: 0.05em; color: rgba(210, 255, 230, 0.55); }
-.gh-choice { border-color: var(--gc); box-shadow: 0 0 24px color-mix(in srgb, var(--gc) 20%, transparent); }
+.gh-choice { margin: 0 0 10px; border-color: var(--gc); box-shadow: 0 0 24px color-mix(in srgb, var(--gc) 20%, transparent); }
 .gh-choice p { font-style: italic; font-size: 13.5px; }
 .gh-choice .opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .gh-note { margin-top: 10px; padding: 7px 10px; border: 1px dashed rgba(125, 255, 178, 0.22); font-size: 11.5px; line-height: 1.45; color: rgba(210, 255, 230, 0.75); }
