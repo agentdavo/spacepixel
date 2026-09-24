@@ -12,7 +12,7 @@
  *   npcVars(person, seed)     `{memory}` for their lines
  *
  * Captures / dev (read once): ?npc=odile:shut,magpie:hunted sets arc steps;
- * ?rivalstate=ismene:hiding:4 sets a rival's status (and grudge);
+ * ?rivalstate=ismene:hiding:4[:tier[:met]] sets a rival's status (grudge, tier, times met);
  * ?npcmemory=1 seeds a few remembered events so `{memory}` has something to say.
  */
 import { counter, fact, saveWorld, setFact, world, type WorldEvent, type WorldScope, type WorldState } from '../world/WorldState';
@@ -53,8 +53,8 @@ function hookSave(): void {
 /** Arcs and rivals catch up with the world (call on docking, the concourse, periodically in flight). */
 export function advanceNpcs(ledgerClock = lastClock, episode = loadProfile().episode): ArcMove[] {
   hookSave();
-  stageOnce();
   lastClock = Math.max(lastClock, ledgerClock);
+  stageOnce();
   const ctx = { now: npcNow(lastClock), episode };
   let moves: ArcMove[] = [];
   world().update((w) => {
@@ -160,10 +160,15 @@ function stageOnce(): void {
       for (const [k, v] of Object.entries(arc.steps[step].sets ?? {})) w = setFact(w, k, v);
     }
     for (const trip of (rivals ?? '').split(',').filter(Boolean)) {
-      const [id, status, grudge] = trip.split(':');
+      const [id, status, grudge, tier, met] = trip.split(':');
       if (!RIVALS.some((r) => r.id === id)) continue;
       w = setStatus(w, id, (status || 'hunting') as RivalStatus);
-      if (grudge) w = { ...w, counters: { ...w.counters, [rk(id, 'grudge')]: Number(grudge) || 0, [rk(id, 'next')]: now + (status === 'hiding' ? 5400 : 0) } };
+      const c: Record<string, number> = { [rk(id, 'next')]: now + (status === 'hiding' ? 5400 : 0) };
+      if (grudge) c[rk(id, 'grudge')] = Number(grudge) || 0;
+      if (tier) c[rk(id, 'tier')] = Math.min(2, Number(tier) || 0);
+      if (met) c[rk(id, 'met')] = Number(met) || 0;
+      if (Number(tier) > 0) c[rk(id, 'beaten')] = Number(tier);
+      w = { ...w, counters: { ...w.counters, ...c } };
     }
     return w;
   });

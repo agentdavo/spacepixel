@@ -185,13 +185,11 @@ test('ally paths: Ismene and Skerry go to ground and can be turned in conversati
   const dw = (flags: Record<string, true>, facts = w.facts): DialogWorld => ({ state: { ...newDialogState(), flags }, ledger: { credits: 0, cargo: {}, capacity: 8, rep: { concord: 0, choir: 0, rustwake: 0 } }, episode: 3, facts, counters: w.counters });
   // Without Lucan's song the asking is locked (shown, with a hint).
   let s = begin(conv, dw({}));
-  s = advance(conv, s.node!, s.world);
   const locked = choicesAt(conv, s.node!, s.world)[0];
   assert.equal(locked.available, false);
   assert.ok(locked.choice.locked);
   // With it: she sings, and flies your wing.
   s = begin(conv, dw({ 'lucan-sang': true }));
-  s = advance(conv, s.node!, s.world);
   s = advance(conv, s.node!, s.world, 0);
   assert.equal(s.world.facts?.['npc.ismene.status'], 'ally');
   w = setFact(w, 'npc.ismene.status', 'ally');
@@ -204,7 +202,7 @@ test('ally paths: Ismene and Skerry go to ground and can be turned in conversati
   assert.equal(rivalState(w, 'skerry').status, 'hunting', 'the window closed');
   // Skerry comes in if Kerrigan came home.
   const sk = RIVAL_TALKS.skerry;
-  const wing = sk.nodes.hello2.choices![0];
+  const wing = sk.nodes.hello.choices![0];
   assert.deepEqual(wing.if, { any: [{ fact: 'npc.toma.home' }, { standing: 'rustwake', min: 15 }] });
 });
 

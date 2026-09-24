@@ -53,7 +53,7 @@ export interface DockContext {
 
 /**
  * Extra dock tabs (shipyard, outfitting, contracts, concourse …) register here
- * and appear after MARKET; digits 1–6 switch tabs. A tab owns its panel's DOM
+ * and appear after MARKET; digits 1–9 switch tabs. A tab owns its panel's DOM
  * and gets first refusal on keys while active (return true = handled).
  */
 export interface DockTabApi {
@@ -236,7 +236,7 @@ export class DockScreen {
 
   private key(e: KeyboardEvent): void {
     if (!this.ctx) return;
-    const digit = /^Digit([1-6])$/.exec(e.code);
+    const digit = /^Digit([1-9])$/.exec(e.code);
     if (digit) {
       e.preventDefault();
       return this.switchTab(Number(digit[1]) - 1);

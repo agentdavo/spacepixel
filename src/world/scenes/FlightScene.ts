@@ -41,6 +41,7 @@ import { DockScreen, DockCinema } from '@/ui/DockScreen';
 import { HullCollisions } from '../HullCollisions';
 import { WingDocking } from '../WingDocking';
 import '@/ui/Concourse'; // registers the CONCOURSE dock tab (people, conversations)
+import { RivalDirector } from '@/game/rivals/RivalDirector';
 import { FlightRadio } from '@/dialog/FlightRadio';
 import { loadLedger, saveLedger } from '@/game/Profile';
 import { MISSILE_MAX, cargoUsed, dockingClearance, reputationForKill, type EconFaction, type TradeLedger } from '@/game/economy';
@@ -49,6 +50,7 @@ import { Outfitter, bindOutfitter } from '@/game/outfitting/Outfitter';
 import { ShipTurrets } from '@/game/outfitting/turrets';
 import '@/ui/ShipyardTab'; // registers the SHIPYARD dock tab (hulls, your hangar)
 import '@/ui/OutfittingTab'; // registers the OUTFITTING dock tab (slots, items, power)
+import '@/ui/ThreadsTab'; // registers the THREADS dock tab (NPC arcs, rivals) — last, so earlier tabs keep their digits
 
 /**
  * Milestones 4–6 + 10–11: one ship flying well, then shooting.
@@ -173,6 +175,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   private wingDock = new WingDocking();
   /** Free-roam contracts: board, accepted jobs, live operations (src/game/contracts). */
   readonly contracts: ContractDesk;
+  /** Named aces and bounty targets who remember you (src/game/rivals). */
+  readonly rivals: RivalDirector;
   /** Shipyard & outfitting: owned hulls, fits, the active ship (src/game/outfitting). */
   readonly outfit = new Outfitter();
   /** Fitted turrets, point defence and hangar complements on non-capital hulls. */
@@ -298,6 +302,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.starMap.toggle();
     }
     this.contracts = new ContractDesk(this);
+    this.rivals = new RivalDirector(this);
     this.outfit.bind(this);
     bindOutfitter(this.outfit);
     this.outfit.settle(); // hold size, hangar complement
@@ -410,6 +415,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       }
     }
     this.contracts.update(dt, time);
+    this.rivals.update(dt);
 
     // 4a'. Radio: wingman / enemy barks and traffic hails.
     this.radio.update(realDt, {
@@ -852,6 +858,19 @@ export class FlightScene implements GameScene, FlightHostScene {
   }
 
   /** True if any station in this system is within `r` metres of the player. */
+  /** A banner over the flight HUD (rivals, world events). */
+  flashBanner(text: string, sub: string, color: string, secs = 5): void {
+    this.reachHud.flash(text, sub, color, this.reachTime, secs);
+  }
+
+  /** Metres to the nearest station in this system. */
+  stationDistance(): number {
+    const p = this.player.flight.position;
+    let d = Infinity;
+    for (const st of this.view.stations) d = Math.min(d, st.center.distanceTo(p));
+    return d;
+  }
+
   private nearStation(r: number): boolean {
     const p = this.player.flight.position;
     return this.view.stations.some((st) => st.center.distanceTo(p) < r);
@@ -979,6 +998,7 @@ export class FlightScene implements GameScene, FlightHostScene {
 
   /** Traffic events → banners, and the standing reward hook for broken ambushes. */
   private onTrafficEvent(e: TrafficEvent): void {
+    this.rivals.onTraffic(e);
     const t = this.reachTime;
     if (e.kind === 'ambush') {
       const v = e.ambush.victim;

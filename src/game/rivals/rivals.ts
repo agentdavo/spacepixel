@@ -530,14 +530,13 @@ export const RIVAL_TALKS: Record<string, Conversation> = {
     priority: 100,
     entry: [{ node: 'hello' }],
     nodes: {
-      hello: say(ISMENE, '(She sits facing the window, hands folded, not drinking.) You. The fossil that ran me off. {memory}', 'hello2'),
-      hello2: ask(ISMENE, 'The Choir wants my silence ended — by a Measure, or by you. I stopped singing when my Measure broke the Observance. Why are you here?', [
+      hello: ask(ISMENE, '(She sits facing the window, not drinking.) The fossil that ran me off. {memory} The Choir wants my silence ended. Why are you here?', [
         ch('Lucan Vey stopped singing too. He started again. Sing — I\'ll listen.', 'sing', { if: { flag: 'lucan-sang' }, locked: '(someone who stopped singing once could tell you how to ask)' }),
         ch('The Choir wants your silence ended. I don\'t. Stop hunting.', 'spare', { effects: [{ fact: 'npc.ismene.status', value: 'spared' }, { standing: 'choir', delta: 2 }] }),
         ch('Why did you stop?', 'why'),
         ch('(Leave her be.)', null),
       ]),
-      why: say(ISMENE, 'Dame-Cantor Psalm shot our weapons off and apologised across the Line. To you. It is hard to sing when you were wrong in front of everyone.', 'hello2'),
+      why: say(ISMENE, 'My Measure broke the Observance. Dame-Cantor Psalm shot our weapons off and apologised across the Line. It is hard to sing when you were wrong in front of everyone.', 'hello'),
       sing: say(ISMENE, '(sung, barely) Out of the dust we were lifted. Out of the dark we were shown.', 'sing2', [{ fact: 'npc.ismene.status', value: 'ally' }, { standing: 'choir', delta: 3 }]),
       sing2: say(ISMENE, '...Lucan was right. It is easier with someone listening. I will fly your wing, fossil. Unwitnessed by the Choir. Witnessed by you.'),
       spare: say(ISMENE, 'Mercy from a Directorate pilot. The Altitude would call it a trick. I will call it a rest in the bar, and go home. Ascend.'),
@@ -550,15 +549,14 @@ export const RIVAL_TALKS: Record<string, Conversation> = {
     priority: 100,
     entry: [{ node: 'hello' }],
     nodes: {
-      hello: say(SKERRY, 'Oh, it\'s you. The one who shot my canopy full of holes. {memory} Buy a deserter a coffee? I\'m out. Again.', 'hello2'),
-      hello2: ask(SKERRY, 'You can call Continuity — they pay forty shares for me, which is insulting — or you can sit down.', [
+      hello: ask(SKERRY, 'Oh, it\'s you. The one who shot my canopy full of holes. {memory} Call Continuity — forty shares, which is insulting — or sit down. Coffee\'s on you.', [
         ch('Fly with me, Corporal.', 'wing', { if: { any: [{ fact: 'npc.toma.home' }, { standing: 'rustwake', min: 15 }] }, effects: [{ fact: 'npc.skerry.status', value: 'ally' }], locked: '(he needs a reason to come in from the cold)' }),
         ch('Why did you run?', 'why'),
         ch('I\'m calling Continuity.', 'jail', { effects: [{ fact: 'npc.skerry.status', value: 'jailed' }, { standing: 'concord', delta: 4 }, { credits: 40 }] }),
         ch('(Leave him to his coffee.)', null),
       ]),
       why: say(SKERRY, 'The count. Every twenty-five hours and fifty-one minutes, primes, going down. Everyone on the picket pretended it was solar. I couldn\'t pretend any more.', 'why2'),
-      why2: say(SKERRY, 'Kerrigan could, just about. Kid was sweating it. If he\'s come in alright, maybe I could too.', 'hello2'),
+      why2: say(SKERRY, 'Kerrigan could, just about. Kid was sweating it. If he\'s come in alright, maybe I could too.', 'hello'),
       wing: say(SKERRY, 'Kerrigan\'s alright? Then — yeah. Alright. Skerry, on your wing. Same paint, even. I\'ll try not to rob anyone.'),
       jail: say(SKERRY, 'Forty shares. I\'m worth forty shares. Well. Keep the light, pilot. Somebody should.'),
     },

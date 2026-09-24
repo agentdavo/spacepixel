@@ -48,6 +48,9 @@ import { NAMED_CLIENTS, namedContract } from './named';
 import { HireDesk } from '@/game/HireDesk';
 import { dialogHooks } from '@/dialog/state';
 import { RescueBeat } from '@/game/RescueBeat';
+import { noteContract, type ContractNote } from '@/game/npc/live';
+import { ARC_CLIENTS } from '@/game/npc/people';
+import { tuneRivalMark } from '@/game/rivals/RivalDirector';
 
 /**
  * Free-roam contracts at runtime: the board, the book, and the live
@@ -183,6 +186,8 @@ class LiveOp {
     if (spec.tag === 'mark') {
       s.hullMax *= 1.5 + 0.5 * this.contract.tier;
       s.hull = s.hullMax;
+      // A mark who is also a rival flies like one (skill, tier, a voice on the band).
+      tuneRivalMark(s, spec.name ?? '');
     }
     if (spec.role === 'wing') issueOrder([s], 'engageAtWill', p);
     this.ships.push(s);
@@ -298,7 +303,7 @@ export class ContractDesk {
   lastReceipts: { station: string; receipts: Receipt[] } | null = null;
   private stage: { kind: ContractKind; phase: string } | null = null;
   private readonly sysNames = new Map<string, string>();
-  private readonly cast: Character[] = [...CAST, ...CLIENTS, ...MARK_CAST, ...NAMED_CLIENTS];
+  private readonly cast: Character[] = [...CAST, ...CLIENTS, ...MARK_CAST, ...NAMED_CLIENTS, ...ARC_CLIENTS];
   /** People signed on from conversations (mechanic, Magpie's Due). */
   readonly hires: HireDesk;
   /** Free-flight death: the salvage tow cutaway, its bill, the debrief. */
@@ -380,6 +385,7 @@ export class ContractDesk {
     if (r.error) return r.error;
     this.setBook(r.book);
     io.setLedger(r.ledger);
+    this.note(k, 'active');
     this.track(k.id);
     this.hud.toast(`CONTRACT ACCEPTED · ${k.title.toUpperCase()}`, '#ffb347');
     return null;
@@ -418,6 +424,7 @@ export class ContractDesk {
   abandon(k: Contract, io: LedgerIO): Receipt | null {
     const r = abandonContract(this.book, io.ledger(), k.id);
     if (r.error) return null;
+    this.note(k, 'abandoned');
     this.teardown(k.id);
     this.setBook(r.book);
     io.setLedger(r.ledger);
@@ -427,9 +434,14 @@ export class ContractDesk {
 
   /** Pay out everything deliverable at `stationId` (or just `only`). */
   turnIn(stationId: string, io: LedgerIO, only?: string): Receipt[] {
+    const before = this.book.active;
     const r = settleAt(this.book, io.ledger(), stationId, only);
     const receipts = r.receipts ?? [];
     if (!receipts.length) return [];
+    for (const x of receipts) {
+      const k = before.find((c) => c.id === x.id);
+      if (k) this.note(k, 'done');
+    }
     for (const x of receipts) this.teardown(x.id);
     this.setBook(r.book);
     io.setLedger(r.ledger);
@@ -452,6 +464,11 @@ export class ContractDesk {
       notes.push({ text: `PRIORITY ORDERS WAITING — EPISODE ${String(this.priority.episode).padStart(2, '0')}. SEE CONTRACTS.`, cls: 'ok' });
     if (this.stage?.phase === 'board' || this.stage?.phase === 'pay') window.setTimeout(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit2' })), 30);
     return notes;
+  }
+
+  /** Tell the world (NPC arcs wait on named jobs; rivals hear about bounties). */
+  private note(k: Contract, state: ContractNote): void {
+    noteContract(k, state, this.sysName, (id) => this.reach.systems.find((x) => x.id === id)?.faction ?? '');
   }
 
   private setBook(b: ContractBook): void {
@@ -490,8 +507,13 @@ export class ContractDesk {
     }
     const frozen = s.docking.frozen;
     if (!frozen && dt > 0) {
+      const before = this.book.active;
       const r = tickBook(this.book, s.ledger, dt);
       if (r.receipts?.length) {
+        for (const x of r.receipts) {
+          const k = before.find((c) => c.id === x.id);
+          if (k) this.note(k, 'lapsed');
+        }
         s.ledger = r.ledger;
         saveLedger(r.ledger);
         this.setBook(r.book);
@@ -547,11 +569,13 @@ export class ContractDesk {
       if (op.runner.outcome === 'success') {
         if (op.build.completes) {
           this.setBook(markReady(this.book, id));
+          this.note(k, 'ready');
           this.hud.toast(`CONTRACT COMPLETE · RETURN TO ${k.payAtName.toUpperCase()} FOR PAYMENT`, '#7dffb2');
           if (this.tracked === id) this.track(id);
         }
       } else {
         const r = failContract(this.book, s.ledger, id);
+        this.note(k, 'failed');
         s.ledger = r.ledger;
         saveLedger(r.ledger);
         this.setBook(r.book);

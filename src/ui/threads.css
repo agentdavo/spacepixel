@@ -1,0 +1,47 @@
+/* ══ Dock tab: THREADS — NPC arcs (left) and rivals (right) ═════════════ */
+.dock-panel:has(.th) { overflow: hidden; }
+.th { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; height: 100%; min-height: 0; }
+.th-col { min-height: 0; overflow: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 7px; }
+.th h3 { margin: 0 0 4px; font-family: var(--font-display); font-size: 13px; letter-spacing: 0.28em; color: var(--fc); font-weight: 700; }
+.th h4 { margin: 8px 0 0; font-size: 11px; letter-spacing: 0.3em; color: rgba(125, 255, 178, 0.55); font-weight: normal; }
+.th-empty { padding: 6px 10px; color: rgba(125, 255, 178, 0.5); font-size: 12px; border: 1px dashed rgba(125, 255, 178, 0.18); }
+
+.th-card, .th-rival {
+  --pc: #7dffb2;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+  padding: 7px 9px 7px 7px;
+  background: rgba(0, 16, 10, 0.55);
+  border: 1px solid rgba(125, 255, 178, 0.16);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--pc) 70%, transparent);
+}
+.th-card canvas, .th-rival canvas { width: 64px; height: 64px; border: 1px solid color-mix(in srgb, var(--pc) 50%, #000); background: #05040c; }
+.th-card header, .th-rival header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.th-card header b, .th-rival header b { color: #fff; font-family: var(--font-display); font-size: 14px; letter-spacing: 0.04em; }
+.th-card header em, .th-rival header em { font-style: normal; font-size: 10.5px; letter-spacing: 0.18em; color: var(--pc); }
+.th-card header i, .th-rival header i { margin-left: auto; font-style: normal; font-size: 10px; letter-spacing: 0.16em; padding: 0 6px; border: 1px solid currentColor; }
+.th i.open, .th i.warm { color: #ffc46b; }
+.th i.good { color: #061012; background: #7dffb2; border-color: #7dffb2; }
+.th i.bad, .th i.hot { color: #ff5f7a; }
+.th i.missed, .th i.dim, .th i.dead { color: rgba(210, 220, 230, 0.55); }
+.th-card p, .th-rival p { margin: 3px 0 2px; font-size: 12px; line-height: 1.38; color: rgba(215, 255, 232, 0.86); }
+.th-card small, .th-rival small { font-size: 10px; letter-spacing: 0.15em; color: rgba(125, 255, 178, 0.6); }
+.th-card.missed, .th-card.bad { opacity: 0.78; }
+.th-job { margin-top: 4px; font-size: 10.5px; letter-spacing: 0.1em; color: #ffb347; }
+.th-job.on { color: #6fe6ff; }
+.th-job.ready { color: #7dffb2; }
+
+.th-rival .th-ship { font-size: 10.5px; letter-spacing: 0.14em; color: #fff; margin: 2px 0; }
+.th-rival.dead { opacity: 0.6; filter: grayscale(0.6); }
+.th-rival.dim p.th-mem { opacity: 0.7; }
+.th-grudge { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.th-meter { display: grid; grid-template-columns: repeat(10, 9px); gap: 2px; }
+.th-meter span { height: 8px; background: rgba(255, 95, 122, 0.14); border: 1px solid rgba(255, 95, 122, 0.3); transform: skewX(-18deg); }
+.th-meter span.on { background: #ff5f7a; border-color: #ff5f7a; box-shadow: 0 0 6px rgba(255, 95, 122, 0.6); }
+.th-rival p.th-mem { font-style: italic; color: rgba(255, 220, 230, 0.82); }
+
+@media (max-width: 900px) {
+  .th { grid-template-columns: minmax(0, 1fr); overflow: auto; }
+  .th-col { overflow: visible; }
+}
