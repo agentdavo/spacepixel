@@ -71,6 +71,53 @@ Pure economy + tests: `src/game/economy.ts`, `tests/economy.test.ts`.
 
 ![Docked](docs/screenshots/dock-screen.jpg)
 
+## People, voices & subtitles
+
+**Voices.** Every speaking character has a procedural voice (`src/audio/voice`):
+a planner turns the line into syllables and phoneme-ish segments — vowels as
+formant targets, consonants as frication / bursts / nasals, a phrase melody
+that falls, rises on questions and sings the Hymn in prime intervals — and a
+small Web Audio graph (glottal pulse → formant bank + noise) renders it
+through a radio band + squelch for comms, a room for people in person, or a
+warm hall for the prologue narrator. It is English *shaped*, not English:
+OVA radio chatter in an invented cadence, and it renders offline
+(`node scripts/audio-render.mjs --only voice-radio,voice-prologue`). Cast
+voices are hand-tuned; everyone else gets a stable voice from a seed.
+Optional real speech (Web Speech API) with per-character voice picks.
+
+**Subtitles.** One timing model (`src/ui/subtitleTiming.ts`: ≤ 15 chars/s,
+hold covers the voice, lines never overlap) drives the comms panel, the
+prologue's captions (now voiced by a narrator keyed to them), station
+conversations and cutscenes; the typewriter follows the voice. Optional
+Japanese second line where the script has one.
+
+**Settings (anywhere):** **F7** voice synth / speech / off · **F8** subtitle
+size S / M / L / off · **F9** Japanese line on/off. URL: `?voice=`, `?subs=0`,
+`?subsize=l`, `?jp=0`.
+
+**Concourse.** A dock tab (`src/ui/Concourse.ts`, key 2) with the 2–4 people
+at the station: fourteen recurring named people who travel the Reach on
+their own schedules (a bartender whose bar moves with her, a Graveyard
+breaker, an engine-warden on circuit, a Tey of *that* Tey, a grounded Cantor,
+a Continuity auditor, a refugee with a letter…) and locals who rotate with
+the play clock. Conversations are data (`src/dialog/conversations.ts`) run by
+a pure engine (`src/dialog/engine.ts`, `tests/dialog.test.ts`): conditions on
+flags / standing / shares / cargo / episode; effects that trade, move
+standing, unlock the codex, fill a notebook of rumours and trade tips, and
+offer contracts or hires through `dialogHooks`. Several change as the
+campaign advances. Captures:
+`?scene=flight&dock=docked&docktab=concourse&talk=odile&talkpath=0`.
+
+**Barks.** In flight, wingmen call splashes, hits, missiles and losses;
+Cantors taunt on the open band; passing traffic hails — all voiced,
+subtitled and rate-limited (`src/dialog/barks.ts`, `FlightRadio.ts`;
+`?radio=0` for a quiet HUD; `?bark=<kind>` fires one for captures). Station
+control talks you down the docking corridor in the cutaway's letterbox.
+Listen: [docs/audio/voice-radio.wav](docs/audio/voice-radio.wav) ·
+[docs/audio/voice-prologue-opening.wav](docs/audio/voice-prologue-opening.wav).
+
+![Concourse](docs/screenshots/people-concourse-lucan.jpg)
+
 ## Scenes (`?scene=`)
 
 `flight` (default game) · `showcase` · `hangar` (model sheets) · `paint`

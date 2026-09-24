@@ -12,6 +12,8 @@ import { CinemaOverlay } from '@/cinema/CinemaOverlay';
 import { PrologueStage } from '@/cinema/PrologueStage';
 import { PROLOGUE } from '@/cinema/prologue';
 import { locate } from '@/cinema/timeline';
+import { narrationCues, cuesCrossed } from '@/cinema/narration';
+import { getVoice } from '@/audio/voice';
 import type { GameScene } from '../GameScene';
 import { WeaponVisuals } from '../WeaponVisuals';
 import { CombatFx } from '../CombatFx';
@@ -49,6 +51,8 @@ export class PrologueScene implements GameScene {
   /** Shader warm-up: one black frame parked on each shot before the film starts. */
   private warm = 0;
   private readonly startT: number;
+  /** Narration voice track keyed to the captions (src/cinema/narration.ts). */
+  private readonly narration = narrationCues(PROLOGUE);
 
   constructor() {
     const q = new URLSearchParams(location.search);
@@ -79,6 +83,7 @@ export class PrologueScene implements GameScene {
   skip(): void {
     if (this.finished || this.exitT >= 0) return;
     getAudio().ui('confirm');
+    getVoice().stopAll();
     if (this.exitOnSkip) {
       this.exitT = 0; // quick fade to black, then finish
       return;
@@ -92,6 +97,7 @@ export class PrologueScene implements GameScene {
   private finish(): void {
     if (this.finished) return;
     this.finished = true;
+    getVoice().stopAll();
     this.overlay.dispose();
     this.stage.dispose();
     resetPostFx();
@@ -113,7 +119,12 @@ export class PrologueScene implements GameScene {
       this.overlay.el.style.visibility = this.warm <= PROLOGUE.length ? 'hidden' : '';
       return;
     }
+    const before = this.cinema.t;
     this.cinema.update(ctx.dt);
+    // Narrator: speak each caption as the playhead crosses it (a loop / seek back just re-arms).
+    if (this.exitT < 0 && this.cinema.t > before) {
+      for (const c of cuesCrossed(this.narration, before, this.cinema.t)) getVoice().speak({ who: c.who, text: c.caption.text, channel: c.channel, maxDur: c.maxDur, maxSqueeze: c.maxSqueeze });
+    }
     const dt = ctx.dt;
     // Everything the weapons sim emitted this frame → flashes, beams, particles.
     this.visuals.update(this.world, dt);

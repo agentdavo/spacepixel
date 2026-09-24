@@ -983,6 +983,128 @@ function drawHuman(c: CanvasRenderingContext2D, spec: PortraitSpec, lid: number,
     c.fill();
     c.stroke();
   }
+  if (acc === 'beard' || acc === 'cap' || acc === 'hood' || acc === 'goggles') drawExtra(c, acc, f, spec, suit, suitSh, hair, hairSh);
+}
+
+/** Station-people accessories: a dock cap, a cantor's cowl, welding goggles, a beard. */
+function drawExtra(c: CanvasRenderingContext2D, acc: 'beard' | 'cap' | 'hood' | 'goggles', f: Face, spec: PortraitSpec, suit: string, suitSh: string, hair: string, hairSh: string): void {
+  c.strokeStyle = INK;
+  c.lineJoin = 'round';
+  if (acc === 'beard') {
+    // Jaw beard with a clear mouth; hair colour, cel shadow on the right.
+    const my = f.chinY - 8.6;
+    const beard = () => {
+      c.beginPath();
+      c.moveTo(CX - R - 2, 60);
+      c.quadraticCurveTo(CX - 12, 63, CX - 7, my - 2.2);
+      c.quadraticCurveTo(CX, my - 3.6, CX + 7, my - 2.2);
+      c.quadraticCurveTo(CX + 12, 63, CX + R + 2, 60);
+      c.lineTo(CX + R + 2, 104);
+      c.lineTo(CX - R - 2, 104);
+      c.closePath();
+      c.ellipse(CX, my + 0.4, f.mouthW / 2 + 2.2, 2.6, 0, 0, Math.PI * 2);
+    };
+    c.save();
+    facePath(c, f, 0, 1.2);
+    c.clip();
+    beard();
+    c.fillStyle = mix(hair, hairSh, 0.25);
+    c.fill('evenodd');
+    // Cel shadow only inside the beard, on the side away from the light.
+    beard();
+    c.clip('evenodd');
+    c.fillStyle = hairSh;
+    c.fillRect(CX + 4, 50, 30, 60);
+    c.restore();
+    c.lineWidth = 1.1;
+    c.beginPath();
+    c.moveTo(CX - R + 1.5, 60.5);
+    c.quadraticCurveTo(CX - 12, f.chinY + 3, CX, f.chinY + 3.4);
+    c.quadraticCurveTo(CX + 12, f.chinY + 3, CX + R - 1.5, 60.5);
+    c.stroke();
+    return;
+  }
+  if (acc === 'goggles') {
+    c.lineWidth = 2.2;
+    c.strokeStyle = '#2a2230';
+    c.beginPath();
+    c.moveTo(CX - R - 0.5, CY - 5);
+    c.quadraticCurveTo(CX, CY - 10.5, CX + R + 0.5, CY - 5);
+    c.stroke();
+    for (const s of [-1, 1]) {
+      const x = CX + s * 8.6;
+      const y = CY - 8.2;
+      c.fillStyle = '#6b5a3a';
+      c.strokeStyle = INK;
+      c.lineWidth = 1;
+      c.beginPath();
+      c.ellipse(x, y, 5.6, 4.6, s * 0.15, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+      c.fillStyle = mix('#ffb347', '#20101a', 0.25);
+      c.beginPath();
+      c.ellipse(x, y, 3.9, 3.1, s * 0.15, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.7)';
+      c.beginPath();
+      c.ellipse(x - 1.4, y - 1.1, 1.2, 0.7, -0.6, 0, Math.PI * 2);
+      c.fill();
+    }
+    return;
+  }
+  if (acc === 'cap') {
+    // Deck cap: crown over the hair, brim to the lit side.
+    const top = CY - R - 3.5;
+    c.beginPath();
+    c.moveTo(CX - R - 1.2, CY - 3);
+    c.quadraticCurveTo(CX - R - 1.5, top, CX, top);
+    c.quadraticCurveTo(CX + R + 1.5, top, CX + R + 1.2, CY - 3);
+    c.quadraticCurveTo(CX, CY - 7.5, CX - R - 1.2, CY - 3);
+    c.closePath();
+    c.fillStyle = suit;
+    c.fill();
+    c.save();
+    c.clip();
+    c.fillStyle = suitSh;
+    c.fillRect(CX + 5, top - 2, 30, 30);
+    c.fillStyle = mix(suit, '#ffffff', 0.35);
+    c.fillRect(CX - 3, top + 3, 6, 4);
+    c.restore();
+    c.lineWidth = 1.3;
+    c.stroke();
+    c.beginPath();
+    c.moveTo(CX - R - 1, CY - 3.2);
+    c.quadraticCurveTo(CX - 6, CY - 8.5, CX + 9, CY - 5.2);
+    c.quadraticCurveTo(CX - 4, CY - 0.8, CX - R - 5.5, CY + 1.2);
+    c.closePath();
+    c.fillStyle = mix(suit, '#05040c', 0.35);
+    c.fill();
+    c.stroke();
+    return;
+  }
+  // Hood / cowl: frames the face, falls to the shoulders.
+  const hr = R + 5.5;
+  c.beginPath();
+  c.moveTo(CX - hr - 3, 92);
+  c.quadraticCurveTo(CX - hr - 2, CY + 8, CX - hr + 0.5, CY - 2);
+  c.arc(CX, CY - 2, hr - 0.5, Math.PI, 0);
+  c.quadraticCurveTo(CX + hr + 2, CY + 8, CX + hr + 3, 92);
+  c.lineTo(CX + R - 1, 86);
+  c.quadraticCurveTo(CX + R + 1.2, 60, CX + R + 0.6, CY - 1);
+  c.arc(CX, CY - 1, R + 0.6, 0, Math.PI, true);
+  c.quadraticCurveTo(CX - R - 1.2, 60, CX - R + 1, 86);
+  c.closePath();
+  c.fillStyle = suit;
+  c.fill();
+  c.save();
+  c.clip();
+  c.fillStyle = suitSh;
+  c.fillRect(CX + 6, 0, 40, 110);
+  c.fillStyle = mix(spec.eyes, '#ffffff', 0.2);
+  c.fillRect(CX - hr - 4, CY + 30, 2 * hr + 8, 1.2);
+  c.restore();
+  c.lineWidth = 1.35;
+  c.stroke();
 }
 
 /** Visor down: flight helmet over the hair, tinted visor over the eyes. */

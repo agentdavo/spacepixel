@@ -31,6 +31,8 @@ import { MissionRunner, type MissionContext, type MissionDef } from '@/game/Miss
 import { updateAI, issueOrder, setFormation, setAutopilot, brainOf } from '@/sim/ai';
 import { DockingController, berth, type Dockable } from '../Docking';
 import { DockScreen, DockCinema } from '@/ui/DockScreen';
+import '@/ui/Concourse'; // registers the CONCOURSE dock tab (people, conversations)
+import { FlightRadio } from '@/dialog/FlightRadio';
 import { loadLedger, saveLedger } from '@/game/Profile';
 import { MISSILE_MAX, cargoUsed, dockingClearance, reputationForKill, type EconFaction, type TradeLedger } from '@/game/economy';
 
@@ -131,6 +133,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   readonly docking: DockingController;
   private dockScreen: DockScreen;
   private cinema: DockCinema;
+  /** Combat barks + traffic hails (voiced, subtitled, rate-limited). */
+  private radio = new FlightRadio(document.getElementById('ui-root')!);
   /** Shares, cargo, standing, missile rails — persisted by Profile.ts. */
   ledger: TradeLedger = loadLedger();
   /**
@@ -336,6 +340,19 @@ export class FlightScene implements GameScene, FlightHostScene {
         done({ outcome: this.campaign.runner.outcome as 'success' | 'failure', codex: [...this.campaign.unlockedTitles] });
       }
     }
+
+    // 4a'. Radio: wingman / enemy barks and traffic hails.
+    this.radio.update(realDt, {
+      player: this.player,
+      ships: this.fleet.ships,
+      events: this.weapons.events,
+      missileIncoming: this.audioFrame.player.incomingMissile,
+      story: this.campaign?.comms ?? null,
+      quiet: this.docking.busy || this.jumpPhase !== 'none',
+      systemName: this.view.system.name,
+    });
+    const dk = this.docking.target;
+    this.radio.dock(this.docking.phase, dk, dk ? berth(dk) : '', realDt);
 
     // 4b. Mission bookkeeping (kills by faction of the victim).
     for (const e of this.weapons.events) if (e.kind === 'kill' && e.ship) this.kills.set(e.ship.faction, (this.kills.get(e.ship.faction) ?? 0) + 1);

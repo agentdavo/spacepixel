@@ -1,5 +1,9 @@
 import './cinema.css';
 import { typed, type Caption } from './timeline';
+import { planFor, revealAt, type VoicePlan } from '@/audio/voice';
+import '@/ui/subtitles.css';
+
+type TypedEl = { el: HTMLElement; text: string; shown: number; plan?: VoicePlan; rest?: HTMLElement };
 
 /**
  * The cutscene's DOM layer: 2.35:1 letterbox bars, film grain + vignette,
@@ -14,7 +18,7 @@ export class CinemaOverlay {
   readonly el: HTMLDivElement;
   private readonly subs: HTMLDivElement;
   private readonly skipEl: HTMLDivElement;
-  private readonly live = new Map<Caption, { el: HTMLElement; typedEls: { el: HTMLElement; text: string; shown: number }[] }>();
+  private readonly live = new Map<Caption, { el: HTMLElement; typedEls: TypedEl[] }>();
   private readonly onKey: (e: KeyboardEvent) => void;
   private readonly onPointer: (e: PointerEvent) => void;
   /** Called when the viewer asks to skip (Space / Enter / Esc / click). */
@@ -69,10 +73,13 @@ export class CinemaOverlay {
       entry.el.style.opacity = a.toFixed(3);
       entry.el.style.setProperty('--age', age.toFixed(3));
       for (const t of entry.typedEls) {
-        const n = typed(t.text, age, c.kind === 'slug' ? 30 : 38);
+        // Narration types with its voice (see narration.ts); the untyped rest
+        // is laid out invisibly so the centred line never shifts.
+        const n = t.plan ? Math.min(t.text.length, revealAt(t.plan, age - 0.08)) : typed(t.text, age, c.kind === 'slug' ? 30 : 38);
         if (n !== t.shown) {
           t.shown = n;
           t.el.textContent = t.text.slice(0, n);
+          if (t.rest) t.rest.textContent = t.text.slice(n);
         }
       }
     }
@@ -83,8 +90,8 @@ export class CinemaOverlay {
     }
   }
 
-  private make(c: Caption): { el: HTMLElement; typedEls: { el: HTMLElement; text: string; shown: number }[] } {
-    const typedEls: { el: HTMLElement; text: string; shown: number }[] = [];
+  private make(c: Caption): { el: HTMLElement; typedEls: TypedEl[] } {
+    const typedEls: TypedEl[] = [];
     const el = document.createElement('div');
     const kind = c.kind ?? 'narration';
     el.className = `cn-cap cn-${kind}`;
@@ -100,7 +107,14 @@ export class CinemaOverlay {
       case 'narration': {
         if (c.kicker) el.append(kicker(c.kicker));
         if (c.jp) el.append(line('cn-jp', c.jp));
-        el.append(line('cn-en', c.text));
+        const en = line('cn-en', '');
+        const done = document.createElement('span');
+        const rest = document.createElement('span');
+        rest.className = 'cn-ghost';
+        en.append(done, rest);
+        el.append(en);
+        el.classList.add('sub-line');
+        typedEls.push({ el: done, rest, text: c.text, shown: -1, plan: planFor({ who: 'narrator', text: c.text, maxDur: Math.max(0.6, c.dur - 0.2), maxSqueeze: 2 }).plan });
         this.subs.append(el);
         break;
       }
