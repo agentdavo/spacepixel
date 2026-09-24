@@ -164,15 +164,17 @@ export function playClip(ctx: BaseAudioContext, dest: AudioNode, clip: ClipRef, 
   const input = gain(1);
   if (radio) {
     const intercept = channel === 'intercept';
-    const hp = biquad('highpass', 340, 0.8);
-    const pre = gain(1.4);
+    // A clean 320–3600 Hz band (4th order each side), then gentle tanh drive
+    // on the band-limited voice. Driving before the band, or into the
+    // shaper's ±1 clamp, turns a recorded voice to buzz.
+    const hp = biquad('highpass', 320, 0.54);
+    const hp2 = biquad('highpass', 320, 1.31);
+    const lp = biquad('lowpass', 3600, 0.54);
+    const lp2 = biquad('lowpass', 3600, 1.31);
+    const pre = gain(0.85);
     const sh = track(ctx.createWaveShaper());
-    sh.curve = drive(1.6 + rasp * 2 + (intercept ? 1.4 : 0));
-    const hp2 = biquad('highpass', 300, 0.6);
-    const pk = biquad('peaking', 1750, 1.1, 5);
-    const lp = biquad('lowpass', 3300, 0.8);
-    const lp2 = biquad('lowpass', 3700, 0.7);
-    input.connect(hp).connect(pre).connect(sh).connect(hp2).connect(pk).connect(lp).connect(lp2).connect(out);
+    sh.curve = drive(2 + rasp * 0.6 + (intercept ? 1.2 : 0));
+    input.connect(hp).connect(hp2).connect(lp).connect(lp2).connect(pre).connect(sh).connect(out);
     // Carrier hiss under the transmission, a key-up click and the squelch tail.
     const hiss = gain(0);
     const hb = biquad('bandpass', 2600, 0.5);

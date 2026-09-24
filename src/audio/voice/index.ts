@@ -50,7 +50,7 @@ export function planFor(req: Pick<SpeakRequest, 'who' | 'text' | 'maxDur' | 'max
 
 const CHANNEL_LEVEL: Record<VoiceChannel, number> = { radio: 0.3, intercept: 0.27, clean: 0.4, narrator: 0.38 };
 /** Recorded clips are peak-normalised; these sit them at the synth's loudness. */
-const CLIP_LEVEL: Record<VoiceChannel, number> = { radio: 0.3, intercept: 0.27, clean: 0.4, narrator: 0.38 };
+const CLIP_LEVEL: Record<VoiceChannel, number> = { radio: 0.4, intercept: 0.36, clean: 0.4, narrator: 0.38 };
 
 export class VoiceBox {
   /** Force a mode (offline renders); null = follow settings. */

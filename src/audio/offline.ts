@@ -280,9 +280,9 @@ export const SCENARIOS: Record<string, Scenario> = {
   // Radio over a dogfight: the voice must sit on top of guns + combat score.
   'voice-mix': voices(
     [
-      ['kade', 'Break left, Point! Two on your six!'],
-      ['jackpot', 'Splash one! That is mine, write it down!'],
-      ['sparrow', 'I am hit, I am hit — still flying!'],
+      ['kade', 'Point, you\'re hit. Break, break!'],
+      ['jackpot', 'Splash! Write it down, write it down!'],
+      ['sparrow', 'I\'m hit, I\'m hit — still flying!'],
     ],
     0.5,
     (s) => {
