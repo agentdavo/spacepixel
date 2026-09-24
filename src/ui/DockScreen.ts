@@ -37,6 +37,8 @@ export interface DockContext {
   station: MarketSpec & { name: string };
   systemName: string;
   berth: string;
+  /** How the hull is berthed (big hulls, planetfall): shown in the header. */
+  berthMode?: 'bay' | 'clamp' | 'mooring' | 'descent';
   /** Every market in the Reach (for the rumour ticker's price tips). */
   markets: readonly (MarketSpec & { name: string })[];
   ledger(): TradeLedger;
@@ -78,6 +80,20 @@ export function registerDockTab(tab: DockTab): void {
   else TABS.push(tab);
 }
 
+/** Berth tag for the header: bay number, clamp berth, mooring (with the lighter pictogram), or pad. */
+function berthTag(ctx: DockContext): string {
+  switch (ctx.berthMode) {
+    case 'clamp':
+      return `CLAMP BERTH ${ctx.berth}`;
+    case 'mooring':
+      return `MOORED · <span class="dock-lighter" title="Crew transfer by lighter"><svg viewBox="0 0 24 12" width="22" height="11" aria-hidden="true"><path d="M2 7 L6 3 H17 L22 6 L17 9 H6 Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 3 V1.5 H13 V3" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="19" cy="6" r="1" fill="currentColor"/></svg> LIGHTER</span>`;
+    case 'descent':
+      return `PAD ${ctx.berth}`;
+    default:
+      return `BERTH ${ctx.berth}`;
+  }
+}
+
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!);
 const sh = (n: number) => `${Math.round(n).toLocaleString('en-US')} sh`;
 
@@ -114,7 +130,7 @@ export class DockScreen {
       <div class="dock-head">
         <div>
           <div class="stripe"></div>
-          <div class="kicker">${KIND_LABEL[ctx.station.kind]} · ${FACTION_LABEL[ctx.station.faction]} · ${esc(ctx.systemName.toUpperCase())} · BERTH ${ctx.berth}${hazard(ctx.station) > 0 ? ` · <span style="color:#ff9b3f">HAZARD PAY +${Math.round(hazard(ctx.station) * HAZARD_DEMAND * 100)}%</span>` : ''}</div>
+          <div class="kicker">${KIND_LABEL[ctx.station.kind]} · ${FACTION_LABEL[ctx.station.faction]} · ${esc(ctx.systemName.toUpperCase())} · ${berthTag(ctx)}${hazard(ctx.station) > 0 ? ` · <span style="color:#ff9b3f">HAZARD PAY +${Math.round(hazard(ctx.station) * HAZARD_DEMAND * 100)}%</span>` : ''}</div>
           <h2>${esc(ctx.station.name.toUpperCase())}</h2>
         </div>
         <div class="dock-stats"></div>

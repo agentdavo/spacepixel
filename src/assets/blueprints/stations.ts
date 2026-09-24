@@ -1,6 +1,7 @@
 import type { Blueprint, FactionId, Part, Vec3 } from '../Blueprint';
 import { rng } from '../HullKit';
 import { hollowBay } from './bays';
+import { berthParts } from './berths';
 import type { StationKind } from '@/game/economy';
 
 /**
@@ -16,6 +17,8 @@ import type { StationKind } from '@/game/economy';
  * Lantern refinery, a gantry cradling a salvaged hull for a breakers' yard,
  * armour and turrets for a bastion, patchwork habs for a free port, and a
  * counter-rotating second ring plus tether anchor for an orbital port.
+ * Every station also carries two clamp gantries and a mooring pylon for
+ * hulls too big for the bay (berths.ts).
  */
 export const BAY_Z = 6.05; // bay mouth plane (units)
 export const BAY_DEPTH = 1.1; // how far a ship slides inside (units)
@@ -279,6 +282,8 @@ export function stationBlueprint(kind: Exclude<StationKind, 'carrier' | 'surface
   if (hit) return hit;
   const r = rng(seed + 1);
   const extra = kind === 'refinery' ? refinery(r) : kind === 'salvage' ? salvage(r, faction) : kind === 'bastion' ? bastion(r) : kind === 'freeport' ? freeport(r) : orbital(r);
+  // Clamp gantries (gunships, corvettes) and the mooring pylon (frigates): see berths.ts.
+  const berths = berthParts(kind);
   const bp: Blueprint = {
     id: `station-${key}`,
     name: 'Station',
@@ -287,9 +292,9 @@ export function stationBlueprint(kind: Exclude<StationKind, 'carrier' | 'surface
     shipClass: 'dreadnought',
     scale: 100,
     ramp: 'classic',
-    parts: [...spine(), ...extra],
+    parts: [...spine(), ...extra, ...berths.parts],
     engines: [],
-    articulations: kind === 'orbital' ? [SPIN, SPIN2] : [SPIN],
+    articulations: [...(kind === 'orbital' ? [SPIN, SPIN2] : [SPIN]), ...berths.joints],
     hardpoints: [{ id: 'bay', pos: [0, 0, BAY_Z], kind: 'hangar' }],
   };
   cache.set(key, bp);

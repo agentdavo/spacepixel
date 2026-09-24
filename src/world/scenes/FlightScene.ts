@@ -282,6 +282,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.dockScreen = new DockScreen(document.getElementById('ui-root')!);
     this.cinema = new DockCinema(document.getElementById('ui-root')!);
     this.docking.onDocked = (d) => this.berthed(d);
+    this.docking.attach(this.world.root);
     window.addEventListener('pagehide', () => saveLedger(this.ledger));
     this.docking.onLaunched = () => {
       this.hulls.fighters.immune(this.player); // off the catapult clean
@@ -885,6 +886,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.onDocked?.(d.id);
     this.campaign?.runner.onDocked(d.id);
     const notices = this.campaign ? [] : this.contracts.onDocked(d.id);
+    if (d.cls === 'mooring') notices.unshift({ text: 'MOORED OFF THE PYLON · LIGHTER RUNNING THE CREW ACROSS', cls: 'ok' });
+    else if (d.cls === 'clamp') notices.unshift({ text: `${d.label ?? 'CLAMP BERTH'} · CLAMPS MADE FAST · UMBILICALS CONNECTED`, cls: 'ok' });
     this.lock.target = null;
     this.turrets.recall(this.player);
     this.dockScreen.open({
@@ -892,6 +895,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       station: d,
       systemName: this.view.system.name,
       berth: berth(d),
+      berthMode: d.cls,
       markets: this.allMarkets(),
       ledger: () => this.ledger,
       setLedger: (l) => {
@@ -914,7 +918,12 @@ export class FlightScene implements GameScene, FlightHostScene {
     const d = this.docking.target;
     if (!d) return;
     const ph = this.docking.phase;
-    if (ph === 'auto') {
+    const seq = this.docking.caption();
+    if (seq) {
+      this.cinema.show(seq.title, d.name.toUpperCase(), seq.sub);
+      this.cinema.timecode(this.docking.t);
+      this.cinema.setIris(seq.iris);
+    } else if (ph === 'auto') {
       this.cinema.show('DOCKING SEQUENCE // AUTO-GUIDANCE', d.name.toUpperCase(), `BERTH ${berth(d)} · ${d.kind === 'orbital' ? 'PLANETARY LANDING CORRIDOR' : d.kind === 'carrier' ? 'HANGAR DECK' : 'APPROACH CORRIDOR'} · SEALS STANDING BY`);
       this.cinema.timecode(this.docking.t);
       // Iris closes over the last beat as she slides into the dark.
@@ -942,10 +951,14 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (dk.phase === 'cleared' && dk.target) {
       const d = dk.target;
       _to.subVectors(pf.velocity, d.velocity);
-      this.hud.drawDockCorridor(d.bay, d.axis, d.up, pf.position, _to, d.name, this.camera, this.world, time);
+      this.hud.drawDockCorridor(d.bay, d.axis, d.up, pf.position, _to, d.name, this.camera, this.world, time, d.profile?.corridorScale ?? 1);
     }
+    const nd = dk.nearest;
     if (dk.message) this.hud.drawDockMessage(dk.message, dk.messageColor);
-    else if (dk.phase === 'free' && dk.nearest) this.hud.drawDockMessage(`[G] REQUEST DOCKING · ${dk.nearest.name.toUpperCase()} · ${(dk.nearest.bay.distanceTo(pf.position) / 1000).toFixed(1)} km`, '#6fe6ff');
+    else if (dk.phase === 'free' && nd) {
+      const km = ((nd.rangeTo ? nd.rangeTo(pf.position) : nd.bay.distanceTo(pf.position)) / 1000).toFixed(1);
+      this.hud.drawDockMessage(nd.cls === 'descent' ? `[G] REQUEST DESCENT · ${nd.name.toUpperCase()} · LANDING CORRIDOR ${km} km` : `[G] REQUEST DOCKING · ${nd.name.toUpperCase()}${nd.label ? ` · ${nd.label}` : ''} · ${km} km`, '#6fe6ff');
+    }
     if (!this.campaign) this.hud.drawLoadout(this.ledger.missiles, MISSILE_MAX, this.ledger.credits, cargoUsed(this.ledger), this.ledger.capacity);
   }
 
@@ -1068,10 +1081,11 @@ export class FlightScene implements GameScene, FlightHostScene {
       place(900, 40);
       this.docking.clear(d);
       this.docking.skipTo = Number(new URLSearchParams(location.search).get('dockt') ?? 0) || 0;
-    } else if (mode === 'docked' || mode === 'launch') {
+    } else if (mode === 'docked' || mode === 'launch' || mode === 'berth') {
       place(900, 0);
       this.player.hull = this.player.hullMax * 0.62;
       this.docking.berth(d);
+      if (mode === 'berth') this.dockScreen.close(); // berthed, no dock screen: the berth cutaway (big hulls)
       if (mode === 'launch') {
         this.dockScreen.close();
         this.docking.launch();
