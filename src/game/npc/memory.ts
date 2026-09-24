@@ -28,7 +28,8 @@
 import type { WorldEvent, WorldState } from '../world/WorldState.ts';
 
 type Data = NonNullable<WorldEvent['data']>;
-type Tpl = (d: Data) => string | null;
+/** `self`: the speaker is the one the event names (a rival talking about you and them). */
+type Tpl = (d: Data, self: boolean) => string | null;
 
 const s = (d: Data, k: string): string | null => (typeof d[k] === 'string' && d[k] ? (d[k] as string) : null);
 
@@ -71,10 +72,10 @@ const TEMPLATES: Record<string, Tpl[]> = {
       return null;
     },
   ],
-  'rival.met': [(d) => (s(d, 'name') && s(d, 'sys') ? `You met ${s(d, 'name')} over ${s(d, 'sys')} and lived.` : null)],
-  'rival.beaten': [(d) => (s(d, 'name') && s(d, 'sys') ? `You ran ${s(d, 'name')} off at ${s(d, 'sys')}.` : null)],
+  'rival.met': [(d, me) => (s(d, 'name') && s(d, 'sys') ? (me ? `We met over ${s(d, 'sys')}. You lived.` : `You met ${s(d, 'name')} over ${s(d, 'sys')} and lived.`) : null)],
+  'rival.beaten': [(d, me) => (s(d, 'name') && s(d, 'sys') ? (me ? `You ran me off at ${s(d, 'sys')}.` : `You ran ${s(d, 'name')} off at ${s(d, 'sys')}.`) : null)],
   'rival.killed': [(d) => (s(d, 'name') && s(d, 'sys') ? `You put ${s(d, 'name')} in the dark at ${s(d, 'sys')}.` : null)],
-  'rival.won': [(d) => (s(d, 'name') && s(d, 'sys') ? `${s(d, 'name')} sent you home on a salvage tug from ${s(d, 'sys')}.` : null)],
+  'rival.won': [(d, me) => (s(d, 'name') && s(d, 'sys') ? (me ? `I sent you home on a salvage tug from ${s(d, 'sys')}.` : `${s(d, 'name')} sent you home on a salvage tug from ${s(d, 'sys')}.`) : null)],
   'rival.wing-down': [(d) => (s(d, 'wingman') && s(d, 'sys') ? `You killed ${s(d, 'wingman')} at ${s(d, 'sys')}.` : null)],
   'npc.arc': [(d) => (s(d, 'arc') && s(d, 'outcome') ? (ARC_ENDS[s(d, 'arc')!]?.[s(d, 'outcome')!] ?? null) : null)],
 };
@@ -97,6 +98,10 @@ export interface RecallQuery {
   seed?: number;
   /** Look back this many events (default 80). */
   depth?: number;
+  /** Only events that name `about`. */
+  strict?: boolean;
+  /** `about` is the one speaking (default): their own events are told in the first person. False for a dossier. */
+  speaker?: boolean;
 }
 
 function names(e: WorldEvent, id: string): boolean {
@@ -114,9 +119,11 @@ export function recall(w: WorldState, q: RecallQuery = {}): Recall | null {
     if (q.only && !q.only.includes(e.kind)) continue;
     const tpls = TEMPLATES[e.kind];
     if (!tpls || !e.data) continue;
+    if (q.strict && q.about && !names(e, q.about)) continue;
     const variant = ((q.seed ?? 0) + i) % tpls.length;
     let text: string | null = null;
-    for (let k = 0; k < tpls.length && !text; k++) text = tpls[(variant + k) % tpls.length](e.data);
+    const self = !!q.about && q.speaker !== false && e.data.rival === q.about;
+    for (let k = 0; k < tpls.length && !text; k++) text = tpls[(variant + k) % tpls.length](e.data, self);
     if (!text) continue;
     let score = 100 - n; // recency
     if (q.about && names(e, q.about)) score += 400;

@@ -185,6 +185,54 @@ Listen: [docs/audio/voice-radio.wav](docs/audio/voice-radio.wav) ·
 
 ![Concourse](docs/screenshots/people-concourse-lucan.jpg)
 
+## Threads & rivals
+
+The Reach keeps living while you fly elsewhere. Both systems are pure data +
+functions over the shared world memory (`src/game/world/WorldState.ts`:
+facts `npc.<id>.*`, events in the log), wired in by `src/game/npc/live.ts`.
+
+**NPC arcs** (`src/game/npc/arcs.ts`, writing in `arcData.ts`,
+`tests/npc-arcs.test.ts`). Seven recurring people have multi-step stories:
+Odile's bar moves after the Bastion falls and needs a stake and her DELAYED
+board; Magpie's forty-gram clan debt is bought by Ninefingers Crane; Pell
+Varga re-audits the Schedule and needs a courier, then a witness; Nadia reads
+refugee lists station by station for her brother; Toma Kerrigan cracks under
+the Signal and takes a Kestrel out to answer it; Class Four's school tender
+loses its escort; Warden-Sister Maud wants to break the Sixth Keeping to ask a
+failing reactor why. Each step puts its person on a particular concourse
+(the arc overrides their usual wandering), has a status line, a voiced and
+subtitled conversation and often a named job (`arcContracts.ts`, flown by
+the ordinary contracts runtime). Steps move on world facts (your choices,
+your jobs' outcomes, story flags) or on elapsed play time — arcs catch up any
+number of steps at once while you're away, so ignored stories end without
+you: well, badly, or missed. The **THREADS** dock tab (`src/ui/ThreadsTab.ts`)
+lists open and closed threads with last-known whereabouts and the job on
+offer.
+
+**Rivals** (`src/game/rivals/rivals.ts`, `RivalDirector.ts`,
+`tests/rivals.test.ts`). Six named aces and bounty marks — Red Sabine (paints
+her kills on the hull), Ninefingers Crane (bought Magpie's paper), Unwitnessed
+Ismene (a Cantor who stopped singing), Corporal Skerry (deserted the Null
+picket), the Metronome (a Choir ace who counts your hits) and Vosk, the
+Knife (Continuity's interceptor). Each has a face and voice, a hull + wing +
+AI personality per tier, hunting grounds, a wake condition and a grudge meter
+fed by what you do (wingmen killed, ambushes broken, bounties taken, beating
+them). With cooldowns (per rival and global) they intercept on lanes or lead
+Rustwake traffic ambushes, taunt on the open band, break off below a third of
+their hull and come back upgraded — until their mortal tier, where going down
+is for good. Ismene and Skerry go to ground on a concourse after their first
+beating and can be talked onto your wing (Lucan's song; Kerrigan coming home).
+
+**Memory.** `src/game/npc/memory.ts` picks the most relevant event from the
+world log and phrases it — *"You were at Halaedon when the Kittiwake
+burned."*, *"You killed Tuck at Pelourin."*, *"You squared Magpie's paper."*
+— for `{memory}` in NPC lines and rival grudge lines (events naming the
+speaker first, then kinds they care about, then recency).
+
+Captures: `?npc=odile:shut,magpie:hunted` (arc steps), `?rivalstate=ismene:hiding:4[:tier[:met]]`,
+`?npcmemory=1` (seed a few remembered events), `?rival=<id>` (force an
+intercept), `?docktab=threads`.
+
 ## The living Reach
 
 **Planets.** Every system is surveyed on its own seeded stream *after* the

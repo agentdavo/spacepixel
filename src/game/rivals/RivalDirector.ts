@@ -94,9 +94,15 @@ export class RivalDirector {
     this.spawnAllies();
   }
 
+  private cast: Comms | null = null;
+
   private radio(): Comms {
     const c = this.scene.contracts.radio();
-    if (!c.hasSpeaker(rivalPersonId(RIVALS[0]))) c.addCast(RIVALS.map(rivalCharacter));
+    if (this.cast !== c) {
+      // Our faces and roles (bounty marks otherwise speak with the board's generic plate).
+      c.addCast(RIVALS.map(rivalCharacter));
+      this.cast = c;
+    }
     return c;
   }
 
@@ -147,7 +153,10 @@ export class RivalDirector {
   /** Captures / dev: this rival, now. */
   intercept(id: string): void {
     const enc = pickEncounter(world().state, { now: this.now(), system: { id: this.scene.currentSystemId(), faction: this.sysFaction() }, mode: 'lane', seed: 0, force: id });
-    if (enc) this.begin(enc, 'lane', null);
+    if (!enc) return;
+    this.begin(enc, 'lane', null, 900);
+    // Screenshot mode: land the capture mid-line, not on the radio click.
+    if (new URLSearchParams(location.search).get('shot') === '1') for (let i = 0; i < 14; i++) this.radio().update(0.25);
   }
 
   /** Traffic events: a rival may lead an ambush; broken ambushes are remembered. */
@@ -174,7 +183,7 @@ export class RivalDirector {
 
   // ── encounters ──────────────────────────────────────────────────────
 
-  private begin(enc: Encounter, mode: 'lane' | 'ambush', ambush: Ambush | null): void {
+  private begin(enc: Encounter, mode: 'lane' | 'ambush', ambush: Ambush | null, range = 3200): void {
     const s = this.scene;
     const r = enc.rival;
     const p = s.player.flight;
@@ -183,7 +192,7 @@ export class RivalDirector {
     const up = new Vector3(0, 1, 0).applyQuaternion(p.orientation);
     const base = ambush
       ? ambush.position.clone().addScaledVector(right, 1400).addScaledVector(up, 300)
-      : p.position.clone().addScaledVector(fwd, 3200).addScaledVector(right, (enc.tier % 2 ? 1 : -1) * 900).addScaledVector(up, 260);
+      : p.position.clone().addScaledVector(fwd, range).addScaledVector(right, (enc.tier % 2 ? 1 : -1) * range * 0.28).addScaledVector(up, range * 0.08);
     const team: Team = r.faction === 'choir' ? 'choir' : 'renegade';
     const facing = _v.subVectors(p.position, base).normalize().clone();
     const ship = s.fleet.spawn(enc.ship.blueprint, r.faction, base, facing, { name: r.callsign, team });
@@ -200,6 +209,9 @@ export class RivalDirector {
       w.flight.velocity.copy(facing).multiplyScalar(180);
       wing.push(w);
     }
+    // Put the rival in the pilot's sights if nothing else is.
+    if (mode === 'lane' && range < 3200) s.lock.target = ship;
+    else if (!s.lock.target?.alive || s.lock.target.team === 'neutral') s.lock.target = ship;
     // They came for you: aim the brains at the Point.
     for (const x of [ship, ...wing]) {
       const b = brainOf(x);
@@ -207,6 +219,7 @@ export class RivalDirector {
       x.target = s.player;
     }
     const sysName = this.sysName();
+    console.info(`[rivals] ${r.id} ${mode} tier ${enc.tier} (${enc.ship.blueprint} +${wing.length})`);
     this.live = { rival: r, enc, ship, wing, sysName, sysId: s.currentSystemId(), ambush, retreat: -1, talkT: 14, age: 0, done: false };
     world().update((w) => beginEncounter(w, r.id, this.now(), sysName));
     const tier = ['', ' · UPGRADED', ' · UPGRADED TWICE'][enc.tier];

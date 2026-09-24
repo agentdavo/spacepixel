@@ -222,6 +222,14 @@ test('nemesis-lite: rivals quote the world log back at you', () => {
   w = record(w, 'ambush.lost', 'system:halaedon', { sys: 'Halaedon', victim: 'Kittiwake', band: 'Blackwake' });
   assert.equal(recall(w, { about: 'red-sabine' })?.text, 'You killed Tuck at Pelourin.');
   assert.equal(recall(w)?.text, 'You were at Halaedon when the Kittiwake burned.');
+  // A rival never quotes another rival's business — only their own, or what's public.
+  const crane = RIVALS.find((x) => x.id === 'ninefingers')!;
+  assert.match(rivalLine(w, crane, 'grudge', 0), /^You were at Halaedon when the Kittiwake burned\./);
+  assert.ok(!rivalLine(wingDown(hunting([]), 'red-sabine', 'Pelourin', 'Tuck'), crane, 'grudge', 0).includes('Tuck'));
+  // Their own history is told in the first person (and in the third on a dossier).
+  const beaten = endEncounter(setStatus(w, 'red-sabine', 'hunting'), 'red-sabine', 'retreated', 50, 'Zephacis');
+  assert.equal(recall(beaten, { about: 'red-sabine' })?.text, 'You ran me off at Zephacis.');
+  assert.equal(recall(beaten, { about: 'red-sabine', speaker: false })?.text, 'You ran Red Sabine off at Zephacis.');
   // Specific lines for specific rivals: vars fill in.
   assert.ok(!rivalLine(w, r, 'intro', 0).includes('{'));
 });

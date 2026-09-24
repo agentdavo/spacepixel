@@ -91,7 +91,7 @@ class ThreadsTab {
       const s = STATUS[st.status];
       const ship = r.ships[st.tier];
       const shipName = CATALOG_BY_ID[ship.blueprint]?.name ?? ship.blueprint.replace(/^[a-z]+-/, '').replace(/-/g, ' ');
-      const mem = st.met || st.beaten ? recall(w, { about: r.id, only: ['rival.met', 'rival.beaten', 'rival.wing-down', 'rival.won', 'rival.killed', 'ambush.broken'] }) : null;
+      const mem = st.met || st.beaten ? recall(w, { about: r.id, strict: true, speaker: false, only: ['rival.met', 'rival.beaten', 'rival.wing-down', 'rival.won', 'rival.killed', 'ambush.broken'] }) : null;
       const hideAt = hide.get(r.id);
       const where = hideAt ? place(hideAt) : null;
       const meter = Array.from({ length: 10 }, (_, i) => `<span class="${i < st.grudge ? 'on' : ''}"></span>`).join('');

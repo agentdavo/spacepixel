@@ -411,6 +411,8 @@ class ConcourseTab {
       }
     }
     void before;
+    // Jobs booked through hooks write world facts too (contract.<key>): conditions should see them.
+    if (applied.some((e) => 'contract' in e)) this.world = { ...this.world!, ...dialogFacts() };
     this.api = { ...this.api, say };
     if (log.length) this.root.querySelector('.cc-log')!.textContent = `› ${log.join(' · ')}`;
   }

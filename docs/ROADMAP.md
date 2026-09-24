@@ -143,8 +143,8 @@ modifiers, an event log), is read and written by everything below.
 | 4 | World state driven by story flags and player actions: prices, traffic, patrols, station attitude | effects visible within one session | 🔧 |
 | 5 | The Schedule on the star map: fixed engagements to fly or break | breaking one has consequences | 🔧 |
 | 6 | The Signal countdown between chapters | visible, advances with the story | 🔧 |
-| 7 | Persistent NPC arcs that advance while you're away | ≥ 6 arcs | 🔧 |
-| 8 | Rivals: named aces and bounty targets that remember and escalate | ≥ 5 rivals | 🔧 |
+| 7 | Persistent NPC arcs that advance while you're away | ≥ 6 arcs | ✅ 7 arcs (Odile, Magpie, Pell, Nadia, Toma, Dalca & Pieter, Maud), 7 arc jobs, THREADS tab |
+| 8 | Rivals: named aces and bounty targets that remember and escalate | ≥ 5 rivals | ✅ 6 rivals (2 can be turned), grudge meters, tiers, world-log memory in their lines |
 
 ## Known issues
 

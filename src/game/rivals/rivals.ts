@@ -495,6 +495,7 @@ export function markDown(w: WorldState, id: string, now: number, sysName: string
 
 /** Memory kinds a rival brings up. */
 const RIVAL_KINDS = ['rival.beaten', 'rival.wing-down', 'rival.won', 'rival.met', 'ambush.broken', 'ambush.lost', 'contract.done', 'contract.failed'];
+const PUBLIC_KINDS = ['ambush.broken', 'ambush.lost', 'contract.done', 'contract.failed'];
 
 /**
  * A radio line of `kind` for rival `r`. `grudge` lines need a memory to
@@ -504,7 +505,8 @@ export function rivalLine(w: WorldState, r: Rival, kind: LineKind, seed: number,
   let k = kind;
   let memory: string | null = null;
   if (k === 'grudge') {
-    memory = recall(w, { about: r.id, kinds: RIVAL_KINDS, only: RIVAL_KINDS, seed })?.text ?? null;
+    // Their own history with you first; else something public (never another rival's business).
+    memory = recall(w, { about: r.id, strict: true, only: RIVAL_KINDS, seed })?.text ?? recall(w, { only: PUBLIC_KINDS, seed })?.text ?? null;
     if (!memory) k = 'taunt';
   }
   const list = r.lines[k];
@@ -530,7 +532,7 @@ export const RIVAL_TALKS: Record<string, Conversation> = {
     priority: 100,
     entry: [{ node: 'hello' }],
     nodes: {
-      hello: ask(ISMENE, '(She sits facing the window, not drinking.) The fossil that ran me off. {memory} The Choir wants my silence ended. Why are you here?', [
+      hello: ask(ISMENE, '(She sits facing the window, not drinking.) The fossil. {memory} The Choir wants my silence ended. Why are you here?', [
         ch('Lucan Vey stopped singing too. He started again. Sing — I\'ll listen.', 'sing', { if: { flag: 'lucan-sang' }, locked: '(someone who stopped singing once could tell you how to ask)' }),
         ch('The Choir wants your silence ended. I don\'t. Stop hunting.', 'spare', { effects: [{ fact: 'npc.ismene.status', value: 'spared' }, { standing: 'choir', delta: 2 }] }),
         ch('Why did you stop?', 'why'),
