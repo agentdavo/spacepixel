@@ -96,3 +96,47 @@ test('every catalogued blueprint builds with its sockets and length', { timeout:
     for (const [id, a] of model.articulations) if (a.channel === 'turret' && !id.endsWith('.L')) assert.ok(model.sockets.has(id), `${e.id}: turret joint ${id} has a socket`);
   }
 });
+
+test('bridge camera looks over the bow: the forward battery sits in the bottom sixth', { timeout: 240_000 }, async () => {
+  server ??= await createServer({
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    logLevel: 'error',
+    appType: 'custom',
+    server: { middlewareMode: true, hmr: false, watch: null },
+  });
+  const THREE = await server.ssrLoadModule('three');
+  const { buildShip } = await server.ssrLoadModule('/src/assets/ShipBuilder.ts');
+  const { BLUEPRINTS } = await server.ssrLoadModule('/src/assets/blueprints/index.ts');
+  const { bridgeFraming, hasBowBattery } = await server.ssrLoadModule('/src/game/shipyard/flight.ts');
+  for (const e of CATALOG.filter((x) => x.camera === 'bridge')) {
+    const model = buildShip(BLUEPRINTS[e.blueprint]);
+    model.root.updateMatrixWorld(true);
+    const s = model.sockets.get('bridge');
+    const f = bridgeFraming([s.position.x, s.position.y, s.position.z], model.length, hasBowBattery(e));
+    // The flight camera at rest: 58° vertical FOV, 16:9, aimed down the bow.
+    const cam = new THREE.PerspectiveCamera(58, 16 / 9, 0.5, 1e6);
+    cam.position.set(...f.offset);
+    cam.lookAt(0, 0, f.lookAhead);
+    cam.updateMatrixWorld(true);
+    const bow = new Set(e.hardpoints.turrets.filter((t) => t.arc === 'bow').map((t) => t.socket));
+    let turretTop = Infinity;
+    let hullTop = Infinity;
+    model.root.traverse((o: { isMesh?: boolean; name: string }) => {
+      if (!o.isMesh) return;
+      const part = o.name.split(':').pop() ?? '';
+      const b = new THREE.Box3().setFromObject(o);
+      for (const x of [b.min.x, b.max.x])
+        for (const y of [b.min.y, b.max.y])
+          for (const z of [b.min.z, b.max.z]) {
+            const p = new THREE.Vector3(x, y, z).project(cam);
+            if (p.z >= 1) continue;
+            const py = (-p.y * 0.5 + 0.5) * 720;
+            if (bow.has(part)) turretTop = Math.min(turretTop, py);
+            else if (part === 'hull') hullTop = Math.min(hullTop, py);
+          }
+    });
+    if (bow.size) assert.ok(Number.isFinite(turretTop), `${e.id}: bow turrets in view`);
+    if (bow.size) assert.ok(turretTop > 720 * (5 / 6), `${e.id}: bow turrets reach up to y=${turretTop.toFixed(0)} of 720 (want the bottom sixth)`);
+    assert.ok(hullTop < 720 * 0.75, `${e.id}: the hull reads below the horizon (top at y=${hullTop.toFixed(0)})`);
+  }
+});

@@ -48,6 +48,18 @@ export function shipyardFlightSpec(blueprintId: string, base: FlightSpec): Fligh
   return e && !e.legacy ? flightSpecFor(e, base) : undefined;
 }
 
+/**
+ * Bridge eye above / behind the bridge socket and the aim distance, as
+ * fractions of hull length. Warships with a forward battery (`overBattery`)
+ * ride higher and further back so the superfiring mount sits in the bottom
+ * sixth of the frame, not the bottom third; merchant bridges (at the stern,
+ * over a long flat deck) keep the low eye.
+ */
+export const BRIDGE_EYE = {
+  battery: { up: 0.16, back: 0.08, lookAhead: 5 },
+  deck: { up: 0.05, back: 0.03, lookAhead: 6 },
+};
+
 export interface ChaseFraming {
   /** Ship-frame camera offset, metres (behind = −Z). */
   offset: [number, number, number];
@@ -82,16 +94,19 @@ export function chaseFraming(lengthM: number): ChaseFraming {
 }
 
 /**
- * Bridge camera: an eye just above and behind the bridge socket, looking
- * over the forward battery (the Yamato shot). `bridge` is the socket
- * position in ship metres.
+ * Bridge camera: an eye above and a little behind the bridge socket, looking
+ * over the bow (the Yamato shot). With a forward battery the eye rides high
+ * enough that the forward mounts (barrels trained up included, mostly) sit
+ * low in the frame and the bow reads below the reticle. `bridge` is the
+ * socket position in ship metres.
  */
-export function bridgeFraming(bridge: [number, number, number], lengthM: number): ChaseFraming {
+export function bridgeFraming(bridge: [number, number, number], lengthM: number, overBattery = false): ChaseFraming {
   const base = chaseFraming(lengthM);
+  const k = overBattery ? BRIDGE_EYE.battery : BRIDGE_EYE.deck;
   return {
     ...base,
-    offset: [bridge[0], bridge[1] + lengthM * 0.05, bridge[2] - lengthM * 0.03],
-    lookAhead: lengthM * 6,
+    offset: [bridge[0], bridge[1] + lengthM * k.up, bridge[2] - lengthM * k.back],
+    lookAhead: lengthM * k.lookAhead,
     speedPullback: 0,
     posSmooth: 0.05,
     lookSmooth: 0.12,
@@ -99,4 +114,9 @@ export function bridgeFraming(bridge: [number, number, number], lengthM: number)
     shake: 0.02 * lengthM * 0.01,
     near: 0.5,
   };
+}
+
+/** Does this hull have a forward battery the bridge looks over? */
+export function hasBowBattery(e: CatalogEntry | undefined): boolean {
+  return !!e?.hardpoints.turrets.some((t) => t.arc === 'bow');
 }
