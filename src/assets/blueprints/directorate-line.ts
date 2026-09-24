@@ -1,7 +1,7 @@
 import type { Blueprint, Part, Station, Vec3 } from '../Blueprint';
 import { sideX, topAt, wingPoint, wingSlice, type WingSpec } from './kit';
 import { KESTREL } from './concord';
-import { bd, bell, bx, cyl, hazard, hp, lf, missile, post, turret, turrets, windows } from './yard';
+import { bd, bell, bx, cyl, hazard, hp, lf, missile, post, turret, windows } from './yard';
 
 /**
  * The Vanguard progression line — Directorate-built ships the player can
@@ -109,7 +109,7 @@ const GT_TURRET = turret('dorsal', [0, topAt(GT_FUSE, -1.6) + 0.25, -1.6], {
   barrelRadius: 0.07,
   housing: [0.85, 0.34, 1.0],
   paint: 'secondary',
-  joint: 'dorsal',
+  elevation: [-5, 85],
 });
 
 export const GAUNTLET: Blueprint = {
@@ -185,7 +185,7 @@ export const GAUNTLET: Blueprint = {
     ]),
     // Remote dorsal turret on a low barbette.
     post('turret-ring', 'dark', [0, topAt(GT_FUSE, -1.6) - 0.05, -1.6], 0.62, 0.58, 0.32, 10),
-    ...GT_TURRET.parts,
+    GT_TURRET,
     bx('airbrake', 'primary', [0, 1.9, -6.2], [1.5, 0.1, 1.5], 0.04, { rot: [-5, 0, 0] }),
     bx('vent', 'dark', [2.25, 0.86, -4.0], [0.9, 0.08, 2.0], 0.03, { mirror: true }),
     {
@@ -203,7 +203,6 @@ export const GAUNTLET: Blueprint = {
     { name: 'irst', paint: 'glass', pos: [0, 0.8, 10.2], shape: { kind: 'dome', radius: 0.24, segments: 8 } },
   ],
   engines: [{ pos: [2.25, -0.25, -13.2], radius: 0.7, plume: 8.5, mirror: true }],
-  articulations: [...(GT_TURRET.joint ? [GT_TURRET.joint] : [])],
   hardpoints: [
     hp('gun', 'gun', [0.72, -0.1, 10.8], { mirror: true }),
     hp('cannon', 'gun', [0, -1.0, 10.7]),
@@ -238,7 +237,8 @@ const BW_WING: WingSpec = {
   tipThickness: 0.45,
 };
 const bwTop = (z: number) => topAt(BW_HULL, z);
-const BW_GUNS = turrets([
+/** Dorsal twin (masked aft by the fin), chin mount. */
+const BW_GUNS = [
   turret('turret-dorsal', [0, bwTop(-2.4) + 0.55, -2.4], {
     radius: 1.15,
     height: 1.1,
@@ -246,7 +246,8 @@ const BW_GUNS = turrets([
     barrelLength: 3.6,
     barrelRadius: 0.13,
     housing: [1.8, 0.7, 2.0],
-    joint: 'turret-dorsal',
+    traverse: [-165, 165],
+    elevation: [-6, 80],
   }),
   turret('turret-chin', [0, -1.75, 7.2], {
     radius: 0.75,
@@ -256,9 +257,8 @@ const BW_GUNS = turrets([
     barrelRadius: 0.08,
     ventral: true,
     paint: 'secondary',
-    joint: 'turret-chin',
   }),
-]);
+];
 
 export const BULWARK: Blueprint = {
   id: 'gs12-bulwark',
@@ -330,7 +330,7 @@ export const BULWARK: Blueprint = {
     { name: 'ventral-fin', paint: 'dark', mirror: true, pos: [1.4, -1.6, -8.4], rot: [0, 0, -120], shape: { kind: 'wing', root: 3.2, tip: 1.4, span: 1.6, sweep: 1.6, thickness: 0.2 } },
     // Turrets.
     post('barbette', 'secondary', [0, bwTop(-2.4) - 0.1, -2.4], 1.2, 1.15, 0.7, 12),
-    ...BW_GUNS.parts,
+    ...BW_GUNS,
     // Nose cannons.
     cyl('nose-gun', 'metal', [1.0, -1.0, 11.8], 0.12, 0.16, 3.0, { mirror: true, segments: 8 }),
     bx('nose-gun-fairing', 'dark', [1.0, -1.0, 9.6], [0.55, 0.55, 2.0], 0.12, { mirror: true }),
@@ -353,7 +353,6 @@ export const BULWARK: Blueprint = {
     { pos: [4.7, 0.1, -13.7], radius: 0.82, plume: 9, mirror: true },
     { pos: [0, 0.2, -14.45], radius: 0.8, plume: 7 },
   ],
-  articulations: BW_GUNS.joints,
   hardpoints: [
     hp('nose-gun', 'gun', [1.0, -1.0, 13.3], { mirror: true }),
     hp('rack', 'missile', [8.0, -0.72, 1.7], { mirror: true }),
@@ -389,11 +388,13 @@ const RS_NAC: Station[] = [
   { z: -7.9, w: 0.85, h: 0.95, x: 3.3, y: -0.3, c: 0.32 },
 ];
 const rsTop = (z: number) => topAt(RS_HULL, z);
-const RS_GUNS = turrets([
-  turret('main-a', [0, rsTop(4.6) - 0.03, 4.6], { radius: 0.44, height: 0.46, barrels: 2, barrelLength: 1.35, barrelRadius: 0.06, housing: [0.8, 0.3, 0.95], joint: 'main-a' }),
-  turret('main-b', [0, rsTop(-4.4) - 0.03, -4.4], { radius: 0.44, height: 0.46, barrels: 2, barrelLength: 1.35, barrelRadius: 0.06, housing: [0.8, 0.3, 0.95], yaw: 180, joint: 'main-b' }),
-  turret('main-v', [0, -0.78, -2.6], { radius: 0.4, height: 0.42, barrels: 2, barrelLength: 1.1, barrelRadius: 0.05, ventral: true, paint: 'secondary', joint: 'main-v' }),
-]);
+const RS_MAIN = { radius: 0.44, height: 0.46, barrels: 2, barrelLength: 1.35, barrelRadius: 0.06, housing: [0.8, 0.3, 0.95] as Vec3 };
+/** A and B masked by the conning tower between them; the keel mount sees all round. */
+const RS_GUNS = [
+  turret('main-a', [0, rsTop(4.6) - 0.03, 4.6], { ...RS_MAIN, traverse: [-150, 150], elevation: [-10, 75] }),
+  turret('main-b', [0, rsTop(-4.4) - 0.03, -4.4], { ...RS_MAIN, yaw: 180, traverse: [-150, 150], elevation: [-10, 75] }),
+  turret('main-v', [0, -0.78, -2.6], { radius: 0.4, height: 0.42, barrels: 2, barrelLength: 1.1, barrelRadius: 0.05, ventral: true, paint: 'secondary' }),
+];
 
 export const RESOLUTE: Blueprint = {
   id: 'cr5-resolute',
@@ -452,7 +453,7 @@ export const RESOLUTE: Blueprint = {
     { name: 'vls-2', paint: 'dark', pos: [-0.45, rsTop(-1.6) + 0.04, -1.6], repeat: { count: 4, step: [0.3, 0, 0] }, shape: { kind: 'box', w: 0.22, h: 0.04, d: 0.22 } },
     { name: 'vls-3', paint: 'dark', pos: [-0.45, rsTop(-1.6) + 0.04, -2.0], repeat: { count: 4, step: [0.3, 0, 0] }, shape: { kind: 'box', w: 0.22, h: 0.04, d: 0.22 } },
     // Main mounts + point defence.
-    ...RS_GUNS.parts,
+    ...RS_GUNS,
     {
       name: 'pd',
       paint: 'secondary',
@@ -461,6 +462,7 @@ export const RESOLUTE: Blueprint = {
       pos: [1.7, rsTop(0) - 0.35, 0.2],
       rot: [0, 30, 0],
       socket: { id: 'pd', kind: 'turret' },
+      rig: { traverse: [-60, 150] }, // the deckhouse masks inboard
       shape: { kind: 'turret', radius: 0.16, height: 0.18, barrels: 1, barrelLength: 0.45, barrelRadius: 0.03 },
     },
     {
@@ -481,7 +483,6 @@ export const RESOLUTE: Blueprint = {
     { pos: [3.3, -0.3, -8.5], radius: 0.36, plume: 4.5, mirror: true },
     { pos: [0, 0.05, -8.82], radius: 0.46, plume: 5 },
   ],
-  articulations: RS_GUNS.joints,
   hardpoints: [
     hp('driver', 'gun', [0, -1.02, 8.9]),
     hp('vls', 'missile', [0, rsTop(-1.6) + 0.1, -1.6], { rot: [-90, 0, 0] }),
@@ -511,13 +512,14 @@ const vlTop = (z: number) => topAt(VL_HULL, z);
 const VL_TOWER_Z = 0.4;
 const VL_TY = vlTop(VL_TOWER_Z);
 const VL_MAIN = { radius: 0.54, height: 0.52, barrels: 3, barrelLength: 1.85, barrelRadius: 0.055, housing: [1.12, 0.34, 1.28] as Vec3 };
-const VL_GUNS = turrets([
-  turret('main-a', [0, vlTop(5.4) - 0.03, 5.4], { ...VL_MAIN, joint: 'main-a' }),
-  turret('main-b', [0, vlTop(3.8) + 0.3, 3.8], { ...VL_MAIN, joint: 'main-b' }),
-  turret('main-x', [0, vlTop(-5.4) - 0.03, -5.4], { ...VL_MAIN, barrels: 2, yaw: 180, joint: 'main-x' }),
-  turret('sec', [1.05, 0.62, 1.6], { radius: 0.2, height: 0.22, barrels: 2, barrelLength: 0.6, barrelRadius: 0.03, paint: 'secondary', mirror: true, yaw: 25 }),
-  turret('sec-aft', [1.05, 0.62, -3.0], { radius: 0.2, height: 0.22, barrels: 2, barrelLength: 0.6, barrelRadius: 0.03, paint: 'secondary', mirror: true, yaw: 150 }),
-]);
+/** A masked aft by superfiring B, B by the tower, X forward by the stack; the secondaries by the tower inboard. */
+const VL_GUNS = [
+  turret('main-a', [0, vlTop(5.4) - 0.03, 5.4], { ...VL_MAIN, traverse: [-150, 150], elevation: [-10, 70] }),
+  turret('main-b', [0, vlTop(3.8) + 0.3, 3.8], { ...VL_MAIN, traverse: [-155, 155], elevation: [-10, 70] }),
+  turret('main-x', [0, vlTop(-5.4) - 0.03, -5.4], { ...VL_MAIN, barrels: 2, yaw: 180, traverse: [-150, 150], elevation: [-10, 70] }),
+  turret('sec', [1.05, 0.62, 1.6], { radius: 0.2, height: 0.22, barrels: 2, barrelLength: 0.6, barrelRadius: 0.03, paint: 'secondary', mirror: true, yaw: 25, traverse: [-70, 140] }),
+  turret('sec-aft', [1.05, 0.62, -3.0], { radius: 0.2, height: 0.22, barrels: 2, barrelLength: 0.6, barrelRadius: 0.03, paint: 'secondary', mirror: true, yaw: 150, traverse: [-155, 50] }),
+];
 
 export const VALIANT: Blueprint = {
   id: 'ffl3-valiant',
@@ -579,7 +581,7 @@ export const VALIANT: Blueprint = {
     bx('stack-cap', 'glass', [0, vlTop(-1.5) + 0.66, -1.4], [0.5, 0.05, 0.85], 0, { emissive: 0.9 }),
     // Barbette for the superfiring mount.
     post('barbette-b', 'secondary', [0, vlTop(3.8) - 0.05, 3.8], 0.44, 0.42, 0.36, 10),
-    ...VL_GUNS.parts,
+    ...VL_GUNS,
     bx('gun-deck', 'primary', [1.0, 0.45, -0.7], [0.4, 0.28, 5.2], 0.08, { mirror: true }),
     // Ventral hangar: doors hinge outward on the keel (channel 'bay').
     bx('bay', 'dark', [0, -1.02, -3.0], [0.9, 0.06, 2.4]),
@@ -610,7 +612,6 @@ export const VALIANT: Blueprint = {
     { pos: [0, 0.1, -9.5], radius: 0.46, plume: 3.8 },
   ],
   articulations: [
-    ...VL_GUNS.joints,
     { id: 'radar', pivot: [0, VL_TY + 2.45, VL_TOWER_Z - 0.1], axis: [0, 1, 0], range: [0, 360], channel: 'radar', mirror: false },
     { id: 'bay-door', pivot: [0.51, -1.08, -3.0], axis: [0, 0, 1], range: [0, 100], channel: 'bay' },
   ],

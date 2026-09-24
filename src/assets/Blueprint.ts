@@ -133,6 +133,24 @@ export interface Part {
   repeat?: { count: number; step?: Vec3; rot?: Vec3 };
   /** Emit a hardpoint socket at this part's origin (one per repeat/mirror copy). */
   socket?: { id: string; kind: Hardpoint['kind'] };
+  /**
+   * Turret rig limits. Every 'turret'-shape part with a socket is rigged by
+   * the builder (a traverse joint named after the socket carrying the base
+   * and housing, an elevation joint `${socket}/el` carrying the guns); this
+   * sets its arcs. `false` = a rigid, unrigged turret.
+   */
+  rig?: TurretRigDef | false;
+}
+
+/** Physical limits of a rigged turret (degrees). */
+export interface TurretRigDef {
+  /**
+   * Traverse about the mount normal relative to the rest pose, + toward the
+   * part's own +X (mirrored copies mirror it). Default [-180, 180]: all round.
+   */
+  traverse?: [number, number];
+  /** Elevation above the mount plane. Default [-8, 80]. */
+  elevation?: [number, number];
 }
 
 export interface EngineMount {

@@ -11,6 +11,7 @@ import { LightPoints, LIGHT_PULSE, LIGHT_STEADY, LIGHT_STROBE, type LightSpec } 
 import { berthLights, stationBerths, type StationBerth } from './berths/sites';
 import type { SurfacePortSite } from '@/universe/Universe';
 import type { PlanetPreset } from './Planet';
+import { createDrive, poseTurret, rigFromInfo, scanPose, type TurretDrive, type TurretRig } from '@/sim/TurretRig';
 
 /**
  * A dockable station in the world (docking & trade). Universe-positioned
@@ -140,9 +141,16 @@ export class StationView {
   }
 
   private ringLights: LightPoints | null = null;
+  /** Battery turrets (bastions): no fire control here, they just scan their arcs. */
+  private guns: { rig: TurretRig; drive: TurretDrive }[] | null = null;
 
   update(time: number): void {
     this.model.setChannel('spin', (time * this.spinRate + (this.site.seed % 97) / 97) % 1);
+    this.guns ??= [...this.model.turrets.values()].map((t) => ({ rig: rigFromInfo(t), drive: createDrive() }));
+    for (const g of this.guns) {
+      scanPose(g.rig, time, g.drive);
+      poseTurret(this.model, g.rig, g.drive);
+    }
     this.lights.update(time);
     this.ringLights?.update(time);
     this.curtain.update(time);
