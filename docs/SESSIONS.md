@@ -8,7 +8,7 @@ touching their files.
 | Area | Owner (session / branch) | Files |
 |---|---|---|
 | Engine, world, campaign, merges | Vanguard lead · `claude/vanguard-space-combat-0l3bfi` | everything not listed below |
-| Turrets, shields, weapon impacts (batch 6) | turrets session · `claude/ship-turrets-shields-weapons-8lz4su` (the user returned it there on 24 Sep) | `src/sim/TurretRig.ts`, `Subsystems.ts`, `Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, `src/fx/impacts.ts`, `src/world/{WeaponVisuals,CombatFx,ImpactDecals,ShieldGeometry}.ts`, impact SFX. **Handed over 24 Sep** (see below); free for the project thread |
+| Turrets, shields, weapon impacts, subsystems, kill paths (batch 6) | **batch 6 project thread** · `claude/project-thread-dl05kd` (took over from the turrets session 24 Sep ~10:40; draft PR #1 into the lead branch) | `src/sim/TurretRig.ts`, `Subsystems.ts`, `Weapons.ts`, `Damage.ts`, `Combat.ts`, `Capitals.ts`, `ai/Turret.ts`, `src/fx/impacts.ts`, `src/world/{WeaponVisuals,CombatFx,ImpactDecals,ShieldGeometry}.ts`, impact SFX, `src/cinema/gunnery.ts` |
 | **Character voices, chat, soundtrack** | voices/score session · `claude/ova-soundtrack-voices` | `src/audio/Music.ts`, `instruments.ts`, `src/audio/score/**`, `src/audio/voice/**`, `src/dialog/**`, `src/ui/Comms.ts`, `AudioTestScene`, `scripts/audio-render.mjs`, `src/audio/offline.ts`, the `soundtrack` field in `src/game/Settings.ts` |
 
 ## Batch 6 handover (turrets session, 24 Sep): done / left
@@ -36,15 +36,18 @@ pass (4v4 sweep 51 % Concord). Milestone status is in ROADMAP *Batch 6*.
   `ImpactDecals.ts`, `WeaponVisuals.ts`, `CombatFx.ts`). Test stage:
   `?scene=combat&stage=impacts&side=hull|shield|collapse|regen|subsystem&cam=0|1|2`.
 
-**Left (next owner)**
-- Impact **audio** in `src/audio/index.ts` / `Sfx.ts`: shield vs hull per
-  `ev.type`, `ev.shielded` beams, 'shield-down', 'shield-up', 'subsystem' by
-  `sub.kind`; player-owned turret shots still play the player gun sound.
+**Done since, by the project thread** (`claude/project-thread-dl05kd`)
+- Impact audio: `hullScorch` / `hullCrunch` / `hullHit` by damage type,
+  thinner shield hits on a failing facing, shielded beams, bleed, `shieldUp`,
+  `mountBlast` by `sub.kind`; player turret shots flagged `WeaponEvent.turret`
+  and played as turret fire. `audio-render --only sfx-batch6`.
+- Trailer / prologue broadsides fire from barrel tips (`src/cinema/gunnery.ts`).
+
+**Left**
 - Screenshot-verify and tune: hull marks (`ImpactDecals`, TSL instanced
   shader rewritten, final look unconfirmed), capital facing outline / low-cell
   density, collapse, regen, fire columns, beam cut lines. Faction shell
   styles (crystal Choir, scrap Rustwake). Run `npm run perf` on a GPU.
-- Trailer / prologue scripted volleys still fire from turret bases.
 - Subsystems not yet modelled: sensors, reactor, missile launchers; station
   batteries (bastion turrets are visual-only `scanPose`).
 - Kill paths (milestone 6) not started: mine the lead's paused
