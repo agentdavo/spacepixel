@@ -88,7 +88,8 @@ try {
   for (let i = 4; i < samples.length; i++) {
     const a = samples[i - 2];
     const b = samples[i];
-    worstGeo = Math.max(worstGeo, Math.abs(b.geometries - a.geometries) / Math.max(1, a.geometries));
+    // Growth only (a drop is freeing, not leaking); +1 is three's cached-geometry recount wobble.
+    worstGeo = Math.max(worstGeo, Math.max(0, b.geometries - a.geometries - 1) / Math.max(1, a.geometries));
     worstTex = Math.max(worstTex, Math.abs(b.textures - a.textures) / Math.max(1, a.textures));
     worstDom = Math.max(worstDom, Math.abs(b.dom - a.dom));
     worstPipe = Math.max(worstPipe, (b.pipelines - a.pipelines) / Math.max(1, a.pipelines));
@@ -96,7 +97,7 @@ try {
   }
   const perCycle = heapGrowth.length ? Math.max(...heapGrowth) : 0;
   check('attract loop alternates reels unattended', samples.at(-1).reels >= cycles * 2, `(${samples.at(-1).reels} reels, ${cycles} cycles ≈ ${((cycles * (2 * 45 + 60 + 90)) / 60).toFixed(0)} min unattended at real pace)`);
-  check('GPU geometries flat cycle to cycle', worstGeo <= 0.02, `(worst ${(worstGeo * 100).toFixed(1)} %)`);
+  check('GPU geometries not growing cycle to cycle', worstGeo <= 0.02, `(worst ${(worstGeo * 100).toFixed(1)} %)`);
   check('GPU textures flat cycle to cycle', worstTex <= 0.02, `(worst ${(worstTex * 100).toFixed(1)} %)`);
   check('DOM flat cycle to cycle', worstDom <= 30, `(worst ${worstDom} nodes)`);
   check('render pipelines flat cycle to cycle', worstPipe <= 0.05, `(worst ${(worstPipe * 100).toFixed(1)} % growth)`);
