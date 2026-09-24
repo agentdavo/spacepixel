@@ -4,6 +4,7 @@ import { narrationCues } from '@/cinema/narration';
 import { intensityAt, soundTimes, type Shot } from '@/cinema/timeline';
 import { hashStr, personById } from '@/dialog/people';
 import { GameAudio, SCORE_IDS, type AudioFrame, type AudioMissileEvent, type AudioShip, type AudioWeaponEvent, type Mood, type ScoreId } from './index';
+import { BANTER, barkLine } from '@/dialog/barks';
 import { CAST_VOICES, VoiceBox, npcVoice, planFor, registerVoice, type VoiceChannel } from './voice';
 
 /**
@@ -239,6 +240,18 @@ export const SCENARIOS: Record<string, Scenario> = {
     ['psalm', 'Be witnessed, Vanguard. Break the Observance and I will break you.'],
     ['system', 'SERVICE WILL RESUME SHORTLY. THANK YOU FOR YOUR PATIENCE.'],
   ]),
+  // Wing orders answered (keys 1–4, then 2 with no lock), then two quiet-leg exchanges.
+  'voice-wing-chat': voices(
+    [
+      ...(['order-form', 'order-attack', 'order-free', 'order-cover', 'order-no-target'] as const).map((k, i) => {
+        const who = ['kade', 'jackpot', 'sparrow', 'salt', 'candle'][i];
+        return [who, barkLine(k, who, 0)] as VLine;
+      }),
+      ...BANTER[0].map(([w, t]) => [w, t] as VLine),
+      ...BANTER[4].map(([w, t]) => [w, t] as VLine),
+    ],
+    0.5,
+  ),
   'voice-cast': voices(
     [
       ['oyelaran', 'Tell her the lines go somewhere. Go where the light is. Keep the light.'],

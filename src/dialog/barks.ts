@@ -12,7 +12,12 @@ export type BarkKind =
   | 'missile' // missile on the Point
   | 'wing-down' // a wingman is lost
   | 'enemy-taunt' // an enemy on the open band
-  | 'enemy-down'; // an enemy's last words
+  | 'enemy-down' // an enemy's last words
+  | 'order-form' // the Point ordered "form on me": the lead wingman answers
+  | 'order-attack' // "attack my target"
+  | 'order-free' // "engage at will"
+  | 'order-cover' // "cover me"
+  | 'order-no-target'; // "attack my target" with nothing locked
 
 /** Lines by kind and voice group. {name} = the other party's callsign. */
 const LINES: Record<BarkKind, Partial<Record<string, string[]>> & { any: string[] }> = {
@@ -84,6 +89,46 @@ const LINES: Record<BarkKind, Partial<Record<string, string[]>> & { any: string[
     concord: ['Keep the—'],
     any: ['—'],
   },
+  'order-form': {
+    kade: ['Forming on you, Point. Tighten it up, Vanguard.', 'Copy. On your wing.'],
+    jackpot: ['Coming home to mother! Save me a seat.', 'Copy, forming up. Nobody touch my slot.'],
+    candle: ['On your wing. As kept.'],
+    sparrow: ['Copy, forming up! On your — yes, on your left.'],
+    salt: ['Rejoining. Try not to lose me.'],
+    any: ['Copy, forming up.'],
+  },
+  'order-attack': {
+    kade: ['Copy your target. Vanguard, on the Point\'s lock.', 'Your target. Going in.'],
+    jackpot: ['Ooh, that one? Copy, he\'s mine. Well, ours.', 'Copy, piling on your target!'],
+    candle: ['Your target. It will not keep long.'],
+    sparrow: ['Copy, attacking your target!'],
+    salt: ['Copy. Your mark, my guns.'],
+    any: ['Copy, attacking your target.'],
+  },
+  'order-free': {
+    kade: ['Weapons free. Vanguard, pick your own. Stay in pairs.', 'Copy, engaging at will.'],
+    jackpot: ['Free hunt! Pool\'s open, people!', 'Engaging at will. Finally.'],
+    candle: ['Free to engage. The seal holds.'],
+    sparrow: ['Copy, weapons free! Okay. Okay. Going.'],
+    salt: ['Free hunt. Copy.'],
+    any: ['Copy, engaging at will.'],
+  },
+  'order-cover': {
+    kade: ['Copy, covering you. Nobody touches the Point.', 'On your six. Fly your fight.'],
+    jackpot: ['Got your back, Point. Your tail\'s my business now.'],
+    candle: ['I keep your six, Point. Go.'],
+    sparrow: ['Covering you! I\'ve got your six!'],
+    salt: ['On your six. Anything follows you, it meets me.'],
+    any: ['Copy, covering you.'],
+  },
+  'order-no-target': {
+    kade: ['Point, you have no lock. Give me a target.', 'Attack what, Point? Lock something first.'],
+    jackpot: ['Love the enthusiasm, Point. Which one?'],
+    candle: ['No lock, Point. Name the target.'],
+    sparrow: ['Um, which target, Point?'],
+    salt: ['You\'re not locked on anything, Point.'],
+    any: ['Say again, Point? No target.'],
+  },
 };
 
 function hash(s: string): number {
@@ -114,6 +159,12 @@ export const BARK_PRIORITY: Record<BarkKind, number> = {
   'wing-down': 2,
   'enemy-taunt': 0,
   'enemy-down': 0,
+  // Answers to the Point's own orders cut in: the player just asked.
+  'order-form': 1,
+  'order-attack': 1,
+  'order-free': 1,
+  'order-cover': 1,
+  'order-no-target': 1,
 };
 
 /** Minimum seconds between two barks of the same kind. */
@@ -127,7 +178,47 @@ export const BARK_COOLDOWN: Record<BarkKind, number> = {
   'wing-down': 3,
   'enemy-taunt': 30,
   'enemy-down': 16,
+  'order-form': 2,
+  'order-attack': 2,
+  'order-free': 2,
+  'order-cover': 2,
+  'order-no-target': 3,
 };
+
+/** The wing's answer to the Point's order (keys 1–4); `hasTarget` for "attack my target". */
+export function orderKind(order: 'formUp' | 'attackMyTarget' | 'engageAtWill' | 'coverMe', hasTarget: boolean): BarkKind {
+  if (order === 'attackMyTarget') return hasTarget ? 'order-attack' : 'order-no-target';
+  return order === 'formUp' ? 'order-form' : order === 'engageAtWill' ? 'order-free' : 'order-cover';
+}
+
+// ── cruise banter ──────────────────────────────────────────────────────
+
+/**
+ * Two- or three-line exchanges between wingmen on a quiet leg. Each line is
+ * [speaker, text]; an exchange plays only if every speaker is flying.
+ */
+export const BANTER: readonly (readonly [string, string])[][] = [
+  [['jackpot', 'Pool\'s at forty shares. Candle, you in?'], ['candle', 'The Order forbids wagering, Jackpot.'], ['jackpot', 'That\'s a no, then. More for me.']],
+  [['sparrow', 'Does anyone else hear the hull ticking? Is that normal?'], ['salt', 'It\'s cooling. Means you\'re alive, Sparrow.']],
+  [['kade', 'Vanguard, check fuel and feeds. Nobody runs dry on my watch.'], ['jackpot', 'Fuel\'s fine. Morale\'s low. Is there a feed for that?']],
+  [['salt', 'Quiet out here. On the convoys, quiet meant somebody was waiting.'], ['kade', 'Then keep your eyes open and your mouth shut, Salt.']],
+  [['candle', 'The drive sings a half-tone flat today.'], ['sparrow', 'Is that bad?'], ['candle', 'It is honest. I will retune it at berth.']],
+  [['jackpot', 'Sparrow, first splash buys the drinks. House rule.'], ['sparrow', 'I don\'t even — okay. Fine. Deal.']],
+  [['kade', 'Good flying today, Sparrow.'], ['sparrow', 'Really? I mean — thank you, Abbess.']],
+  [['salt', 'Candle. What does the Order say about the dead ones out here?'], ['candle', 'That they were kept once. And that we remember.']],
+  [['jackpot', 'Anyone else think the Point flies like they\'re late for dinner?'], ['kade', 'The Point flies fine. Watch your own spacing.']],
+  [['sparrow', 'Pretty stars tonight.'], ['salt', 'They\'re always there, kid. Tonight you looked.']],
+];
+
+/** A banter exchange whose speakers are all in `flying`, skipping those in `used` while any other fits. */
+export function pickBanter(flying: readonly string[], used: ReadonlySet<number>, n: number): number {
+  const fits: number[] = [];
+  for (let i = 0; i < BANTER.length; i++) if (BANTER[i].every(([who]) => flying.includes(who))) fits.push(i);
+  if (!fits.length) return -1;
+  const fresh = fits.filter((i) => !used.has(i));
+  const pool = fresh.length ? fresh : fits;
+  return pool[hash(`banter:${n}`) % pool.length];
+}
 
 /**
  * Rate limiter: a per-kind cooldown, a global gap between any two barks, and

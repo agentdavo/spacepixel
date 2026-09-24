@@ -23,6 +23,15 @@ Hooks for other owners:
 - Title, prologue and trailer stay on the **Original Score** unless the player
   pinned one, so `make-video` / trailer renders are unchanged.
 
+## Wing chat (voices session)
+
+- Wing orders (keys 1–4) get a spoken answer from the lead wingman, in
+  character (`order-*` barks in `src/dialog/barks.ts`); "attack my target"
+  with no lock gets a "which one?". The only touch outside this area is one
+  line in `FlightScene.onKey`: `this.radio.order(this.wingOrder, !!this.lock.target)`.
+- On a long quiet leg (30 s clear of hostiles, 90 s between exchanges, never
+  during an episode) the wing chats among itself: `BANTER` in `barks.ts`.
+
 ## Requests
 
 - **Overlap: turrets / shields / impacts (lead session, 24 Sep ~09:20).** The

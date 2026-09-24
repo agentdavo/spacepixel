@@ -1637,6 +1637,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.wingOrder = orders[i];
       this.orderStatus = `VANGUARD 1 → WING: "${labels[i]}"   · COPY, LEAD.`;
       this.onWingOrder?.(this.wingOrder);
+      this.radio.order(this.wingOrder, !!this.lock.target);
     }
   }
 
