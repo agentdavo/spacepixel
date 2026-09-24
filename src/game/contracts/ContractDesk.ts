@@ -44,6 +44,9 @@ import {
   type V3,
 } from './contracts';
 import { buildOp, type OpBuild } from './ops';
+import { NAMED_CLIENTS, namedContract } from './named';
+import { HireDesk } from '@/game/HireDesk';
+import { dialogHooks } from '@/dialog/state';
 
 /**
  * Free-roam contracts at runtime: the board, the book, and the live
@@ -295,7 +298,9 @@ export class ContractDesk {
   lastReceipts: { station: string; receipts: Receipt[] } | null = null;
   private stage: { kind: ContractKind; phase: string } | null = null;
   private readonly sysNames = new Map<string, string>();
-  private readonly cast: Character[] = [...CAST, ...CLIENTS, ...MARK_CAST];
+  private readonly cast: Character[] = [...CAST, ...CLIENTS, ...MARK_CAST, ...NAMED_CLIENTS];
+  /** People signed on from conversations (mechanic, Magpie's Due). */
+  readonly hires: HireDesk;
 
   constructor(private scene: FlightScene) {
     this.reach = reachOf(scene.universe);
@@ -306,6 +311,10 @@ export class ContractDesk {
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('pagehide', () => this.saveAll());
     scene.starMap.overlay = (c, at, time) => this.drawMap(c, at, time);
+    this.hires = new HireDesk(scene);
+    // Work and hires offered in conversation (the concourse).
+    dialogHooks.onContract = (id, stationId) => this.acceptNamed(id, stationId);
+    dialogHooks.onRecruit = (id) => this.hires.recruit(id);
   }
 
   // ── Board & book ──────────────────────────────────────────────────────
@@ -368,6 +377,19 @@ export class ContractDesk {
   acceptById(stationId: string, id: string, io: LedgerIO = this.sceneLedger()): string | null {
     const k = this.offers(stationId).find((x) => x.id === id);
     return k ? this.accept(k, io) : 'OFFER NOT ON THE BOARD';
+  }
+
+  /**
+   * "Take the job" in a conversation: build the named contract (named.ts)
+   * as offered at `stationId` now and book it. Returns the dock-log line.
+   */
+  acceptNamed(key: string, stationId: string, io: LedgerIO = this.sceneLedger()): { text: string; ok: boolean } {
+    const k = namedContract(key, { reach: this.reach, station: stationId, clock: this.book.clock, rep: this.scene.ledger.rep, tier: this.tier() });
+    if (!k) return { text: 'NO SUCH WORK FROM HERE', ok: false };
+    const open = this.book.active.find((x) => x.named === key);
+    if (open) return { text: `ALREADY ON YOUR BOOK · ${open.title.toUpperCase()}`, ok: false };
+    const err = this.accept(k, io);
+    return err ? { text: `CONTRACT · ${err}`, ok: false } : { text: `CONTRACT ACCEPTED · ${k.title.toUpperCase()} · ${k.reward.toLocaleString('en-US')} sh`, ok: true };
   }
 
   private sceneLedger(): LedgerIO {

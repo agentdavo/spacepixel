@@ -23,6 +23,7 @@ import {
   type TradeLedger,
 } from '@/game/economy';
 import { getAudio } from '@/audio';
+import { loadCrew, repairMultiplier } from '@/game/crew';
 
 /**
  * The docked screen (docking & trade): a DOM overlay in the CRT/OVA style of
@@ -211,11 +212,12 @@ export class DockScreen {
 
   private repair(): void {
     const ctx = this.ctx!;
-    const r = repair(ctx.ledger(), ctx.station, ctx.hull());
+    const mechanic = repairMultiplier(loadCrew());
+    const r = repair(ctx.ledger(), ctx.station, ctx.hull(), mechanic);
     if (r.cost > 0) {
       ctx.setLedger(r.ledger);
       ctx.setHull(r.hull);
-      this.say(`HULL PATCHED TO ${Math.round(r.hull * 100)}% — ${sh(r.cost)}. THE WARDENS SAY THE WORDS.`, 'ok');
+      this.say(`HULL PATCHED TO ${Math.round(r.hull * 100)}% — ${sh(r.cost)}. ${mechanic < 1 ? 'TWO-COATS DOES THE LABOUR; THE YARD SELLS THE PLATE.' : 'THE WARDENS SAY THE WORDS.'}`, 'ok');
     } else this.say(ctx.hull() >= 1 ? 'HULL IS WHOLE. NOTHING TO KEEP.' : 'INSUFFICIENT SHARES FOR REPAIRS', ctx.hull() >= 1 ? '' : 'err');
     this.render();
   }
@@ -321,11 +323,12 @@ export class DockScreen {
     el.querySelector('.dock-blurb')!.textContent = `${c.name.toUpperCase()} — ${c.blurb}`;
 
     const hull = ctx.hull();
-    const rc = repairCost(st, l, hull);
+    const mechanic = repairMultiplier(loadCrew());
+    const rc = repairCost(st, l, hull, mechanic);
     el.querySelector('.dock-svc.hull')!.innerHTML = `
       <div class="row"><h3>HULL · AIRFRAME 0413</h3><span>${Math.round(hull * 100)}%</span></div>
       <div class="meter"><i style="width:${Math.round(hull * 100)}%"></i></div>
-      <div class="row"><span>${rc > 0 ? 'Wardens standing by.' : 'The seal holds.'}</span><button class="dock-btn" data-act="repair" ${rc > 0 && l.credits > 0 ? '' : 'disabled'}>REPAIR${rc > 0 ? ` — ${sh(rc)}` : ''}</button></div>`;
+      <div class="row"><span>${rc > 0 ? (mechanic < 1 ? 'Two-Coats has his sleeves up (−30%).' : 'Wardens standing by.') : 'The seal holds.'}</span><button class="dock-btn" data-act="repair" ${rc > 0 && l.credits > 0 ? '' : 'disabled'}>REPAIR${rc > 0 ? ` — ${sh(rc)}` : ''}</button></div>`;
     const ac = rearmCost(st, l);
     el.querySelector('.dock-svc.rails')!.innerHTML = `
       <div class="row"><h3>MICRO-MISSILE RAILS</h3><span class="pips">${'■'.repeat(l.missiles)}${'□'.repeat(MISSILE_MAX - l.missiles)}</span></div>

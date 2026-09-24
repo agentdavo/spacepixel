@@ -22,6 +22,7 @@ import { CampaignSession, type FlightHostScene } from '@/game/CampaignSession';
 import { SYSTEM_FALLBACK } from '@/game/campaign/missions';
 import { getAudio, combatIntensity, type AudioFrame } from '@/audio';
 import type { CampaignMission } from '@/game/campaign/types';
+import type { FactionId } from '@/assets/Blueprint';
 import type { StarSystem } from '@/universe/Universe';
 import type { Universe } from '@/universe/Universe';
 import { FlightHud } from '@/ui/FlightHud';
@@ -1101,6 +1102,33 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.orderStatus = `VANGUARD 1 → WING: "${labels[i]}"   · COPY, LEAD.`;
       this.onWingOrder?.(this.wingOrder);
     }
+  }
+
+  /**
+   * A hire joins the free-flight wing (src/game/crew.ts): spawned in the next
+   * formation slot — or, while berthed, at a hold point off the approach —
+   * and flown on the standing wing order. Story episodes park it with the
+   * rest of the free-flight wing.
+   */
+  addWingman(blueprint: string, name: string, faction: FactionId): ShipEntity {
+    const pf = this.player.flight;
+    const n = this.wingmen.length;
+    const slot = new Vector3((n % 2 ? 1 : -1) * (46 + 40 * n), -7 + 6 * n, -34 - 30 * n);
+    const pos = slot.clone().applyQuaternion(pf.orientation).add(pf.position);
+    const d = this.docking.target;
+    if (d && this.docking.phase !== 'free') this.docking.toWorld(d, WingDocking.slot(n, d.interior.hw, _v), pos);
+    const ship = this.fleet.spawn(blueprint, faction, pos, pf.forward(new Vector3()), { name, team: this.player.team });
+    ship.flight.velocity.copy(d && this.docking.phase !== 'free' ? d.velocity : pf.velocity);
+    this.wingmen.push({ ship, slot });
+    const wing = this.wingmen.map((w) => w.ship).filter((s) => s.alive);
+    setFormation(wing, 'fingerFour', 40);
+    issueOrder(wing, this.wingOrder, this.player);
+    this.wingDock.adopt(ship);
+    if (this.campaign) {
+      ship.alive = false;
+      ship.model.root.visible = false;
+    }
+    return ship;
   }
 
   /** Set by the AI integration to receive wing orders. */

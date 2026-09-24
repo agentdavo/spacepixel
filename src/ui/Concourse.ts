@@ -387,11 +387,12 @@ class ConcourseTab {
         if (unlockCodexEntry(e.codex)) this.api.say(`CODEX UNLOCKED · ${(CODEX_TITLE.get(e.codex) ?? e.codex).toUpperCase()}`, 'ok');
       } else if ('rumour' in e || 'tip' in e) this.renderNotebook();
       else if ('contract' in e) {
-        dialogHooks.onContract?.(e.contract, stId);
-        this.api.say(`CONTRACT OFFERED · ${e.contract.toUpperCase()}`, 'ok');
+        const r = dialogHooks.onContract?.(e.contract, stId);
+        this.api.say(r ? r.text : `CONTRACT OFFERED · ${e.contract.toUpperCase()}`, r && !r.ok ? 'err' : 'ok');
+        if (r) this.api.refresh();
       } else if ('recruit' in e) {
-        dialogHooks.onRecruit?.(e.recruit, stId);
-        this.api.say(`HIRE AVAILABLE · ${e.recruit.toUpperCase()}`, 'ok');
+        const r = dialogHooks.onRecruit?.(e.recruit, stId);
+        this.api.say(r ? r.text : `HIRE AVAILABLE · ${e.recruit.toUpperCase()}`, r && !r.ok ? 'err' : 'ok');
       }
     }
     void before;

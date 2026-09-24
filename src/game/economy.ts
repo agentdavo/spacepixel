@@ -370,15 +370,16 @@ export function sell(ledger: TradeLedger, spec: MarketSpec, cid: CommodityId, qt
 }
 
 /** Cost to repair from `hull` to full (0..1 fractions of a 100-point hull). */
-export function repairCost(spec: MarketSpec, l: TradeLedger, hull: number): number {
+/** `mul` scales the labour (a hired mechanic, src/game/crew.ts). */
+export function repairCost(spec: MarketSpec, l: TradeLedger, hull: number, mul = 1): number {
   const missing = Math.max(0, Math.round((1 - clamp(hull, 0, 1)) * 100));
   const yard = spec.kind === 'bastion' || spec.kind === 'salvage' || spec.kind === 'carrier' ? 0.8 : 1;
-  return Math.ceil(missing * HULL_PRICE * yard * serviceMarkup(l.rep[spec.faction]));
+  return Math.ceil(missing * HULL_PRICE * yard * mul * serviceMarkup(l.rep[spec.faction]));
 }
 
 /** Repair as much as the player can afford. Returns the new hull fraction. */
-export function repair(ledger: TradeLedger, spec: MarketSpec, hull: number): { ledger: TradeLedger; hull: number; cost: number } {
-  const full = repairCost(spec, ledger, hull);
+export function repair(ledger: TradeLedger, spec: MarketSpec, hull: number, mul = 1): { ledger: TradeLedger; hull: number; cost: number } {
+  const full = repairCost(spec, ledger, hull, mul);
   if (full <= 0) return { ledger, hull, cost: 0 };
   const l = clone(ledger);
   if (l.credits >= full) {

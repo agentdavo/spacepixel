@@ -76,6 +76,11 @@ export class WingDocking {
     }
   }
 
+  /** A wingman who joined mid-sequence (a hire signed on while berthed): hold with the rest. */
+  adopt(s: ShipEntity): void {
+    if (this.holding.length && !this.holding.includes(s)) this.holding.push(s);
+  }
+
   /** Is `s` currently parked off the corridor by us? */
   isHolding(s: ShipEntity): boolean {
     return this.holding.includes(s);

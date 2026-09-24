@@ -43,9 +43,12 @@ export function saveDialogState(s: DialogState): void {
  * `{ recruit: id }` calls `onRecruit(id, stationId)`. Unhooked, the offer is
  * still remembered in DialogState.contracts / .recruits.
  */
+export type HookResult = { text: string; ok: boolean } | void;
+
 export const dialogHooks: {
-  onContract: ((id: string, stationId: string) => void) | null;
-  onRecruit: ((id: string, stationId: string) => void) | null;
+  /** May return the line to log (accepted / why not); otherwise the offer is only noted. */
+  onContract: ((id: string, stationId: string) => HookResult) | null;
+  onRecruit: ((id: string, stationId: string) => HookResult) | null;
   /** Every applied effect (analytics / debug / other systems). */
   onEffect: ((e: Effect, stationId: string) => void) | null;
 } = { onContract: null, onRecruit: null, onEffect: null };
