@@ -515,9 +515,12 @@ standing; Rustwake salvage is 6 % worse, heavier and 28 % cheaper. Mk III and
 Mk IV need standing with the maker's faction (Directorate +20 / +50) and
 Mk IV is sold only at bastions and carriers. Guns and turrets fit a slot of
 their size; racks their size or smaller; utility items their slot's class.
-Utility numbers are ratios against the hull's stock (Mk I) item, so a stock
-Kestrel is exactly the Kestrel the balance was tuned on, and every hull's
-stock fit leaves ~20 % power headroom (all-Mk IV needs a better reactor).
+Utility numbers are ratios against the Mk I version of the hull's stock item
+(`baselineFit`), so a stock Kestrel is exactly the Kestrel the balance was
+tuned on, and every hull's Mk I fit leaves ~20 % power headroom (all-Mk IV
+needs a better reactor). Most hulls leave the yard all Mk I; the Resolute
+and Valiant come with Mk II kit (Resolute: Mk II mounts, driver, shield and
+plate, Mk III torpedoes; Valiant: Mk II rail mounts and shield).
 
 A fit is applied to the live ship at spawn and after every refit
 (`applyFit`: combat stats, damage pools, loadout with per-gun sockets / Mk
@@ -550,9 +553,9 @@ hit), so PD thins a swarm without stopping it.
 **Balance** (`npm run balance`, scenario *outfit*: scripted helm at 1.5 km,
 turrets live on both sides, mean of six seeds): a Mk III Resolute kills a
 Lantern Guard solo in ~78 s with ~49 % hull left (bands 60–120 s, 30–80 %);
-a stock one loses — refit before taking a picket alone. A Mk III Valiant
+a stock one wins narrowly (~87 s, ~19 % hull; band 5–35 %). A Mk III Valiant
 beats a Vesper in ~68 s with ~52 % hull left (bands 45–120 s, 30–80 %; stock
-~88 s, 18 %), six of its seven torpedoes shot down. Scenario *swarm*: three
+~81 s, ~24 %, band 15–40 %), six of its seven torpedoes shot down. Scenario *swarm*: three
 12-round swarms from 2.2 km — a Lantern Guard's PD takes ~25 %, a Mk III
 Resolute's PD turrets ~8 %, the rest hit. Pure + tested:
 `src/game/outfitting/{items,fit,hangar}.ts`, `tests/outfitting.test.ts`.

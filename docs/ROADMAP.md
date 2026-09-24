@@ -129,7 +129,7 @@ buy the next hull, take on bigger adversaries.
 | Capital subsystems with effects; B sub-targets | turret to a wing of 4: 5–15 s | `src/sim/Damage.ts`, `Combat.ts`, `Capitals.ts` |
 | Fighter damage zones (thrust, roll drift, smoke) | unit-tested routing | `Damage.ts`, `src/world/DamageFx.ts` |
 | Directional capital shields, collapse / regen visuals | facing routing unit-tested | `WeaponVisuals.ts`, `CombatFx.ts` |
-| Balance | Kestrel vs Cantor 3–8 s · capital to a squadron 60–180 s · Mk III Resolute vs Lantern Guard 60–120 s / 30–80 % hull · Mk III Valiant vs Vesper 45–120 s / 30–80 % hull · PD thins swarms | `npm run balance` |
+| Balance | Kestrel vs Cantor 3–8 s · capital to a squadron 60–180 s · Mk III Resolute vs Lantern Guard 60–120 s / 30–80 % hull · Mk III Valiant vs Vesper 45–120 s / 30–80 % hull · stock Resolute beats a Lantern Guard narrowly (5–35 % hull) · stock Valiant vs Vesper 15–40 % hull · PD thins swarms | `npm run balance` |
 
 ![Shield facing collapse](screenshots/combat-shield.jpg)
 
@@ -183,10 +183,6 @@ modifiers, an event log), is read and written by everything below.
   (by design — it's the Yamato shot — but a bow-view toggle would help).
 - Bay dust fades only for the docking target / nearest bay: a camera parked
   in another ship's hangar (cutaways of wingmen) still sees streaks.
-- A stock (unfitted) Resolute loses a solo duel with a Lantern Guard (a stock
-  Valiant scrapes past a Vesper with ~18 % hull; `npm run balance` INFO
-  lines): fitting out is the intended answer, but the first T5 sortie can
-  surprise.
 
 Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
 
@@ -211,6 +207,17 @@ Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
   Mk III vs Vesper ~68 s / 52 % hull, swarm vs PD bands (`npm run balance`);
   Cantor shield 80 → 95 brings the 96-seed dogfight sweep from 69 % to 53 %
   Concord (`npm run ai-sim`).
+- **Stock warship fits** — an all-Mk I Resolute lost a solo duel with a
+  Lantern Guard (0 % hull) and a stock Valiant scraped past a Vesper with
+  ~18 % hull. Both now leave the yard with Mk II kit (`STOCK_OVERRIDE` in
+  `src/game/outfitting/fit.ts`): Resolute Mk II mounts, driver, shield and
+  plate plus a Mk III torpedo load (at Mk I/II the picket's PD takes nearly
+  every torpedo); Valiant Mk II rail mounts and shield. Utility ratios are
+  now taken against the Mk I stock item (`baselineFit`), so the Mk II kit
+  counts. Stock Resolute vs Lantern Guard ~87 s / ~19 % hull (band 5–35 %,
+  6 of 6 seeds; ~10 of 12 on a wider sweep — still a narrow win), stock
+  Valiant vs Vesper ~81 s / ~24 % hull (band 15–40 %); Mk III fits
+  unchanged and still ~28–30 points better.
 - **Valiant bridge camera** — eye 0.16 L above / 0.08 L behind the bridge over
   a forward battery; the mounts sit in the bottom sixth (tested).
 - **Hires** — Magpie (wing) and Brennick (−30 % repairs) verified end to end
