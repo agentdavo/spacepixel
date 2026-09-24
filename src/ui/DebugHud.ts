@@ -103,7 +103,8 @@ export class DebugHud implements Updatable {
       <div>VIEW     <b>${this.view.toUpperCase()}</b> · INK <b>${s.enabled ? 'ON' : 'OFF'}</b> · BOIL <b>${s.boilAmount > 0 ? 'ON' : 'OFF'}</b></div>
       <div class="keys">[F1-F6] view  [I] ink  [B] boil  [C] camera</div>
       <div class="keys">mouse/arrows steer · Q/E roll · W/S throttle · SHIFT burner · Z assist · X stop</div>
-      <div class="keys">SPACE guns · R gun · F salvo · Y missile · T target · B subsystem · J cruise · V cam · M map · TAB tactical · 1-4 wing orders</div>`;
+      <div class="keys">SPACE guns · R gun · F salvo · Y missile · T target · B subsystem · J cruise · V cam · M map · TAB tactical · 1-4 wing orders</div>
+      <div class="keys">. shields fwd / next facing · , shields aft / prev facing · / shield AUTO on-off</div>`;
     this.el.append(this.graph);
     this.shotEl.textContent = this.game.cameraLabel?.() ?? this.sceneName.toUpperCase();
   }

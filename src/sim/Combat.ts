@@ -22,15 +22,21 @@ import {
 } from './Loadouts';
 import {
   DAMAGE_MUL,
+  FACING_AXIS,
+  FACING_NAMES,
   addSubsystem,
+  adoptShield,
   applyHit,
   capitalEffects,
   createDamageState,
   createHitResult,
+  facingOf,
+  facingUp,
   fighterEffects,
   regenShields,
   resetDamage,
-  shieldFacing,
+  setShieldCapacity,
+  stepShieldPower,
   type CapitalEffects,
   type DamageState,
   type FighterEffects,
@@ -94,9 +100,9 @@ const _v = new Vector3();
 const _w = new Vector3();
 const _q = new Quaternion();
 
-/** Capital for combat purposes: facings, subsystems, voxel hull (corvettes included). */
+/** Capital for combat purposes: 4+ shield facings, subsystems, voxel hull (corvettes included). */
 export function isCapitalModel(model: ShipModel): boolean {
-  return (SHIP_STATS[model.blueprint.id]?.facings ?? 1) === 4 || model.radius > 200;
+  return (SHIP_STATS[model.blueprint.id]?.facings ?? 1) >= 4 || model.radius > 200;
 }
 
 /** Flight spec for a design: class base × stats multipliers (+ exact overrides). */
@@ -146,8 +152,11 @@ export function createCombat(blueprintId: string, model: ShipModel, faction: Fac
   } else modelBox(model, _box);
   const c = _box.getCenter(new Vector3());
   const h = _box.getSize(new Vector3()).multiplyScalar(0.5);
-  const dmg = createDamageState(capital, stats.shield, stats.hull, { cx: c.x, cy: c.y, cz: c.z, halfW: h.x, halfH: h.y, halfL: h.z }, stats.shieldRegen, stats.shieldDelay);
+  // Hulls that fly and take hits as fighters (sphere hits, gunships, small corvettes) get at most the fore / aft halves.
+  const dmg = createDamageState(capital, stats.shield, stats.hull, { cx: c.x, cy: c.y, cz: c.z, halfW: h.x, halfH: h.y, halfL: h.z }, stats.shieldRegen, stats.shieldDelay, capital ? stats.facings : Math.min(stats.facings, 2), stats.shieldTransfer);
   if (capital && grid) addCapitalSubsystems(dmg, model, blueprintId, grid, stats.hull);
+  // Every ship starts with its shield officer on (the player's keys take over: , . /).
+  dmg.trimAuto = true;
   return {
     stats,
     loadout,
@@ -206,6 +215,70 @@ function addCapitalSubsystems(dmg: DamageState, model: ShipModel, id: string, gr
   if (bridgeSocket) add('bridge', 'bridge', _v.setFromMatrixPosition(_m.multiplyMatrices(_inv, bridgeSocket.matrixWorld)));
   else add('bridge', 'bridge', onTop(layout.bridge.x, layout.bridge.z));
   add('shieldGen', 'shield-gen', onTop(layout.shieldGen.x, layout.shieldGen.z));
+  addShieldEmitters(dmg, grid, len, hullMax);
+}
+
+const _eh: GridHit = { t: 0, nx: 0, ny: 0, nz: 0 };
+const _ef = new Vector3();
+/** Offsets across the face (fractions of the half extents: along the hull / up the face, then the other way) tried in turn for an emitter's spot. */
+const EMITTER_SLIDE = [0, 0, 0.3, 0, -0.3, 0, 0, 0.3, 0, -0.3, 0.55, 0, -0.55, 0, 0, 0.55, 0, -0.55, 0.3, 0.3, -0.3, -0.3, 0.8, 0, -0.8, 0];
+
+/**
+ * One shield emitter per facing (4+ facings): dropped onto the plating that
+ * faces that way by a grid raycast inward along the facing's axis (bow and
+ * stern on the centreline, flanks amidships, deck and keel on the midline),
+ * slid across the face until the spot belongs to that facing's region (so
+ * fire has to come through that facing to reach it) and clears the other
+ * subsystems. Knocking one out keeps its facing down (Damage.ts).
+ */
+function addShieldEmitters(dmg: DamageState, grid: HullGrid, len: number, hullMax: number): void {
+  const n = dmg.facings.length;
+  if (n < 4) return;
+  const t = SUBSYSTEM_TUNING.shieldEmitter;
+  const radius = Math.max(t.radius * len * (len < 400 ? 1.6 : 1), 2.5) + grid.cell * 0.75;
+  const b = grid.box;
+  const c = [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, (b.minZ + b.maxZ) / 2];
+  const h = [(b.maxX - b.minX) / 2, (b.maxY - b.minY) / 2, (b.maxZ - b.minZ) / 2];
+  const pad = grid.cell * 2;
+  const o = [0, 0, 0];
+  const d = [0, 0, 0];
+  for (let f = 0; f < n; f++) {
+    const a = FACING_AXIS[f];
+    const ax = a[0] ? 0 : a[1] ? 1 : 2;
+    // Slide along the hull's length on the flanks / deck / keel, up the face at bow and stern.
+    const across = ax === 2 ? 1 : 2;
+    const other = 3 - ax - across;
+    let fallback = 0; // 0 none · 1 any hit · 2 a hit in the facing's own region
+    let placed = false;
+    for (let i = 0; i < EMITTER_SLIDE.length; i += 2) {
+      o[0] = c[0];
+      o[1] = c[1];
+      o[2] = c[2];
+      o[ax] += a[ax] * (h[ax] + pad);
+      o[across] += EMITTER_SLIDE[i] * h[across];
+      o[other] += EMITTER_SLIDE[i + 1] * h[other];
+      d[0] = d[1] = d[2] = 0;
+      d[ax] = -a[ax] * (h[ax] * 2 + pad * 2);
+      if (!raycastGrid(grid, o[0], o[1], o[2], d[0], d[1], d[2], _eh)) continue;
+      _v.set(o[0] + d[0] * _eh.t, o[1] + d[1] * _eh.t, o[2] + d[2] * _eh.t);
+      const own = facingOf(dmg, _v) === f;
+      const clear = !dmg.subsystems.some((s) => Math.hypot(s.x - _v.x, s.y - _v.y, s.z - _v.z) < (s.radius + radius) * 0.6);
+      if (own && clear) {
+        placed = true;
+        break;
+      }
+      const rank = own ? 2 : 1;
+      if (rank > fallback) {
+        fallback = rank;
+        _ef.copy(_v);
+      }
+    }
+    if (!placed) {
+      if (fallback) _v.copy(_ef);
+      else _v.set(c[0] + a[0] * h[0], c[1] + a[1] * h[1], c[2] + a[2] * h[2]);
+    }
+    addSubsystem(dmg, { id: `emitter-${FACING_NAMES[f].toLowerCase()}`, kind: 'shieldEmitter', label: `${FACING_NAMES[f]} ${t.label}`, x: _v.x, y: _v.y, z: _v.z, radius, hpMax: Math.max(40, hullMax * t.hp), facing: f });
+  }
 }
 
 export function combatOf(s: ShipEntity): CombatState {
@@ -248,14 +321,10 @@ export function chooseGun(s: ShipEntity, target: ShipEntity | null): void {
   const guns = s.combat.loadout.guns;
   if (guns.length < 2 || !target) return;
   const dist = target.flight.position.distanceTo(s.flight.position);
-  // Capitals: the facing between us and the hull is what matters.
+  // The facing between us and the hull is what matters (a fighter's aft half when we're on its six).
+  // Keep stripping until it is really down: a live facing gets charge shunted into it.
   const st = target.combat.dmg;
-  let up: boolean;
-  if (st.capital) {
-    toLocal(target, s.flight.position, _v);
-    const f = shieldFacing(_v.x - st.cx, _v.z - st.cz, st.halfW, st.halfL);
-    up = st.facings[f] > st.facingMax * 0.03;
-  } else up = target.shield > target.shieldMax * 0.05;
+  const up = st.facings.length ? facingUp(st, facingOf(st, toLocal(target, s.flight.position, _v)), 0.005) : false;
   const layer = up ? 'shield' : 'hull';
   let best = s.combat.gun;
   let bs = -1;
@@ -285,16 +354,11 @@ export function stepCombat(s: ShipEntity, dt: number): void {
     resetDamage(st, s);
     c.damaged = false;
   }
-  if (st.capital) {
-    // A scene refilled `shield` directly: spread it over the facings.
-    let sum = 0;
-    for (const f of st.facings) sum += f;
-    if (s.shield > sum + 1) {
-      const each = Math.min(st.facingMax, s.shield / st.facings.length);
-      for (let i = 0; i < st.facings.length; i++) st.facings[i] = Math.max(st.facings[i], each);
-      st.down = 0;
-    }
-  }
+  // A scene resized or refilled / drained the pools directly: carry it into the facings.
+  if (Math.abs(s.shieldMax - st.facingMax * st.facings.length) > 1e-6 * Math.max(1, s.shieldMax)) setShieldCapacity(st, s, s.shieldMax);
+  adoptShield(st, s);
+  // Shield power: AI ships (and the player on autopilot) trim toward incoming fire; the player trims by hand or AUTO.
+  stepShieldPower(st, s, dt, !s.isPlayer || (s.brain as { autopilot?: boolean } | null)?.autopilot === true);
   regenShields(st, s, s.sinceHit, dt);
   if (st.tether > 0) st.tether = Math.max(0, st.tether - dt);
   if (c.missileReload > 0) c.missileReload = Math.max(0, c.missileReload - dt);
@@ -351,7 +415,8 @@ export function raycastShip(s: ShipEntity, a: Vector3, d: Vector3, pad: number, 
     out.point.copy(a).addScaledVector(d, t);
     out.normal.subVectors(out.point, f.position).normalize();
     toLocal(s, out.point, out.local);
-    out.onShield = s.shield > 0;
+    const st = c.dmg;
+    out.onShield = st.facings.length > 0 && st.facings[facingOf(st, out.local)] > 0;
     return true;
   }
   // Broad phase: full bounding sphere.
@@ -375,10 +440,9 @@ export function raycastShip(s: ShipEntity, a: Vector3, d: Vector3, pad: number, 
     if (t <= 1) {
       const lx = _lo.x + _ld.x * t;
       const lz = _lo.z + _ld.z * t;
-      const facing = shieldFacing(lx - st.cx, lz - st.cz, st.halfW, st.halfL);
-      if (st.facings[facing] > 0) {
+      out.local.set(lx, _lo.y + _ld.y * t, lz);
+      if (st.facings[facingOf(st, out.local)] > 0) {
         out.t = t;
-        out.local.set(lx, _lo.y + _ld.y * t, lz);
         out.point.copy(a).addScaledVector(d, t);
         // Ellipsoid normal: gradient of the implicit surface.
         out.normal.set((lx - st.cx) / (sx * sx), (out.local.y - st.cy) / (sy * sy), (lz - st.cz) / (sz * sz)).normalize().applyQuaternion(f.orientation);
@@ -455,6 +519,8 @@ export function damageShip(s: ShipEntity, amount: number, type: DamageType, poin
     r.hullDamage = r.shieldDamage = 0;
     r.subsystem = null;
     r.subsystemDestroyed = r.facingCollapsed = false;
+    r.strength = -1;
+    r.bleed = r.splash = 0;
     return r;
   }
   s.sinceHit = 0;

@@ -4,7 +4,7 @@ import type { Weapons, Beam } from './Weapons';
 import { createTurretSolution, turretAim, turretCanPoint, turretSelectTarget, TURRET_DEFAULTS, type TurretMount, type TurretSolution } from './ai/Turret';
 import { issueOrder, leadPoint } from './ai';
 import { CAPITAL_LANCE, GUNS, type BatterySpec, type GunSpec } from './Loadouts';
-import { shieldFacing, type Subsystem } from './Damage';
+import { facingOf, facingUp, type Subsystem } from './Damage';
 import type { Rng } from './Rng';
 import { PD_TOL, createDrive, gateTolerance, mountFromRig, nextMuzzle, poseTurret, restoreDrive, rigFor, stepDrive, wreckDrive, type TurretDrive, type TurretRig } from './TurretRig';
 
@@ -116,10 +116,10 @@ const _sol = createTurretSolution();
 /** Is the shield between `from` and the ship still up (its facing, or its bubble)? */
 function shieldUpToward(t: ShipEntity, from: Vector3): boolean {
   const st = t.combat.dmg;
-  if (!st.capital) return t.shield > t.shieldMax * 0.05;
+  if (st.facings.length < 2) return t.shield > t.shieldMax * 0.05;
+  // The facing toward the gun (fore/aft halves, 4 or 6 capital facings).
   _v.subVectors(from, t.flight.position).applyQuaternion(_q.copy(t.flight.orientation).invert());
-  const f = shieldFacing(_v.x - st.cx, _v.z - st.cz, st.halfW, st.halfL);
-  return st.facings[f] > st.facingMax * 0.05;
+  return facingUp(st, facingOf(st, _v), 0.05);
 }
 
 const _m = new Matrix4();

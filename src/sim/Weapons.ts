@@ -2,7 +2,7 @@ import { Vector3 } from 'three';
 import type { Fleet, HitEventKind, ShipEntity, Team } from './Fleet';
 import type { FactionId } from '@/assets/Blueprint';
 import { GUNS, GUN_INDEX, GUN_LIST, type DamageType, type GunSpec } from './Loadouts';
-import type { Subsystem } from './Damage';
+import { facingStrength, type Subsystem } from './Damage';
 import { chooseGun, createRayHit, cycleSubsystem, gunOf, raycastShip } from './Combat';
 import type { Rng } from './Rng';
 
@@ -14,8 +14,8 @@ export { segmentSphere } from './Combat';
  *
  * Bolts: fixed pool of projectiles in flat Float64Arrays (universe space).
  * Each step they move and are tested as swept segments against every enemy:
- * fighters are spheres (their shield bubble), capitals are a shield shell
- * (four facings) around a voxel hull (Combat.raycastShip) so hits land on the
+ * fighters are spheres (their shield bubble, fore / aft halves), capitals are
+ * a shield shell (four or six facings) around a voxel hull (Combat.raycastShip) so hits land on the
  * plating and route to the subsystem under them. Heavy torpedoes in the way
  * can be shot down.
  *
@@ -33,6 +33,15 @@ export const BOLT_CAPACITY = 4096;
 
 export type WeaponEventKind = 'hit' | 'shield' | 'kill' | 'fire' | 'beam-hit' | HitEventKind | 'shield-up';
 
+/**
+ * Shield events (Damage.ts facings): 'shield' a hit the facing held (it may
+ * still have bled: `bleed`), 'shield-bleed' part of a hit leaked through a
+ * failing facing to the hull (always alongside that hit's 'shield' /
+ * 'beam-hit' / missile detonation), 'shield-down' a facing collapsed under
+ * fire, 'shield-up' a collapsed facing started coming back (regen, or charge
+ * transferred in). Facings lost for good arrive as 'subsystem' with
+ * `sub.kind` 'shieldEmitter' (that `sub.facing`) or 'shieldGen' (all).
+ */
 export interface WeaponEvent {
   kind: WeaponEventKind;
   position: Vector3;
@@ -45,8 +54,21 @@ export interface WeaponEvent {
   gun: GunSpec | null;
   /** Destroyed subsystem ('subsystem'). */
   sub: Subsystem | null;
-  /** Capital shield facing (shield, shield-down, shield-up); −1 = fighter bubble / n/a. */
+  /**
+   * Shield facing (shield, shield-bleed, shield-down, shield-up, and hits /
+   * subsystems for the facing they landed under): a Damage.FACING index —
+   * fighters 0 fore / 1 aft, capitals up to 5 (Damage.FACING_AXIS gives its
+   * direction). −1 = n/a.
+   */
   facing: number;
+  /**
+   * That facing's charge / capacity after the event, 0..1 (shield,
+   * shield-bleed, shield-down → 0, shield-up); −1 = n/a. Drives ripple
+   * brightness: a flickering, failing facing reads near 0.
+   */
+  strength: number;
+  /** Fraction of the hit (0..Damage.BLEED_MAX) that bled through to the hull (shield, shield-bleed, beam-hit); 0 = none. */
+  bleed: number;
 }
 
 export interface Beam {
@@ -119,16 +141,20 @@ export class Weapons {
   constructor(readonly fleet: Fleet) {
     this.rng = fleet.rng.fork('weapons');
     for (let i = 0; i < EVENT_POOL; i++) {
-      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1 });
+      this.eventPool.push({ kind: 'hit', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1, strength: -1, bleed: 0 });
     }
     for (let i = 0; i < 128; i++) {
-      this.flashes.push({ kind: 'fire', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1 });
+      this.flashes.push({ kind: 'fire', position: new Vector3(), normal: new Vector3(), velocity: new Vector3(), ship: null, shooter: null, gun: null, sub: null, facing: -1, strength: -1, bleed: 0 });
     }
-    fleet.onEvent = (kind, ship, point, normal, shooter, sub, facing) => {
+    fleet.onEvent = (kind, ship, point, normal, shooter, sub, facing, hit) => {
       const e = this.emit(kind, point, normal, ship.flight.velocity, ship, shooter);
       if (e) {
         e.sub = sub;
         e.facing = facing;
+        if (hit && (kind === 'shield-bleed' || kind === 'shield-down')) {
+          e.strength = hit.strength;
+          e.bleed = hit.bleed;
+        }
       }
     };
   }
@@ -149,6 +175,8 @@ export class Weapons {
     e.gun = gun;
     e.sub = null;
     e.facing = -1;
+    e.strength = -1;
+    e.bleed = 0;
     this.events.push(e);
     return e;
   }
@@ -288,7 +316,10 @@ export class Weapons {
         for (let f = 0; f < Math.max(1, st.facings.length); f++) {
           if (!(st.regenStarted & (1 << f))) continue;
           const e = this.emit('shield-up', s.flight.position, _c.set(0, 1, 0), s.flight.velocity, s, null);
-          if (e) e.facing = st.capital ? f : -1;
+          if (e) {
+            e.facing = f < st.facings.length ? f : -1;
+            e.strength = e.facing >= 0 ? facingStrength(st, f) : -1;
+          }
         }
         st.regenStarted = 0;
       }
@@ -322,7 +353,11 @@ export class Weapons {
         if (shooter) provoke(hitShip, shooter);
         const r = this.fleet.hit(hitShip, this.damage[i], gun.type, _b, _c, shooter);
         const e = this.emit(r.shielded ? 'shield' : 'hit', _b, _c, _f, hitShip, shooter, gun);
-        if (e) e.facing = r.facing;
+        if (e) {
+          e.facing = r.facing;
+          e.strength = r.strength;
+          e.bleed = r.bleed;
+        }
         this.life[i] = 0;
         continue;
       }
@@ -369,6 +404,8 @@ export class Weapons {
         const e = this.emit(r.shielded ? 'shield' : 'beam-hit', b.end, _c, hitShip.flight.velocity, hitShip, b.owner, b.gun);
         if (e) {
           e.facing = r.facing;
+          e.strength = r.strength;
+          e.bleed = r.bleed;
           // Beam shield contact is continuous: only flash the ripple now and then.
           if (r.shielded && this.rand() > 0.12) e.kind = 'beam-hit';
         }
