@@ -70,7 +70,12 @@ export interface CamMove {
   units?: 'km' | 'm';
 }
 
-export type CaptionKind = 'narration' | 'slug' | 'word' | 'count' | 'title';
+/**
+ * narration: outlined subtitle (voiced by the narrator, or by `who`) · slug: date line typed into the top bar
+ * · word: one big spoken word · count: the Signal's prime counter · title: the title card
+ * · card: full-frame eyecatch interstitial ("TRADE.") · label: lower-third name tag · slate: end slate.
+ */
+export type CaptionKind = 'narration' | 'slug' | 'word' | 'count' | 'title' | 'card' | 'label' | 'slate';
 
 export interface Caption {
   at: number;
@@ -81,6 +86,12 @@ export interface Caption {
   /** Optional Japanese line (OVA dual subtitle flavour). */
   jp?: string;
   kind?: CaptionKind;
+  /** Narration / word captions: who speaks it (default the narrator; `''` = silent). */
+  who?: string;
+  /** Voice channel for `who` (default: narrator for the narrator, else radio). */
+  channel?: 'narrator' | 'radio' | 'clean' | 'intercept';
+  /** Card / slate colourway (CSS modifier). */
+  tone?: string;
 }
 
 export type FxField = 'flash' | 'fade' | 'invert' | 'hue' | 'solarize' | 'jump' | 'boost' | 'speed';
@@ -98,12 +109,17 @@ export interface SoundCue {
   stinger?: StingerKind;
   radio?: RadioKind;
   gain?: number;
+  /** Fire `repeat` times, `every` seconds apart (gun bursts). */
+  repeat?: number;
+  every?: number;
 }
 
 export interface MusicCue {
   at: number;
   mood: Mood;
   fade?: number;
+  /** Music intensity 0..1 from here on (drums / brass layers); hosts that drive it read `intensityAt`. */
+  intensity?: number;
 }
 
 /** Stage events (particle bursts, prop state changes) — fired on crossing, also while seeking. */
@@ -214,6 +230,26 @@ export function sampleFx(shot: Shot, local: number, out: FxValues = emptyFx()): 
     out[tr.field] = tr.field === 'hue' ? out[tr.field] + v : Math.max(out[tr.field], v);
   }
   return out;
+}
+
+/** Global cue times of a sound cue (expands `repeat` / `every`). */
+export function soundTimes(c: SoundCue): number[] {
+  const n = Math.max(1, Math.floor(c.repeat ?? 1));
+  const out: number[] = [];
+  for (let k = 0; k < n; k++) out.push(c.at + k * (c.every ?? 0.1));
+  return out;
+}
+
+/** The music intensity in force at global time `t` (latest cue that sets one; default `dflt`). */
+export function intensityAt(shots: readonly Shot[], t: number, dflt = 0.5): number {
+  let start = 0;
+  let v = dflt;
+  for (const s of shots) {
+    if (start > t) break;
+    for (const m of s.music ?? []) if (m.intensity !== undefined && start + m.at <= t + 1e-6) v = m.intensity;
+    start += s.dur;
+  }
+  return v;
 }
 
 /** Captions on screen at shot-local time, with their age. */

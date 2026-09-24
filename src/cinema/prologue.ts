@@ -13,12 +13,12 @@ import type { FxField, FxTrack, Shot } from './timeline';
  */
 
 /** Attack → hold → release pulse on one postFx field. */
-function pulse(field: FxField, at: number, peak: number, attack = 0.06, hold = 0.05, release = 0.5): FxTrack {
+export function pulse(field: FxField, at: number, peak: number, attack = 0.06, hold = 0.05, release = 0.5): FxTrack {
   return { field, keys: [[at, 0], [at + attack, peak], [at + attack + hold, peak], [at + attack + hold + release, 0]] };
 }
 
 /** Ramp a field from `a` to `b` over [t0, t1] (held beyond). */
-function ramp(field: FxField, t0: number, t1: number, a: number, b: number): FxTrack {
+export function ramp(field: FxField, t0: number, t1: number, a: number, b: number): FxTrack {
   return { field, keys: [[t0, a], [t1, b]] };
 }
 

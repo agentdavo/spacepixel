@@ -1,7 +1,10 @@
 import { PROLOGUE } from '@/cinema/prologue';
+import { CONCOURSE_PERSON, TRAILER } from '@/cinema/trailer';
 import { narrationCues } from '@/cinema/narration';
+import { intensityAt, soundTimes, type Shot } from '@/cinema/timeline';
+import { hashStr, personById } from '@/dialog/people';
 import { GameAudio, type AudioFrame, type AudioMissileEvent, type AudioShip, type AudioWeaponEvent, type Mood } from './index';
-import { VoiceBox, planFor, type VoiceChannel } from './voice';
+import { CAST_VOICES, VoiceBox, npcVoice, planFor, registerVoice, type VoiceChannel } from './voice';
 
 /**
  * Headless renders for scripts/audio-render.mjs. Each scenario runs the real
@@ -76,9 +79,9 @@ const music = (mood: Mood, seconds: number, intensity: number, rampTo?: number):
   },
 });
 
-/** The prologue's soundtrack: the same music/sound cues the Cinema fires, on the same clock. */
-const prologue = (): Scenario => {
-  const seconds = PROLOGUE.reduce((a, sh) => a + sh.dur, 0) + 1.5;
+/** A cutscene's soundtrack: the same music/sound cues the Cinema fires, on the same clock. */
+const film = (shots: readonly Shot[], opts: { intensity?: boolean } = {}): Scenario => {
+  const seconds = shots.reduce((a, sh) => a + sh.dur, 0) + 1.5;
   return {
     seconds,
     setup: (s) => {
@@ -88,16 +91,50 @@ const prologue = (): Scenario => {
     },
     tick: (s) => {
       let start = 0;
-      for (const sh of PROLOGUE) {
+      for (const sh of shots) {
         for (const m of sh.music ?? []) if (s.at(start + m.at)) s.audio.music.setMood(m.mood, m.fade ?? 2);
         for (const c of sh.sound ?? []) {
-          if (!s.at(start + c.at)) continue;
-          if (c.sfx) s.audio.sfx.play(c.sfx, { gain: c.gain ?? 1 });
-          if (c.stinger) s.audio.stinger(c.stinger);
-          if (c.radio) s.audio.radio(c.radio);
+          for (const at of soundTimes(c)) {
+            if (!s.at(start + at)) continue;
+            if (c.sfx) s.audio.sfx.play(c.sfx, { gain: c.gain ?? 1 });
+            if (c.stinger) s.audio.stinger(c.stinger);
+            if (c.radio) s.audio.radio(c.radio);
+          }
         }
         start += sh.dur;
       }
+      if (opts.intensity) s.frame.combatIntensity = intensityAt(shots, s.t, 0.3);
+    },
+  };
+};
+const prologue = (): Scenario => film(PROLOGUE);
+
+/**
+ * The trailer's soundtrack (scripts/make-video.mjs muxes it under the
+ * recorded frames): music moods + intensity, the authored SFX, every voiced
+ * caption (narrator and radio) and the concourse greeting the dock tab
+ * speaks when the trailer cuts to it.
+ */
+const trailer = (): Scenario => {
+  const base = film(TRAILER, { intensity: true });
+  const cues = narrationCues(TRAILER);
+  let t = 0;
+  for (const sh of TRAILER) {
+    if (sh.id === 'concourse') break;
+    t += sh.dur;
+  }
+  const concourseAt = t + 0.12;
+  const person = personById(CONCOURSE_PERSON);
+  return {
+    ...base,
+    setup: (s) => {
+      base.setup!(s);
+      if (person && !CAST_VOICES[person.id]) registerVoice(person.id, npcVoice(hashStr(person.id), { ...person.voice, faction: person.faction }));
+    },
+    tick: (s) => {
+      base.tick!(s);
+      for (const c of cues) if (s.at(c.at)) s.voice.speak({ who: c.who, text: c.caption.text, channel: c.channel, maxDur: c.maxDur, maxSqueeze: c.maxSqueeze });
+      if (person && s.at(concourseAt)) s.voice.speak({ who: person.id, text: person.greeting, channel: 'clean' });
     },
   };
 };
@@ -184,6 +221,7 @@ export const SCENARIOS: Record<string, Scenario> = {
   ),
 
   prologue: prologue(),
+  trailer: trailer(),
   // The prologue soundtrack with its narration voice track (what the cold open sounds like now).
   'voice-prologue': (() => {
     const base = prologue();

@@ -96,7 +96,8 @@ class ConcourseTab {
     this.people = peopleAt({ id: st.id, faction: st.faction, kind: st.kind }, stations, l.clock, episode);
     // Captures / dev: ?talk=<id> brings a roster person here and opens the conversation.
     const q = new URLSearchParams(location.search);
-    const want = q.get('talk');
+    const demo = ctx.demo?.person;
+    const want = demo ?? q.get('talk');
     if (want && !this.people.some((p) => p.id === want)) {
       const p = personById(want);
       if (p) this.people.unshift(p);
@@ -146,7 +147,7 @@ class ConcourseTab {
     this.subs = new Subtitles(this.root.querySelector('.cc-subs')!, 'dock');
     this.root.querySelector('.cc-settings')!.textContent = describeSettings();
     this.sel = 0;
-    this.select(want ? Math.max(0, this.people.findIndex((p) => p.id === want)) : 0, !want);
+    this.select(want ? Math.max(0, this.people.findIndex((p) => p.id === want)) : 0, !want || !!demo);
     this.renderNotebook();
     this.last = performance.now();
     const loop = (now: number) => {
@@ -156,7 +157,7 @@ class ConcourseTab {
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
-    if (want) {
+    if (want && !demo) {
       this.startTalk();
       const path = (q.get('talkpath') ?? '').split('.').filter(Boolean).map(Number);
       for (const i of path) this.choose(i);
