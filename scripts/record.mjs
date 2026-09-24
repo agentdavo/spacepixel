@@ -37,7 +37,7 @@ try {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
   page.on('console', (m) => m.type() === 'error' && console.log(`[console.error] ${m.text().slice(0, 300)}`));
-  const url = `http://127.0.0.1:${port}/?shot=1&record=${fps}&scene=${scene}&loop=0&t=${from}${extra ? '&' + extra : ''}`;
+  const url = `http://127.0.0.1:${port}/?shot=1&record=${fps}&scene=${scene}&loop=0&hud=0&t=${from}${extra ? '&' + extra : ''}`;
   await page.goto(url, { waitUntil: 'commit' });
   await page.waitForFunction(() => window.__VANGUARD__?.error || window.__VANGUARD__?.hooks?.step, null, { timeout: 300_000, polling: 250 });
   const err = await page.evaluate(() => window.__VANGUARD__?.error);
@@ -49,17 +49,22 @@ try {
   const last = Math.round(to * fps);
   const t0 = Date.now();
   for (let i = first; i < last; i++) {
-    await page.evaluate(async (frameMs) => {
-      await window.__VANGUARD__.hooks.step(1);
-      // CSS animations run on wall-clock time; put them on the film's clock.
-      for (const a of document.getAnimations()) {
-        if (a.__rec === undefined) {
-          a.__rec = 0;
-          a.pause();
-        } else a.__rec += frameMs;
-        a.currentTime = a.__rec;
-      }
-    }, 1000 / fps);
+    await page.evaluate(
+      async ([frameMs, resume]) => {
+        await window.__VANGUARD__.hooks.step(1);
+        // CSS animations run on wall-clock time; put them on the film's clock.
+        // A range that starts mid-film finds its intro animations (letterbox
+        // bars…) already finished, as they would be in a continuous take.
+        for (const a of document.getAnimations()) {
+          if (a.__rec === undefined) {
+            a.__rec = resume ? 60_000 : 0;
+            a.pause();
+          } else a.__rec += frameMs;
+          a.currentTime = a.__rec;
+        }
+      },
+      [1000 / fps, i === first && from > 0],
+    );
     const file = `${out}/f_${String(i).padStart(5, '0')}.jpg`;
     if (!existsSync(file) || args.includes('--overwrite')) await page.screenshot({ path: file, type: 'jpeg', quality: 92, timeout: 300_000 });
     if ((i - first) % 24 === 0) {
