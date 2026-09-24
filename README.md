@@ -369,8 +369,8 @@ Everything lives in the shared world state (`guild.<id>.merit / .rank /
 `src/game/guilds/`, `src/game/outposts/outposts.ts`, `tests/guilds.test.ts`
 (every arc mission is flown end to end in the real CampaignRunner against the
 seed-1994 Reach). Captures:
-`?scene=flight&dock=docked&station=anchorage-salvage-1&docktab=guild&guild=keeping:3[:merit][&gpanel=work|qm|arc|outpost][&choice=1]`,
-`?scene=flight&guild=keeping:3&outpost=<stage>[&osite=<system>][&ophase=docked]`.
+`?scene=flight&dock=docked&station=anchorage-salvage-1&docktab=guild&guild=keeping.3[.merit][&gpanel=work|qm|arc|outpost][&choice=1]`,
+`?scene=flight&guild=keeping.3&outpost=<stage>[&osite=<system>][&ophase=docked]`.
 
 ## Scenes (`?scene=`)
 

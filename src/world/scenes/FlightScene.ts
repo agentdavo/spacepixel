@@ -309,7 +309,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (q.get('dock')) this.dockFlag(q.get('dock')!, q.get('station') ?? '', q.get('cargo') === 'demo');
     // ?contract=<kind>&cphase=board|op|pay|map: contract captures.
     this.contracts.stageFromQuery();
-    // ?guild=<id>:<rank> · ?outpost=<stage>: guild / outpost captures.
+    // ?guild=<id>.<rank> · ?outpost=<stage>: guild / outpost captures.
     this.guilds.stageFromQuery();
     if (q.get('dockui') === '0') this.dockScreen.close();
     // ?reach=body|ring|lane|ambush [&sys=<id>] …: living-Reach captures (world/ReachStage.ts).

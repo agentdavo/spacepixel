@@ -208,7 +208,7 @@ export class GuildRuntime {
   // ── captures ──────────────────────────────────────────────────────
 
   /**
-   * ?guild=<id>:<rank>[:<merit>] — membership for captures (several, comma-separated).
+   * ?guild=<id>.<rank>[.<merit>] — membership for captures (several, comma-separated).
    * ?outpost=<stage>[&osite=<system>][&ophase=fly|docked][&odamaged=1] — an outpost at
    * that restoration stage in `osite` (default: the quietest system), with the
    * pilot flying past it or berthed in it.

@@ -28,7 +28,7 @@ import type { GuildRuntime } from '@/game/guilds/GuildRuntime';
  *   ARC             the guild's hand-written missions, and the finale's choice
  *   OUTPOST         claim a hulk (rank 3), deliver goods, build stages, storage
  *
- * Captures: ?dock=docked&station=<hall>&docktab=guild&guild=keeping:3[&gpanel=arc|qm|outpost]
+ * Captures: ?dock=docked&station=<hall>&docktab=guild&guild=keeping.3[&gpanel=arc|qm|outpost]
  */
 let rt: GuildRuntime | null = null;
 export function bindGuildTab(r: GuildRuntime): void {
@@ -140,6 +140,8 @@ class GuildTab {
     this.stage = { canvas: cv, c2d: cv.getContext('2d')! };
     this.subs = new Subtitles(this.root.querySelector('.gh-subs')!, 'dock');
     if (this.guild && who) void this.subs.say({ who: who.id, speaker: who.callsign, color: g!.color, text: greeting(world().state, this.guild), voice: true });
+    // Screenshot mode: the greeting lands fully typed.
+    if (q.get('shot') === '1') this.subs.skip();
     this.render();
     this.last = performance.now();
     const loop = (now: number) => {
