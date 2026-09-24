@@ -111,6 +111,8 @@ export class FlightRadio {
     if (!this.enabled || phase === this.dockPhase) return;
     const prev = this.dockPhase;
     this.dockPhase = phase;
+    // Berthed: the dock screen owns the bottom of the frame (its ticker); guidance has finished talking.
+    if (phase === 'docked') this.subs?.clear();
     if (!target) return;
     const carrier = target.kind === 'carrier';
     const fac = COLOR[target.faction] ? target.faction : 'concord';
