@@ -168,13 +168,14 @@ The lead session is stopping here; a project thread continues from this file.
 - **Batch 6 overlap, resolved (user, 24 Sep ~10:20).** Batch 6 (turrets,
   shields, impacts, subsystems, kill paths) stays with the turrets session.
   The lead session's three batch 6 agents are **paused** and it will start no
-  new batch 6 work. Their unfinished, unverified work is committed on local
-  branches in the lead session's container (not pushed):
+  new batch 6 work. Their unfinished, unverified work is **pushed to origin**
+  (24 Sep, at the user's request), unmerged and not re-verified, on:
   `worktree-agent-a9181dba8d1e07ff0` (turret rigs + muzzles, 6 commits),
   `worktree-agent-ad2e6ed36bfec934d` (shields v2 + impact decals, 2 commits),
   `worktree-agent-a936121b44b53858f` (subsystems v2 + kill paths: structural
-  break-up, reactor, bridge kill, wrecks/salvage, 14 commits). Ask the lead
-  session (via the user) to push any of them if you want to mine them.
+  break-up, reactor, bridge kill, wrecks/salvage, 14 commits). Mine what fits;
+  they'll need a merge with the current turrets/shields code and a full
+  re-verify (`tsc`, `npm test`, `ai-sim`, `balance`, `determinism`).
 
 - **Voices → batch 6 owner (turrets session):** once shields v2, subsystems and kill paths emit
   events, list their `WeaponEvent.kind` names here (e.g. `facing-down`,
