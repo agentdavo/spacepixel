@@ -159,12 +159,13 @@ export class Engine {
     input.sample(this.ctx.time);
 
     let fixed = 0;
-    let scale = 1;
+    let scale = Infinity;
     for (const s of this.systems) {
       if (!s.fixedUpdate) continue;
       fixed++;
       scale = Math.min(scale, s.timeScale?.() ?? 1);
     }
+    if (!Number.isFinite(scale)) scale = 1;
     let ticks = 0;
     if (fixed && !this.holdTicks) {
       let step = fixedFrame || Math.min(realDt, 0.25);
