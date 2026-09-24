@@ -4,7 +4,7 @@ import { Weapons } from './Weapons';
 import { Missiles } from './Missiles';
 import { Capitals } from './Capitals';
 import { chooseGun, gunOf, leadSpeedOf, selectSubsystem, subsystemPosition, toUniverse } from './Combat';
-import { FACING, syncShield, type Subsystem } from './Damage';
+import { FACING, facingOf, syncShield, type Subsystem } from './Damage';
 import { issueOrder, setFormation, updateAI } from './ai';
 import { GUNS, MISSILES, SHIP_STATS, type GunId } from './Loadouts';
 import { leadPoint } from './ai/Pilot';
@@ -660,12 +660,14 @@ void GUNS;
 
 // ── subsystem targeting ─────────────────────────────────────────────
 
-/** Strip one shield facing and keep it down (a flank someone already worked over). */
+/** Strip one shield facing and keep it down (a flank someone already worked over): no charge, no regeneration, no transfer into it. */
 function stripFacing(cap: ShipEntity, f: number): void {
-  cap.combat.dmg.facings[f] = 0;
-  cap.combat.dmg.down |= 1 << f;
-  syncShield(cap.combat.dmg, cap);
-  cap.sinceHit = 0; // (no regeneration either)
+  const st = cap.combat.dmg;
+  st.facings[f] = 0;
+  st.down |= 1 << f;
+  st.cooldown[f] = 999;
+  syncShield(st, cap);
+  cap.sinceHit = 0;
 }
 
 /**
@@ -682,6 +684,9 @@ export function aimedShare(capBp: string, socket: string, range = 900, maxT = 60
   const sub = st.subsystems.find((s) => s.id === socket)!;
   const tp = subsystemPosition(cap, sub, new Vector3());
   const side = new Vector3(Math.sign(sub.x - st.cx) || 1, 0.35, 0.1).normalize();
+  // The facing over the mount, and the one the shots come in through.
+  const over = facingOf(st, sub);
+  const through = facingOf(st, side.clone().multiplyScalar(Math.max(st.halfW, st.halfH) * 2).add(new Vector3(sub.x, sub.y, sub.z)));
   const s = w.fleet.spawn('vf27-kestrel', 'concord', tp.clone().addScaledVector(side, range), side.clone().negate());
   s.target = cap;
   s.combat.gun = 0; // lasers
@@ -691,8 +696,8 @@ export function aimedShare(capBp: string, socket: string, range = 900, maxT = 60
   let onHull = 0;
   let t = 0;
   for (; t < maxT && !sub.destroyed; t += DT) {
-    stripFacing(cap, FACING.PORT);
-    stripFacing(cap, FACING.STBD);
+    stripFacing(cap, over);
+    stripFacing(cap, through);
     cap.flight.velocity.set(0, 0, 0);
     subsystemPosition(cap, sub, tp);
     hold(s, zero);
@@ -725,7 +730,7 @@ export function torpedoSplash(capBp: string, socket: string): { destroyed: numbe
   const zero = new Vector3();
   for (let t = 0; t < 15; t += DT) {
     // Shields down all round: a torpedo curves in, and a standing facing anywhere on its path would take it.
-    for (let f = 0; f < 4; f++) stripFacing(cap, f);
+    for (let f = 0; f < st.facings.length; f++) stripFacing(cap, f);
     cap.flight.velocity.set(0, 0, 0);
     hold(bomber, zero);
     bomber.controls.fire = false;
@@ -738,7 +743,8 @@ export function torpedoSplash(capBp: string, socket: string): { destroyed: numbe
 
 /**
  * The player's wing on "attack my target" against a capital with a stripped
- * port flank (no return fire: this measures the brains, not survival). The
+ * port flank and the facing over `socket` down (no return fire: this
+ * measures the brains, not survival). The
  * lead holds 2.5 km off with `socket` selected; the wing kills it, then (lead
  * deselects) picks exposed mounts on its own for 60 s.
  */
@@ -763,8 +769,10 @@ export function wingStrip(capBp: string, socket: string, maxT = 90): { ordered: 
   let shieldedKills = 0;
   const killed = new Set<Subsystem>();
   let t = 0;
+  const over = facingOf(st, sub);
   for (; t < maxT + 60 && cap.alive; t += DT) {
     stripFacing(cap, FACING.PORT);
+    stripFacing(cap, over);
     cap.flight.velocity.set(0, 0, 0);
     lead.flight.position.copy(leadPos);
     hold(lead, zero);
@@ -782,8 +790,9 @@ export function wingStrip(capBp: string, socket: string, maxT = 90): { ordered: 
     for (const e of w.weapons.events) {
       if (e.kind !== 'subsystem' || e.ship !== cap || !e.sub || killed.has(e.sub)) continue;
       killed.add(e.sub);
-      // (Mounts the port facing doesn't cover are still under their shields.)
-      if (e.facing >= 0 && e.facing !== FACING.PORT) shieldedKills++;
+      // (Mounts the stripped facings don't cover are still under their shields.)
+      if (!e.sub.destroyed || facingOf(st, e.sub) === FACING.PORT || facingOf(st, e.sub) === over) continue;
+      shieldedKills++;
     }
   }
   return { ordered, after: killed.size - (sub.destroyed ? 1 : 0), shielded: shieldedKills };
