@@ -26,7 +26,7 @@ export interface AudioShip {
 }
 
 export interface AudioWeaponEvent {
-  readonly kind: 'hit' | 'shield' | 'kill' | 'fire' | 'beam-hit' | 'subsystem' | 'shield-down' | 'shield-up' | 'shield-bleed';
+  readonly kind: 'hit' | 'shield' | 'kill' | 'fire' | 'beam-hit' | 'subsystem' | 'shield-down' | 'shield-up' | 'shield-bleed' | 'reactor-critical' | 'reactor-vented';
   readonly position: Vec3Like;
   readonly ship: AudioShip | null;
   readonly shooter: AudioShip | null;
@@ -42,6 +42,8 @@ export interface AudioWeaponEvent {
   readonly sub?: { readonly kind: string } | null;
   /** fire: a turret mount's shot, not the pilot's guns. */
   readonly turret?: boolean;
+  /** kill: how a big hull died — 'hull' · 'structural' (break-up) · 'reactor' (detonation) · 'bridge' (she struck). */
+  readonly cause?: 'hull' | 'structural' | 'reactor' | 'bridge' | null;
 }
 
 /** The hull sound for a hit of damage type `type`. */
@@ -327,7 +329,7 @@ export class GameAudio {
           // Mounts shear off; generators take their facing's shell with them; hangars, engines and bridges go up.
           const k = ev.sub?.kind;
           if (k === 'shieldGen' || k === 'shieldEmitter') sfx.playAtRaw('shieldDown', ev.position, eye, 0.7);
-          if (k === 'hangar' || k === 'engine' || k === 'bridge') sfx.playAtRaw('explosionLarge', ev.position, eye, 0.8);
+          if (k === 'hangar' || k === 'engine' || k === 'bridge' || k === 'reactor') sfx.playAtRaw('explosionLarge', ev.position, eye, 0.8);
           sfx.playAtRaw('mountBlast', ev.position, eye, ev.ship?.isPlayer ? 1 : 0.85);
           break;
         }
@@ -342,9 +344,30 @@ export class GameAudio {
           this.lastBleed = now;
           sfx.playAtRaw(ev.ship?.isPlayer ? 'playerHit' : hullSound(ev.type), ev.position, eye, 0.45);
           break;
+        case 'reactor-critical':
+          // The core breached: containment failing (a falling whine) under a hard crack.
+          sfx.playAtRaw('shieldDown', ev.position, eye, 1);
+          sfx.playAtRaw('mountBlast', ev.position, eye, 0.9);
+          break;
+        case 'reactor-vented':
+          // The crew dumps the core: a long hiss of plasma let out, then quiet.
+          sfx.playAtRaw('shieldUp', ev.position, eye, 0.6);
+          break;
         case 'kill':
           if (ev.ship?.isPlayer) sfx.playAtRaw('explosionSmall', ev.position, eye, 1.2, 'concord', 8);
-          else kill.consider(i, sfx.audibility(ev.ship && ev.ship.radius > CAPITAL_RADIUS ? 'explosionLarge' : 'explosionSmall', ev.position, eye));
+          else if (ev.cause === 'reactor') {
+            // Detonation: the big one, twice over, and the shock front's crack.
+            sfx.playAtRaw('explosionLarge', ev.position, eye, 1.3);
+            sfx.playAtRaw('explosionLarge', ev.position, eye, 1);
+            sfx.playAtRaw('shieldDown', ev.position, eye, 0.9);
+          } else if (ev.cause === 'structural') {
+            // Break-up: the spine tears, then the fire takes the break.
+            sfx.playAtRaw('hullCrunch', ev.position, eye, 1.2);
+            sfx.playAtRaw('explosionLarge', ev.position, eye, 0.9);
+          } else if (ev.cause === 'bridge') {
+            // Struck: one last pop on the command deck, then the hull goes dark and silent.
+            sfx.playAtRaw('mountBlast', ev.position, eye, 0.9);
+          } else kill.consider(i, sfx.audibility(ev.ship && ev.ship.radius > CAPITAL_RADIUS ? 'explosionLarge' : 'explosionSmall', ev.position, eye));
           break;
       }
     }

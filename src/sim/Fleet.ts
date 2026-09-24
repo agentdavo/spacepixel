@@ -4,9 +4,10 @@ import type { FactionId, Livery } from '@/assets/Blueprint';
 import type { ShipModel } from '@/assets/ShipBuilder';
 import { assets } from '@/assets/AssetLibrary';
 import { FlightModel } from './FlightModel';
-import { createCombat, damageShip, stepCombat, subsystemPosition, toLocal, type CombatState } from './Combat';
+import { createCombat, damageShip, settleDeath, stepCombat, subsystemPosition, toLocal, type CombatState } from './Combat';
+import { Destruction } from './Destruction';
 import type { DamageType } from './Loadouts';
-import type { HitResult, Subsystem } from './Damage';
+import { checkStrike, type HitResult, type Subsystem } from './Damage';
 import { DEFAULT_WORLD_SEED, Rng } from './Rng';
 import { HANGAR_SECONDARY, splashSubsystems } from './Subsystems';
 
@@ -65,10 +66,17 @@ export interface ShipEntity {
 
 /**
  * Consequences of a hit that FX / audio / HUD care about (emitted through
- * `Fleet.onEvent`). 'shield-bleed': a failing facing let part of the hit
- * through to the hull (HitResult.bleed).
+ * `Fleet.onEvent`):
+ *
+ *   kill              any death; how is `ship.combat.dmg.structure.death`
+ *                     (hull · structural · reactor · bridge; WeaponEvent.cause)
+ *   subsystem         a mount destroyed (`sub.kind`, `sub.wreck` droop / blown)
+ *   shield-down       a facing collapsed
+ *   shield-bleed      a failing facing let part of the hit through (HitResult.bleed)
+ *   reactor-critical  a capital's core was breached: the fuse is lit (`shooter` did it)
+ *   reactor-vented    the crew vented a critical core in time (she lives, browned out)
  */
-export type HitEventKind = 'kill' | 'subsystem' | 'shield-down' | 'shield-bleed';
+export type HitEventKind = 'kill' | 'subsystem' | 'shield-down' | 'shield-bleed' | 'reactor-critical' | 'reactor-vented';
 
 /**
  * Anything that can be shot down (torpedoes, micro-missiles). Registered by the
@@ -108,12 +116,15 @@ export class Fleet {
 
   /** The world's root PRNG; every system and entity forks its own stream from it (Rng.ts). */
   readonly rng: Rng;
+  /** Kill paths' aftermath: wreck pieces (salvage) and reactor shockwaves. Stepped with the fleet. */
+  readonly destruction: Destruction;
 
   constructor(
     private root: Group,
     seed = DEFAULT_WORLD_SEED,
   ) {
     this.rng = new Rng(seed);
+    this.destruction = new Destruction(this);
   }
 
   /** Next entity id (replays record it so a resync after a berth allocates the same ids). */
@@ -181,12 +192,36 @@ export class Fleet {
         s.model.setChannel('radar', (this.clock * 0.15) % 1);
       }
       stepCombat(s, dt);
+      const re = s.combat.reactorEvent;
+      if (re === 'vented') this.onEvent?.('reactor-vented', s, s.flight.position, _n.set(0, 1, 0), null, null, -1);
+      if ((re === 'detonated' || s.combat.dmg.structure.pending) && this.settle(s, null)) continue;
       s.flight.step(s.controls, dt);
       s.sinceHit += dt;
       s.model.root.position.copy(s.flight.position);
       s.model.root.quaternion.copy(s.flight.orientation);
       s.model.setThrottle(s.flight.boosting ? 1.55 : 0.25 + s.flight.throttle * 0.9);
     }
+    this.destruction.step(dt);
+  }
+
+  /** Ship by id (kill credit for delayed deaths), or null. */
+  byId(id: number): ShipEntity | null {
+    if (!id) return null;
+    for (const o of this.ships) if (o.id === id) return o;
+    return null;
+  }
+
+  /**
+   * A delayed kill path came due outside a hit (the reactor's fuse ran out):
+   * settle it, credit whoever lit it, announce it and leave the wreck.
+   */
+  private settle(s: ShipEntity, shooter: ShipEntity | null): boolean {
+    if (!settleDeath(s)) return false;
+    const S = s.combat.dmg.structure;
+    const by = shooter ?? this.byId(S.reactor.by || S.lastBy);
+    this.onEvent?.('kill', s, s.flight.position, _n.set(0, 1, 0), by, null, -1);
+    this.destruction.onKill(s, S.death ?? 'hull', by);
+    return true;
   }
 
   enemiesOf(s: ShipEntity): ShipEntity[] {
@@ -210,18 +245,31 @@ export class Fleet {
    * cooks off (`cookOff`). The result is shared scratch — read it immediately.
    */
   hit(s: ShipEntity, amount: number, type: DamageType, point: Vector3 | null, normal: Vector3 | null, shooter: ShipEntity | null, sub: Subsystem | null = null): HitResult & { killed: boolean } {
-    const r = damageShip(s, amount, type, point, sub);
+    const r = damageShip(s, amount, type, point, sub, shooter);
     const ev = this.onEvent;
     if (ev) {
       const p = point ?? s.flight.position;
       const n = normal ?? _n.set(0, 1, 0);
       if (r.bleed > 0) ev('shield-bleed', s, p, n, shooter, null, r.facing, r);
       if (r.facingCollapsed) ev('shield-down', s, p, n, shooter, null, r.facing, r);
-      if (r.subsystemDestroyed && r.subsystem) ev('subsystem', s, p, n, shooter, r.subsystem, r.facing);
+      if (r.subsystemDestroyed && r.subsystem) {
+        ev('subsystem', s, p, n, shooter, r.subsystem, r.facing);
+        this.critical(s, r.subsystem, p, shooter);
+      }
       if (r.killed) ev('kill', s, s.flight.position, n, shooter, null, -1);
+    }
+    if (r.killed) {
+      const killed = r.killed;
+      this.destruction.onKill(s, s.combat.dmg.structure.death ?? 'hull', shooter);
+      r.killed = killed; // (shared scratch: a shockwave may have hit someone in between)
     }
     if (r.subsystemDestroyed && r.subsystem?.kind === 'hangar' && this.cookOff(s, r.subsystem, shooter, 1)) r.killed = true;
     return r;
+  }
+
+  /** A destroyed reactor that went critical: announce the lit fuse. */
+  private critical(s: ShipEntity, sub: Subsystem, p: Vector3, shooter: ShipEntity | null): void {
+    if (sub.kind === 'reactor' && s.combat.dmg.structure.reactor.phase === 'critical') this.onEvent?.('reactor-critical', s, p, _n.set(0, 1, 0), shooter, sub, -1);
   }
 
   /**
@@ -245,9 +293,12 @@ export class Fleet {
       if (this.onEvent) {
         subsystemPosition(s, sub, _sp[depth]);
         this.onEvent('subsystem', s, _sp[depth], _n.subVectors(_sp[depth], s.flight.position).normalize(), shooter, sub, -1);
+        this.critical(s, sub, _sp[depth], shooter);
       }
       if (sub.kind === 'hangar' && this.cookOff(s, sub, shooter, depth + 1)) killed = true;
     }
+    // A splash can finish the bridge of a hull already under half: she strikes.
+    if (!killed && s.alive && s.combat.dmg.structure.pending === 'bridge' && this.settle(s, shooter)) killed = true;
     return killed;
   }
 
@@ -261,14 +312,8 @@ export class Fleet {
     s.hull -= hangar.hpMax * HANGAR_SECONDARY.hull;
     s.combat.damaged = true;
     s.sinceHit = 0;
-    if (s.plotArmour) s.hull = Math.max(s.hull, s.hullMax * 0.15);
-    if (s.hull <= 0) {
-      s.hull = 0;
-      s.alive = false;
-      s.model.root.visible = false;
-      this.onEvent?.('kill', s, s.flight.position, _n.set(0, 1, 0), shooter, null, -1);
-      return true;
-    }
+    checkStrike(s.combat.dmg, s);
+    if (this.settle(s, shooter)) return true;
     subsystemPosition(s, hangar, _sp[depth]);
     return this.blast(s, _sp[depth], hangar.radius * HANGAR_SECONDARY.radius, hangar.hpMax * HANGAR_SECONDARY.splash, 'explosive', shooter, hangar, depth);
   }

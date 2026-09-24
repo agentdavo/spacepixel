@@ -165,7 +165,8 @@ export class Missiles implements Shootables {
    */
   salvo(shooter: ShipEntity, target: ShipEntity, spec?: MissileSpec): boolean {
     const s = spec ?? missileOf(shooter) ?? (shooter.combat.loadout.missiles.length ? null : MICRO_MISSILE);
-    if (!s) return false;
+    // Every launcher on a capital knocked out: the racks are gone.
+    if (!s || !shooter.combat.cap.launchers) return false;
     if (!spec) {
       if (shooter.combat.missileReload > 0) return false;
       shooter.combat.missileReload = s.reload;
@@ -434,7 +435,8 @@ export class Missiles implements Shootables {
     const spec = missileOf(shooter) ?? MICRO_MISSILE;
     const sig = Math.sqrt(Math.max(0.25, t.combat.stats.signature));
     coneDeg ??= spec.lockCone;
-    range ??= spec.lockRange * Math.min(3, sig);
+    // Big hulls with their sensors shot away lock from closer in (and slower: fx.lockMul).
+    range ??= spec.lockRange * Math.min(3, sig) * shooter.combat.cap.sensors;
     lockTime ??= (spec.lockTime * shooter.combat.fx.lockMul) / Math.min(2, sig);
     _r.subVectors(t.flight.position, shooter.flight.position);
     const dist = _r.length();

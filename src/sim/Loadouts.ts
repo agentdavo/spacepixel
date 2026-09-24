@@ -426,26 +426,36 @@ export const DEFAULT_LOADOUT: Record<FactionId, Loadout> = {
 export interface CapitalLayout {
   bridge: { socket?: string; x: number; z: number };
   shieldGen: { x: number; z: number };
+  /** Reactor core; `below` drops it onto the keel instead of the deck (roll under her to reach it). */
+  reactor?: { x: number; z: number; below?: boolean };
+  /** Sensor mast (a 'radar' joint on the model wins). */
+  sensors?: { x: number; z: number };
 }
 
 export const CAPITAL_LAYOUT: Record<string, CapitalLayout> = {
-  'ffc-lantern-guard': { bridge: { socket: 'bridge', x: 0, z: 0.1 }, shieldGen: { x: 0, z: -0.35 } },
-  'choir-vesper': { bridge: { x: 0, z: 0.35 }, shieldGen: { x: 0, z: -0.25 } },
-  'cvs07-hesperus-dawn': { bridge: { x: 0.42, z: -0.03 }, shieldGen: { x: -0.25, z: -0.62 } },
-  'bb-indomitable': { bridge: { socket: 'bridge', x: 0, z: 0.1 }, shieldGen: { x: 0, z: -0.2 } },
-  'choir-cathedral': { bridge: { x: 0, z: 0.72 }, shieldGen: { x: 0, z: -0.52 } },
+  'ffc-lantern-guard': { bridge: { socket: 'bridge', x: 0, z: 0.1 }, shieldGen: { x: 0, z: -0.35 }, reactor: { x: 0, z: -0.5 } },
+  'choir-vesper': { bridge: { x: 0, z: 0.35 }, shieldGen: { x: 0, z: -0.25 }, reactor: { x: 0, z: -0.45 } },
+  'cvs07-hesperus-dawn': { bridge: { x: 0.42, z: -0.03 }, shieldGen: { x: -0.25, z: -0.62 }, reactor: { x: 0, z: -0.3, below: true } },
+  'bb-indomitable': { bridge: { socket: 'bridge', x: 0, z: 0.1 }, shieldGen: { x: 0, z: -0.2 }, reactor: { x: 0, z: 0, below: true } },
+  'choir-cathedral': { bridge: { x: 0, z: 0.72 }, shieldGen: { x: 0, z: -0.52 }, reactor: { x: 0, z: -0.15, below: true }, sensors: { x: 0, z: 0.85 } },
 };
 
-export const DEFAULT_LAYOUT: CapitalLayout = { bridge: { x: 0, z: 0.3 }, shieldGen: { x: 0, z: -0.3 } };
+export const DEFAULT_LAYOUT: CapitalLayout = { bridge: { x: 0, z: 0.3 }, shieldGen: { x: 0, z: -0.3 }, reactor: { x: 0, z: -0.1 }, sensors: { x: 0, z: 0.5 } };
 
 /** Subsystem hit points as a fraction of hull, and routing radius as a fraction of ship length. */
 export const SUBSYSTEM_TUNING = {
   turret: { hp: 0.018, radius: 0.024, label: 'TURRET' },
   lance: { hp: 0.035, radius: 0.03, label: 'LANCE' },
+  launcher: { hp: 0.035, radius: 0.022, label: 'LAUNCHER' },
   hangar: { hp: 0.045, radius: 0.035, label: 'HANGAR' },
   engine: { hp: 0.04, radius: 0, label: 'ENGINE' },
   shieldGen: { hp: 0.05, radius: 0.04, label: 'SHIELD GEN' },
   // One per facing (4+ facings), on the plating that faces that way: knock one out and the facing stays down.
   shieldEmitter: { hp: 0.02, radius: 0.026, label: 'EMITTER' },
-  bridge: { hp: 0.05, radius: 0.035, label: 'BRIDGE' },
+  // The command deck is a citadel: lose it and she fights blind; lose it with the hull under Structure.STRIKE_HULL and she strikes.
+  bridge: { hp: 0.1, radius: 0.035, label: 'BRIDGE' },
+  // Lost: lock range and fire-control accuracy drop (Damage.SENSORS_LOST).
+  sensors: { hp: 0.02, radius: 0.028, label: 'SENSORS' },
+  // The core: an armoured citadel. Destroyed → CRITICAL (Structure.ts): vented, or it detonates.
+  reactor: { hp: 0.2, radius: 0.04, label: 'REACTOR' },
 } as const;

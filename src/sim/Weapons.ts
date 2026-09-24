@@ -5,6 +5,7 @@ import { GUNS, GUN_INDEX, GUN_LIST, type DamageType, type GunSpec } from './Load
 import { facingStrength, type Subsystem } from './Damage';
 import { chooseGun, createRayHit, cycleSubsystem, gunOf, pickSubsystemAtCrosshair, raycastShip } from './Combat';
 import type { Rng } from './Rng';
+import type { DeathCause } from './Structure';
 
 export type { GunSpec } from './Loadouts';
 export { segmentSphere } from './Combat';
@@ -79,6 +80,12 @@ export interface WeaponEvent {
   shielded?: boolean;
   /** fire: a turret mount's shot (`muzzleFlash`), not the pilot's own guns. Presentation only (sound). */
   turret?: boolean;
+  /**
+   * kill: how she died (Structure.DeathCause) — 'hull' the rolling chain,
+   * 'structural' the spine broke, 'reactor' the core detonated, 'bridge' she
+   * struck. null on every other event.
+   */
+  cause?: DeathCause | null;
 }
 
 export interface Beam {
@@ -162,6 +169,7 @@ export class Weapons {
         e.sub = sub;
         e.subHp = sub ? sub.hp / sub.hpMax : -1;
         e.facing = facing;
+        if (kind === 'kill') e.cause = ship.combat.dmg.structure.death ?? 'hull';
         if (hit && (kind === 'shield-bleed' || kind === 'shield-down')) {
           e.strength = hit.strength;
           e.bleed = hit.bleed;
@@ -193,6 +201,7 @@ export class Weapons {
     e.amount = 0;
     e.shielded = false;
     e.turret = false;
+    e.cause = null;
     this.events.push(e);
     return e;
   }

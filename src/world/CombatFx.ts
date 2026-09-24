@@ -79,7 +79,7 @@ const COLUMNS = 16;
 const CUTS = 16;
 
 /** Subsystem blast scale by kind (× its routing radius): hangars, engines and generators go up hardest. */
-const SUB_BLAST: Record<SubsystemKind, number> = { turret: 1, lance: 1.2, bridge: 1.35, shieldEmitter: 1.3, shieldGen: 1.6, hangar: 1.9, engine: 2 };
+const SUB_BLAST: Record<SubsystemKind, number> = { turret: 1, launcher: 1.3, lance: 1.2, bridge: 1.35, sensors: 1, shieldEmitter: 1.3, shieldGen: 1.6, hangar: 1.9, engine: 2, reactor: 2.2 };
 
 const _p = new Vector3();
 const _v = new Vector3();

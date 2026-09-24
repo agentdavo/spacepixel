@@ -29,12 +29,18 @@
  *   strips shields, explosives wreck subsystems — and splash across the
  *   facings next to the one they hit (SPLASH).
  * - Capitals: a hull hit goes to the nearest intact subsystem within its
- *   radius of the impact point (turrets, lances, hangars, engines, shield
- *   generator and emitters, bridge), else to bare hull (and leaves a scar).
+ *   radius of the impact point (turrets, launchers, lances, hangars,
+ *   engines, shield generator and emitters, bridge, sensors, reactor), else
+ *   to bare hull (and leaves a scar).
+ * - Kill paths (Structure.ts): capital hull damage also lands on the section
+ *   it hit (bow / midships / stern — a failed one breaks her spine); a
+ *   destroyed reactor goes critical; a lost bridge makes a badly hurt hull
+ *   strike. `structure.pending` carries the verdict to Combat.settleDeath.
  * - Fighters: four zones by impact direction (nose, port wing, starboard wing,
  *   engines) accumulate damage that degrades flight.
  */
 import type { DamageType } from './Loadouts';
+import { createStructure, damageSection, reactorCritical, reactorStruck, resetStructure, STRIKE_HULL, type Structure } from './Structure.ts';
 
 export const DAMAGE_MUL: Record<DamageType, { shield: number; hull: number; subsystem: number }> = {
   kinetic: { shield: 0.5, hull: 1.4, subsystem: 1.2 },
@@ -133,10 +139,10 @@ export function pickFacing(n: number, nx: number, ny: number, nz: number): numbe
 
 // ── state ─────────────────────────────────────────────────────────────
 
-export type SubsystemKind = 'turret' | 'lance' | 'hangar' | 'engine' | 'shieldGen' | 'shieldEmitter' | 'bridge';
+export type SubsystemKind = 'turret' | 'launcher' | 'lance' | 'hangar' | 'engine' | 'shieldGen' | 'shieldEmitter' | 'bridge' | 'sensors' | 'reactor';
 
 export interface Subsystem {
-  /** Socket id (or 'engine-N', 'shield-gen', 'emitter-<facing>', 'bridge'). */
+  /** Socket id (or 'engine-N', 'shield-gen', 'emitter-<facing>', 'bridge', 'sensors', 'reactor'). */
   id: string;
   kind: SubsystemKind;
   label: string;
@@ -151,6 +157,12 @@ export interface Subsystem {
   destroyed: boolean;
   /** Shield emitters: the facing (FACING index) it projects. */
   facing?: number;
+  /**
+   * How it died (weapon mounts; presentation reads it): 'droop' knocked out
+   * (the rig skews, the barrels sag), 'blown' an overkill threw the gun house
+   * off its ring. null while intact.
+   */
+  wreck?: 'droop' | 'blown' | null;
 }
 
 /** A hull scorch left by damage that hit bare plating (capitals). */
@@ -210,6 +222,8 @@ export interface DamageState {
   version: number;
   /** Rustwake harpoon tether, seconds left. */
   tether: number;
+  /** Sections, reactor and kill paths (Structure.ts; sections on capitals only). */
+  structure: Structure;
 }
 
 export interface Pools {
@@ -260,11 +274,12 @@ export function createDamageState(capital: boolean, shieldMax: number, hullMax: 
     down: 0,
     version: 0,
     tether: 0,
+    structure: createStructure(capital, ext.cz, ext.halfL, hullMax),
   };
 }
 
 export function addSubsystem(st: DamageState, s: Omit<Subsystem, 'hp' | 'destroyed'>): Subsystem {
-  const sub: Subsystem = { ...s, hp: s.hpMax, destroyed: false };
+  const sub: Subsystem = { ...s, hp: s.hpMax, destroyed: false, wreck: null };
   st.subsystems.push(sub);
   return sub;
 }
@@ -275,7 +290,9 @@ export function resetDamage(st: DamageState, pools: Pools): void {
   for (const s of st.subsystems) {
     s.hp = s.hpMax;
     s.destroyed = false;
+    s.wreck = null;
   }
+  resetStructure(st.structure);
   updateCaps(st);
   for (let i = 0; i < st.facings.length; i++) st.facings[i] = st.facingCap[i];
   st.cooldown.fill(0);
@@ -649,12 +666,14 @@ export function applyHit(st: DamageState, pools: Pools, hit: HitInput, out: HitR
   const sub = aimed ?? (p && st.subsystems.length ? pickSubsystem(st.subsystems, p.x, p.y, p.z) : null);
   if (sub) {
     out.subsystem = sub;
-    out.subsystemDestroyed = hitSubsystem(st, pools, sub, raw * mul.subsystem);
+    out.subsystemDestroyed = hitSubsystem(st, pools, sub, raw * mul.subsystem, hit.type);
     // Armoured mounts: the hull behind a subsystem only takes half.
     hull *= 0.5;
   } else if (st.capital && p) {
     addScar(st, p.x, p.y, p.z, hull / Math.max(pools.hullMax, 1));
   }
+  // Fire on the plating around a critical core knocks the crew's venting back.
+  if (p && st.structure.reactor.phase === 'critical') strikeCriticalCore(st, p, raw * mul.subsystem);
   if (!st.capital && p) {
     const z = fighterZone(p.x - st.cx, p.y - st.cy, p.z - st.cz);
     out.zone = z;
@@ -662,10 +681,36 @@ export function applyHit(st: DamageState, pools: Pools, hit: HitInput, out: HitR
     st.zones[z] = Math.min(1, before + hull / Math.max(st.zoneHp, 1e-6));
     if (Math.floor(st.zones[z] * 10) !== Math.floor(before * 10)) st.version++;
   }
+  // Structure: the section it landed in (capitals; untargeted hits spread and never snap her).
+  if (st.capital && damageSection(st.structure, p ? p.z : null, hull) >= 0) st.version++;
   pools.hull -= hull;
   out.hullDamage = hull;
+  checkStrike(st, pools);
   return out;
 }
+
+/** A hit within 1.5 × the core's radius of a critical reactor (destroyed, so routing skips it) sets the venting back. */
+function strikeCriticalCore(st: DamageState, p: { x: number; y: number; z: number }, amount: number): void {
+  for (const s of st.subsystems) {
+    if (s.kind !== 'reactor') continue;
+    if (Math.hypot(p.x - s.x, p.y - s.y, p.z - s.z) <= s.radius * 1.5) reactorStruck(st.structure, amount, s.hpMax);
+    return;
+  }
+}
+
+/**
+ * Bridge kill: the command deck is gone and the hull is at or under
+ * STRIKE_HULL — the crew strikes (`pending = 'bridge'`). With more hull left
+ * she fights on blind. The owner may refuse it (plot armour, the player).
+ */
+export function checkStrike(st: DamageState, pools: Pools): void {
+  const S = st.structure;
+  if (!st.capital || S.pending || S.death || pools.hull > pools.hullMax * STRIKE_HULL) return;
+  for (const x of st.subsystems) if (x.kind === 'bridge' && x.destroyed) S.pending = 'bridge';
+}
+
+/** Overkill threshold for a mount's wreck style (fraction of its max hp in the killing blow). */
+export const BLOWN_AT = 0.3;
 
 /**
  * Damage one subsystem directly: a routed hull hit, blast splash, a hangar's
@@ -675,13 +720,15 @@ export function applyHit(st: DamageState, pools: Pools, hit: HitInput, out: HitR
  * its own); the rest follow
  * from `destroyed` (Capitals / ShipTurrets stop the mount, capitalEffects).
  */
-export function hitSubsystem(st: DamageState, pools: Pools, sub: Subsystem, amount: number): boolean {
+export function hitSubsystem(st: DamageState, pools: Pools, sub: Subsystem, amount: number, type?: DamageType): boolean {
   if (sub.destroyed || amount <= 0) return false;
   sub.hp -= amount;
   st.version++;
   if (sub.hp > 0) return false;
   sub.hp = 0;
   sub.destroyed = true;
+  // A warhead or a blow well past what was left throws the gun house off; chip damage leaves it drooping.
+  sub.wreck = type === 'explosive' || amount > sub.hpMax * BLOWN_AT ? 'blown' : 'droop';
   const n = st.facings.length;
   if (sub.kind === 'shieldGen') {
     // The generator feeds every emitter: all facings drop, no regen.
@@ -692,7 +739,10 @@ export function hitSubsystem(st: DamageState, pools: Pools, sub: Subsystem, amou
     collapse(st, sub.facing);
     updateCaps(st);
     syncShield(st, pools);
-  }
+  } else if (sub.kind === 'reactor' && st.capital) {
+    // The core is breached: CRITICAL, the fuse is lit (credit whoever hit her last).
+    reactorCritical(st.structure, st.structure.lastBy);
+  } else if (sub.kind === 'bridge') checkStrike(st, pools);
   return true;
 }
 
@@ -731,11 +781,13 @@ export function addScar(st: DamageState, x: number, y: number, z: number, frac: 
  * facing past its share). A facing in its
  * collapse cooldown, or without an emitter, stays down; a destroyed shield
  * generator stops all of it. Sets `regenStarted` bits when a collapsed pool
- * starts coming back. (Cooldowns tick in stepShieldPower.)
+ * starts coming back. A hurt reactor browns it out (powerLevel). (Cooldowns
+ * tick in stepShieldPower.)
  */
 export function regenShields(st: DamageState, pools: Pools, sinceHit: number, dt: number): void {
   if (sinceHit < st.shieldDelay) return;
   if (!isOnline(st, 'shieldGen')) return;
+  const power = powerLevel(st);
   let any = false;
   for (let i = 0; i < st.facings.length; i++) {
     const cap = st.facingCap[i];
@@ -744,7 +796,7 @@ export function regenShields(st: DamageState, pools: Pools, sinceHit: number, dt
       st.down &= ~(1 << i);
       st.regenStarted |= 1 << i;
     }
-    st.facings[i] = Math.min(cap, st.facings[i] + st.facingMax * st.shieldRegen * dt);
+    st.facings[i] = Math.min(cap, st.facings[i] + st.facingMax * st.shieldRegen * dt * power);
     any = true;
   }
   if (any) syncShield(st, pools);
@@ -791,9 +843,35 @@ export interface CapitalEffects {
   shieldsOnline: boolean;
   /** Fire control (bridge): 1 coordinated · 0.35 local control only. */
   coordination: number;
+  /** Reactor power 0.5..1 (brownout: shields regenerate and turrets cycle slower). */
+  power: number;
+  /** Sensors: 1 intact · SENSORS_LOST lock range and fire-control accuracy left. */
+  sensors: number;
+  /** Any launcher left (true when the hull has none modelled): false = no salvos. */
+  launchers: boolean;
 }
 
-export function capitalEffects(st: DamageState, out: CapitalEffects = { speedMul: 1, drift: false, shieldsOnline: true, coordination: 1 }): CapitalEffects {
+export function createCapitalEffects(): CapitalEffects {
+  return { speedMul: 1, drift: false, shieldsOnline: true, coordination: 1, power: 1, sensors: 1, launchers: true };
+}
+
+/** Lock range and fire-control accuracy left with the sensors shot away. */
+export const SENSORS_LOST = 0.55;
+
+/**
+ * Reactor power 0..1: full while the core is healthy, 0.75 (brownout) once
+ * it is below half, 0.5 destroyed / critical / vented; 1 with no core modelled.
+ */
+export function powerLevel(st: DamageState): number {
+  for (const s of st.subsystems) {
+    if (s.kind !== 'reactor') continue;
+    if (s.destroyed || st.structure.reactor.phase !== 'ok') return 0.5;
+    return s.hp < s.hpMax * 0.5 ? 0.75 : 1;
+  }
+  return 1;
+}
+
+export function capitalEffects(st: DamageState, out: CapitalEffects = createCapitalEffects()): CapitalEffects {
   let engines = 0;
   let alive = 0;
   for (const s of st.subsystems) {
@@ -805,5 +883,8 @@ export function capitalEffects(st: DamageState, out: CapitalEffects = { speedMul
   out.drift = engines > 0 && alive === 0;
   out.shieldsOnline = isOnline(st, 'shieldGen');
   out.coordination = isOnline(st, 'bridge') ? 1 : 0.35;
+  out.power = powerLevel(st);
+  out.sensors = isOnline(st, 'sensors') ? 1 : SENSORS_LOST;
+  out.launchers = isOnline(st, 'launcher');
   return out;
 }

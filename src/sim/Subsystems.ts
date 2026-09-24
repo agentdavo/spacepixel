@@ -27,8 +27,11 @@
  *              without a hit, damaged mounts regain REPAIR.rate of max hp per
  *              second; after REPAIR.restoreAfter s one destroyed turret per
  *              REPAIR.restoreEvery s comes back at REPAIR.restoreHp. Nothing
- *              else is ever restored in flight (lances, hangars, engines,
- *              bridge and shield generator stay dead until the yard).
+ *              else is ever restored in flight (launchers, lances, hangars,
+ *              engines, bridge, sensors, reactor and shield generator stay
+ *              dead until the yard).
+ *   kill paths sections, the reactor's fuse and the bridge strike live in
+ *              Structure.ts; the wreckage in Destruction.ts.
  */
 import { DAMAGE_MUL, facingOf, facingUp, hitSubsystem, type DamageState, type Pools, type Subsystem, type SubsystemKind } from './Damage.ts';
 import type { DamageType } from './Loadouts';
@@ -44,6 +47,13 @@ export const SPLASH_FRAC = 0.5;
  * corvette a torpedo would otherwise wipe every mount on the hull at once).
  */
 export const SPLASH_CAP = 0.7;
+
+/**
+ * Armoured citadels: the bridge and the reactor core sit deep inside the
+ * hull. Blast splash never reaches them — only a direct (aimed or routed)
+ * hit does, so a kill path through them is a choice, not an accident.
+ */
+export const CITADELS: ReadonlySet<SubsystemKind> = new Set<SubsystemKind>(['bridge', 'reactor']);
 
 /** Hangar cook-off: hull damage and splash as multiples of the hangar's max hp; blast radius × its routing radius. */
 export const HANGAR_SECONDARY = { hull: 1.0, splash: 0.8, radius: 2.5 } as const;
@@ -183,10 +193,14 @@ export function segmentSubsystem(subs: readonly Subsystem[], ox: number, oy: num
 /** What a fighter wants to kill on a capital, by kind (lower = sooner). */
 export type KindWeights = Readonly<Record<SubsystemKind, number>>;
 
-/** Fighters strip the guns that shoot at them: turrets and lances first. */
-export const FIGHTER_PREFS: KindWeights = { turret: 1, lance: 1, hangar: 2.5, engine: 3, shieldGen: 2, shieldEmitter: 1.5, bridge: 3 };
-/** Bombers go for what keeps the hull fighting: shield emitters (a lost one keeps its facing down) and the generator, then engines. */
-export const BOMBER_PREFS: KindWeights = { turret: 2, lance: 2, hangar: 2, engine: 0.8, shieldGen: 0.5, shieldEmitter: 0.4, bridge: 1.5 };
+/** Fighters strip the guns that shoot at them: turrets and lances first (launchers next: they throw the missiles). */
+export const FIGHTER_PREFS: KindWeights = { turret: 1, launcher: 1.3, lance: 1, hangar: 2.5, engine: 3, shieldGen: 2, shieldEmitter: 1.5, bridge: 3, sensors: 2.5, reactor: 4 };
+/**
+ * Bombers go for what keeps the hull fighting: shield emitters (a lost one
+ * keeps its facing down) and the generator, then engines; the reactor (a
+ * citadel: a long job, but it can end her) before the guns.
+ */
+export const BOMBER_PREFS: KindWeights = { turret: 2, launcher: 1.8, lance: 2, hangar: 2, engine: 0.8, shieldGen: 0.5, shieldEmitter: 0.4, bridge: 1.5, sensors: 1.6, reactor: 1.2 };
 
 /**
  * An attacker's pick on a capital: the exposed subsystem with the lowest
@@ -216,7 +230,7 @@ export function chooseAttackSubsystem(st: DamageState, shield: number, fx: numbe
  * edge lies within `radius` takes SPLASH_FRAC × amount × type multiplier,
  * falling off linearly to nothing at the rim, capped at SPLASH_CAP of its
  * max hp per burst. Shields don't matter — the
- * burst is already inside the shell. Destroyed mounts are pushed to `out`
+ * burst is already inside the shell. Citadels (CITADELS) are out of reach. Destroyed mounts are pushed to `out`
  * (cleared first). Returns the total subsystem damage dealt.
  */
 export function splashSubsystems(st: DamageState, pools: Pools, x: number, y: number, z: number, radius: number, amount: number, type: DamageType, skip: Subsystem | null, out: Subsystem[]): number {
@@ -225,7 +239,7 @@ export function splashSubsystems(st: DamageState, pools: Pools, x: number, y: nu
   const mul = DAMAGE_MUL[type].subsystem;
   let total = 0;
   for (const s of st.subsystems) {
-    if (s.destroyed || s === skip) continue;
+    if (s.destroyed || s === skip || CITADELS.has(s.kind)) continue;
     const d = Math.max(0, Math.hypot(s.x - x, s.y - y, s.z - z) - s.radius * AIM_SPHERE);
     if (d >= radius) continue;
     const dmg = Math.min(amount * SPLASH_FRAC * (1 - d / radius) * mul, s.hpMax * SPLASH_CAP);

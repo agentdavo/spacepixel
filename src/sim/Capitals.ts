@@ -288,11 +288,13 @@ export class Capitals {
       s.controls.throttleSet = fx.drift ? 0 : 0.35 * fx.speedMul;
       s.controls.fire = false;
       if (fx.drift) f.flightAssist = false;
-      const coord = fx.coordination;
+      // Fire control: the bridge coordinates (cadence, scatter), the sensors see (scatter), the reactor powers (cadence).
+      const coord = fx.coordination * fx.sensors;
+      const slow = (1 + (1 - fx.coordination)) / fx.power;
       const gun = c.gun;
       const rng = c.rng;
       const burst = gun.burst ?? { count: 3, gap: 0.09, interval: 1.6, scatter: 0.03 };
-      const interval = (this.gunInterval ?? burst.interval) * (1 + (1 - coord));
+      const interval = (this.gunInterval ?? burst.interval) * slow;
 
       // ── turrets (flak / choir batteries) ──────────────────────────
       const ord = this.fleet.ordnance;
@@ -344,7 +346,7 @@ export class Capitals {
           g.burst++;
           if (g.burst >= b.count) {
             g.burst = 0;
-            g.cooldown = b.interval * (1 + (1 - coord)) * (0.85 + rng.next() * 0.3);
+            g.cooldown = b.interval * slow * (0.85 + rng.next() * 0.3);
           } else g.cooldown = b.gap;
           continue;
         }
@@ -403,7 +405,7 @@ export class Capitals {
         for (const o of this.fleet.ships) {
           if (!o.alive || !hostile(o, s)) continue;
           // No bridge: no fire control — lances take whatever they see first.
-          const d = o.flight.position.distanceTo(_v) * (coord < 1 ? 0.5 + rng.next() : 1);
+          const d = o.flight.position.distanceTo(_v) * (fx.coordination < 1 ? 0.5 + rng.next() : 1);
           if (d < bd) {
             bd = d;
             best = o;
@@ -417,7 +419,7 @@ export class Capitals {
         const L = CAPITAL_LANCE;
         l.beam = this.weapons.fireBeam(s, l.socket, LANCE_RANGE, L.width, L.duration, best.radius > 60 ? L.dpsCapital : L.dpsFighter, L.type);
         l.beam.aimTarget = best;
-        l.cooldown = (7 + rng.next() * 5) / (0.55 + 0.45 * coord);
+        l.cooldown = (7 + rng.next() * 5) / (0.55 + 0.45 * fx.coordination) / fx.power;
       }
 
       // ── hangars: launch fighters while below the cap ─────────────
