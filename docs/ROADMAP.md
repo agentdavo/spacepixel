@@ -156,8 +156,9 @@ modifiers, an event log), is read and written by everything below.
 - Large flat hulls (carrier deck) catch the rim light at grazing angles;
   a screen-space silhouette rim would fix it.
 - SwiftShader timings are meaningless in absolute terms: run `npm run perf`
-  on real hardware. Relative A/B on one machine is fine
-  (`npm run perf -- --no-demo --query 'dynres=0&…'`).
+  on real hardware. Relative A/B needs a quiet machine and frame-stepped
+  timing (`npm run perf -- --stepped --query 'planetlod=0&…'`); on the
+  shared box run-to-run drift is ±25 %.
 - Planet LOD savings are unmeasured on real hardware (the shared SwiftShader
   box's load swamps the A/B); run the `--stepped` A/B above on a GPU.
 - Planet LOD switches compile the mid / far surface pipeline the first time a
@@ -171,9 +172,10 @@ modifiers, an event log), is read and written by everything below.
   (by design — it's the Yamato shot — but a bow-view toggle would help).
 - Bay dust fades only for the docking target / nearest bay: a camera parked
   in another ship's hangar (cutaways of wingmen) still sees streaks.
-- A stock (unfitted) Resolute loses a solo duel with a Lantern Guard and a
-  stock Valiant a duel with a Vesper (`npm run balance` INFO lines): fitting
-  out is the intended answer, but the first T5/T6 sortie can surprise.
+- A stock (unfitted) Resolute loses a solo duel with a Lantern Guard (a stock
+  Valiant scrapes past a Vesper with ~18 % hull; `npm run balance` INFO
+  lines): fitting out is the intended answer, but the first T5 sortie can
+  surprise.
 
 Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
 
@@ -194,8 +196,10 @@ Fixed in the edges pass (`docs/screenshots/edges-*.jpg`):
   full 6.1 / 6.3 / 4.6 s per frame over three runs, mid 5.2, far 5.0 — the
   run-to-run drift (±25 %) swamps the difference; needs a real GPU.
 - **Balance** — corvette main batteries, PD cadence and clusters, shootable
-  micro-missiles; Resolute Mk III vs Lantern Guard ~74 s / 56 % hull, Valiant
-  Mk III vs Vesper ~65 s / 56 % hull, swarm vs PD bands (`npm run balance`).
+  micro-missiles; Resolute Mk III vs Lantern Guard ~78 s / 49 % hull, Valiant
+  Mk III vs Vesper ~68 s / 52 % hull, swarm vs PD bands (`npm run balance`);
+  Cantor shield 80 → 95 brings the 96-seed dogfight sweep from 69 % to 53 %
+  Concord (`npm run ai-sim`).
 - **Valiant bridge camera** — eye 0.16 L above / 0.08 L behind the bridge over
   a forward battery; the mounts sit in the bottom sixth (tested).
 - **Hires** — Magpie (wing) and Brennick (−30 % repairs) verified end to end
