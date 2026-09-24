@@ -54,7 +54,9 @@ interface World {
 }
 
 function world(): World {
-  const fleet = new Fleet(new Group());
+  // The world seed follows the scenario's aim-noise seed: every stream (weapons,
+  // missiles, capital fire control, AI) is repeatable per scenario.
+  const fleet = new Fleet(new Group(), seed);
   const weapons = new Weapons(fleet);
   const missiles = new Missiles(fleet);
   const capitals = new Capitals(fleet, weapons);
@@ -464,17 +466,12 @@ export interface DuelOut {
  * FREE); torpedoes go in on reload.
  */
 export function fittedDuel(hullId: string, fit: Fit, targetBp: string, range = 1500, maxT = 300, seeds = [31, 47, 59, 73]): DuelOut {
-  // Capitals draws on Math.random (turret cadence, scatter): seed it so the bands are repeatable,
-  // and average a few seeds (a capital duel is chaotic: facings, torpedo intercepts).
-  const random = Math.random;
-  Math.random = rand;
-  try {
-    const runs = seeds.map((sd) => duelInner(hullId, fit, targetBp, range, maxT, sd));
-    const mean = (f: (d: DuelOut) => number) => runs.reduce((n, d) => n + f(d), 0) / runs.length;
-    return { t: mean((d) => d.t), hullLeft: mean((d) => d.hullLeft), power: runs[0].power, torps: Math.round(mean((d) => d.torps)) };
-  } finally {
-    Math.random = random;
-  }
+  // Every stream (capital turret cadence and scatter included) forks from the
+  // world seed, so the bands are repeatable; average a few seeds (a capital
+  // duel is chaotic: facings, torpedo intercepts).
+  const runs = seeds.map((sd) => duelInner(hullId, fit, targetBp, range, maxT, sd));
+  const mean = (f: (d: DuelOut) => number) => runs.reduce((n, d) => n + f(d), 0) / runs.length;
+  return { t: mean((d) => d.t), hullLeft: mean((d) => d.hullLeft), power: runs[0].power, torps: Math.round(mean((d) => d.torps)) };
 }
 
 function duelInner(hullId: string, fit: Fit, targetBp: string, range: number, maxT: number, sd: number): DuelOut {

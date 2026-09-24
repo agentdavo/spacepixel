@@ -201,7 +201,7 @@ interface DogfightRun {
  * `stopOnWipe` ends the run when one side is gone (balance sweeps).
  */
 function flyDogfight(seed: number, seconds: number, stopOnWipe: boolean): DogfightRun {
-  const fleet = new Fleet(new Group());
+  const fleet = new Fleet(new Group(), seed); // world seed: AI, gun spread, missile dice
   const arms = new Arms(fleet);
   const jit = (k: number) => Math.sin(seed * 12.9898 + k * 78.233) * 120;
 
