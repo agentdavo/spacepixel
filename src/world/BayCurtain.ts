@@ -11,7 +11,7 @@ import { useBlendedMRT } from './BlendedMRT';
  * within a few tens of metres of the plane, a ring ripples out from where
  * it crosses — the pilot visibly passes THROUGH something into the bay.
  *
- * HDR stays low (≈0.003–0.16 across the sheet, ~0.9 at the ripple crest) so
+ * HDR stays low (≈0.003–0.06 across the sheet, ~0.9 at the ripple crest) so
  * bloom doesn't wash out the recess; never inked (noInkMRT, blended MRT).
  * The plane is authored in the bay's local frame: centred on the mouth,
  * facing +Z (out of the bay). Call `setShip` with the ship's position in
@@ -44,7 +44,9 @@ export class BayCurtain {
       // Edge glow: brighter toward the frame, a thin sheet in the middle.
       const ex: Node = min(q.x, float(1).sub(q.x)).mul(aspect);
       const ey: Node = min(q.y, float(1).sub(q.y));
-      const edge: Node = exp(min(ex, ey).mul(-14.0));
+      // A thin line on the frame, not a band: a wide edge glow over the collar
+      // and the deck lip read as the mouth itself being lit.
+      const edge: Node = exp(min(ex, ey).mul(-40.0));
       // Scanlines drifting down, and a soft band wiping up every ~3 s.
       // The sheet itself stays nearly invisible: over a dark bay any additive
       // wash reads as a teal fog on the liners (it used to: ~0.04 linear).
@@ -54,7 +56,7 @@ export class BayCurtain {
       const d: Node = length(vec2(q.x.sub(this.ship.x).mul(aspect), q.y.sub(this.ship.y)));
       const ring: Node = exp(abs(d.sub(this.ship.z.mul(0.9))).mul(-26.0)).mul(float(1).sub(this.ship.z).mul(0.9));
       const hot: Node = exp(d.mul(-9.0)).mul(max(float(0), float(1).sub(this.ship.z.mul(2.2)))).mul(0.3);
-      const k: Node = float(0.003).add(edge.mul(0.16)).add(scan).add(band).add(ring).add(hot);
+      const k: Node = float(0.003).add(edge.mul(0.06)).add(scan).add(band).add(ring).add(hot);
       return vec3(this.color).mul(k);
     })();
     mat.mrtNode = noInkMRT();

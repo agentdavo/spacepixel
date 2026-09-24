@@ -16,6 +16,7 @@ import { CombatFx } from '../CombatFx';
 import { StarSystemView, type GateInstance } from '../StarSystemView';
 import { Hyperspace } from '../Hyperspace';
 import { SpaceDust } from '../SpaceDust';
+import { bayDust } from '../BayDust';
 import { MultiplaneSky } from '../MultiplaneSky';
 import { generateUniverse, specialSystem } from '@/universe/generate';
 import { CampaignSession, type FlightHostScene } from '@/game/CampaignSession';
@@ -109,6 +110,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   readonly starMap: StarMap;
   private hyperspace = new Hyperspace();
   private dust = new SpaceDust();
+  /** `?dust=0` hides the space dust (captures: isolate what draws over a scene). */
+  private dustOn = new URLSearchParams(location.search).get('dust') !== '0';
   /** ?planes=N km strata (default 16, 0 = off). */
   private planes: MultiplaneSky | null = (() => {
     const n = Number(new URLSearchParams(location.search).get('planes') ?? 16);
@@ -453,8 +456,10 @@ export class FlightScene implements GameScene, FlightHostScene {
 
     this.view.backdrop.follow(this.camera);
     this.view.update(time, this.world.eye);
-    this.dust.update(this.world.eye, pf.velocity, dt);
-    this.dust.object.visible = this.jumpPhase !== 'tunnel';
+    // No dust in a hangar: it fades out down the bay corridor and streaks in the host's frame (BayDust.ts).
+    this.dust.intensity = bayDust(this.world.eye, pf.velocity, [this.docking.target, this.docking.nearest], _dustVel);
+    this.dust.update(this.world.eye, _dustVel, dt);
+    this.dust.object.visible = this.jumpPhase !== 'tunnel' && this.dustOn;
     if (this.planes) {
       this.planes.update(this.world.eye, pf.speed);
       // A world filling the sky clears the km strata off its face.
@@ -1313,6 +1318,7 @@ export class FlightScene implements GameScene, FlightHostScene {
 
 const _v = new Vector3();
 const _to = new Vector3();
+const _dustVel = new Vector3();
 
 /**
  * Demo/capture mode: the AI flies the player (autopilot); this only adds a
