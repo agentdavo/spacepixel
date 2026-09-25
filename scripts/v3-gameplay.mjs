@@ -23,6 +23,8 @@ const pilot = args.includes('--pilot');
 const plan = opt('inputs', '') ? JSON.parse(readFileSync(opt('inputs', ''), 'utf8')) : [];
 if (existsSync(`${out}/events.jsonl`)) throw new Error('Choose a new output directory; capture logs cannot be appended to old takes');
 mkdirSync(out, { recursive: true });
+const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
+writeFileSync(`${out}/capture-harness.mjs`, readFileSync('scripts/v3-gameplay.mjs'));
 const server = await createServer({ cacheDir: `node_modules/.vite-v3-${port}`, server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: null }, logLevel: 'warn', plugins: [{ name: 'v3-replay', configureServer(s) { s.middlewares.use((req,res,next) => { if (req.url !== '/__v3-tape.json') return next(); res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(replay)); }); } }] });
 await server.listen();
 const browser = await chromium.launch({ channel: 'msedge', args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--use-angle=d3d11'] });
@@ -62,7 +64,6 @@ try {
     S.audio.update = f => { window.__v3.audio.push({ tick: S.simTick, ...snapshotAudioFrame(f), player: { ...f.player, position: { ...f.player.position }, velocity: { ...f.player.velocity } }, jumpPhase: f.jumpPhase, combatIntensity: f.combatIntensity }); audioUpdate(f); };
     return subjects.map(s => ({ id: s.id, name: s.name, blueprint: s.model.blueprint.id, pos: s.flight.position.toArray(), orientation: s.flight.orientation.toArray(), hull: s.hull, hullMax: s.hullMax, shield: s.shield, shieldMax: s.shieldMax, loadout: s.combat.loadout }));
   });
-  const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
   const scenery = await page.evaluate(() => window.__v3.S.loreFlight?.provenance ?? null);
   writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, cameraScale, pilot, initial, scenery, kind: 'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot option reads aim and sends ordinary mouse/keyboard controls.', inputs: plan }, null, 2));
   let ended = false;
