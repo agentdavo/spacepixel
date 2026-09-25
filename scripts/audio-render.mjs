@@ -13,7 +13,7 @@
  */
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const args = process.argv.slice(2);
@@ -21,7 +21,17 @@ const opt = (name, def) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : def;
 };
-const outDir = resolve(opt('out', '/tmp/claude-0/-home-user-spacepixel/8e290d9e-5be9-58a7-9f52-012490160559/scratchpad/audio'));
+const outDir = resolve(opt('out', 'scratchpad/audio'));
+const eventsPath = opt('events', '');
+const eventRows = eventsPath ? readFileSync(eventsPath, 'utf8').trim().split(/\r?\n/).map(JSON.parse) : null;
+const captured = eventRows?.slice(1) ?? null;
+if (captured) {
+  const header = eventRows[0];
+  if (header.scene !== 'trailer' || header.version !== 1 || !captured.length) throw new Error('Expected a trailer capture event log');
+  if (captured.length !== Math.round(header.to * header.fps) - Math.round(header.from * header.fps)) throw new Error('Capture is incomplete; wait until frame recording finishes');
+  for (let i = 1; i < captured.length; i++) if (captured[i].frame !== captured[i - 1].frame + 1) throw new Error('Capture log has a frame gap');
+  console.log(`Replaying ${captured.length} captured frames from ${eventsPath}`);
+}
 const port = Number(opt('port', '5198'));
 const only = opt('only', '')
   .split(',')
@@ -38,7 +48,7 @@ const blank = {
     });
   },
 };
-const server = await createServer({ server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'warn', plugins: [blank] });
+const server = await createServer({ cacheDir: resolve(`node_modules/.vite-audio-${port}`), server: { port, host: '127.0.0.1', strictPort: true, hmr: false }, logLevel: 'warn', plugins: [blank] });
 await server.listen();
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
 
@@ -250,13 +260,18 @@ try {
   page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
   await page.goto(`http://127.0.0.1:${port}/__audio.html`);
+  if (only.some(name => name.startsWith('trailer'))) {
+    const audit = await page.evaluate(async () => (await import('/src/audio/offline.ts')).auditTrailerVoices());
+    writeFileSync(`${outDir}/voice-audit.json`, JSON.stringify(audit, null, 2));
+    console.log(`Trailer neural voice audit: ${audit.filter(line => line.fits).length}/${audit.length} covered and fitting`);
+  }
   const names = await page.evaluate(async () => Object.keys((await import('/src/audio/offline.ts')).SCENARIOS));
   // `--only voice-radio+cast` renders a scenario with the recorded voices.
   for (const name of only.length ? only.filter((n) => names.includes(n.replace(/\+cast$/, ''))) : names) {
     const t0 = Date.now();
     let r;
     try {
-      r = await page.evaluate(async (nm) => (await import('/src/audio/offline.ts')).renderScenario(nm), name);
+      r = await page.evaluate(async ({ name, frames }) => (await import('/src/audio/offline.ts')).renderScenario(name, 48000, frames), { name, frames: captured });
     } catch (e) {
       console.log(`✗ ${name}: ${e.message}`);
       failed = true;
@@ -278,6 +293,7 @@ try {
 }
 
 console.log(`\nWAVs → ${outDir}\n`);
+writeFileSync(`${outDir}/analysis.json`, JSON.stringify(rows, null, 2));
 console.log(
   'scenario'.padEnd(18) +
     'peak dB'.padStart(8) +

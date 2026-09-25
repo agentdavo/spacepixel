@@ -4,9 +4,38 @@ import { narrationCues } from '@/cinema/narration';
 import { intensityAt, soundTimes, type Shot } from '@/cinema/timeline';
 import { hashStr, personById } from '@/dialog/people';
 import { GameAudio, SCORE_IDS, type AudioFrame, type AudioMissileEvent, type AudioShip, type AudioWeaponEvent, type Mood, type ScoreId } from './index';
-import { clipsSettled, loadClips } from './voice/Recorded';
+import { clipFor, clipsSettled, fetchClip, loadClips } from './voice/Recorded';
 import { BANTER, barkLine } from '@/dialog/barks';
 import { CAST_VOICES, VoiceBox, npcVoice, planFor, registerVoice, type VoiceChannel } from './voice';
+import type { RecordedAudioFrame } from '@/cinema/recording';
+
+let capturedFrames: readonly RecordedAudioFrame[] | null = null;
+// These sounds now come from matching simulation frames. Script-only cinematic
+// explosions (kills, detonate, hits) retain their authored cues exactly once.
+const capturedSounds = new Set(['laser', 'cannon', 'missileLaunch', 'missileHit', 'shieldDown', 'hullHit', 'beamHit']);
+
+/** Every trailer line, including the greeting spoken by the actual dock UI. */
+export async function auditTrailerVoices() {
+  await loadClips();
+  const person = personById(CONCOURSE_PERSON)!;
+  registerVoice(person.id, npcVoice(hashStr(person.id), { ...person.voice, faction: person.faction }));
+  const lines = narrationCues(TRAILER).map(c => ({ who: c.who, text: c.caption.text, channel: c.channel,
+    at: c.at, maxDur: c.maxDur, captionEnd: c.at - (c.caption.kind === 'word' ? 0 : 0.08) + c.caption.dur }));
+  let start = 0;
+  for (const shot of TRAILER) {
+    if (shot.id === 'concourse') {
+      lines.push({ who: person.id, text: person.greeting, channel: 'clean', at: start + 0.12, maxDur: shot.dur - 0.3, captionEnd: start + shot.dur });
+      break;
+    }
+    start += shot.dur;
+  }
+  return lines.sort((a, b) => a.at - b.at).map(line => {
+    const clip = clipFor(line.who, line.text, planFor(line).profile);
+    const rate = clip ? Math.max(1, Math.min(1.2, clip.dur / line.maxDur)) : 1;
+    const end = line.at + (line.channel === 'radio' || line.channel === 'intercept' ? 0.08 : 0.02) + (clip?.dur ?? 0) / rate;
+    return { ...line, clip, rate, end, fits: !!clip && end <= line.captionEnd + 0.025 };
+  });
+}
 
 /**
  * Headless renders for scripts/audio-render.mjs. Each scenario runs the real
@@ -156,6 +185,7 @@ const film = (shots: readonly Shot[], opts: { intensity?: boolean } = {}): Scena
       for (const sh of shots) {
         for (const m of sh.music ?? []) if (s.at(start + m.at)) s.audio.music.setMood(m.mood, m.fade ?? 2);
         for (const c of sh.sound ?? []) {
+          if (capturedFrames && shots === TRAILER && c.sfx && (capturedSounds.has(c.sfx) || (sh.id === 'capital' && c.sfx === 'explosionLarge'))) continue;
           for (const at of soundTimes(c)) {
             if (!s.at(start + at)) continue;
             if (c.sfx) s.audio.sfx.play(c.sfx, { gain: c.gain ?? 1 });
@@ -508,7 +538,8 @@ export const SCENARIOS: Record<string, Scenario> = {
   },
 };
 
-export async function renderScenario(name: string, sampleRate = 44100): Promise<RenderStats> {
+export async function renderScenario(name: string, sampleRate = 44100, frames: RecordedAudioFrame[] | null = null): Promise<RenderStats> {
+  capturedFrames = frames;
   // "<scenario>+cast": the same scenario with the recorded voices.
   const cast = name.endsWith('+cast');
   const sc = SCENARIOS[cast ? name.slice(0, -5) : name];
@@ -521,6 +552,25 @@ export async function renderScenario(name: string, sampleRate = 44100): Promise<
   const voice = new VoiceBox(audio);
   voice.modeOverride = cast ? 'cast' : 'synth';
   if (cast) await loadClips();
+  if (cast && name.startsWith('trailer')) {
+    const audit = await auditTrailerVoices();
+    if (audit.some(line => !line.fits)) throw new Error(`Trailer voice coverage/fit failed: ${JSON.stringify(audit.filter(line => !line.fits))}`);
+    for (const line of audit) if (!await fetchClip(ctx, line.clip!.key)) throw new Error(`Cannot decode trailer voice: ${line.text}`);
+  }
+  if (name.startsWith('trailer')) {
+    // Keep the synthetic recorded cast forward; duck effects as well as music.
+    const speak = voice.speak.bind(voice);
+    voice.speak = (req) => {
+      const utterance = speak({ ...req, level: 1.15, maxSqueeze: 1.2 });
+      audio.engine.duckMusic(-9, utterance.dur + 0.15, 0.45);
+      const gain = audio.engine.sfx!.gain;
+      const now = ctx.currentTime;
+      gain.cancelScheduledValues(now);
+      gain.setTargetAtTime(0.45, now, 0.025);
+      gain.setTargetAtTime(1, now + utterance.dur + 0.1, 0.12);
+      return utterance;
+    };
+  }
   const zero = { x: 0, y: 0, z: 0 };
   const sim: Sim = {
     t: 0,
@@ -558,10 +608,20 @@ export async function renderScenario(name: string, sampleRate = 44100): Promise<
   sim.frame.missileEvents = sim.m;
   sc.setup?.(sim);
   let maxVoices = 0;
+  let frameCursor = 0;
   const step = (): void => {
     sim.w.length = 0;
     sim.m.length = 0;
     sc.tick?.(sim);
+    if (frames) {
+      while (frameCursor < frames.length && frames[frameCursor].at < sim.t + sim.frame.dt) {
+        const f = frames[frameCursor++];
+        sim.frame.eye = f.eye;
+        sim.frame.camera = f.camera;
+        sim.w.push(...f.weaponEvents);
+        sim.m.push(...f.missileEvents);
+      }
+    }
     audio.update(sim.frame);
     maxVoices = Math.max(maxVoices, audio.engine.activeVoices());
   };
