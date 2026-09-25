@@ -2,7 +2,7 @@
 /** V3 deterministic staged gameplay: stock healthy ships, normal simulation after setup. */
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
-import { mkdirSync, writeFileSync, appendFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, appendFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -27,7 +27,10 @@ const routeUntil = Number(opt('route-until','1e9'));
 const plan = opt('inputs', '') ? JSON.parse(readFileSync(opt('inputs', ''), 'utf8')) : [];
 if (existsSync(`${out}/events.jsonl`)) throw new Error('Choose a new output directory; capture logs cannot be appended to old takes');
 mkdirSync(out, { recursive: true });
-const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts','src/game/CampaignSession.ts','src/game/CampaignRunner.ts','src/game/campaign/missions.ts','src/ui/Comms.ts','src/sim/CameraDirector.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
+// Include the episode modules and their helpers: missions.ts is now only a facade.
+const campaignSources = readdirSync('src/game/campaign', { recursive: true })
+  .filter(p => p.endsWith('.ts')).map(p => `src/game/campaign/${p.replaceAll('\\', '/')}`).sort();
+const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts','src/game/CampaignSession.ts','src/game/CampaignRunner.ts',...campaignSources,'src/ui/Comms.ts','src/sim/CameraDirector.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
 writeFileSync(`${out}/capture-harness.mjs`, readFileSync('scripts/v3-gameplay.mjs'));
 const server = await createServer({ cacheDir: `node_modules/.vite-v3-${port}`, server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: { ignored:['**/*'] } }, logLevel: 'warn', plugins: [{ name: 'v3-replay', configureServer(s) { s.middlewares.use((req,res,next) => { if (req.url !== '/__v3-tape.json') return next(); res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(replay)); }); } }] });
 await server.listen();
