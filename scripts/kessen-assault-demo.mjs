@@ -114,7 +114,10 @@ try {
       soundtrack(wav, start, duration);
       const file = cut === 'close' ? 'kessen-assault-close.mp4' : 'kessen-capital-assault.mp4';
       execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', `${fps}`, '-i', `${dir}/f_%05d.jpg`, '-i', wav,
-        '-c:v', 'libx264', '-preset', 'slow', '-crf', '19', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k',
+        '-vf', 'scale=in_range=pc:out_range=tv:out_color_matrix=bt709,format=yuv420p',
+        '-c:v', 'libx264', '-preset', 'slow', '-crf', '19', '-pix_fmt', 'yuv420p',
+        '-color_range', 'tv', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
+        '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2',
         '-af', 'loudnorm=I=-18:TP=-1.5:LRA=9', '-movflags', '+faststart', '-t', `${duration}`, `${out}/${file}`]);
       console.log(`Created ${file}`);
       reports.push({ cut, file, start, duration, fps, size: [1280, 720], url, ...device, checks, errors });

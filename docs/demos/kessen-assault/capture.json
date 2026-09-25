@@ -1,0 +1,66 @@
+{
+  "note": "Authored standalone cinematic demo using native game assets at their original scale. Choreographed salvo/impacts, not campaign combat or boarding mechanics. Original procedural soundtrack.",
+  "scratch": "C:\\Users\\DAVID(~1\\AppData\\Local\\Temp\\kessen-assault-Y0hGhg",
+  "reports": [
+    {
+      "cut": "cinematic",
+      "file": "kessen-capital-assault.mp4",
+      "start": 0,
+      "duration": 18,
+      "fps": 24,
+      "size": [
+        1280,
+        720
+      ],
+      "url": "http://127.0.0.1:5264/?scene=kessen-assault&cut=cinematic&shot=1&record=24&hud=0&quality=high&dynres=0",
+      "backend": "WebGPU",
+      "deviceCreated": true,
+      "checks": {
+        "frames": 8,
+        "originalScale": true,
+        "seekStable": true,
+        "barrelAlignment": [
+          0.9999883026573787,
+          0.99998778142084,
+          0.9999892274958418,
+          0.9999909500118592,
+          0.9999791267014139,
+          0.9999971991511558,
+          0.9999973863113597,
+          0.999993332773793
+        ]
+      },
+      "errors": []
+    },
+    {
+      "cut": "close",
+      "file": "kessen-assault-close.mp4",
+      "start": 5,
+      "duration": 12,
+      "fps": 24,
+      "size": [
+        1280,
+        720
+      ],
+      "url": "http://127.0.0.1:5264/?scene=kessen-assault&cut=close&shot=1&record=24&hud=0&quality=high&dynres=0",
+      "backend": "WebGPU",
+      "deviceCreated": true,
+      "checks": {
+        "frames": 8,
+        "originalScale": true,
+        "seekStable": true,
+        "barrelAlignment": [
+          0.9999883026573787,
+          0.99998778142084,
+          0.9999892274958418,
+          0.9999909500118592,
+          0.9999791267014139,
+          0.9999971991511558,
+          0.9999973863113597,
+          0.999993332773793
+        ]
+      },
+      "errors": []
+    }
+  ]
+}
