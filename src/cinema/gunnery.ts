@@ -1,6 +1,6 @@
 import { Quaternion, Vector3 } from 'three';
 import type { ShipEntity } from '@/sim/Fleet';
-import { aimAngles, createDrive, nextMuzzle, poseTurret, reachable, rigFor, type TurretDrive, type TurretRig } from '@/sim/TurretRig';
+import { aimAngles, aimError, barrelDir, createDrive, nextMuzzle, poseTurret, reachable, rigFor, type TurretDrive, type TurretRig } from '@/sim/TurretRig';
 
 /**
  * Scripted gunnery for the cinema stages: the trailer and prologue volleys
@@ -10,8 +10,9 @@ import { aimAngles, createDrive, nextMuzzle, poseTurret, reachable, rigFor, type
  * the next barrel tip in the universe, alternating through the salvo like
  * the live batteries (TurretRig.nextMuzzle).
  *
- * `pose: false` for ships a live Capitals sim already drives: the sim owns
- * their joints, this only reads the muzzles off the same rig.
+ * `traverse` animates the displayed joints and the firing solution together;
+ * `ready` gates fire on alignment, mount health and mechanical arcs.
+ * `pose: false` computes a solution without immediately applying its pose.
  */
 export class CinemaGunnery {
   private readonly mounts = new Map<ShipEntity, Map<string, { rig: TurretRig; drive: TurretDrive } | null>>();
@@ -41,10 +42,10 @@ export class CinemaGunnery {
     return ok;
   }
 
-  /** The sockets that can bear on `target`, trained on it; all of them if none can. */
+  /** The sockets that can bear on `target`, trained on it. */
   bear(s: ShipEntity, sockets: string[], target: Vector3, pose = true): string[] {
     const on = sockets.filter((k) => this.train(s, k, target, pose));
-    return on.length ? on : sockets;
+    return on;
   }
 
   /** Seekable cinema traverse: stowed → firing solution on shot-local time. */
@@ -52,13 +53,36 @@ export class CinemaGunnery {
     const p = Math.max(0, Math.min(1, progress));
     const ease = p * p * (3 - 2 * p);
     for (const socket of sockets) {
+      if (s.combat.dmg.subsystems.some(sub => sub.id === socket && sub.destroyed)) continue;
       this.train(s, socket, target, false);
       const m = this.mount(s, socket);
       if (!m) continue;
-      m.drive.yaw *= ease;
-      m.drive.pitch *= ease;
+      // Start 0.4 radians short of the solution, then visibly train in.
+      // A firing solution and a render pose always share this same drive.
+      m.drive.yaw = Math.max(m.rig.traverse[0], Math.min(m.rig.traverse[1], m.drive.yaw - 0.4 * (1 - ease)));
+      m.drive.pitch = Math.max(m.rig.elevation[0], m.drive.pitch - 0.12 * (1 - ease));
+      m.drive.recoil = 0;
       poseTurret(s.model, m.rig, m.drive);
     }
+  }
+
+  /** Only intact, articulated mounts actually aligned with the target may fire. */
+  ready(s: ShipEntity, sockets: string[], target: Vector3): string[] {
+    return sockets.filter(socket => {
+      if (s.combat.dmg.subsystems.some(sub => sub.id === socket && sub.destroyed)) return false;
+      const m = this.mount(s, socket);
+      if (!m?.rig.yawJoint || !m.rig.pitchJoint) return false;
+      _q.copy(s.flight.orientation).invert();
+      _d.subVectors(target, s.flight.position).applyQuaternion(_q).sub(m.rig.base).normalize();
+      aimAngles(m.rig, _d, _a);
+      return reachable(m.rig, _a.yaw, _a.pitch) && aimError(m.rig, m.drive.yaw, m.drive.pitch, _d) < 0.025;
+    });
+  }
+
+  direction(s: ShipEntity, socket: string, out: Vector3): Vector3 {
+    const m = this.mount(s, socket);
+    if (!m) throw new Error(`No articulated barrel: ${socket}`);
+    return barrelDir(m.rig, m.drive.yaw, m.drive.pitch, out).applyQuaternion(s.flight.orientation).normalize();
   }
 
   /** Universe muzzle of the mount's next barrel (the socket for an unrigged one). */

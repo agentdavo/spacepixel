@@ -5,7 +5,6 @@ import { faceAlong, type Fleet, type ShipEntity } from '@/sim/Fleet';
 import type { Weapons } from '@/sim/Weapons';
 import type { Missiles } from '@/sim/Missiles';
 import { CinemaGunnery } from './gunnery';
-import { Capitals } from '@/sim/Capitals';
 import { subsystemPosition, toUniverse } from '@/sim/Combat';
 import { GUNS, MISSILES } from '@/sim/Loadouts';
 import type { Subsystem } from '@/sim/Damage';
@@ -32,7 +31,7 @@ import { LONG_DARK_SKY } from './PrologueStage';
  * The trailer's sets — the prologue's machinery (sets thousands of km apart,
  * rigs, props posed as pure functions of the shot clock) plus live combat:
  * scripted fighters (kinematic paths, guns on a fire flag, scripted kills)
- * drive the real Weapons / Missiles / Capitals sims, so bolts, beams,
+ * drive the real Weapons / Missiles sims, so bolts, beams,
  * shield ripples, missile spirals, section blasts and burning subsystems
  * are the game's own. The Reach set is the real Meridian system
  * (StarSystemView: Castellan and its rings, stations with hollow bays,
@@ -104,7 +103,6 @@ export class TrailerStage implements CinemaStage {
   private readonly skies = new Map<string, Backdrop>();
   private readonly flags = new Set<string>();
   private readonly frame: SetPieceFrame;
-  private readonly capitals: Capitals;
   private readonly ui: TrailerUi;
   private live: SetDef | null = null;
   private liveLight: LightPreset | null = null;
@@ -154,7 +152,7 @@ export class TrailerStage implements CinemaStage {
   private canticle!: ShipEntity;
   private valiantTurrets: string[] = [];
   private canticleTurrets: string[] = [];
-  /** Scripted volleys leave the barrels (the battle's Indomitable is Capitals-driven; the rest are posed here). */
+  /** One authority for each capital's visible turret pose and projectile origin/direction. */
   private readonly gunnery = new CinemaGunnery();
 
   constructor(
@@ -167,7 +165,6 @@ export class TrailerStage implements CinemaStage {
     private readonly camera: PerspectiveCamera,
     uiRoot: HTMLElement,
   ) {
-    this.capitals = new Capitals(fleet, weapons);
     const u = generateUniverse(1994);
     const sys = (id: string) => u.systems.get(id)!;
     const meridian: StarSystem = sys('meridian');
@@ -342,7 +339,6 @@ export class TrailerStage implements CinemaStage {
     this.cathedral = C;
     this.pose(I, set.anchor, _z);
     this.pose(C, _w.set(3200, 150, 900).add(set.anchor), _z);
-    for (const s of [I, C]) this.capitals.register(s, { launchBlueprint: null });
     for (let i = 0; i < 4; i++) this.BK.push(this.ship(set, 'vf27-kestrel', 'concord'));
     this.BK.forEach((k, i) => (k.combat.gun = i % 2));
     for (let i = 0; i < 5; i++) this.measure.push(this.ship(set, 'choir-cantor', 'choir'));
@@ -431,7 +427,15 @@ export class TrailerStage implements CinemaStage {
       s.controls.fire = false;
       s.hull = s.hullMax;
     }
-    if (set?.id === 'battle') this.resetShields();
+    if (set?.id === 'battle') {
+      this.resetShields();
+      this.cathedral.flight.orientation.identity();
+      this.cathedral.model.root.quaternion.identity();
+      if (shot.id === 'lance') {
+        faceAlong(this.cathedral.flight.orientation, _v.subVectors(this.indomitable.flight.position, this.cathedral.flight.position));
+        this.cathedral.model.root.quaternion.copy(this.cathedral.flight.orientation);
+      }
+    }
     this.ui.show(UI_SHOTS[shot.id] ?? null);
   }
 
@@ -447,6 +451,7 @@ export class TrailerStage implements CinemaStage {
     this.missiles.events.length = 0;
     const set = this.live;
     if (!set) return;
+    this.frame.dt = dt;
     this.setClock = local;
     this.uiLocal = local;
     switch (set.id) {
@@ -467,16 +472,15 @@ export class TrailerStage implements CinemaStage {
       case 'lineup':
         return this.animateLineup(local);
       case 'broadside':
-        this.animateBroadside(local);
+        this.animateBroadside(local, dt);
         break;
     }
     if (dt > 0) this.stepSims(set, dt, _seeking);
   }
 
   /** Weapons (+ missiles, capital turrets) for the live combat set. */
-  private stepSims(set: SetDef, dt: number, seeking: boolean): void {
+  private stepSims(_set: SetDef, dt: number, seeking: boolean): void {
     this.simT += dt;
-    if (set.id === 'battle') this.capitals.step(dt);
     this.weapons.step(dt);
     this.missiles.step(dt);
     // The missile circus: the first warhead to reach a Cantor finishes it.
@@ -690,6 +694,15 @@ export class TrailerStage implements CinemaStage {
     const C = this.cathedral;
     const I = this.indomitable;
     for (const s of [...this.BK, ...this.measure]) s.controls.fire = false;
+    const mounts = (ship: ShipEntity) => [...ship.model.turrets.keys()];
+    for (const [ship, target] of [[I, C], [C, I]]) {
+      const sockets = mounts(ship);
+      this.gunnery.traverse(ship, sockets, target.flight.position, t / 1.2);
+      if (t > 1.2 && Math.floor(t / 0.48) !== Math.floor((t - this.frame.dt) / 0.48)) {
+        const ready = this.gunnery.ready(ship, sockets, target.flight.position);
+        this.boltVolley(ship, ready, target, ready.length, ship === I ? GUNS.railgun : GUNS.battery);
+      }
+    }
     const cs = C.combat.dmg;
     const is = I.combat.dmg;
     if (shot.id === 'capital') {
@@ -819,7 +832,7 @@ export class TrailerStage implements CinemaStage {
     });
   }
 
-  private animateBroadside(t: number): void {
+  private animateBroadside(t: number, dt: number): void {
     const V = this.valiant;
     const X = this.canticle;
     const A = this.live!.anchor;
@@ -828,16 +841,11 @@ export class TrailerStage implements CinemaStage {
     V.model.setThrottle(0.6);
     X.model.setThrottle(0.6);
     this.gunnery.traverse(V, this.valiantTurrets, X.flight.position, t / 0.8);
-    // The Canticle answers: choir battery shards off its near side.
-    const k = Math.floor(t * 9);
-    if (Math.floor((t - 1 / 60) * 9) !== k && t > 0.4) {
-      toUniverse(V, 60 * hash(k + 11), 20, 120 * hash(k + 13), _u);
-      const mounts = this.gunnery.bear(X, this.canticleTurrets, _u);
-      if (mounts.length) this.gunnery.muzzle(X, mounts[k % mounts.length], _w);
-      else toUniverse(X, -120 + 60 * hash(k), 40 * hash(k + 3), 180 * hash(k + 7), _w);
-      _v.subVectors(_u, _w).normalize().multiplyScalar(GUNS.battery.speed);
-      this.weapons.spawnBolt(_w, _v, 2.2, 5, X, GUNS.battery);
-      this.weapons.muzzleFlash(_w, _v.clone().normalize(), X.flight.velocity, X, GUNS.battery);
+    this.gunnery.traverse(X, this.canticleTurrets, V.flight.position, t / 1.1);
+    // Both sides use the pose actually displayed; no ideal-aim proxy or hull-origin fallback.
+    if (t > 1.1 && Math.floor(t * 3) !== Math.floor((t - dt) * 3)) {
+      const ready = this.gunnery.ready(X, this.canticleTurrets, V.flight.position);
+      this.boltVolley(X, ready, V, ready.length, GUNS.battery);
     }
   }
 
@@ -945,7 +953,9 @@ export class TrailerStage implements CinemaStage {
         const C = this.cathedral;
         const sock = ['lance', 'harp', 'spire-1'].find((n) => C.model.sockets.has(n)) ?? null;
         const b = this.weapons.fireBeam(C, sock, 9000, 42, 1.4, 0);
-        b.aimTarget = this.indomitable;
+        // The fixed bow lance follows the ship's nose. The lance shot turns
+        // the Cathedral toward its opponent before the camera begins.
+        b.aimTarget = null;
         return;
       }
       case 'detonate': {
@@ -979,42 +989,23 @@ export class TrailerStage implements CinemaStage {
     }
   }
 
-  /** Every turret on the line trains and fires: beams to mark, bolts to hurt. */
+  /** A broadside uses only mounts already laid on target, firing along their barrels. */
   private broadside(seeking: boolean): void {
-    const live = this.live?.id;
-    const W = this.weapons;
-    if (live === 'battle') {
-      const I = this.indomitable;
-      const all = [...I.model.sockets.entries()].filter(([, o]) => o.userData.kind === 'turret').map(([k]) => k);
-      const turrets = this.gunnery.bear(I, all, this.cathedral.flight.position, false);
-      turrets.slice(0, 5).forEach((k) => {
-        const b = W.fireBeam(I, k, 9000, 12, 0.9, 0);
-        b.muzzle = this.gunnery.emitter(I, k);
-        b.aimTarget = this.cathedral;
-      });
-      this.boltVolley(I, turrets, this.cathedral, 18, GUNS.railgun);
-      return;
-    }
-    if (live === 'broadside') {
-      const V = this.valiant;
-      const turrets = this.gunnery.bear(V, this.valiantTurrets, this.canticle.flight.position);
-      turrets.slice(0, 4).forEach((k) => {
-        const b = W.fireBeam(V, k, 4000, 6, 0.6, 0);
-        b.muzzle = this.gunnery.emitter(V, k);
-        b.aimTarget = this.canticle;
-      });
-      this.boltVolley(V, turrets, this.canticle, 14, GUNS.cannon);
-    }
+    const from = this.live?.id === 'battle' ? this.indomitable : this.valiant;
+    const target = this.live?.id === 'battle' ? this.cathedral : this.canticle;
+    const sockets = [...from.model.turrets.keys()];
+    const ready = this.gunnery.ready(from, sockets, target.flight.position);
+    this.boltVolley(from, ready, target, ready.length * 2, GUNS.railgun);
     void seeking;
   }
 
   private boltVolley(from: ShipEntity, sockets: string[], target: ShipEntity, n: number, gun: (typeof GUNS)[keyof typeof GUNS]): void {
-    const c = target.flight.position;
+    if (!sockets.length) return;
+    void target;
     for (let i = 0; i < n; i++) {
       const k = sockets[i % Math.max(1, sockets.length)];
-      if (k) this.gunnery.muzzle(from, k, _w);
-      else this.weapons.socketPosition(from, 'hull', _w);
-      _v.subVectors(c, _w).normalize().add(_u.set(hash(i) * 0.03, hash(i + 7) * 0.03, hash(i + 13) * 0.03)).normalize().multiplyScalar(Math.max(1600, gun.speed));
+      this.gunnery.muzzle(from, k, _w);
+      this.gunnery.direction(from, k, _v).multiplyScalar(Math.max(1600, gun.speed));
       this.weapons.spawnBolt(_w, _v, 3.2, 2, from, gun);
       this.weapons.muzzleFlash(_w, _v.clone().normalize(), from.flight.velocity, from, gun);
     }

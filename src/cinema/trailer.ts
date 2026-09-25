@@ -67,7 +67,7 @@ export const TRAILER: Shot[] = [
     captions: [
       { at: 0.15, dur: 4.4, kind: 'slug', text: 'NULL · THE EDGE OF THE REACH · YEAR 431' },
       ...TRAILER_PULSES.map((at, i): Caption => ({ at, dur: i === TRAILER_PULSES.length - 1 ? 1.3 : 0.75, kind: 'count', kicker: 'NULL · BURST', text: PRIMES[i] })),
-      { at: 2.35, dur: 2.2, text: 'Something is counting down the primes.', jp: '何かが、素数を数えている。' },
+      { at: 2.25, dur: 2.3, text: 'Something beyond this gate is counting down.' },
     ],
     fx: [ramp('fade', 0, 0.7, 1, 0), ...TRAILER_PULSES.flatMap((at) => [pulse('flash', at, 0.12, 0.02, 0.02, 0.25), pulse('solarize', at, 0.35, 0.02, 0.05, 0.4)])],
     music: [{ at: 0, mood: 'dread', fade: 0.8, intensity: 0.5 }],
@@ -82,8 +82,7 @@ export const TRAILER: Shot[] = [
       { at: 2.6, dur: 2.4, from: { eye: [0.6, 0.35, 13.5], look: [0, 0, 0], fov: 36 }, to: { eye: [0.5, 0.3, 11.7], look: [0, 0, 0], fov: 36 }, ease: 'linear' },
     ],
     captions: [
-      { at: 0.35, dur: 2.15, text: 'In the Long Dark…', jp: '長い闇の中で…' },
-      { at: 2.75, dur: 2.15, text: '…every light is worth a war.', jp: '光ひとつが、戦争に値する。' },
+      { at: 0.1, dur: 4.8, text: 'Four centuries ago, the Lantern gates went dark. Humanity was stranded.' },
     ],
     events: [{ at: 2.3, id: 'ebon' }],
     fx: [ramp('fade', 0, 0.5, 0.8, 0), pulse('hue', 2.3, 0.45, 0.2, 0.3, 1.0), pulse('flash', 2.6, 0.5, 0.03, 0.04, 0.45), pulse('solarize', 2.6, 0.3, 0.05, 0.1, 0.6)],
@@ -224,7 +223,7 @@ export const TRAILER: Shot[] = [
     ],
     captions: [{ at: 0.1, dur: 1.4, who: 'candle', kicker: 'CANDLE · VANGUARD 3', text: 'All batteries — fire!' }],
     events: [
-      { at: 0.2, id: 'broadside' },
+      { at: 1.25, id: 'broadside' },
       { at: 1.6, id: 'great-lance' },
       { at: 2.4, id: 'detonate' },
     ],
@@ -245,8 +244,7 @@ export const TRAILER: Shot[] = [
       { at: 2.8, dur: 2.8, rig: 'kestrel', units: 'm', from: { eye: [9, 3.5, -26], look: [-400, -40, 1500], fov: 54 }, to: { eye: [8, 3.2, -24], look: [-400, -40, 1500], fov: 55 }, ease: 'linear' },
     ],
     captions: [
-      { at: 0.15, dur: 2.55, text: 'Twenty-two systems. Six Lanterns.', jp: '二十二の星系。六つのランタン。' },
-      { at: 2.85, dur: 2.6, text: 'A Reach that keeps its own timetable.', jp: '時刻表どおりに生きる宙域。' },
+      { at: 0.1, dur: 5.35, text: 'The Terran Directorate. The Zenith Hegemony. Fighting for the fuel that keeps six gates alive.' },
     ],
     fx: [speed(2.8, 5.6, 0.3)],
     sound: [{ at: 2.8, sfx: 'cruiseDisengage', gain: 0.6 }],
@@ -257,7 +255,7 @@ export const TRAILER: Shot[] = [
     set: 'reach',
     dur: 3.8,
     cams: [{ at: 0, dur: 3.8, rig: 'lantern', units: 'm', from: { eye: [1500, 260, 1500], look: [0, 0, 380], fov: 46 }, to: { eye: [1420, 245, 1380], look: [0, 0, 360], fov: 46 }, ease: 'linear' }],
-    captions: [{ at: 0.25, dur: 3.3, text: 'Haul Ebon-gas down the lanes…', jp: 'エボンガスを運び…' }],
+    captions: [{ at: 0.25, dur: 3.3, text: 'Ebon-gas, harvested from dying stars.' }],
     events: [{ at: 2.35, id: 'jump' }],
     fx: [pulse('flash', 2.35, 0.3, 0.02, 0.04, 0.5)],
     sound: [{ at: 2.2, sfx: 'jumpEntry', gain: 0.6 }, { at: 2.35, sfx: 'jumpExit', gain: 0.8 }],
@@ -267,7 +265,7 @@ export const TRAILER: Shot[] = [
     set: 'reach',
     dur: 3.0,
     cams: [{ at: 0, dur: 3.0, rig: 'liner', units: 'm', from: { eye: [70, 34, -200], look: [0, 0, 150], fov: 52 }, to: { eye: [62, 30, -110], look: [0, 0, 170], fov: 52 }, ease: 'linear' }],
-    captions: [{ at: 0.2, dur: 2.7, text: '…fly escort, take contracts, trade.', jp: '護衛し、契約し、交易する。' }],
+    captions: [{ at: 0.2, dur: 2.7, text: 'Without it, the colonies fall silent.' }],
     sound: [{ at: 0.6, sfx: 'afterburnerIgnite', gain: 0.4 }],
   },
   {
@@ -288,7 +286,7 @@ export const TRAILER: Shot[] = [
     set: 'reach',
     dur: 3.4,
     cams: [hold(0, 3.4, [50, -29, -112], [0, -6, 150], 62)].map((m) => ({ ...m, rig: 'bay', units: 'm' as const })),
-    captions: [{ at: 0.4, dur: 2.9, text: 'Buy where it’s cheap. Sell where it’s scarce.', jp: '安く買い、足りない所で売れ。' }],
+    captions: [{ at: 0.3, dur: 3.0, text: 'Trade. Take contracts. Build your future.' }],
     sound: [{ at: 0.05, sfx: 'lockConfirm', gain: 0.4 }],
   },
   {
@@ -309,7 +307,7 @@ export const TRAILER: Shot[] = [
     set: 'lineup',
     dur: 4.0,
     cams: [{ at: 0, dur: 4.0, rig: 'row', from: { eye: [0.9, 0.35, 1.9], look: [0.3, 0.05, 0], fov: 40 }, to: { eye: [0.8, 0.33, 1.8], look: [0.3, 0.05, 0], fov: 40 }, ease: 'linear' }],
-    captions: [{ at: 0.3, dur: 3.5, text: 'Earn your shares. Buy the next hull.', jp: '稼いで、次の艦を買え。' }],
+    captions: [{ at: 0.3, dur: 3.5, text: 'Every ship is a relic of a lost age.' }],
   },
   {
     // The ladder at true scale: Kestrel → Gauntlet → Bulwark → Resolute → Valiant.
@@ -327,7 +325,7 @@ export const TRAILER: Shot[] = [
       { at: 1.35, dur: 1.3, kind: 'label', who: '', kicker: 'T3 · 28 M  ·  T4 · 56 M', text: 'GAUNTLET · BULWARK', jp: '58,000 SH · 125,000 SH' },
       { at: 2.75, dur: 1.4, kind: 'label', who: '', kicker: 'T5 · 177 M · CREW 20', text: 'CR-5 RESOLUTE', jp: '240,000 SH' },
       { at: 4.3, dur: 2.6, kind: 'label', who: '', kicker: 'T6 · 380 M · FLOWN FROM THE BRIDGE', text: 'FFL-3 VALIANT', jp: 'YOUR OWN FRIGATE' },
-      { at: 4.35, dur: 2.5, text: 'From a borrowed Kestrel to your own frigate.', jp: '借り物のケストレルから、自分のフリゲートへ。' },
+      { at: 4.35, dur: 2.5, text: 'Keep it flying. Make it yours.' },
     ],
     sound: [{ at: 1.3, radio: 'click' }, { at: 2.7, radio: 'click' }, { at: 4.2, radio: 'click' }],
   },
@@ -343,8 +341,11 @@ export const TRAILER: Shot[] = [
     captions: [{ at: 0.2, dur: 1.9, who: 'kade', kicker: 'KADE · VANGUARD LEAD', text: 'Broadside. Everything you have.', jp: '全砲門、斉射！' }],
     events: [
       { at: 0.9, id: 'broadside' },
+      { at: 1.15, id: 'broadside' },
       { at: 1.6, id: 'broadside' },
+      { at: 1.85, id: 'broadside' },
       { at: 2.6, id: 'broadside' },
+      { at: 2.85, id: 'broadside' },
       { at: 3.4, id: 'hits' },
     ],
     fx: [pulse('flash', 3.4, 0.35, 0.02, 0.05, 0.4)],
@@ -359,7 +360,7 @@ export const TRAILER: Shot[] = [
     cams: [{ at: 0, dur: 6.5, from: { eye: [0.35, -0.2, 10.5], look: [0, 0.25, 0], fov: 34 }, to: { eye: [0.3, -0.16, 9.6], look: [0, 0.25, 0], fov: 34 }, ease: 'linear' }],
     captions: [
       { at: 0.35, dur: 6.15, kind: 'title', text: 'PROJECT\nVANGUARD', kicker: 'THE LONG DARK', jp: '長い闇' },
-      { at: 2.2, dur: 4.1, text: 'The squadron that goes through first.', jp: '最初に抜ける部隊。' },
+      { at: 2.2, dur: 4.1, text: 'You are Vanguard. The squadron that goes through first.' },
     ],
     fx: [pulse('flash', 0.35, 0.45, 0.02, 0.04, 0.5), ramp('fade', 6.0, 6.5, 0, 0.7)],
     music: [{ at: 0, mood: 'title', fade: 0.3, intensity: 0.9 }],
