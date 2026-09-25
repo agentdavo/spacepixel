@@ -97,6 +97,16 @@ through `Weapons.step(dt, true)`. Standalone `Weapons.step(dt)` still starts its
 own window. Tests cover mixed contact and bolt kills, ordered delivery to
 EventTap, survival across the weapon phase and absence on the following tick.
 
+Chief/audio review then found that direct collision hull FX/sound ignored actual
+shield absorption and bypassed the replay-seek presentation gate. The follow-up
+routes capital damage through `Weapons.contactHit`: Fleet.hit applies it, then
+one ordinary shield/hit event immediately copies its exact result. It carries
+kinetic type, raw amount, null gun, damage in each layer, facing, strength, bleed
+and subsystem fields. FlightScene and the headless harness use this adapter.
+Capital contacts no longer call particles or audio directly; ordinary CombatFx,
+EventTap and GameAudio consumers respect the existing fast-forward gate. Camera
+shake remains tied to physical impact. Fighter handling/cues are unchanged.
+
 ## Checks and measurements
 
 Focused commands (run serially to avoid this machine's concurrent-suite pressure):
@@ -108,6 +118,10 @@ npm run build
 
 Result: **44 focused tests pass**; production build, TypeScript, campaign and
 expansion content checks pass. No combined/full-suite acceptance is claimed here.
+The layer-aware follow-up passes the real runtime collision suite, audio and
+EventTap checks and TypeScript. Actual GameAudio spies hear shield cues only for
+absorbed contacts, exactly one cue per damaged layer for penetrating contacts,
+and preserve those layers for a gunless contact which kills the player.
 
 The physics fixtures cover stationary and separating overlap, gentle sustained
 thrust, docking exclusion, near misses inside broad spheres, 60 km/s relative
@@ -161,19 +175,25 @@ Evidence root on the task's retained worktree:
 
 - `baseline-native/`: actual detached `c9429e0` source. No contacts/damage/deaths;
   ships visibly interpenetrate. Video, frames and state/provenance JSON preserved.
-- `native-final/`: final committed source; one 360 m/s contact around tick 107,
+- `native-layer-final/`: final layer-aware source; one 360 m/s contact around tick 107,
   two fore-shield collapses and two structural kill events, four wreck pieces,
   zero page errors. Exact source SHA and file hashes are in `evidence.json`.
+- `native-shield-final/`: same committed source, centres ±1,140 m and opposing
+  10 m/s inertial velocities. Both hulls remain intact, with two ordinary shield
+  impact events and no hull damage. Metadata retains kinetic type and null gun.
 - `targeted-tests.txt`: focused test output, catalog/damage/performance facts.
 - `v4-42-48.png`: diagnostic V4 contact sheet; original film remains unchanged.
 
 Earlier takes are retained, not relabelled: native-01 failed an import before
 capture; native-02 established numeric deaths but its camera looked away;
 native-03 has valid framing/physics but predates the event fix; native-04-events
-is an intermediate event regression take. Use native-final for final acceptance.
+is an intermediate event regression take. `native-final/` is the clean dbf1899
+physics/event-boundary fixture before layer-aware feedback review. Use
+native-layer-final and native-shield-final for final acceptance.
 
 ```sh
 node scripts/collision-capture.mjs --out scratchpad/collision-audit/another-final
+node scripts/collision-capture.mjs --case shield --out scratchpad/collision-audit/another-shield
 node scripts/collision-capture.mjs --root PATH_TO_C9429E0 --baseline --out scratchpad/collision-audit/another-baseline
 ```
 

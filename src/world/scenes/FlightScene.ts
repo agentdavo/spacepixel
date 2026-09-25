@@ -328,7 +328,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.scene.add(this.visuals.group);
     this.combatFx = new CombatFx(this.weapons, this.missiles);
     this.scene.add(this.combatFx.fx.object);
-    this.hulls = new HullCollisions(this.fleet, () => (this.fxOn ? this.combatFx.fx : null));
+    this.hulls = new HullCollisions(this.fleet, () => (this.fxOn ? this.combatFx.fx : null), (s, amount, point, normal, other) => this.weapons.contactHit(s, amount, point, normal, other));
     // The timetable clock runs from a settled point (+1 day) so lanes are already busy.
     this.traffic = new Traffic(this.fleet, this.fxOn ? this.combatFx.fx : null, (id) => id in BLUEPRINTS, this.universe.seed);
     this.traffic.clock = 86_400 + this.ledger.clock;

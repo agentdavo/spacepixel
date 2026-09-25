@@ -2,7 +2,7 @@ import { Vector3 } from 'three';
 import type { Fleet, HitEventKind, ShipEntity, Team } from './Fleet';
 import type { FactionId } from '@/assets/Blueprint';
 import { CAPITAL_LANCE_GUN, GUNS, GUN_INDEX, GUN_LIST, type DamageType, type GunSpec } from './Loadouts';
-import { facingStrength, type Subsystem } from './Damage';
+import { facingStrength, type HitResult, type Subsystem } from './Damage';
 import { chooseGun, createRayHit, cycleSubsystem, gunOf, pickSubsystemAtCrosshair, raycastShip } from './Combat';
 import type { Rng } from './Rng';
 import type { DeathCause } from './Structure';
@@ -335,6 +335,26 @@ export class Weapons {
    * may keep using step(dt), which starts its own window as before. */
   beginTick(): void {
     this.events.length = 0;
+  }
+
+  /** Physical contact uses the same damage layers and presentation events as
+   * projectiles. A shield-absorbed impact must not play a hull-damage cue. */
+  contactHit(ship: ShipEntity, amount: number, point: Vector3, normal: Vector3, other: ShipEntity): HitResult & { killed: boolean } {
+    const r = this.fleet.hit(ship, amount, 'kinetic', point, normal, other);
+    if (r.shieldDamage + r.hullDamage <= 0) return r;
+    const e = this.emit(r.shielded ? 'shield' : 'hit', point, normal, ship.flight.velocity, ship, other);
+    if (e) {
+      e.type = 'kinetic';
+      e.amount = amount;
+      e.shielded = r.shielded;
+      e.hullDamage = r.hullDamage;
+      e.shieldDamage = r.shieldDamage;
+      e.facing = r.facing;
+      e.strength = r.strength;
+      e.bleed = r.bleed;
+      subOnEvent(e, r.subsystem);
+    }
+    return r;
   }
 
   step(dt: number, keepEvents = false): void {
