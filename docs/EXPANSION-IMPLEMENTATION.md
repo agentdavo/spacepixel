@@ -9,7 +9,7 @@ Branch: `codex/universe-expansion`, based on the isolated rendering Package A. T
 - `npm run dev -- --host 127.0.0.1 --port 5232`
 - `/?atlas=1`: Open Horizon survey atlas, also reachable from the title menu. This path does not create a renderer.
 - `/?scene=flight&expansion=pilot`: independent six-system flight prototype. Start at Threshold; use M to plot a gate route and G for normal docking. FIRST CONTACT at a Marches port lists supply agreements and their destinations. Buy cargo in MARKET and deliver it through FIRST CONTACT. Existing flight controls, repair and trade apply.
-- Reloading that prototype resumes at the last Marches berth. Cargo, rewards and completion receipts share one ledger transaction. Loading the normal campaign still uses the original Reach.
+- Reloading that prototype resumes at its last berth in either the Marches or the Reach. A dedicated prototype berth survives subsequent normal-campaign visits; a first prototype visit starts at Threshold. Cargo, rewards and completion receipts commit together, with delivery refused if persistence fails. Loading the normal campaign still uses the original Reach.
 - `/?scene=shipreview&ship=pa-skimmer`: inspect a prototype with the existing native hull-review scene. Other IDs are listed below. These views use the renderer and should not run concurrently with measured trailer captures.
 - Developer-only `own=<id>` can exercise a stock-fitted prototype in flight; it uses the existing debug ownership mechanism and adds it to that test profile's hangar. Prototype hulls are not yet sold by normal yards.
 
@@ -65,6 +65,8 @@ node scripts/check-frontier-ui.mjs
 - No browser page/console errors occurred in the final check.
 
 Final command outputs are stored under [reviews/expansion-foundation](reviews/expansion-foundation/). No new GPU performance result supersedes Package A's failing native performance gate.
+
+The subsequent integration review found four issues in the foundation. [Scoped fix notes](reviews/expansion-foundation/integration-fixes.md) describe issuer ownership, quota-safe primary persistence, future contact-document preservation and actual berth restoration, with focused regression evidence. Generic frontier contracts remain unavailable until local clients are authored; FIRST CONTACT supplies the current pilot agreements.
 
 ## Integration boundaries and next production work
 

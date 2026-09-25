@@ -49,17 +49,22 @@ try {
   const runtime = await page.evaluate(async () => {
     localStorage.removeItem('vanguard.expansion.v1');
     const { newLedger } = await import('/src/game/economy.ts');
-    const ledger = newLedger(); ledger.cargo = { medical: 2 }; localStorage.setItem('vanguard.trade.v1', JSON.stringify(ledger));
+    const { generateUniverse } = await import('/src/universe/generate.ts');
+    const ledger = newLedger(); ledger.cargo = { medical: 2 };
+    ledger.lastDock = generateUniverse(1994).systems.get('rustwake').stations[0].id;
+    localStorage.setItem('vanguard.trade.v1', JSON.stringify(ledger));
     document.getElementById('frontier-atlas').remove();
     const { FlightScene } = await import('/src/world/scenes/FlightScene.ts');
     const scene = new FlightScene();
     for (let i = 0; i < 120; i++) scene.simStep();
+    const entry = { system: scene.currentSystemId(), phase: scene.docking.phase, open: scene.dockScreen.isOpen };
     const station = scene.universe.systems.get('marches:threshold').stations[0].id;
     const docked = scene.berthAt(station);
     window.__frontierTestScene = scene;
-    return { systems: scene.universe.systems.size, station, docked, finite: scene.fleet.ships.every(s => Number.isFinite(s.hull) && Number.isFinite(s.flight.position.x)) };
+    return { entry, systems: scene.universe.systems.size, station, docked, finite: scene.fleet.ships.every(s => Number.isFinite(s.hull) && Number.isFinite(s.flight.position.x)) };
   });
   assert.equal(runtime.systems, 28); assert.equal(runtime.docked, true); assert.equal(runtime.finite, true);
+  assert.deepEqual(runtime.entry, { system: 'marches:threshold', phase: 'free', open: false });
   await page.getByRole('button', { name: /CONTRACTS$/ }).click();
   assert.match(await page.locator('.ct').innerText(), /No local contract issuers.*FIRST CONTACT/);
   assert.doesNotMatch(await page.locator('.ct').innerText(), /Halloran|REPOST IN/);
@@ -89,27 +94,64 @@ try {
   assert.deepEqual(settled.contact.completed, ['pelagic-1']); assert.equal(settled.cargo.medical ?? 0, 0);
   assert.equal(settled.credits, 3600); assert.equal(settled.rep.pelagic, 5);
   assert.equal(await page.locator('.dock-panel').isVisible(), true); // Enter did not launch.
-  await page.reload(); await page.locator('#frontier-atlas').waitFor();
-  const resumed = await page.evaluate(async () => {
-    document.getElementById('frontier-atlas').remove();
-    const { FlightScene } = await import('/src/world/scenes/FlightScene.ts');
-    const scene = new FlightScene();
-    window.__frontierTestScene = scene;
-    return { dock: scene.ledger.lastDock, done: scene.ledger.contact.completed, credits: scene.ledger.credits, systems: scene.universe.systems.size };
-  });
+  const reloadFlight = async (url = `${base}/?atlas=1&expansion=pilot&voice=off`) => {
+    await page.goto(url); await page.locator('#frontier-atlas').waitFor();
+    return page.evaluate(async () => {
+      document.getElementById('frontier-atlas').remove();
+      const { FlightScene } = await import('/src/world/scenes/FlightScene.ts');
+      const scene = new FlightScene();
+      window.__frontierTestScene = scene;
+      return { dock: scene.ledger.lastDock, frontierDock: scene.ledger.frontierDock, done: scene.ledger.contact.completed, credits: scene.ledger.credits, systems: scene.universe.systems.size,
+        system: scene.currentSystemId(), phase: scene.docking.phase, target: scene.docking.target?.id, open: scene.dockScreen.isOpen };
+    });
+  };
+  const assertBerth = async (state, system, station) => {
+    assert.equal(state.system, system); assert.equal(state.phase, 'docked'); assert.equal(state.target, station);
+    assert.equal(state.open, true); assert.equal(state.frontierDock, station);
+    assert.equal(await page.locator('.dock-screen').isVisible(), true);
+    assert.equal(await page.locator('.dock-body').isVisible(), true);
+  };
+  const resumed = await reloadFlight();
   assert.equal(resumed.dock, runtime.station); assert.deepEqual(resumed.done, ['pelagic-1']); assert.equal(resumed.credits, 3600);
+  await assertBerth(resumed, 'marches:threshold', runtime.station);
+  let reachBerth;
+  for (const system of ['marches:stillwater', 'rustwake']) {
+    const station = await page.evaluate(system => {
+      const scene = window.__frontierTestScene;
+      const station = scene.universe.systems.get(system).stations[0].id;
+      if (!scene.berthAt(station)) throw new Error(`Could not berth at ${station}`);
+      return station;
+    }, system);
+    await assertBerth(await reloadFlight(), system, station);
+    if (system.startsWith('marches:')) {
+      // Migrate an earlier prototype save which only had the shared Marches lastDock.
+      await page.evaluate(() => { delete window.__frontierTestScene.ledger.frontierDock; });
+      await assertBerth(await reloadFlight(), system, station);
+    } else reachBerth = station;
+  }
+  // A normal campaign visit changes shared lastDock, but cannot move the prototype berth.
+  await reloadFlight(`${base}/?atlas=1&voice=off`);
+  await page.evaluate(() => {
+    const scene = window.__frontierTestScene;
+    if (!scene.berthAt(scene.universe.systems.get('meridian').stations[0].id)) throw new Error('Normal Reach berth failed');
+  });
+  await assertBerth(await reloadFlight(), 'rustwake', reachBerth);
   const futureContact = { version: 2, completed: ['pelagic-1', 'pelagic-4'], receipts: { 'pelagic-4': { reward: 3300, revision: 2 } } };
   await page.evaluate(async contact => {
     const scene = window.__frontierTestScene;
     const { normaliseLedger } = await import('/src/game/economy.ts');
     scene.ledger = normaliseLedger({ ...scene.ledger, contact });
-    scene.berthAt(scene.ledger.lastDock);
+    scene.berthAt(scene.universe.systems.get('marches:threshold').stations[0].id);
     scene.dockScreen.showTab('contact');
   }, futureContact);
   assert.equal(await page.locator('.dock-panel').getByRole('status').isVisible(), true);
   assert.match(await page.locator('.dock-panel').innerText(), /unsupported version.*saved records are preserved/);
   assert.equal(await page.getByRole('button', { name: 'Deliver supplies', exact: true }).count(), 0);
   assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('vanguard.trade.v1')).contact), futureContact);
+  await page.evaluate(() => { window.__frontierTestScene.ledger.frontierDock = 'missing-station'; });
+  const invalidResume = await reloadFlight();
+  assert.equal(invalidResume.system, 'marches:threshold'); assert.equal(invalidResume.phase, 'free'); assert.equal(invalidResume.open, false);
+  assert.equal(invalidResume.credits, 3600);
   assert.deepEqual(errors, []);
-  console.log('PASS: CPU-only FlightScene construction, 120 ticks, 28 systems, real dock/contact tab, unsupported issuer message, failed-save delivery rollback, successful keyboard retry, single payment and save/reload. Fixture supplies were injected; this is not a flown playthrough or renderer/performance validation.');
+  console.log('PASS: CPU-only FlightScene, 120 ticks, 28 systems, issuer guard, failed-save delivery rollback/retry, future contact protection, actual Threshold/Stillwater/Rustwake berth restore, legacy Marches migration, campaign/prototype location independence and invalid-berth fallback. Fixture supplies and forced berths were used; this is not a flown playthrough or renderer/performance validation.');
 } finally { await browser?.close(); await server.close(); }

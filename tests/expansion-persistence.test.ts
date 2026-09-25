@@ -97,3 +97,14 @@ test('supported contact records still clean corrupt, duplicate and orphaned comp
   assert.deepEqual(normalizeContact({ version: 1, completed: ['pelagic-2', 'pelagic-1', 'pelagic-1', 'mantle-1', 'unknown'] }), { version: 1, completed: ['pelagic-1', 'pelagic-2', 'mantle-1'] });
   assert.deepEqual(normalizeContact({ version: 1, completed: 'broken' }), { version: 1, completed: [] });
 });
+
+test('prototype berth round-trips separately from normal campaign lastDock', () => {
+  const s = storage();
+  const ledger = { ...profile.loadLedger(), frontierDock: 'rustwake-freeport-0', lastDock: 'meridian-orbital-0' };
+  assert.equal(profile.saveLedger(ledger), true);
+  assert.equal(profile.loadLedger().frontierDock, ledger.frontierDock);
+  assert.equal(profile.loadLedger().lastDock, ledger.lastDock);
+  assert.equal(normaliseLedger(JSON.parse(legacy)).frontierDock, undefined);
+  assert.equal(normaliseLedger({ ...ledger, frontierDock: 42 }).frontierDock, undefined);
+  assert.equal(JSON.parse(s.getItem(KEY)!).frontierDock, ledger.frontierDock);
+});

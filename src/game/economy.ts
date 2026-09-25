@@ -132,6 +132,8 @@ export interface PressureCell {
 export interface TradeLedger {
   /** Additive first-contact receipts, committed with cargo/payment to prevent duplicate rewards. */
   contact?: ContactState;
+  /** Last prototype berth, independent of a subsequent normal-campaign visit. */
+  frontierDock?: string;
   credits: number;
   cargo: Partial<Record<CommodityId, number>>;
   /** Cargo pod capacity, units. */
@@ -182,6 +184,7 @@ export function normaliseLedger(raw: unknown): TradeLedger {
   for (const f of Object.keys(rep) as EconFaction[]) rep[f] = clamp(num(r.rep?.[f], rep[f]), -100, 100);
   return {
     ...(r.contact ? { contact: normalizeContact(r.contact) } : {}),
+    ...(typeof r.frontierDock === 'string' ? { frontierDock: r.frontierDock } : {}),
     credits: Math.max(0, Math.floor(num(r.credits, base.credits))),
     cargo: r.cargo ? cargo : base.cargo,
     capacity: Math.max(1, Math.floor(num(r.capacity, base.capacity))),

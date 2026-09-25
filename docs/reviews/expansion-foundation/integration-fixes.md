@@ -21,3 +21,16 @@ Validation: four focused real Profile load/save tests passed (read-only load, qu
 Trade-ledger normalization preserves contact documents with unsupported explicit versions opaquely, including unknown receipt IDs and metadata. Contact eligibility and delivery refuse mutations while normal trade remains available. FIRST CONTACT displays an update-required message and no delivery actions. Supported v1 documents still remove corrupt, duplicate and orphaned completion entries.
 
 Validation: 18 expansion/persistence tests passed, including the reviewer's exact version-2 example through real Profile load, a commodity purchase, save and reload. TypeScript passed. GPU-disabled browser check verified the visible unsupported-version message, absence of delivery buttons and unchanged future receipt document after a real berth/save.
+
+## Prototype berth restoration
+
+The trade ledger now carries `frontierDock` separately from the shared career `lastDock`. Prototype docking records it for either Marches or Reach ports; normal campaign docking preserves it. First entry ignores an existing campaign Reach berth and starts at Threshold. Earlier prototype saves with only a Marches `lastDock` migrate on resume. Invalid station IDs leave the pilot at the initial Threshold flight state without resetting the career. Replay playback does not restore or update the dedicated prototype berth.
+
+Validation: seven persistence tests passed and TypeScript passed. The GPU-disabled browser check verifies actual `currentSystemId`, docking phase, docking target and visible dock screen after Threshold, Stillwater and Rustwake reloads. It also checks first entry with a pre-existing Reach career, legacy Marches migration, a normal Meridian visit between prototype sessions, and invalid-station fallback. These are forced-berth wiring checks, not ordinary-input flight acceptance.
+
+## Combined validation after all four fixes
+
+- Full isolated-branch regression suite: **335 passed, 0 failed**. Output: [integration-tests.txt](integration-tests.txt).
+- Content validation, TypeScript and production build passed. Output: [integration-build.txt](integration-build.txt).
+- GPU-disabled browser integration check passed with no page/console errors. Output: [integration-browser.txt](integration-browser.txt).
+- `git diff --check` passed. U08's native performance, visual, language and ordinary-input playthrough gates remain open. These results do not certify a later integrated tree.

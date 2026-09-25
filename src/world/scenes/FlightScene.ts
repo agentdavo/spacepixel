@@ -471,7 +471,10 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.killCam.onEnd = () => this.chase.snap(this.player.flight);
     if (this.frontier) {
       this.quiet();
-      if (!q.get('dock') && !this.replay.playing && this.ledger.lastDock?.startsWith('marches:')) this.berthAt(this.ledger.lastDock);
+      // A first prototype visit starts at Threshold, not the campaign's Reach
+      // berth. Subsequent visits resume either region. Migrate old Marches saves.
+      const savedBerth = this.ledger.frontierDock ?? (this.ledger.lastDock?.startsWith('marches:') ? this.ledger.lastDock : undefined);
+      if (!q.get('dock') && !this.replay.playing && savedBerth) this.berthAt(savedBerth);
     }
     this.replay.booting = false;
     window.__VANGUARD__ = { ...(window.__VANGUARD__ ?? { ready: false, frame: () => 0, backend: '' }), hooks: { ...window.__VANGUARD__?.hooks, scene: this, replay: this.replay.api() } };
@@ -1292,6 +1295,7 @@ export class FlightScene implements GameScene, FlightHostScene {
   /** Berthed: save, notify hooks, open the dock screen. */
   private berthed(d: Dockable): void {
     this.ledger.lastDock = d.id;
+    if (this.frontier && !this.replay.playing) this.ledger.frontierDock = d.id;
     saveLedger(this.ledger);
     this.cinema.hide();
     this.onDocked?.(d.id);
