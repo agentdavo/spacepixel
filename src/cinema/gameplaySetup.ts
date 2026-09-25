@@ -44,5 +44,8 @@ export function stageV3Pursuit(player: ShipEntity, wing: ShipEntity[], enemies: 
   };
   place(player, [0, 40, -700], [0, 0, 1]);
   wing.forEach((s,i) => place(s, [i ? 70 : -70, 20, -770-i*40], [0,0,1]));
-  enemies.forEach((s,i) => place(s, i ? [i === 1 ? 400 : -500, i*50, i*500] : [0,0,0], i ? [0,0,-1] : [0,0,1]));
+  enemies.forEach((s,i) => {
+    if (i) { s.alive = false; s.model.root.visible = false; return; }
+    place(s, [0,0,0], [0,0,1]);
+  });
 }

@@ -33,7 +33,7 @@ try {
   const q = new URLSearchParams(replay?.header.boot ?? 'scene=flight&record=30&demo=0&hud=1&quality=high&dynres=0&traffic=0&planes=0&seed=1994&score=nexus&voice=off');
   if (!replay && scenario === 'capital') { q.set('own','ffl3-valiant'); q.set('bridge','1'); q.set('captureSetup','v3-capital'); }
   if (!replay) for (const [k,v] of new URLSearchParams(opt('query',''))) q.set(k,v);
-  if (replay) { q.set('replay','/__v3-tape.json'); q.set('rseek',String(Math.max(0,from-10))); }
+  if (replay) { q.set('replay','/__v3-tape.json'); q.set('rseek',String(plan.length ? 0 : Math.max(0,from-10))); }
   const query = q.toString();
   await page.goto(`http://127.0.0.1:${port}/?${query}`, { waitUntil: 'commit' });
   await page.waitForFunction(() => window.__VANGUARD__?.error || (window.__VANGUARD__?.ready && window.__VANGUARD__?.hooks?.step), null, { timeout: 300000 });
@@ -89,12 +89,16 @@ try {
         return { yaw:Math.atan2(v.x,v.z),pitch:Math.atan2(v.y,Math.hypot(v.x,v.z)),range,locked:S.lock.locked };
       });
       if (aim) {
+        await page.keyboard.up('KeyT');
         const joystick=e=>{const control=Math.min(0.95,Math.abs(e)*2.5);return Math.sign(e)*(0.06+0.94*(-0.35+Math.sqrt(0.1225+2.6*control))/1.3);};
         await page.mouse.move(640*(1-joystick(aim.yaw)),360*(1-joystick(aim.pitch)));
         if (Math.abs(aim.yaw)<0.14 && Math.abs(aim.pitch)<0.14 && aim.range<1500) await page.keyboard.down('Space'); else await page.keyboard.up('Space');
         if (aim.range>1000) await page.keyboard.down('KeyW'); else await page.keyboard.up('KeyW');
         if (aim.range<350) await page.keyboard.down('KeyS'); else await page.keyboard.up('KeyS');
         if (aim.locked && tick%180===0) await page.keyboard.down('KeyF'); else await page.keyboard.up('KeyF');
+      } else {
+        await page.keyboard.up('Space'); await page.keyboard.up('KeyF');
+        if (tick%30===0) await page.keyboard.down('KeyT'); else await page.keyboard.up('KeyT');
       }
     }
     f++;
