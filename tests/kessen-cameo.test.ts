@@ -2,7 +2,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { createServer, type ViteDevServer } from 'vite';
-import { Group, Vector3 } from 'three';
+import { Box3, Group, Sphere, Vector3 } from 'three';
 import { CampaignRunner, type CampaignHost } from '../src/game/CampaignRunner.ts';
 import { MISSIONS } from '../src/game/campaign/missions.ts';
 import type { CampaignMission, SetPieceSpec } from '../src/game/campaign/types.ts';
@@ -127,4 +127,36 @@ test('cameos: first jump releases geometry exactly once and preserves shared fra
   assert.equal(p.group.children.length, 0);
   assert.equal(p.frames.length, 0);
   shared.removeEventListener('dispose', onShared);
+});
+
+test('cameos: rescue module clears actual lifeboat flight and arrival turns', async () => {
+  const { KessenCameo } = await load();
+  const { Fleet } = await server!.ssrLoadModule('/src/sim/Fleet.ts');
+  const { flyToPoint, createPilotState } = await server!.ssrLoadModule('/src/sim/ai/Pilot.ts');
+  const mission = MISSIONS[9];
+  const spec = mission.setpieces.find((p) => p.kind === 'kessen-cameo')!;
+  const lane = new Vector3(...mission.setpieces.find((p) => p.tag === 'lane')!.place.offset!);
+  const bastion = new Vector3(...mission.setpieces.find((p) => p.tag === 'bastion')!.place.offset!);
+  const escort = mission.spawns.find((s) => s.tag === 'lifeboats')!;
+  const base = bastion.clone().add(new Vector3(...escort.place.offset!));
+  const piece = new KessenCameo('clearance', lane.clone().add(new Vector3(...spec.place.offset!)), spec.params, true);
+  const bounds = new Box3().setFromObject(piece.group).getBoundingSphere(new Sphere());
+  const fleet = new Fleet(new Group());
+  let minimumGap = Infinity;
+  for (let member = 0; member < escort.count; member++) {
+    const start = base.clone().add(new Vector3(member * 60, member * 12, -member * 45));
+    const ship = fleet.spawn(escort.blueprint, escort.faction, start, new Vector3(0, 0, 1));
+    ship.flight.velocity.set(0, 0, 0); ship.flight.throttle = 0;
+    const pilot = createPilotState();
+    // Production CampaignSession escort steering, including arrival turns.
+    for (let tick = 0; tick < 18000; tick++) {
+      flyToPoint(ship.controls, ship.flight, lane, 60, pilot, 1 / 60);
+      ship.flight.step(ship.controls, 1 / 60);
+      minimumGap = Math.min(minimumGap, ship.flight.position.distanceTo(bounds.center) - ship.radius - bounds.radius);
+    }
+  }
+  assert.ok(minimumGap > 20, `conservative sphere clearance ${minimumGap.toFixed(1)} m`);
+  console.log(`Kessen module / actual lifeboat route: minimum conservative clearance ${minimumGap.toFixed(1)} m`);
+  piece.dispose();
+  for (const ship of fleet.ships) ship.model.root.traverse((o: any) => o.geometry?.dispose());
 });

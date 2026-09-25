@@ -1004,7 +1004,7 @@ const EP10: CampaignMission = {
     piece('beacon', 'lane', ahead(-6000, -200, -8000), { label: 'Graveyard lane' }),
     piece('wreckage', 'graveyard', ahead(-9000, 0, -11000), { radius: 4000, era: 'golden-age', label: 'The Timetable Graveyard' }),
     // Evacuation aftermath only. No objectives, kills, chatter or Schedule effects.
-    piece('kessen-cameo', 'kessen-evacuation', by('lane', 65, -14, 100), { whenFlag: 'bastion-destroyed', tableau: 'evacuation' }),
+    piece('kessen-cameo', 'kessen-evacuation', by('lane', -160, -14, 100), { whenFlag: 'bastion-destroyed', tableau: 'evacuation' }),
   ],
   chatter: [
     beat('open', START, [
