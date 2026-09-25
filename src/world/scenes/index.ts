@@ -16,6 +16,7 @@ export const SCENES: Record<string, () => Promise<GameScene>> = {
   prologue: async () => new (await import('./PrologueScene')).PrologueScene(),
   trailer: async () => new (await import('./TrailerScene')).TrailerScene(),
   kessen: async () => new (await import('./KessenTestScene')).KessenTestScene(),
+  'kessen-assault': async () => new (await import('./KessenAssaultScene')).KessenAssaultScene(),
 };
 
 export const DEFAULT_SCENE = 'flight';
