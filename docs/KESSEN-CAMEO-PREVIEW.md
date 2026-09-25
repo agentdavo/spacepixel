@@ -1,6 +1,6 @@
 # Kessen environmental cameo preview
 
-This is an isolated **default-off preview**, initially based on integration commit `cafc28b`. The chief accepted the revised service-module design and local lighting for gated integration after rejecting the first floating platform treatment. Release enablement remains a chief decision, pending final motion evidence and integration's navigation checks; passing the noninterference checks alone does not constitute release acceptance.
+This is an isolated **default-off preview**, rebased onto integration's combined work and navigation fix **`2c284ab`**. The chief accepted the revised service-module design and local lighting for gated integration, then accepted Episode 19's normal-flight motion samples. Release enablement remains a chief decision, pending final Episode 10 motion review and integration's navigation checks; passing the noninterference checks alone does not constitute release acceptance.
 
 ## What appears
 
@@ -46,12 +46,23 @@ The bomber-intercept objective may still be pending in that legitimate aftermath
 
 The five focused tests cover mission timing boundaries, equal runner snapshots/chatter/kills/success with cameo specs removed, a single release across repeated updates, default-off allocation, real frame heights, absolute-time posing, idempotent first-jump disposal without disposing the shared frame material, and physical route clearance. The clearance check flies both actual lifeboat models with the production `flyToPoint` / FlightModel escort logic for 300 seconds, including arrival turns; the minimum conservative model-sphere-to-module-sphere gap is **108.4 m**. Native captures compare enabled/off gameplay hashes, runner snapshots and world facts. [Machine-readable evidence](screenshots/kessen/evidence.json) includes source commit, URLs, backend/device checks, progression, camera positions, flags and renderer memory accounting.
 
-Validation before the navigation-base rebase: all **305 tests pass** on the module revision, then all **five focused tests** and typecheck pass on the clearance correction. `npm run build` passes typecheck and the production Vite build. The existing front-end flow check also passes all title/prologue/episode handoff checks; that separate smoke test used its existing WebGL2 fallback on this host, so it is not counted as native visual evidence. Native visual evidence comes from the Edge capture harness above.
+After rebasing onto `2c284ab`, **the full test suite passes**, including all five focused cameo tests and the incoming navigation tests. `npm run build` passes typecheck and the production Vite build. The earlier front-end flow check also passes all title/prologue/episode handoff checks; that separate smoke test used its existing WebGL2 fallback on this host, so it is not counted as native visual evidence. Native visual evidence comes from the Edge capture harness above.
+
+The final stills and `evidence.json` were refreshed after the navigation rebase. The two approach clips/contact sheets retain the accepted art and corrected Episode 10 placement captured immediately before that rebase; [motion-evidence.json](screenshots/kessen/motion-evidence.json) records each clip's original source commit, exact 600 m travel over eight seconds, and live player state. They are not represented as recordings of the later navigation-base build. The post-rebase source checks preserve integration's navigation changes and rerun native enabled/off mission equivalence.
+
+| Post-rebase native A/B | Episode 10 | Episode 19 |
+|---|---:|---:|
+| Gameplay hash, both off and on | 3189088699 | 2330304181 |
+| Extra renderer-accounted bytes with cameo | 1,922,494 | 2,107,278 |
+| Extra geometries / pipelines | 153 / 6 | 154 / 6 |
+| Browser errors | 0 | 0 |
+
+Runner snapshots and world facts match exactly in each pair. The Episode 10 one-second trace has the attack flag at 72.03 s, destruction at 97.03 s, and the cameo present at 98.03 s; it never appears before destruction. Episode 19's existing dwell objective continues to progress during normal flight, and the test suite confirms the first-jump cleanup gate.
 
 Frame timings from a screenshot-stepped process under concurrent development load are not a performance benchmark. Renderer memory accounting measures the incremental resource footprint only; it does not establish a frame-time budget or support extrapolation to crowds. Full manual mission playthrough and chief visual acceptance remain outside the evidence supplied here.
 
 ## Integration handoff
 
-The active scope is recorded in [KESSEN-INTEGRATION-PLAN.md](KESSEN-INTEGRATION-PLAN.md); its original broader faction/boarding/Train proposal is explicitly archived. Source checkpoints before rebasing onto the navigation fix are `3a73ff4` (scope correction), `58c1797` (gated preview and tests), `2cbb81d` (purposeful modules and local contrast), and `ddf9e22` (lifeboat route clearance).
+The active scope is recorded in [KESSEN-INTEGRATION-PLAN.md](KESSEN-INTEGRATION-PLAN.md); its original broader faction/boarding/Train proposal is explicitly archived. Rebased checkpoints are `3da9e05` (scope correction), `6075374` (gated preview/tests), `98fde84` (purposeful modules/local contrast), `86e6a6d` (lifeboat clearance), and `420f4ad` (motion evidence/report). Motion metadata references the corresponding pre-rebase art/clearance commits `2cbb81d` and `ddf9e22`.
 
-Integration owns ROADMAP/SESSIONS; chief owns GAME-DIRECTION. None is edited here. The integration task's subsequent EP01 objective `navTag` work is acknowledged as a separate shared-file hunk to preserve. This branch has not been pushed, merged or made into a PR.
+Integration owns ROADMAP/SESSIONS; chief owns GAME-DIRECTION. None is edited here. The EP01 objective `navTag` work and related navigation changes were preserved in the clean rebase. This branch has not been pushed, merged or made into a PR.

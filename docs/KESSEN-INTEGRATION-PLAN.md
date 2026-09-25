@@ -6,7 +6,7 @@
 
 The race design, provisional name and five Statures remain approved. The chief's earlier D1 approval of an initial four-step arc is **superseded**. D2 (successful material intervention, not mere presence, makes one active engagement decisive) and D3 (validated slow hull-relative entry with a real breach) remain **future design directions only**. They authorise no current combat, Schedule or shield implementation. The suggested 2 m/s and 30 ticks are unvalidated tuning hypotheses.
 
-**Current bounded deliverable: an isolated, default-off environmental cameo preview, authorised by the chief after this scope correction.** The implementation is on `codex/kessen-faction-foundation`, rebased onto integration's combined `cafc28b`; its branch name records the earlier scope, not a promise to deliver it. The only shared type addition is a set-piece kind. General faction types and other canon files remain unchanged. The chief decides release enablement after the screenshot review, without another routine design approval request to David. See [the preview evidence and reproduction notes](KESSEN-CAMEO-PREVIEW.md).
+**Current bounded deliverable: an isolated, default-off environmental cameo preview, authorised by the chief after this scope correction.** The implementation is on `codex/kessen-faction-foundation`, rebased onto integration's combined work and navigation fix `2c284ab`; its branch name records the earlier scope, not a promise to deliver it. The only shared type addition is a set-piece kind. General faction types and other canon files remain unchanged. The chief accepted the revised service-module design/local contrast for gated integration; release enablement awaits final motion/navigation review, without another routine design approval request to David. See [the preview evidence and reproduction notes](KESSEN-CAMEO-PREVIEW.md).
 
 ## Least invasive cameo proposal for the chief
 
@@ -33,12 +33,12 @@ Use existing deferred set-piece flags and resolved local placement; never wall-c
 
 - New `src/world/setpieces/KessenCameo.ts`; register it in `src/world/setpieces/index.ts`; add its kind to `src/game/campaign/types.ts`.
 - `src/game/campaign/missions.ts`: optional presentation-only placements for Episodes 10/19. If the current mission construction cannot cleanly carry the A/B toggle, propose the smallest session-construction edit to the chief before touching `CampaignSession.ts` or `main.ts`.
-- Four focused cameo tests covering mission boundaries, runner equivalence, absolute-time posing, and cleanup/material ownership; screenshots of actual Episode 10/19 compositions and the off baseline. The toggle is contained in the registry; no session or main entry edit was needed.
+- Five focused cameo tests covering mission boundaries, runner equivalence, absolute-time posing, cleanup/material ownership, and actual lifeboat-route clearance; screenshots and native approach clips of actual Episode 10/19 sites with matching off baselines. The toggle is contained in the registry; no session or main entry edit was needed.
 - Deferred until a release/canon review needs them: `docs/LORE.md` fossil-tech/Standing qualification, `docs/CAMPAIGN.md` optional appearance notes, and `docs/KESSEN.md` release-status notes. These files have not been edited for a default-off preview.
 
 **Deferred entirely:** `FactionId`, faction/team numeric indices, ship/equipment/market types, economy and save changes, general NPC identity plumbing, side-arc registry, dialogue/voices, score, PD, weapons, collision, boarding, consist AI and Train batching. No mechanical shield bypass. No 200-frame delivery or performance promise. The archived engineering audit below remains useful if a later reviewed scope needs those systems.
 
-Integration task `01a0d8f2-bc9d-7713-8f66-cf8baee8ec58` owns `docs/ROADMAP.md` and `docs/SESSIONS.md`; both remain untouched. Chief owns `docs/GAME-DIRECTION.md`. The preview was rebased onto integration's combined PD/voice/trailer base `cafc28b` before final validation. Integration's subsequent EP01 `CampaignObjective.navTag` and objective metadata changes are acknowledged as non-overlapping hunks to preserve. Avoid `package.json`, `public/voice`, dialogue/audio and cinema/capture behavior changes.
+Integration task `01a0d8f2-bc9d-7713-8f66-cf8baee8ec58` owns `docs/ROADMAP.md` and `docs/SESSIONS.md`; both remain untouched. Chief owns `docs/GAME-DIRECTION.md`. The preview was rebased first onto combined PD/voice/trailer base `cafc28b`, then navigation fix `2c284ab`, before final validation. Integration's EP01 `CampaignObjective.navTag`, objective metadata and flight navigation changes were preserved without conflicts. Avoid `package.json`, `public/voice`, dialogue/audio and cinema/capture behavior changes.
 
 ## Verification, screenshot and commit checkpoints
 
@@ -48,7 +48,7 @@ For the proposed cameo slice, run typecheck and focused campaign/cameo tests, th
 
 Supply screenshot pairs at each meaningful visual checkpoint: Episode 10 composition on/off, Episode 19 composition on/off, and a closer inspection of true frame scale/support contact. Identify the trigger, mission state and backend with each capture. A Kessen viewer image is a baseline art reference only. Keep chief informed with those images and narrow commits; do not represent an image from the viewer as campaign integration.
 
-Review checkpoints: (1) scope correction `3a73ff4`; (2) gated set-piece/placement slice and tests `58c1797`; (3) native screenshot evidence and final report. Both source commits are based on `cafc28b`. Stop and report if further implementation requires a broader actor/type, save or camera change than described here. No PR, push or merge has been requested for this task.
+Rebased review checkpoints on `2c284ab`: scope correction `3da9e05`; gated preview/tests `6075374`; service modules/local contrast `98fde84`; lifeboat clearance `86e6a6d`; motion evidence/report `420f4ad`. Stop and report if further implementation requires a broader actor/type, save or camera change than described here. No PR, push or merge has been requested for this task.
 
 ## Archived full-integration proposal — reference only
 
