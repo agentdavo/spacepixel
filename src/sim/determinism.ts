@@ -303,7 +303,7 @@ function tick(w: World, i: number): void {
   w.turrets?.step(DT, w.lock.target);
   w.weapons.beginTick();
   w.fleet.step(DT);
-  (w.hullContacts ??= new CapitalCollisions()).step(w.fleet.ships, DT, (s, amount, point, normal, other) => w.fleet.hit(s, amount, 'kinetic', point, normal, other));
+  (w.hullContacts ??= new CapitalCollisions()).step(w.fleet.ships, DT, (s, amount, point, normal, other) => w.weapons.contactHit(s, amount, point, normal, other));
   w.bumps.step(w.fleet.ships, DT, (s, d) => w.fleet.damage(s, d));
   if (w.player.alive) {
     if (c.nextTarget || !w.lock.target?.alive) cycleTarget(w);

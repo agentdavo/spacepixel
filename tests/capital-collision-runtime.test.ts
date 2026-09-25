@@ -10,6 +10,7 @@ test('real hull contact: catalog envelopes, located shields/structure, determini
     const { CapitalCollisions } = await server.ssrLoadModule('/src/sim/CapitalCollisions.ts');
     const { Weapons } = await server.ssrLoadModule('/src/sim/Weapons.ts');
     const { EventTap } = await server.ssrLoadModule('/src/world/EventTap.ts');
+    const { GameAudio } = await server.ssrLoadModule('/src/audio/index.ts');
     const { ReplayTake, ReplayCursor, parseReplay } = await server.ssrLoadModule('/src/sim/Replay.ts');
     const { hashWorld } = await server.ssrLoadModule('/src/sim/StateHash.ts');
     const { BLUEPRINTS } = await server.ssrLoadModule('/src/assets/blueprints/index.ts');
@@ -45,7 +46,7 @@ test('real hull contact: catalog envelopes, located shields/structure, determini
         weapons.beginTick();
         for (const s of [a, b]) if (s.alive) s.flight.position.addScaledVector(s.flight.velocity, 1 / 60);
         solver.step(fleet.ships, 1 / 60, (s: any, amount: number, point: any, normal: any, other: any) => {
-          const r = fleet.hit(s, amount, 'kinetic', point, normal, other);
+          const r = weapons.contactHit(s, amount, point, normal, other);
           evidence.push({ id: s.id, amount, hull: s.hull, shield: s.shield, facing: r.facing, hullDamage: r.hullDamage, shieldDamage: r.shieldDamage, sub: r.subsystem?.id, destroyed: r.subsystemDestroyed, cause: s.combat.dmg.structure.death, sections: s.combat.dmg.structure.sections.map((x: any) => x.hp) });
         });
         if (mixed && evidence.length) {
@@ -61,6 +62,22 @@ test('real hull contact: catalog envelopes, located shields/structure, determini
     }
     const minor = impact(10);
     assert.ok(minor.evidence.every(x => x.shieldDamage > 0 && x.hullDamage === 0), 'low-energy contact respects intact shields');
+    const absorbed = minor.weapons.events.filter((e: any) => e.kind === 'shield');
+    assert.equal(absorbed.length, 2);
+    assert.ok(absorbed.every((e: any) => e.hullDamage === 0 && e.shieldDamage > 0 && e.type === 'kinetic' && e.gun === null && e.amount > 0));
+    assert.equal(minor.weapons.events.filter((e: any) => e.kind === 'hit').length, 0, 'absorbed contact cannot masquerade as a hull hit');
+    function heardLayers(events: any[]) {
+      const audio = new GameAudio({ unlockTarget: null }), layers: boolean[] = [];
+      audio.sfx.audibility = () => 1;
+      audio.sfx.impact = (shield: boolean) => layers.push(shield);
+      audio.sfx.playAtRaw = audio.sfx.playRaw = () => {};
+      audio.weaponEvents(events, new Vector3(), 1);
+      audio.dispose();
+      return layers;
+    }
+    assert.deepEqual(heardLayers(minor.weapons.events), [true, true], 'absorbed collision has shield cues only');
+    const penetrating = impact(60);
+    assert.deepEqual(heardLayers(penetrating.weapons.events), [true, false, true, false], 'each mixed-layer collision supplies each layer once');
     const severe = impact(180);
     const repeat = impact(180);
     assert.deepEqual(severe.evidence, repeat.evidence);
@@ -68,6 +85,8 @@ test('real hull contact: catalog envelopes, located shields/structure, determini
     assert.ok(severe.fleet.destruction.wrecks.length >= 2);
     assert.equal(severe.weapons.events.filter((e: any) => e.kind === 'kill').length, 2, 'collision kills survive the weapons phase for missions/audio/telemetry');
     assert.equal(severe.weapons.events.filter((e: any) => e.kind === 'shield-down').length, 2);
+    severe.a.isPlayer = true;
+    assert.deepEqual(heardLayers(severe.weapons.events), [true, false, true, false], 'gunless contact still delivers impact layers after player death');
     severe.weapons.beginTick(); severe.weapons.step(1 / 60, true);
     assert.equal(severe.weapons.events.filter((e: any) => e.kind === 'kill').length, 0, 'kill events are delivered once');
     assert.deepEqual(severe.fleet.destruction.wrecks.map((x: any) => [x.cause, x.position.toArray(), x.velocity.toArray(), x.spin.toArray(), x.kick.toArray()]), repeat.fleet.destruction.wrecks.map((x: any) => [x.cause, x.position.toArray(), x.velocity.toArray(), x.spin.toArray(), x.kick.toArray()]));
@@ -107,7 +126,7 @@ test('real hull contact: catalog envelopes, located shields/structure, determini
         else { a.controls.throttleSet = 0; a.controls.cycleGun = tick % 60 === 3; }
         take.input.push(a.controls);
         weapons.beginTick(); fleet.step(1 / 60);
-        solver.step(fleet.ships, 1 / 60, (s: any, amount: number, point: any, normal: any, other: any) => fleet.hit(s, amount, 'kinetic', point, normal, other));
+        solver.step(fleet.ships, 1 / 60, (s: any, amount: number, point: any, normal: any, other: any) => weapons.contactHit(s, amount, point, normal, other));
         weapons.step(1 / 60, true);
         for (const e of weapons.events) if (e.kind === 'kill') events.push([tick, e.ship.id, e.cause]);
         if ((tick + 1) % 60 === 0) {

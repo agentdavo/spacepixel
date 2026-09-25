@@ -13,6 +13,8 @@ const opt = (k, d) => args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1]
 const out = resolve(opt('out', 'scratchpad/collision-audit/native'));
 const root = resolve(opt('root', '.'));
 const baseline = args.includes('--baseline');
+const fixture = opt('case', 'severe');
+if (!['severe', 'shield'].includes(fixture)) throw new Error('Unknown contact fixture');
 if (existsSync(out)) throw new Error('Choose a new output directory; evidence is never overwritten');
 mkdirSync(out, { recursive: true });
 const server = await createServer({ root, server: { port: 5493, host: '127.0.0.1', strictPort: true, hmr: false, watch: null }, logLevel: 'warn' });
@@ -24,7 +26,7 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   await page.goto('http://127.0.0.1:5493/?scene=flight&record=30&demo=0&hud=0&quality=high&dynres=0&traffic=0&planes=0&seed=1994&voice=off', { waitUntil: 'commit' });
   await page.waitForFunction(() => window.__VANGUARD__?.error || (window.__VANGUARD__?.ready && window.__VANGUARD__?.hooks?.step), null, { timeout: 300000 });
-  const initial = await page.evaluate(async () => {
+  const initial = await page.evaluate(async fixture => {
     const v = window.__VANGUARD__;
     if (v.error || v.backend !== 'WebGPU') throw new Error(v.error ?? `Expected WebGPU, got ${v.backend}`);
     const S = v.hooks.scene;
@@ -35,9 +37,10 @@ try {
     for (const b of S.bandits) b.deadFor = -1;
     S.player.flight.throttle = 0;
     S.player.flight.velocity.set(0, 0, 0);
-    const a = S.fleet.spawn('bb-indomitable', 'concord', origin.clone().add(new Vector3(0, 0, -1450)), new Vector3(0, 0, 1));
-    const b = S.fleet.spawn('bb-indomitable', 'concord', origin.clone().add(new Vector3(0, 0, 1450)), new Vector3(0, 0, -1));
-    for (const [s, vz] of [[a, 180], [b, -180]]) {
+    const distance = fixture === 'shield' ? 1140 : 1450, speed = fixture === 'shield' ? 10 : 180;
+    const a = S.fleet.spawn('bb-indomitable', 'concord', origin.clone().add(new Vector3(0, 0, -distance)), new Vector3(0, 0, 1));
+    const b = S.fleet.spawn('bb-indomitable', 'concord', origin.clone().add(new Vector3(0, 0, distance)), new Vector3(0, 0, -1));
+    for (const [s, vz] of [[a, speed], [b, -speed]]) {
       s.flight.velocity.set(0, 0, vz);
       s.flight.throttle = 0;
       s.flight.flightAssist = false;
@@ -52,11 +55,11 @@ try {
     S.simStep = () => {
       step();
       for (const e of S.hulls.capitals?.events ?? []) records.push({ tick: S.simTick, a: e.a.id, b: e.b.id, closing: e.closing, impulse: e.impulse, energy: e.energy, damageA: e.damageA, damageB: e.damageB, point: e.point.toArray(), normal: e.normal.toArray() });
-      for (const e of S.weapons.events) if (e.ship === a || e.ship === b) damageEvents.push({ tick: S.simTick, kind: e.kind, ship: e.ship.id, cause: e.cause, facing: e.facing, sub: e.sub?.id });
+      for (const e of S.weapons.events) if (e.ship === a || e.ship === b) damageEvents.push({ tick: S.simTick, kind: e.kind, ship: e.ship.id, cause: e.cause, facing: e.facing, sub: e.sub?.id, amount: e.amount, shielded: e.shielded, hullDamage: e.hullDamage, shieldDamage: e.shieldDamage, type: e.type, gun: e.gun?.id ?? null });
     };
     window.__contactFixture = { a, b, records, damageEvents, start: S.simTick };
     return { backend: v.backend, device: v.hooks.renderer().backend.device?.constructor.name, seed: 1994, startTick: S.simTick, origin: origin.toArray(), ships: [a, b].map(s => ({ id: s.id, blueprint: s.model.blueprint.id, position: s.flight.position.toArray(), orientation: s.flight.orientation.toArray(), velocity: s.flight.velocity.toArray(), hull: s.hull, shield: s.shield })) };
-  });
+  }, fixture);
   await page.addStyleTag({ content: '#ui-root,.hud-debug,.replay-deck,.replay-toast{display:none!important}' });
   const states = [];
   for (let frame = 0; frame < 150; frame++) {
@@ -69,9 +72,12 @@ try {
   }
   const contacts = await page.evaluate(() => window.__contactFixture.records);
   const damageEvents = await page.evaluate(() => window.__contactFixture.damageEvents);
-  const evidence = { source: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), baseline, sourceFiles: Object.fromEntries(['src/sim/CapitalCollisions.ts', 'src/sim/Destruction.ts', 'src/world/HullCollisions.ts', 'src/sim/Weapons.ts', 'src/world/scenes/FlightScene.ts'].map(p => [p, existsSync(resolve(root, p)) ? createHash('sha256').update(readFileSync(resolve(root, p))).digest('hex') : null])), harnessSha256: createHash('sha256').update(readFileSync(new URL(import.meta.url))).digest('hex'), policy: 'Authored initial two-ship inertial approach, fixed presentation camera; ordinary FlightScene sim thereafter, no injected damage or post-start poses. This is a collision fixture, not campaign/trailer footage.', initial, states, contacts, damageEvents, errors };
+  const evidence = { source: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), baseline, fixture, sourceFiles: Object.fromEntries(['src/sim/CapitalCollisions.ts', 'src/sim/Destruction.ts', 'src/world/HullCollisions.ts', 'src/sim/Weapons.ts', 'src/world/scenes/FlightScene.ts'].map(p => [p, existsSync(resolve(root, p)) ? createHash('sha256').update(readFileSync(resolve(root, p))).digest('hex') : null])), harnessSha256: createHash('sha256').update(readFileSync(new URL(import.meta.url))).digest('hex'), policy: 'Authored initial two-ship inertial approach, fixed presentation camera; ordinary FlightScene sim thereafter, no injected damage or post-start poses. This is a collision fixture, not campaign/trailer footage.', initial, states, contacts, damageEvents, errors };
   writeFileSync(`${out}/evidence.json`, JSON.stringify(evidence, null, 2));
-  const outcome = baseline ? !contacts.length && states.every(s => s.ships.every(x => x.hull === 48000 && x.shield === 9000)) : contacts.some(e => e.energy > 0) && states.some(s => s.wrecks.length >= 4) && damageEvents.filter(e => e.kind === 'kill').length === 2;
+  const shieldHits = damageEvents.filter(e => e.kind === 'shield');
+  const outcome = baseline ? !contacts.length && states.every(s => s.ships.every(x => x.hull === 48000 && x.shield === 9000)) : contacts.some(e => e.energy > 0) && (fixture === 'shield'
+    ? states.every(s => s.ships.every(x => x.hull === 48000)) && shieldHits.length === 2 && shieldHits.every(e => e.hullDamage === 0 && e.shieldDamage > 0 && e.type === 'kinetic' && e.gun === null)
+    : states.some(s => s.wrecks.length >= 4) && damageEvents.filter(e => e.kind === 'kill').length === 2);
   if (errors.length || !outcome) throw new Error('Native fixture did not produce expected outcome: ' + JSON.stringify({ errors, contacts, states }));
   execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-framerate', '15', '-i', `${out}/f_%04d.jpg`, '-c:v', 'libx264', '-crf', '20', '-pix_fmt', 'yuv420p', `${out}/capital-contact.mp4`]);
   console.log(JSON.stringify({ out, backend: initial.backend, contacts: contacts.length, states: states.length, errors }));
