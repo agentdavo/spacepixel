@@ -1,0 +1,37 @@
+[
+  {
+    "branch": "codex/lantern-pd-investigation",
+    "commit": "7fcc10bd2e7f3cc2f12bf57399726a344f3592bb",
+    "archiveTag": "archive/2026-09-25/lantern-pd-investigation"
+  },
+  {
+    "branch": "codex/kessen-faction-foundation",
+    "commit": "e75d68b582fc2d384539e6a8d08eabd60f174f29",
+    "archiveTag": "archive/2026-09-25/kessen-faction-foundation"
+  },
+  {
+    "branch": "codex/voice-recording-repair",
+    "commit": "d11c78b118493309ed8df82911d896708c391075",
+    "archiveTag": "archive/2026-09-25/voice-recording-repair"
+  },
+  {
+    "branch": "codex/vanguard-trailer-delivery",
+    "commit": "2378e5d00207da7c2b3567436de4b26cb84efb1c",
+    "archiveTag": "archive/2026-09-25/vanguard-trailer-delivery"
+  },
+  {
+    "branch": "codex/kessen-assault-demo",
+    "commit": "706960faed012c31d85c9c2dae6279928c980dc0",
+    "archiveTag": "archive/2026-09-25/kessen-assault-demo"
+  },
+  {
+    "branch": "codex/render-ships-m01-m04",
+    "commit": "b9b043a2b59225daced4518abf6095068a9c3feb",
+    "archiveTag": "archive/2026-09-25/render-ships-m01-m04"
+  },
+  {
+    "branch": "codex/universe-expansion",
+    "commit": "8b084f29efe0abcfcdccc8092a72e6ae5e3621c9",
+    "archiveTag": "archive/2026-09-25/universe-expansion"
+  }
+]

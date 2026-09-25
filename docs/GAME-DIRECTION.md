@@ -7,6 +7,15 @@ Specific later instructions from David take precedence.
 
 ## Latest trailer direction
 
+V4 has been rendered and delivered as a 114-second review cut. David then flagged
+strange ship movement and collisions at 00:42–00:48. The review found shared
+escort destinations and crowding, a camera/source-time discontinuity at 46
+seconds, and an obscuring shield flash near 48 seconds. Preserve V4 and replace
+only 42.5–48.5 after escort guidance and ship-contact fixes are integrated and
+verified. The V4.1 pickup keeps the remaining shots, narration, score and duration.
+The collision task owns physical response and damage; the integration task owns
+escort arrival; the trailer task owns the corrected capture and edit.
+
 David's review of V3 says the picture is roughly acceptable but insufficiently
 cinematic, and the narration needs a full rewrite that makes sense to a
 twelve-year-old hearing it once. `TRAILER_V4_SCRIPT.md` is the current chief
@@ -58,6 +67,12 @@ radio, briefings and environmental storytelling. Preserve mystery and character
 stakes; the trailer must not explain the late revelations.
 
 ## Current delivery order
+
+The completed portions below are accounted for in
+[the consolidation record](CONSOLIDATION-2026-09-25.md). Current ownership and
+the corrective-work priority are in [the team plan](TEAM-OWNERSHIP.md). Completed
+source integration does not remove the ordinary-play, art or hardware acceptance
+gates listed here.
 
 1. Finish and verify the revised 720p trailer. Visible gun barrels, muzzle
    positions and trajectories must agree. Explain the Shattering, surviving

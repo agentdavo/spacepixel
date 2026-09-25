@@ -107,8 +107,15 @@ fallback policy; fallback availability does not imply visual/performance parity.
 
 Acceptance: native WebGPU and forced WebGL scene captures, repeated launch/leave
 cycles, recovery where supported, unchanged gameplay hashes, and measured frame
-time/memory on a stated device. Existing rendering Package A work remains on its
-owner's branch until combined-tree review; this document does not accept it.
+time/memory on a stated device. Bounded Package A correctness fixes are reconciled
+in `b0212de`: portable shield hex shaders, actual-device/timing reporting,
+restart controls, refit resource cleanup, subsystem armour scaling and optional
+reduced effects. Default bloom/ink and reviewed combat cadence are preserved.
+The renderer owner verified 350 tests and native resource/restart/shader checks;
+combined integration evidence is tracked in
+[the consolidation record](CONSOLIDATION-2026-09-25.md). Historical frame-time
+targets and final visual signoff remain open. See
+[the reconciliation record](RENDER-RECONCILIATION.md) for precise exclusions.
 
 ## Audio and 5.1
 
