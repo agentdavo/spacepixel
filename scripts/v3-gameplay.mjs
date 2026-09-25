@@ -28,7 +28,8 @@ await server.listen();
 const browser = await chromium.launch({ channel: 'msedge', args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--use-angle=d3d11'] });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
-  page.on('pageerror', e => console.error('PAGEERROR', e.message));
+  const pageErrors = [];
+  page.on('pageerror', e => { pageErrors.push(e.message); console.error('PAGEERROR', e.message); });
   const q = new URLSearchParams(replay?.header.boot ?? 'scene=flight&record=30&demo=0&hud=1&quality=high&dynres=0&traffic=0&planes=0&seed=1994&score=nexus&voice=off');
   if (!replay && scenario === 'capital') { q.set('own','ffl3-valiant'); q.set('bridge','1'); q.set('captureSetup','v3-capital'); }
   if (!replay) for (const [k,v] of new URLSearchParams(opt('query',''))) q.set(k,v);
@@ -67,6 +68,7 @@ try {
   let ended = false;
   let cameraApplied = false;
   let f = -1;
+  let outputFrames = 0;
   for (let attempt = 0; attempt < (seconds+15) * 30 && !ended; attempt++) {
     const tick = await page.evaluate(() => window.__v3.S.simTick);
     if (tick / 60 >= seconds) break;
@@ -107,13 +109,16 @@ try {
     });
     const frame = Math.round(sample.at*30)-1;
     if (sample.at > from) {
+      outputFrames++;
       appendFileSync(`${out}/events.jsonl`, JSON.stringify({ frame, ...sample })+'\n');
       if (!probe || f % 300 === 0) await page.screenshot({ path: `${out}/f_${String(frame).padStart(5,'0')}.jpg`, type: 'jpeg', quality: 94 });
     }
     if (sample.state && sample.tick % 600 === 0) console.log(JSON.stringify({ at: sample.at, player: sample.state.player, target: sample.state.target && { hull: sample.state.target.hull, shield: sample.state.target.shield, alive: sample.state.target.alive }, wrecks: sample.state.wrecks.length, deadAt: sample.state.deadAt }));
   }
-  const tape = await page.evaluate(() => window.__VANGUARD__.hooks.replay.clip(1e9));
+  const replayStatus = await page.evaluate(() => window.__VANGUARD__.hooks.replay.state());
+  if (pageErrors.length || outputFrames !== Math.round((seconds-from)*30) || replayStatus.desyncAt >= 0 || replayStatus.tick < Math.round(seconds*60)) throw new Error(`Capture validation failed: ${JSON.stringify({replayStatus,pageErrors,outputFrames})}`);
+  const tape = replay ?? await page.evaluate(() => window.__VANGUARD__.hooks.replay.clip(1e9));
   writeFileSync(`${out}/take.vgr`, JSON.stringify(tape));
-  writeFileSync(`${out}/replay-status.json`, JSON.stringify(await page.evaluate(() => window.__VANGUARD__.hooks.replay.state()), null, 2));
+  writeFileSync(`${out}/replay-status.json`, JSON.stringify(replayStatus, null, 2));
   console.log('DONE', out);
 } finally { await browser.close(); await server.close(); }

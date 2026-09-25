@@ -691,8 +691,8 @@ export async function renderCapturedStem(
       if (stem === 'sfx') { weapons.push(...f.weaponEvents); missiles.push(...f.missileEvents); }
     }
     frame.weaponEvents = weapons; frame.missileEvents = missiles;
+    if (stem === 'music') frame.combatIntensity = intensity;
     audio.update(frame);
-    audio.music.setIntensity(intensity);
     maxVoices = Math.max(maxVoices, audio.engine.activeVoices());
   };
   step();
