@@ -11,8 +11,10 @@ New isolated Codex tasks cover: the finished 720p trailer and synchronized
 soundtrack; point-defence investigation and combat visual QA; voice recording
 coverage and Windows tooling; and a Kessen integration plan for approval.
 The trailer uses already-merged features and does not depend on Kessen
-integration. V2 is delivered; completed PD, voice and cinema changes are being
-combined in a local integration branch. No historical branches were deleted.
+integration. V2 is delivered; completed PD, voice and cinema changes are
+combined and checked on `codex/integrate-audit-trailer-combat-voices` (code
+checkpoint `2c25431`, followed by documentation/screenshots). No historical
+branches were deleted and no remote push was made.
 The chief task owns direction in [GAME-DIRECTION.md](GAME-DIRECTION.md).
 The user's superseding scope is **Kessen cameos first**, preserving the
 original technical milestones and twenty-episode campaign. The earlier

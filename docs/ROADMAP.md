@@ -10,7 +10,12 @@ ancestry, verified checks and remaining gaps.
 
 The revised **720p MP4 trailer (V2)** is delivered with native WebGPU,
 Symphony of Gates, recorded voices and captured combat audio. Point defence,
-voice tooling and trailer changes are being integrated and checked together.
+voice tooling and V2 trailer changes are integrated locally on
+`codex/integrate-audit-trailer-combat-voices`: 301 tests, build, balance,
+ten-minute determinism, AI sim and voice coverage pass. Native WebGPU
+[capital](screenshots/integration-2026-09-25/capital.jpg) and
+[broadside](screenshots/integration-2026-09-25/broadside.jpg) samples were
+captured from the combined code. These changes are not yet on the remote default.
 The user's original 20 technical milestones followed by the 20-episode story
 remain the mandate; Kessen are **cameos first** in Episodes 10/19. General
 faction expansion, boarding, consists and the side arc are deferred.
@@ -136,7 +141,7 @@ buy the next hull, take on bigger adversaries.
 | 8 | Free-roam career loop between episodes | story resumes on demand | ✅ |
 | 9 | Living Reach: ringed giants, moons, city lights, traffic lanes, patrols, pirates | perf budget holds | ✅ |
 | 10 | People: concourse NPCs, branching dialog, rumours | ≥ 12 conversations | ✅ |
-| 11 | Voices: recorded Piper cast with procedural fallback and optional Web Speech; subtitles | < 17 chars/s | 🔧 recorded cast merged; combat placeholder coverage and Windows recording command need repair (25 Sep audit) |
+| 11 | Voices: recorded Piper cast with procedural fallback and optional Web Speech; subtitles | < 17 chars/s | 🔧 placeholder coverage and portable recording repaired on local integration branch (1,631 current lines covered); listening/live subtitle timing still needs review |
 | 12 | Hollow hangar bays, collisions, economy rebalance | next ship in 30–60 min | ✅ |
 ### Combat depth ✅
 
