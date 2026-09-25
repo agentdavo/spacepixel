@@ -23,6 +23,8 @@ const pilot = args.includes('--pilot');
 const plan = opt('inputs', '') ? JSON.parse(readFileSync(opt('inputs', ''), 'utf8')) : [];
 if (existsSync(`${out}/events.jsonl`)) throw new Error('Choose a new output directory; capture logs cannot be appended to old takes');
 mkdirSync(out, { recursive: true });
+const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
+writeFileSync(`${out}/capture-harness.mjs`, readFileSync('scripts/v3-gameplay.mjs'));
 const server = await createServer({ cacheDir: `node_modules/.vite-v3-${port}`, server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: null }, logLevel: 'warn', plugins: [{ name: 'v3-replay', configureServer(s) { s.middlewares.use((req,res,next) => { if (req.url !== '/__v3-tape.json') return next(); res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(replay)); }); } }] });
 await server.listen();
 const browser = await chromium.launch({ channel: 'msedge', args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--use-angle=d3d11'] });
@@ -33,7 +35,7 @@ try {
   const q = new URLSearchParams(replay?.header.boot ?? 'scene=flight&record=30&demo=0&hud=1&quality=high&dynres=0&traffic=0&planes=0&seed=1994&score=nexus&voice=off');
   if (!replay && scenario === 'capital') { q.set('own','ffl3-valiant'); q.set('bridge','1'); q.set('captureSetup','v3-capital'); }
   if (!replay) for (const [k,v] of new URLSearchParams(opt('query',''))) q.set(k,v);
-  if (replay) { q.set('replay','/__v3-tape.json'); q.set('rseek',String(Math.max(0,from-10))); }
+  if (replay) { q.set('replay','/__v3-tape.json'); q.set('rseek',String(plan.length ? 0 : Math.max(0,from-10))); }
   const query = q.toString();
   await page.goto(`http://127.0.0.1:${port}/?${query}`, { waitUntil: 'commit' });
   await page.waitForFunction(() => window.__VANGUARD__?.error || (window.__VANGUARD__?.ready && window.__VANGUARD__?.hooks?.step), null, { timeout: 300000 });
@@ -62,7 +64,6 @@ try {
     S.audio.update = f => { window.__v3.audio.push({ tick: S.simTick, ...snapshotAudioFrame(f), player: { ...f.player, position: { ...f.player.position }, velocity: { ...f.player.velocity } }, jumpPhase: f.jumpPhase, combatIntensity: f.combatIntensity }); audioUpdate(f); };
     return subjects.map(s => ({ id: s.id, name: s.name, blueprint: s.model.blueprint.id, pos: s.flight.position.toArray(), orientation: s.flight.orientation.toArray(), hull: s.hull, hullMax: s.hullMax, shield: s.shield, shieldMax: s.shieldMax, loadout: s.combat.loadout }));
   });
-  const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
   const scenery = await page.evaluate(() => window.__v3.S.loreFlight?.provenance ?? null);
   writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, cameraScale, pilot, initial, scenery, kind: 'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot option reads aim and sends ordinary mouse/keyboard controls.', inputs: plan }, null, 2));
   let ended = false;
@@ -89,12 +90,16 @@ try {
         return { yaw:Math.atan2(v.x,v.z),pitch:Math.atan2(v.y,Math.hypot(v.x,v.z)),range,locked:S.lock.locked };
       });
       if (aim) {
+        await page.keyboard.up('KeyT');
         const joystick=e=>{const control=Math.min(0.95,Math.abs(e)*2.5);return Math.sign(e)*(0.06+0.94*(-0.35+Math.sqrt(0.1225+2.6*control))/1.3);};
         await page.mouse.move(640*(1-joystick(aim.yaw)),360*(1-joystick(aim.pitch)));
         if (Math.abs(aim.yaw)<0.14 && Math.abs(aim.pitch)<0.14 && aim.range<1500) await page.keyboard.down('Space'); else await page.keyboard.up('Space');
         if (aim.range>1000) await page.keyboard.down('KeyW'); else await page.keyboard.up('KeyW');
         if (aim.range<350) await page.keyboard.down('KeyS'); else await page.keyboard.up('KeyS');
         if (aim.locked && tick%180===0) await page.keyboard.down('KeyF'); else await page.keyboard.up('KeyF');
+      } else {
+        await page.keyboard.up('Space'); await page.keyboard.up('KeyF');
+        if (tick%30===0) await page.keyboard.down('KeyT'); else await page.keyboard.up('KeyT');
       }
     }
     f++;
