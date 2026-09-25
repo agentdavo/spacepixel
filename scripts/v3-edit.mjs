@@ -8,6 +8,7 @@ const ledger=JSON.parse(readFileSync(args[0],'utf8'));
 const out=resolve(args[1]??'scratchpad/delivery/v3/final');
 const cueFile=args[2];
 const audio=args[3] && !args[3].startsWith('--') ? resolve(args[3]) : null;
+const filename=args.includes('--name') ? args[args.indexOf('--name')+1] : audio?'vanguard-v3-720p.mp4':'picture-preview.mp4';
 mkdirSync(join(out,'frames'),{recursive:true});
 const fps=30;
 let count=0;
@@ -32,6 +33,7 @@ for(const l of ledger.labels??[])ass+=`Dialogue: 0,${stamp(l.at)},${stamp(l.at+l
 writeFileSync(join(out,'captions.ass'),ass);
 if(args.includes('--prepare-only'))process.exit(0);
 const command=['-hide_banner','-loglevel','error','-y','-framerate','30','-i','frames/f_%05d.jpg',...(audio?['-i',audio]:[]),'-vf','scale=in_range=pc:out_range=tv:out_color_matrix=bt709,format=yuv420p,ass=captions.ass,fade=t=in:st=0:d=1.2','-c:v','libx264','-preset','slow','-crf','20','-tune','animation','-pix_fmt','yuv420p','-color_range','tv','-colorspace','bt709','-color_primaries','bt709','-color_trc','bt709',...(audio?['-c:a','aac','-b:a','192k','-ar','48000','-ac','2']:[]),'-t',String(ledger.duration),'-movflags','+faststart',audio?'vanguard-v3-720p.mp4':'picture-preview.mp4'];
+command[command.length-1]=filename;
 const result=spawnSync('ffmpeg',command,{cwd:out,stdio:'inherit'});
 if(result.status!==0)throw new Error(`FFmpeg failed: ${result.status}`);
 console.log(JSON.stringify({out,frames:count,duration:count/30}));
