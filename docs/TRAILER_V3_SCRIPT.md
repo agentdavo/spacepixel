@@ -10,11 +10,12 @@ are withheld.
 
 ## Narration
 
-125 words. A younger female narrator, softly spoken, with an English-dub anime
-delivery. Amy and HFC Female are separate, unselected voice candidates for the
-same picture. Both play at natural 1.0× speed and pitch. The common captions
-accommodate the longer reading of each line. Times below are seconds from the
-start; spoken endings vary by candidate.
+125 words. Clear, natural English with measured epic storytelling and gravitas.
+David rejected the Amy and HFC Female auditions as unclear, superseding the
+earlier younger anime-dub direction. The voice task is preparing a clearer
+audition. Natural 1.0× playback remains required. The times below are the current
+picture's provisional caption envelope; revise them to fit the accepted reading
+before final narration delivery.
 
 | Start | Caption clears | Text |
 | ---: | ---: | --- |

@@ -53,12 +53,13 @@ consequence or imply a weapon did damage that came from a debug hook.
 
 ## Approved narrator script
 
-The narrator is a calm witness to history, not an announcer. David's subsequent
-feedback in the voice task prefers a softly spoken woman with a smooth voice,
-subsequently refined to a younger woman with an English-dub anime delivery;
-the initial male recordings are provisional and must not lock the final cast.
-Audition the available female voices and use the selected trailer narrator at
-natural 1.0x playback throughout, without changing the game-wide cast. Measure lines
+The narrator is a calm witness to history, not an announcer. David's latest
+feedback rejects the Amy/HFC auditions because the English is unclear and asks
+for the measured weight of a Dune/Game of Thrones-style introduction. Prioritise
+clear, natural English and epic storytelling; this supersedes the earlier
+younger English-dub anime direction. The earlier male and female recordings do
+not lock the final cast. Audition a clearer narrator and use the selected voice
+at natural 1.0x playback throughout, without changing the game-wide cast. Measure lines
 before locking their time windows. Leave intentional pauses; shorten or move
 a line instead of raising pitch to meet a cut. These lines are the approved
 recording text; stage directions below are not spoken.
