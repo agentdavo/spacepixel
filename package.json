@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "shot": "node scripts/screenshot.mjs",
     "perf": "node scripts/perf.mjs",
-    "test": "node --experimental-transform-types --no-warnings --test 'tests/*.test.ts'",
+    "test": "node --experimental-transform-types --no-warnings --test \"tests/*.test.ts\"",
     "voices": "node --experimental-transform-types --no-warnings scripts/voice-lines.ts > /tmp/voice-lines.json && python3 scripts/voice-record.py /tmp/voice-lines.json --models ${PIPER_MODELS:-piper-models}",
     "ai-sim": "node scripts/ai-sim.mjs",
     "flow-check": "node scripts/flow-check.mjs",

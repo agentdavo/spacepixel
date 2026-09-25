@@ -1,5 +1,23 @@
 # Roadmap
 
+## Current checkpoint — 25 September 2026
+
+Audited default branch: `claude/vanguard-space-combat-0l3bfi` at `72ced42`.
+PRs #1–#4 are merged: batch 6 combat, Kessen models/viewer, gameplay polish,
+and soundtrack/recorded voices. Older pending-PR and ownership notes below
+are historical. See [the continuation audit](AUDIT-2026-09-25.md) for branch
+ancestry, verified checks and remaining gaps.
+
+The revised **720p MP4 trailer (V2)** is delivered with native WebGPU,
+Symphony of Gates, recorded voices and captured combat audio. Point defence,
+voice tooling and trailer changes are being integrated and checked together.
+The user's original 20 technical milestones followed by the 20-episode story
+remain the mandate; Kessen are **cameos first** in Episodes 10/19. General
+faction expansion, boarding, consists and the side arc are deferred.
+See [GAME-DIRECTION.md](GAME-DIRECTION.md) for the chief architect's decisions.
+Existing completion marks describe implementation; live experience and
+performance verification must be recorded separately.
+
 Guiding rules (after Carmack): one ship flying well first; performance and
 latency measured from day one with pass/fail numbers; camera-relative
 rendering designed in; direct code over architecture; strict TypeScript;
@@ -118,7 +136,7 @@ buy the next hull, take on bigger adversaries.
 | 8 | Free-roam career loop between episodes | story resumes on demand | ✅ |
 | 9 | Living Reach: ringed giants, moons, city lights, traffic lanes, patrols, pirates | perf budget holds | ✅ |
 | 10 | People: concourse NPCs, branching dialog, rumours | ≥ 12 conversations | ✅ |
-| 11 | Voices: procedural OVA voice synth (+ optional Web Speech), subtitles everywhere | < 17 chars/s | ✅ |
+| 11 | Voices: recorded Piper cast with procedural fallback and optional Web Speech; subtitles | < 17 chars/s | 🔧 recorded cast merged; combat placeholder coverage and Windows recording command need repair (25 Sep audit) |
 | 12 | Hollow hangar bays, collisions, economy rebalance | next ship in 30–60 min | ✅ |
 ### Combat depth ✅
 
@@ -150,7 +168,7 @@ modifiers, an event log), is read and written by everything below.
 | 7 | Persistent NPC arcs that advance while you're away | ≥ 6 arcs | ✅ 7 arcs (Odile, Magpie, Pell, Nadia, Toma, Dalca & Pieter, Maud), 7 arc jobs, THREADS tab |
 | 8 | Rivals: named aces and bounty targets that remember and escalate | ≥ 5 rivals | ✅ 6 rivals (2 can be turned), grudge meters, tiers, world-log memory in their lines |
 
-## Batch 6 — guns you can see, shields you can break, ships that die well (carried by the batch 6 project thread on `claude/project-thread-dl05kd`, draft PR #1; see docs/SESSIONS.md)
+## Batch 6 — guns you can see, shields you can break, ships that die well (PR #1 merged; remaining QA and station work below)
 
 | # | Milestone | Pass/fail | Status |
 |---|---|---|---|
