@@ -29,7 +29,7 @@ if (existsSync(`${out}/events.jsonl`)) throw new Error('Choose a new output dire
 mkdirSync(out, { recursive: true });
 const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts','src/game/CampaignSession.ts','src/game/CampaignRunner.ts','src/game/campaign/missions.ts','src/ui/Comms.ts','src/sim/CameraDirector.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
 writeFileSync(`${out}/capture-harness.mjs`, readFileSync('scripts/v3-gameplay.mjs'));
-const server = await createServer({ cacheDir: `node_modules/.vite-v3-${port}`, server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: null }, logLevel: 'warn', plugins: [{ name: 'v3-replay', configureServer(s) { s.middlewares.use((req,res,next) => { if (req.url !== '/__v3-tape.json') return next(); res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(replay)); }); } }] });
+const server = await createServer({ cacheDir: `node_modules/.vite-v3-${port}`, server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: { ignored:['**/*'] } }, logLevel: 'warn', plugins: [{ name: 'v3-replay', configureServer(s) { s.middlewares.use((req,res,next) => { if (req.url !== '/__v3-tape.json') return next(); res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(replay)); }); } }] });
 await server.listen();
 const browser = await chromium.launch({ channel: 'msedge', args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--use-angle=d3d11'] });
 try {
@@ -72,7 +72,7 @@ try {
     return subjects.map(s => ({ id: s.id, name: s.name, blueprint: s.model.blueprint.id, pos: s.flight.position.toArray(), orientation: s.flight.orientation.toArray(), hull: s.hull, hullMax: s.hullMax, shield: s.shield, shieldMax: s.shieldMax, loadout: s.combat.loadout }));
   });
   const scenery = await page.evaluate(() => window.__v3.S.loreFlight?.provenance ?? null);
-  writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, cameraScale, cameraTag, pilot, episode, route, routeUntil, initial, scenery, kind: episode?'native campaign gameplay':'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot/route options read positions and send ordinary mouse/keyboard controls. Episode starts through the normal recorded campaign API before the first tick; mission flags are never forced.', inputs: plan }, null, 2));
+  writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, cameraScale, cameraTag, pilot, episode, route, routeUntil, fastPreroll:args.includes("--fast-preroll"), replayFromStart:args.includes("--replay-from-start"), initial, scenery, kind: episode?'native campaign gameplay':'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot/route options read positions and send ordinary mouse/keyboard controls. Episode starts through the normal recorded campaign API before the first tick; mission flags are never forced.', inputs: plan }, null, 2));
   let ended = false;
   let cameraApplied = false;
   let f = -1;
@@ -120,7 +120,7 @@ try {
       }
     }
     f++;
-    if (probe && f % 30 !== 0) {
+    if ((probe || (args.includes('--fast-preroll') && tick/60<from-5)) && f % 30 !== 0) {
       await page.evaluate(async () => { const S = window.__v3.S, {input}=await import('/src/core/Input.ts'); input.sample(S.simTick/60); input.beginTick(true); S.simStep(); input.beginTick(false); S.simStep(); input.endTicks(2,false); S.update({ dt: 1/30, time: S.simTick/60, alpha: 0, frame: S.simTick/2, ticks: 2 }); });
     } else await page.evaluate(() => window.__VANGUARD__.hooks.step(1));
     const sample = await page.evaluate(() => {
@@ -137,6 +137,7 @@ try {
       if (!probe || f % 300 === 0) await page.screenshot({ path: `${out}/f_${String(frame).padStart(5,'0')}.jpg`, type: 'jpeg', quality: 94 });
     }
     if (sample.state && sample.tick % 600 === 0) console.log(JSON.stringify({ at: sample.at, player: sample.state.player, target: sample.state.target && { hull: sample.state.target.hull, shield: sample.state.target.shield, alive: sample.state.target.alive }, wrecks: sample.state.wrecks.length, deadAt: sample.state.deadAt, campaign: sample.state.campaign && {state:sample.state.campaign.state,flags:sample.state.campaign.flags,comms:sample.state.campaign.comms} }));
+    if(!replay && sample.tick%600===0)writeFileSync(`${out}/take-checkpoint.vgr`,JSON.stringify(await page.evaluate(()=>window.__VANGUARD__.hooks.replay.clip(1e9))));
   }
   const replayStatus = await page.evaluate(() => window.__VANGUARD__.hooks.replay.state());
   if (pageErrors.length || outputFrames !== Math.round((seconds-from)*30) || replayStatus.desyncAt >= 0 || replayStatus.tick < Math.round(seconds*60)) throw new Error(`Capture validation failed: ${JSON.stringify({replayStatus,pageErrors,outputFrames})}`);
