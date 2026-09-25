@@ -12,10 +12,12 @@ are withheld.
 
 125 words. Clear, natural English with measured epic storytelling and gravitas.
 David rejected the Amy and HFC Female auditions as unclear, superseding the
-earlier younger anime-dub direction. The voice task is preparing a clearer
-audition. Natural 1.0× playback remains required. The times below are the current
-picture's provisional caption envelope; revise them to fit the accepted reading
-before final narration delivery.
+earlier younger anime-dub direction. The replacement review cut uses British
+female Kokoro `bf_emma`, generated locally at synthesis pace 0.90 and played at
+natural 1.0× speed without pitch processing. It contains 45.805 seconds of speech.
+This is a new voice for review, not a claim of accepted casting. The times below
+match its picture captions; the complete line recordings and provenance are
+supplied with the film.
 
 | Start | Caption clears | Text |
 | ---: | ---: | --- |
@@ -24,8 +26,8 @@ before final narration delivery.
 | 20.000 | 26.763 | We call it the Shattering. Four centuries later, we still live among its wreckage. |
 | 29.000 | 33.960 | Here, in the Meridian Reach, six gates burn again. |
 | 36.000 | 42.839 | Their fuel is Ebon-gas, harvested from dying stars. Their price is war. |
-| 44.500 | 49.971 | The Terran Directorate counts every gram and calls it survival. |
-| 51.000 | 56.332 | The Zenith Hegemony sings to its engines and calls it ascension. |
+| 44.500 | 50.013 | The Terran Directorate counts every gram and calls it survival. |
+| 51.000 | 56.663 | The Zenith Hegemony sings to its engines and calls it ascension. |
 | 60.000 | 65.012 | Between them fly the people who keep the worlds alive. |
 | 66.000 | 74.172 | Our ships are older than our nations. We know how to wake them. We have forgotten why they work. |
 | 77.000 | 81.000 | You fly Vanguard. The squadron that goes through first. |
@@ -41,7 +43,7 @@ before final narration delivery.
 | 45–58 | The two powers | Capital bridge/bow gameplay places the Directorate and Hegemony in physical opposition. |
 | 58–70 | The people between them | A brief fighter encounter gives the fleets a human scale. |
 | 70–81 | The inherited machines | Native target/subsystem selection accompanies the fossil-technology line, then the player's squadron identity. |
-| 81–110 | Combat speaks for itself | Sustained capital engagement shows real shield and hull state and weapon feedback. No narration. |
+| 81–110 | Combat speaks for itself | Held exterior orbit of the recorded capital engagement shows real shield and hull state and weapon feedback. No narration. |
 | 110–130 | Structural failure | A wider replay camera follows the same battle through hull separation and drifting wreck sections. Score yields for the rupture. |
 | 130–142 | Beyond the last light | A distinct later gate shot carries the final question; the signal remains unexplained. |
 | 142–152.967 | Title and end slate | Native title sequence and browser-play slate, with room for the music to resolve. |
@@ -51,8 +53,8 @@ before final narration delivery.
 Native WebGPU gameplay, 1280×720 at 30 fps, with 92 seconds of visible game HUD.
 Encounters use authored initial formations and healthy stock ships. After a
 take begins, recorded ordinary controls and the real combat simulation determine
-the outcome. The hero shot uses a wider presentation camera over the recorded
-capital battle. The dead-gate and wreckage locations assemble existing scenery
+the outcome. The 81–110 second HUD passage and hero shot use held presentation
+cameras over the recorded capital battle. The dead-gate and wreckage locations assemble existing scenery
 before play and are staged lore views rather than literal campaign captures.
 
 The onboard views are the game's supported capital bridge/bow viewpoints over
