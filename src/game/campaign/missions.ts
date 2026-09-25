@@ -1003,6 +1003,8 @@ const EP10: CampaignMission = {
     piece('bastion', 'bastion', ahead(0, -800, 4000), { flagship: 'Hesperus Dawn', carriers: 3, escorts: 11 }),
     piece('beacon', 'lane', ahead(-6000, -200, -8000), { label: 'Graveyard lane' }),
     piece('wreckage', 'graveyard', ahead(-9000, 0, -11000), { radius: 4000, era: 'golden-age', label: 'The Timetable Graveyard' }),
+    // Evacuation aftermath only. No objectives, kills, chatter or Schedule effects.
+    piece('kessen-cameo', 'kessen-evacuation', by('lane', 65, -14, 100), { whenFlag: 'bastion-destroyed', tableau: 'evacuation' }),
   ],
   chatter: [
     beat('open', START, [
@@ -1865,6 +1867,8 @@ const EP19: CampaignMission = {
   ],
   setpieces: [
     piece('beacon', 'tune-meridian', ahead(0, 400, 5000), { label: 'Meridian tuning point', hold: 20, radius: 450, color: '#e8fff8' }),
+    // Witnesses at the first approach, well before the protected crest sequence.
+    piece('kessen-cameo', 'kessen-witness', by('tune-meridian', 65, -14, -100), { tableau: 'witness', hideWhenFlag: 'leg2' }),
     piece('beacon', 'tune-second', ahead(0, 300, 4000), { whenFlag: 'leg2', label: 'Tuning point II', hold: 20, radius: 450, color: '#e8fff8' }),
     piece('beacon', 'tune-third', ahead(0, 300, 4500), { whenFlag: 'leg3', label: 'Tuning point III', hold: 30, radius: 450, color: '#e8fff8' }),
     piece('beacon', 'crest-watch', ahead(0, 600, 1500), { whenFlag: 'crest', label: 'Hold for the crest', hold: 50, radius: 900, color: '#ffffff' }),

@@ -10,6 +10,7 @@ import { Wreckage } from './Wreckage';
 import { Nebula } from './Nebula';
 import { Bastion } from './Bastion';
 import { Pilgrimage } from './Pilgrimage';
+import { KessenCameo } from './KessenCameo';
 
 export type { SetPiece, SetPieceFrame, SetPieceParams } from './types';
 export { Monolith, MegaGate, Derelict, BlackBox, Beacon, Wreckage, Nebula, Bastion, Pilgrimage };
@@ -24,6 +25,10 @@ export { Monolith, MegaGate, Derelict, BlackBox, Beacon, Wreckage, Nebula, Basti
 export function createSetPiece(spec: SetPieceSpec, anchor: Vector3): SetPiece {
   const p = spec.params;
   switch (spec.kind) {
+    case 'kessen-cameo':
+      // Preview-only until visual review; the replay boot query preserves this
+      // presentation toggle. The disabled piece allocates no render assets.
+      return new KessenCameo(spec.tag, anchor, p, typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('kessenCameos') === '1');
     case 'monolith':
       return new Monolith(spec.tag, anchor, p);
     case 'megagate':

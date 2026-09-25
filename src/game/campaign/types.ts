@@ -113,6 +113,7 @@ export interface SpawnSpec {
 }
 
 export type SetPieceKind =
+  | 'kessen-cameo' // presentation only: existing frames, no combat or objective effects
   | 'derelict' // pre-Shattering ghost ship in a radiation belt
   | 'blackbox' // recoverable data core (fly within 60 m to recover → sets flag `${tag}-recovered`)
   | 'monolith' // moon-sized Builder sphere
