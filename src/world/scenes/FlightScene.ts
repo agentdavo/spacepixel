@@ -446,7 +446,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.killCam = new KillCam(document.getElementById('ui-root')!, this.fleet, this.visuals, this.fxOn ? this.combatFx : null);
     this.killCam.onEnd = () => this.chase.snap(this.player.flight);
     this.replay.booting = false;
-    window.__VANGUARD__ = { ...window.__VANGUARD__, ready: false, frame: () => 0, backend: '', hooks: { ...window.__VANGUARD__?.hooks, scene: this, replay: this.replay.api() } };
+    window.__VANGUARD__ = { ...(window.__VANGUARD__ ?? { ready: false, frame: () => 0, backend: '' }), hooks: { ...window.__VANGUARD__?.hooks, scene: this, replay: this.replay.api() } };
   }
 
   // ── fixed step ─────────────────────────────────────────────────────
@@ -787,12 +787,16 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.hud.update(view, this.camera, this.world, time);
     if (this.tactical) {
       const markers = this.view.gates.map((g) => ({ label: `LANTERN → ${this.universe.systems.get(g.link.to)!.name.toUpperCase()}`, pos: g.center, radius: g.gate.radius }));
+      const destination = this.campaign?.runner.navigation();
+      if (destination) markers.unshift({ label: destination.label.toUpperCase(), pos: destination.position, radius: 200 });
       this.hud.drawTactical(this.player, this.fleet, this.camera, this.world, this.orderStatus, markers);
     }
     else if (this.jumpPhase === 'none') {
       this.hud.drawTargets(this.player, this.fleet, this.lock, this.camera, this.world, time);
+      const destination = this.campaign?.runner.navigation();
       const nav = this.docking.phase === 'cleared' ? undefined : this.navGate();
-      if (nav) this.hud.drawNav(this.universe.systems.get(nav.link.to)!.name, nav.center, view.position, this.camera, this.world, time);
+      if (destination) this.hud.drawNav(destination.label, destination.position, view.position, this.camera, this.world, time, true);
+      else if (nav) this.hud.drawNav(this.universe.systems.get(nav.link.to)!.name, nav.center, view.position, this.camera, this.world, time);
     }
     this.combatHud.turrets = this.turrets.status(this.player);
     this.combatHud.hangar = this.turrets.hangarStatus(this.player);
@@ -981,6 +985,13 @@ export class FlightScene implements GameScene, FlightHostScene {
     faceAlong(pf.orientation, fwd);
     pf.velocity.copy(fwd).multiplyScalar(160);
     pf.throttle = 0.7;
+    // EP01's survey route is authored along world +Z. Let a new pilot read
+    // the opening dialogue before choosing to move, instead of drifting into a gate.
+    if (m.id === 'ep01-the-long-dark') {
+      faceAlong(pf.orientation, new Vector3(0, 0, 1));
+      pf.velocity.set(0, 0, 0);
+      pf.throttle = 0;
+    }
     this.player.hull = this.player.hullMax;
     this.player.shield = this.player.shieldMax;
     this.player.alive = true;

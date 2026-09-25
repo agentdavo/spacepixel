@@ -8,12 +8,14 @@
  *   in formation and fights → dock (auto-guidance) → repair at Brennick's
  *   discount → buy a ship and fit a gun → reload the page: everything kept.
  *
- *   node scripts/career-check.mjs [--port 5260] [--size 1280x720]
+ *   node scripts/career-check.mjs [--port 5260] [--size 1280x720] [--browser msedge]
  *
  * The sim is stepped in-page (FlightScene.simStep + update at 60 Hz, no
  * rendering: `?record=30` stops the rAF loop), so flight seconds are cheap
  * even on a software adapter. Prints PASS/FAIL per step; exits non-zero on
- * any failure.
+ * any failure. This is a plumbing regression: it uses direct hooks, a docking
+ * teleport and granted credits/standing. It does not verify normal-control
+ * approach, UI purchasing or affordability from the starting balance.
  */
 import { createServer } from 'vite';
 import { chromium } from 'playwright';
@@ -24,10 +26,11 @@ const port = Number(opt('port', 5260));
 const [width, height] = opt('size', '1280x720').split('x').map(Number);
 const T = 600_000;
 
-const server = await createServer({ server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'warn' });
+const server = await createServer({ cacheDir: `node_modules/.vite-career-${port}`, server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: null }, logLevel: 'warn' });
 await server.listen();
 const browser = await chromium.launch({
-  args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--use-angle=swiftshader', '--ignore-gpu-blocklist'],
+  channel: opt('browser', process.platform === 'win32' ? 'msedge' : 'chromium'),
+  args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', ...(process.platform === 'win32' ? ['--use-angle=d3d11'] : [])],
 });
 const results = [];
 const check = (name, ok, extra = '') => {
@@ -79,6 +82,8 @@ try {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await boot(page);
+  const backend = await page.evaluate(() => window.__VANGUARD__?.backend);
+  check('renderer is WebGPU', backend === 'WebGPU', String(backend));
 
   // 1. New profile.
   const fresh = await page.evaluate(() => {

@@ -157,6 +157,8 @@ export interface CampaignContext {
 export interface CampaignObjective {
   id: string;
   text: string;
+  /** Set-piece tag to mark while this visible objective is active. */
+  navTag?: string;
   optional?: boolean;
   /** Hidden until activated (twists). */
   hidden?: boolean;

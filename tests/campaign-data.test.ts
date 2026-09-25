@@ -50,6 +50,59 @@ test('campaign data: 20 missions, speakers and codex resolve', () => {
   }
 });
 
+test('EP01 navigation follows active survey objectives and clears during combat and on resolution', () => {
+  const m = MISSIONS.find((m) => m.id === 'ep01-the-long-dark')!;
+  const h = fakeHost();
+  const r = new CampaignRunner(m, h);
+  r.begin();
+  for (const tag of ['buoy1', 'buoy2', 'buoy3']) {
+    const nav = r.navigation()!;
+    assert.equal(nav.tag, tag);
+    assert.match(nav.label, /Survey buoy/);
+    h.playerPosition.copy(nav.position);
+    r.update(0.1);
+  }
+  assert.equal(r.navigation(), undefined, 'combat has no destination marker');
+  r.update(5); // release the flag-delayed scavengers
+  for (const ship of h.ships) {
+    if (ship.faction === 'rustwake') { ship.alive = false; r.onKill(ship); }
+  }
+  r.update(0.1);
+  for (const tag of ['timetable', 'yards']) {
+    assert.equal(r.navigation()?.tag, tag);
+    h.playerPosition.copy(r.navigation()!.position);
+    r.update(0.1);
+  }
+  assert.equal(r.outcome, 'success');
+  assert.equal(r.navigation(), undefined);
+
+  const failedHost = fakeHost();
+  const failed = new CampaignRunner(m, failedHost);
+  failed.begin();
+  assert.equal(failed.navigation()?.tag, 'buoy1');
+  failedHost.playerAlive = false;
+  failed.update(0.1);
+  assert.equal(failed.navigation(), undefined, 'failure clears the destination');
+});
+
+test('navigation ignores hidden or unresolved destinations and missions without metadata', () => {
+  const base = MISSIONS[0];
+  for (const objective of [
+    { ...base.objectives[0], hidden: true },
+    { ...base.objectives[0], navTag: 'missing' },
+    { ...base.objectives[0], navTag: undefined },
+  ]) {
+    const runner = new CampaignRunner({ ...base, objectives: [objective] }, fakeHost());
+    runner.begin();
+    assert.equal(runner.navigation(), undefined);
+  }
+  for (const m of MISSIONS.slice(1)) {
+    const runner = new CampaignRunner(m, fakeHost());
+    runner.begin();
+    assert.equal(runner.navigation(), undefined, m.id);
+  }
+});
+
 test('campaign data: every mission runs 60 s in the runner without throwing', () => {
   for (const m of MISSIONS) {
     const h = fakeHost();
