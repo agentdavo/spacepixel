@@ -18,8 +18,16 @@ branches were deleted and no remote push was made.
 The chief task owns direction in [GAME-DIRECTION.md](GAME-DIRECTION.md).
 The user's superseding scope is **Kessen cameos first**, preserving the
 original technical milestones and twenty-episode campaign. The earlier
-side-arc/faction-foundation sequence is deferred; the Kessen task is revising
-its plan and has not edited shared gameplay code.
+side-arc/faction-foundation sequence is deferred. The Kessen task has built an
+isolated, default-off render-only cameo preview and is completing motion/timing
+evidence; it is not yet integrated or enabled here.
+
+Integration follow-up `2c284ab` fixes the reproduced EP01 waypoint/autojump
+blocker. The [first-session report](FIRST-SESSION-2026-09-25.md) separates live
+survey/trade/refit/manual-docking/persistence results from debug harness checks
+and the still-unverified successful combat route. Changes remain local.
+The chief's [trailer editorial review](TRAILER_EDITORIAL_REVIEW.md) is recorded
+without modifying the current cast, clips or V2 export.
 
 Read [AUDIT-2026-09-25.md](AUDIT-2026-09-25.md) for current evidence and scope.
 Historical statements such as "draft PR #1", original-score-only exports and

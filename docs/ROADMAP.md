@@ -23,6 +23,15 @@ See [GAME-DIRECTION.md](GAME-DIRECTION.md) for the chief architect's decisions.
 Existing completion marks describe implementation; live experience and
 performance verification must be recorded separately.
 
+First-session follow-up (`2c284ab`): fixed EP01's missing waypoint markers and
+unintended opening gate transit; 303 tests and build pass. Normal-control
+survey flight, UI trade/refit, manual redocking and native-profile save/resume
+have been exercised. The run used failure recovery after an unattended combat
+loss; successful EP01 completion is still an acceptance gap. See the
+[first-session report and screenshots](FIRST-SESSION-2026-09-25.md).
+Trailer V2 remains the current review artifact; the chief's
+[editorial review](TRAILER_EDITORIAL_REVIEW.md) records pending voice/script work.
+
 Guiding rules (after Carmack): one ship flying well first; performance and
 latency measured from day one with pass/fail numbers; camera-relative
 rendering designed in; direct code over architecture; strict TypeScript;
