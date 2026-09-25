@@ -368,6 +368,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       player: { position: pf0.position, velocity: pf0.velocity, throttle: 0, boosting: false, cruise: 'off', lockProgress: 0, locked: false, incomingMissile: false, alive: true },
       weaponEvents: this.frameEvents.weapons,
       missileEvents: this.frameEvents.missiles,
+      beams: this.weapons.beams,
       jumpPhase: 'none',
       combatIntensity: 0,
     };

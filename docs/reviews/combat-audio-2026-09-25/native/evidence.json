@@ -1,0 +1,36 @@
+{
+  "browser": "msedge",
+  "results": [
+    {
+      "name": "shield",
+      "query": "stage=impacts&side=shield&freeze=0.3",
+      "backend": "WebGPU",
+      "errors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ]
+    },
+    {
+      "name": "hull",
+      "query": "stage=impacts&side=hull&freeze=0.6",
+      "backend": "WebGPU",
+      "errors": []
+    },
+    {
+      "name": "collapse",
+      "query": "stage=impacts&side=collapse&after=0.12",
+      "backend": "WebGPU",
+      "errors": []
+    },
+    {
+      "name": "weapons",
+      "query": "stage=weapons&freeze=0.5",
+      "backend": "WebGPU",
+      "errors": []
+    }
+  ],
+  "audio": {
+    "channelCount": 2,
+    "maxChannelCount": 2,
+    "sampleRate": 48000
+  }
+}

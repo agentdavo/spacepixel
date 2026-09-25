@@ -1,0 +1,40 @@
+
+WAVs → C:\projects\spacepixel\scratchpad\combat-audio-review
+
+scenario           peak dB  rms dB  clip voices silent% maxgap s centroid onsets/s  tempo  pulse
+sfx-lasers            -8.7   -29.6     0      7       0     0.00     3642      7.4    176   0.42
+sfx-pan               -4.6   -26.8     0      3      38     0.85     1641      3.1    148   0.46
+sfx-impacts           -4.6   -28.9     0      3       1     0.05     2099      5.0     67   0.38
+sfx-batch6            -3.7   -26.1     0      3       1     0.05     2791      3.6     60   0.08
+sfx-explosions        -4.0   -26.8     0      2       1     0.05     2316      2.3     60   0.11
+sfx-missiles         -10.8   -30.5     0      7       1     0.05     6014      8.4    166   0.71
+mix-combat            -4.2   -24.6     0     13       0     0.00     3901      9.3     78   0.30
+stress                -2.6   -13.1     0     40       0     0.00     2408      1.5    166   0.11
+
+per-2s series (rms dBFS | centroid Hz):
+  sfx-lasers        rms  -27 -33 -34
+                    cent 4559 1775 471
+  sfx-pan           rms  -28 -28 -30
+                    cent 1652 1682 596
+  sfx-impacts       rms  -31 -27 -34
+                    cent 2514 2044 809
+  sfx-batch6        rms  -30 -28 -23 -32
+                    cent 2918 3739 2259 2247
+  sfx-explosions    rms  -28 -25 -34 -26
+                    cent 2686 2268 815 2535
+  sfx-missiles      rms  -29 -32 -33
+                    cent 6650 5300 4464
+  mix-combat        rms  -29 -23 -28 -28 -21 -25
+                    cent 1945 4768 4862 3953 3113 2905
+  stress            rms  -14 -14
+                    cent 2303 2518
+
+L/R balance per 0.5 s (dB, + = right) for SFX:
+  sfx-lasers        0 0 0 5 3 -1 -2 -1 0 0
+  sfx-pan           19 19 19 -19 -19 -19 0 0 0
+  sfx-impacts       2 1 -5 -4 0 0 0 0 0 0
+  sfx-batch6        0 0 1 1 2 0 2 0 -3 0 2 2 2 0 1 0
+  sfx-explosions    3 0 -4 0 3 0 4 2 1 0 0 0 0 0 0 0
+  sfx-missiles      0 1 0 0 1 0 0 0 0 0
+  mix-combat        0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 1 0 0 0 0 0 0
+  stress            -6 -5 -6 -5 -6 -6 -3 -4

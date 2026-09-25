@@ -15,6 +15,26 @@ import { SOUNDTRACK_SETTINGS, describeSoundtrack, type SoundtrackSetting } from 
 /** cast: recorded neural voices (public/voice), synth where a line has no clip. */
 export type VoiceMode = 'cast' | 'synth' | 'speech' | 'off';
 export type SubSize = 's' | 'm' | 'l';
+export interface AudioSettings {
+  master: number;
+  music: number;
+  effects: number;
+  dialogue: number;
+  output: 'stereo' | 'headphones' | 'surround';
+  range: 'full' | 'reduced';
+}
+export const DEFAULT_AUDIO: AudioSettings = { master: 0.9, music: 0.3, effects: 1, dialogue: 1, output: 'stereo', range: 'full' };
+export function normaliseAudio(value: Partial<AudioSettings> | null | undefined): AudioSettings {
+  const a = { ...DEFAULT_AUDIO };
+  if (!value || typeof value !== 'object') return a;
+  for (const key of ['master', 'music', 'effects', 'dialogue'] as const) {
+    const v = value[key];
+    if (typeof v === 'number' && Number.isFinite(v)) a[key] = Math.min(1, Math.max(0, v));
+  }
+  if (['stereo', 'headphones', 'surround'].includes(value.output ?? '')) a.output = value.output!;
+  if (value.range === 'full' || value.range === 'reduced') a.range = value.range;
+  return a;
+}
 
 export interface GameSettings {
   voice: VoiceMode;
@@ -24,10 +44,11 @@ export interface GameSettings {
   subSecond: boolean;
   /** 'auto' follows the galaxy / episode; a score id pins that score everywhere. */
   soundtrack: SoundtrackSetting;
+  audio: AudioSettings;
 }
 
 const KEY = 'vanguard.settings.v1';
-const DEFAULTS: GameSettings = { voice: 'cast', subtitles: true, subSize: 'm', subSecond: true, soundtrack: 'auto' };
+const DEFAULTS: GameSettings = { voice: 'cast', subtitles: true, subSize: 'm', subSecond: true, soundtrack: 'auto', audio: DEFAULT_AUDIO };
 
 const VOICES: VoiceMode[] = ['cast', 'synth', 'speech', 'off'];
 const SIZES: SubSize[] = ['s', 'm', 'l'];
@@ -45,6 +66,7 @@ function load(): GameSettings {
       if (SIZES.includes(r.subSize as SubSize)) s.subSize = r.subSize as SubSize;
       if (typeof r.subSecond === 'boolean') s.subSecond = r.subSecond;
       if (SOUNDTRACK_SETTINGS.includes(r.soundtrack as SoundtrackSetting)) s.soundtrack = r.soundtrack as SoundtrackSetting;
+      s.audio = normaliseAudio(r.audio);
     }
   } catch {
     /* storage unavailable */
@@ -76,6 +98,7 @@ export function onSettings(cb: (s: GameSettings) => void): () => void {
 }
 
 export function setSettings(patch: Partial<GameSettings>): void {
+  if (patch.audio) patch = { ...patch, audio: normaliseAudio(patch.audio) };
   Object.assign(settings, patch);
   try {
     localStorage.setItem(KEY, JSON.stringify({ ...settings, castVoices: true }));

@@ -1,4 +1,6 @@
 import { makeImpulse, makeNoiseBuffer, softClipCurve } from './dsp';
+import { SpatialRouter, type DynamicRange, type OutputMode } from './spatial';
+export type { DynamicRange, OutputMode } from './spatial';
 
 /**
  * Procedural audio core: context lifecycle, mix buses and the SFX voice pool.
@@ -32,24 +34,28 @@ export interface AudioEngineOptions {
  * registers them with `track()` so a steal can silence them.
  */
 export class VoiceSlot {
+  serial = 0;
   readonly input: GainNode;
   readonly filter: BiquadFilterNode;
   readonly panner: StereoPannerNode;
+  readonly spatial: SpatialRouter;
   /** When the current sound starts (ctx time). Sounds must schedule from here. */
   t0 = 0;
   end = 0;
   priority = 0;
   level = 0;
+  cockpit = false;
   readonly sources: AudioScheduledSourceNode[] = [];
 
   constructor(ctx: BaseAudioContext, dest: AudioNode) {
     this.input = ctx.createGain();
     this.filter = ctx.createBiquadFilter();
     this.filter.type = 'lowpass';
-    this.filter.frequency.value = 20000;
+    this.filter.frequency.value = Math.min(20000, ctx.sampleRate / 2);
     this.filter.Q.value = 0.5;
-    this.panner = ctx.createStereoPanner();
-    this.input.connect(this.filter).connect(this.panner).connect(dest);
+    this.spatial = new SpatialRouter(ctx, dest);
+    this.panner = this.spatial.stereo;
+    this.input.connect(this.filter).connect(this.spatial.input);
   }
 
   track<T extends AudioScheduledSourceNode>(src: T): T {
@@ -73,6 +79,10 @@ export class AudioEngine {
   music: GainNode | null = null;
   musicDuck: GainNode | null = null;
   sfx: GainNode | null = null;
+  external: GainNode | null = null;
+  cockpit: GainNode | null = null;
+  private externalDuck: GainNode | null = null;
+  readonly metrics = { dropped: 0, stolen: 0 };
   voice: GainNode | null = null;
   /** Send into the SFX space reverb (short, dark). */
   sfxVerb: AudioNode | null = null;
@@ -90,6 +100,15 @@ export class AudioEngine {
   private maxVoices: number;
   private unlockHandler: (() => void) | null = null;
   private unlockTarget: EventTarget | null = null;
+  outputMode: OutputMode = 'stereo';
+  requestedOutput: OutputMode = 'stereo';
+  outputReason = '';
+  dynamicRange: DynamicRange = 'full';
+  private outputRevision = 0;
+  private surroundLoad: Promise<void> | null = null;
+  private surroundLimiter: AudioWorkletNode | null = null;
+  private center: ChannelMergerNode | null = null;
+  private voiceMono: GainNode | null = null;
 
   constructor(opts: AudioEngineOptions = {}) {
     this.maxVoices = opts.maxVoices ?? 40;
@@ -207,16 +226,21 @@ export class AudioEngine {
       const sfx = ctx.createGain();
       sfx.gain.value = this.volumes.sfx;
       sfx.connect(master);
+      const external = ctx.createGain();
+      const externalDuck = ctx.createGain();
+      external.connect(externalDuck).connect(sfx);
+      const cockpit = ctx.createGain();
+      cockpit.connect(sfx);
       const voice = ctx.createGain();
       voice.gain.value = this.volumes.voice;
       voice.connect(master);
 
       const verb = ctx.createConvolver();
       verb.normalize = false;
-      verb.buffer = makeImpulse(ctx, 1.6, 0x77, 0.35, 0.02);
+      verb.buffer = makeImpulse(ctx, 0.95, 0x77, 0.35, 0.02);
       const verbRet = ctx.createGain();
-      verbRet.gain.value = 0.28;
-      verb.connect(verbRet).connect(sfx);
+      verbRet.gain.value = 0.18;
+      verb.connect(verbRet).connect(external);
 
       this.master = master;
       this.compressor = comp;
@@ -224,10 +248,13 @@ export class AudioEngine {
       this.music = music;
       this.musicDuck = duck;
       this.sfx = sfx;
+      this.external = external;
+      this.cockpit = cockpit;
+      this.externalDuck = externalDuck;
       this.voice = voice;
       this.sfxVerb = verb;
 
-      for (let i = 0; i < this.maxVoices; i++) this.slots.push(new VoiceSlot(ctx, sfx));
+      for (let i = 0; i < this.maxVoices; i++) this.slots.push(new VoiceSlot(ctx, external));
     } catch (e) {
       console.warn('[audio] graph init failed', e);
       this.ctx = null;
@@ -243,6 +270,86 @@ export class AudioEngine {
         console.warn('[audio] init callback failed', e);
       }
     }
+    void this.setOutputMode(this.requestedOutput);
+    this.setDynamicRange(this.dynamicRange);
+  }
+
+  /** Output changes preserve sources; unsupported devices stay on stereo. */
+  async setOutputMode(requested: OutputMode): Promise<OutputMode> {
+    this.requestedOutput = requested;
+    const revision = ++this.outputRevision;
+    const ctx = this.ctx;
+    if (!ctx || !this.master || !this.compressor || !this.voice) return this.outputMode;
+    let mode = requested;
+    this.outputReason = '';
+    const channels = this.live ? ctx.destination.maxChannelCount : ctx.destination.channelCount;
+    if (requested === 'surround') {
+      if (channels < 6) { mode = 'stereo'; this.outputReason = `This output exposes ${channels} channels; using stereo.`; }
+      else {
+        try {
+          this.surroundLoad ??= ctx.audioWorklet.addModule(new URL('./surround-limiter.worklet.js', import.meta.url));
+          await this.surroundLoad;
+          if (revision !== this.outputRevision) return this.outputMode;
+          if (!this.surroundLimiter) this.surroundLimiter = new AudioWorkletNode(ctx, 'vanguard-surround-limiter', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [6], channelCount: 6, channelCountMode: 'explicit', channelInterpretation: 'discrete' });
+          this.surroundLimiter.port.postMessage(this.dynamicRange);
+        } catch {
+          mode = 'stereo'; this.outputReason = 'Surround processing unavailable; using stereo.';
+          this.surroundLoad = null;
+        }
+      }
+    }
+    if (revision !== this.outputRevision) return this.outputMode;
+    if (this.live) {
+      try { ctx.destination.channelCount = mode === 'surround' ? 6 : Math.min(2, channels); }
+      catch { mode = 'stereo'; this.outputReason = 'Device rejected surround; using stereo.'; }
+    }
+    this.master.disconnect();
+    this.surroundLimiter?.disconnect();
+    this.voice.disconnect();
+    this.voiceMono?.disconnect();
+    this.center?.disconnect();
+    if (mode === 'surround') {
+      this.master.connect(this.surroundLimiter!).connect(ctx.destination);
+      this.center ??= ctx.createChannelMerger(6);
+      this.voiceMono ??= ctx.createGain();
+      this.voiceMono.channelCount = 1; this.voiceMono.channelCountMode = 'explicit';
+      this.voice.connect(this.voiceMono).connect(this.center, 0, 2);
+      this.center.connect(this.master);
+    } else {
+      this.master.connect(this.compressor);
+      this.voice.connect(this.master);
+    }
+    this.outputMode = mode;
+    for (const s of this.slots) s.spatial.setMode(mode);
+    return mode;
+  }
+
+  setDynamicRange(range: DynamicRange): void {
+    this.dynamicRange = range;
+    if (this.compressor) {
+      this.compressor.threshold.value = range === 'reduced' ? -23 : -14;
+      this.compressor.ratio.value = range === 'reduced' ? 5 : 2.5;
+    }
+    this.surroundLimiter?.port.postMessage(range);
+  }
+
+  /** Quiet sequential channel identification; UI supplies the matching labels. */
+  testChannels(): string[] {
+    const labels = this.outputMode === 'surround' ? ['Front left', 'Front right', 'Center', 'LFE', 'Surround left', 'Surround right'] : ['Left', 'Right'];
+    const ctx = this.ctx;
+    if (!ctx || !this.master) return [];
+    const merger = ctx.createChannelMerger(labels.length);
+    merger.connect(this.master);
+    labels.forEach((_, i) => {
+      const t = ctx.currentTime + 0.1 + i * 0.7;
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.frequency.value = labels.length === 6 && i === 3 ? 65 : 440;
+      gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(0.12, t + 0.015);
+      gain.gain.setValueAtTime(0.12, t + 0.3); gain.gain.linearRampToValueAtTime(0, t + 0.36);
+      osc.connect(gain).connect(merger, 0, i); osc.start(t); osc.stop(t + 0.4);
+      osc.onended = () => { osc.disconnect(); gain.disconnect(); if (i === labels.length - 1) merger.disconnect(); };
+    });
+    return labels;
   }
 
   bus(name: BusName): GainNode | null {
@@ -282,6 +389,14 @@ export class AudioEngine {
     p.cancelScheduledValues(now);
     p.setTargetAtTime(Math.pow(10, db / 20), now, 0.04);
     p.setTargetAtTime(1, now + hold, release / 3);
+    // Leave cockpit alarms/player damage intact while radio clears room in
+    // the external battle. A modest reduction keeps weapons present.
+    const fx = this.externalDuck?.gain;
+    if (fx) {
+      fx.cancelScheduledValues(now);
+      fx.setTargetAtTime(Math.pow(10, -3 / 20), now, 0.04);
+      fx.setTargetAtTime(1, now + hold, release / 3);
+    }
   }
 
   /**
@@ -290,7 +405,7 @@ export class AudioEngine {
    * faded out and stolen — unless the new sound matters even less, in which
    * case it is dropped (returns null). Allocation-free.
    */
-  acquire(priority: number, level: number, duration: number, pan = 0, cutoff = 20000): VoiceSlot | null {
+  acquire(priority: number, level: number, duration: number, pan = 0, cutoff = 20000, cockpit = false): VoiceSlot | null {
     const ctx = this.ctx;
     if (!ctx) return null;
     const now = ctx.currentTime;
@@ -313,7 +428,8 @@ export class AudioEngine {
     }
     let t0 = now;
     if (!slot) {
-      if (!victim || priority * (0.2 + level) <= victimScore) return null;
+      if (!victim || priority * (0.2 + level) <= victimScore) { this.metrics.dropped++; return null; }
+      this.metrics.stolen++;
       slot = victim;
       const sg = slot.input.gain;
       sg.cancelScheduledValues(now);
@@ -329,6 +445,11 @@ export class AudioEngine {
       t0 = now + STEAL_FADE + 0.001;
     }
     slot.sources.length = 0;
+    slot.serial++;
+    if (slot.cockpit !== cockpit) {
+      slot.spatial.setDestination((cockpit ? this.cockpit : this.external)!);
+      slot.cockpit = cockpit;
+    }
     slot.t0 = t0;
     slot.end = t0 + duration;
     slot.priority = priority;
@@ -337,9 +458,10 @@ export class AudioEngine {
     if (t0 === now) g.cancelScheduledValues(now); // (a steal keeps its fade-out ramp)
     g.setValueAtTime(1, t0);
     slot.filter.frequency.cancelScheduledValues(now);
-    slot.filter.frequency.setValueAtTime(cutoff, t0);
+    slot.filter.frequency.setValueAtTime(Math.min(cutoff, ctx.sampleRate / 2), t0);
     slot.panner.pan.cancelScheduledValues(now);
     slot.panner.pan.setValueAtTime(pan, t0);
+    slot.spatial.position(pan, undefined, 0, t0);
     return slot;
   }
 

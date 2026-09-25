@@ -618,6 +618,7 @@ export async function renderScenario(name: string, sampleRate = 44100, frames: R
         const f = frames[frameCursor++];
         sim.frame.eye = f.eye;
         sim.frame.camera = f.camera;
+        sim.frame.beams = f.beams ?? [];
         sim.w.push(...f.weaponEvents);
         sim.m.push(...f.missileEvents);
       }
@@ -685,6 +686,7 @@ export async function renderCapturedStem(
     while (frameCursor < frames.length && frames[frameCursor].at < t + frame.dt) {
       const f = frames[frameCursor++];
       frame.eye = f.eye; frame.camera = f.camera;
+      frame.beams = stem === 'sfx' ? f.beams ?? [] : [];
       if (f.player) frame.player = f.player;
       frame.jumpPhase = f.jumpPhase ?? 'none';
       frame.combatIntensity = f.combatIntensity ?? 0;

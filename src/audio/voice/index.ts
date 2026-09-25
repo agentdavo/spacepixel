@@ -76,7 +76,7 @@ export class VoiceBox {
     let handle: { stop(): void } | null = null;
     const mode = this.mode;
     if (mode === 'speech' && speechAvailable() && !this.audio.muted) {
-      const h = speakReal(req.who, req.text, profile, (req.level ?? 1) * this.audio.engine.getVolume('voice'));
+      const h = speakReal(req.who, req.text, profile, (req.level ?? 1) * this.audio.engine.getVolume('voice') * this.audio.engine.getVolume('master'));
       if (h) {
         dur = Math.max(plan.dur * 0.8, h.dur);
         handle = h;

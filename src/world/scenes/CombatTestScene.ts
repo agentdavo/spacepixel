@@ -8,12 +8,15 @@ import { Weapons } from '@/sim/Weapons';
 import { Missiles } from '@/sim/Missiles';
 import { Capitals } from '@/sim/Capitals';
 import { createRayHit, raycastShip, selectSubsystem, subsystemPosition, toUniverse } from '@/sim/Combat';
-import { GUNS, MISSILES } from '@/sim/Loadouts';
+import { CAPITAL_LANCE, CAPITAL_LANCE_GUN, GUNS, MISSILES, type GunId, type MissileId } from '@/sim/Loadouts';
+import { BLUEPRINTS } from '@/assets/blueprints';
+import { resetDamage, syncShield } from '@/sim/Damage';
 import { WeaponVisuals } from '../WeaponVisuals';
 import { CombatFx } from '../CombatFx';
 import { Backdrop, BACKDROPS } from '../Backdrop';
 import { LightRig, LIGHT_PRESETS } from '@/render/LightRig';
 import { CombatHud } from '@/ui/CombatHud';
+import { getAudio, type AudioFrame } from '@/audio';
 
 /**
  * Combat-depth test bed: `?scene=combat&stage=…` — staged, deterministic
@@ -56,7 +59,7 @@ import { CombatHud } from '@/ui/CombatHud';
 const ORIGIN = new Vector3(2_400_000, 150_000, -1_100_000);
 const DT = 1 / 60;
 
-type Stage = 'capital' | 'shield' | 'smoke' | 'weapons' | 'impacts' | 'kill';
+type Stage = 'capital' | 'shield' | 'smoke' | 'weapons' | 'impacts' | 'kill' | 'audition';
 type KillStagePath = 'reactor' | 'structural' | 'bridge' | 'hull';
 
 /** Default seconds after the death for each path's capture. */
@@ -112,11 +115,16 @@ export class CombatTestScene implements GameScene {
   private hudOn = new URLSearchParams(location.search).get('hud') !== '0';
   /** &fx=0: no particles (inspect the hull paint alone). */
   private fxOn = new URLSearchParams(location.search).get('fx') !== '0';
+  private audio = getAudio();
+  private audioFrame!: AudioFrame;
+  private auditionStep: (() => void) | null = null;
+  private auditionPanel: HTMLElement | null = null;
+  private audioMeter: HTMLOutputElement | null = null;
 
   constructor() {
     const q = new URLSearchParams(location.search);
     this.combatFx.fx.enabled = this.fxOn;
-    this.stage = (['capital', 'shield', 'smoke', 'weapons', 'impacts', 'kill'] as const).find((s) => s === q.get('stage')) ?? 'capital';
+    this.stage = (['capital', 'shield', 'smoke', 'weapons', 'impacts', 'kill', 'audition'] as const).find((s) => s === q.get('stage')) ?? 'capital';
     this.freeze = Number(q.get('freeze') ?? NaN);
     this.camMode = Number(q.get('cam') ?? 0) || 0;
     LightRig.apply(LIGHT_PRESETS.meridian);
@@ -124,7 +132,8 @@ export class CombatTestScene implements GameScene {
     this.hud = new CombatHud(document.getElementById('ui-root')!);
 
     let pre = 0;
-    if (this.stage === 'capital') pre = this.setupCapital(q.get('ship') ?? 'choir-cathedral');
+    if (this.stage === 'audition') pre = this.setupAudition(q);
+    else if (this.stage === 'capital') pre = this.setupCapital(q.get('ship') ?? 'choir-cathedral');
     else if (this.stage === 'shield') pre = this.setupShield();
     else if (this.stage === 'smoke') pre = this.setupSmoke();
     else if (this.stage === 'kill') {
@@ -132,6 +141,12 @@ export class CombatTestScene implements GameScene {
       pre = this.setupKill(path, Number(q.get('kt') ?? q.get('t') ?? KILL_T[path]), q.get('ship') ?? 'choir-cathedral');
     } else if (this.stage === 'impacts') pre = this.setupImpacts(q.get('side') ?? 'hull', Number(q.get('after') ?? 0.1), q.get('ship') ?? 'bb-indomitable', (q.get('faction') ?? 'concord') as FactionId);
     else pre = this.setupWeapons();
+
+    this.audioFrame = {
+      dt: 0, eye: this.world.eye, camera: this.camera.quaternion,
+      player: { position: this.player.flight.position, velocity: this.player.flight.velocity, throttle: 0, boosting: false, cruise: 'off', lockProgress: 0, locked: false, incomingMissile: false, alive: false },
+      weaponEvents: [], missileEvents: [], beams: [], jumpPhase: 'none', combatIntensity: 0,
+    };
 
     // Fast-forward (no FX): the fight settles into shape.
     for (let t = 0; t < pre || (this.preUntil?.() && t < pre * 8); t += DT) {
@@ -146,6 +161,64 @@ export class CombatTestScene implements GameScene {
   }
 
   // ── stages ───────────────────────────────────────────────────────────
+
+  private setupAudition(q: URLSearchParams): number {
+    const hull = q.get('ship') ?? 'vf27-kestrel';
+    const bp = BLUEPRINTS[hull] ?? BLUEPRINTS['vf27-kestrel'];
+    const weapon = q.get('weapon') ?? 'laser';
+    const gun = GUNS[weapon as GunId];
+    const missile = MISSILES[weapon as MissileId];
+    const charge = Math.max(0, Math.min(1, Number(q.get('charge') ?? 1) || 0));
+    const distance = Math.max(60, Math.min(3000, Number(q.get('distance') ?? 300) || 300));
+    const listener = Math.max(30, Math.min(4000, Number(q.get('listener') ?? 100) || 100));
+    const target = this.fleet.spawn(bp.id, bp.faction, ORIGIN.clone(), new Vector3(0,0,1), { name: bp.name, team: 'renegade', plotArmour: true });
+    target.flight.velocity.set(0,0,0); target.controls.throttleSet = 0;
+    const st = target.combat.dmg;
+    st.trimAuto = false;
+    const restore = () => { resetDamage(st,target); target.combat.damaged=false; st.facings.fill(st.facingMax * charge); st.cooldown.fill(1e6); syncShield(st,target); target.sinceHit=0; };
+    restore();
+    const aim = toUniverse(target,st.cx,st.cy,st.cz,new Vector3());
+    const start = aim.clone().add(new Vector3(0,0,target.combat.shell.z+distance));
+    const shooter = this.fleet.spawn('vf27-kestrel','concord',start,new Vector3(0,0,-1),{isPlayer:q.get('listenerMode')==='cockpit',plotArmour:true});
+    shooter.combat.loadout = { guns: gun ? [gun.id] : [], missiles: [] };
+    this.scripted.push({ship:shooter,aim:()=>aim,speed:0,fire:()=>!!gun});
+    this.player=shooter; this.target=target; shooter.target=target;
+    let next=0.3;
+    this.auditionStep=()=>{
+      target.flight.velocity.set(0,0,0); target.sinceHit=0;
+      if (this.simT < next) return;
+      if (missile) { this.missiles.salvo(shooter,target,missile); next=this.simT+Math.max(2,missile.reload); }
+      else if (weapon==='capital-lance') {
+        const b=CAPITAL_LANCE_GUN.beam!;
+        const beam=this.weapons.fireBeam(shooter,null,b.length,b.width,b.duration,st.capital ? CAPITAL_LANCE.dpsCapital : CAPITAL_LANCE.dpsFighter,'harmonic');
+        this.weapons.muzzleFlash(beam.origin,beam.dir,shooter.flight.velocity,shooter,CAPITAL_LANCE_GUN);
+        next=this.simT+4;
+      }
+    };
+    this.eyeFn=(_t,eye,look)=>{ look.copy(aim);eye.copy(aim).add(new Vector3(target.combat.shell.x+listener, target.combat.shell.y+listener*0.3,target.combat.shell.z+listener)); };
+    const panel=document.createElement('details');panel.open=true;
+    panel.style.cssText='position:fixed;right:12px;top:58px;z-index:70;background:#071323ed;color:#d8efff;border:1px solid #79cee0;padding:12px;width:290px;font:12px ui-monospace,monospace;pointer-events:auto';
+    const title=document.createElement('summary');title.textContent='Combat audition';panel.append(title);
+    const form=document.createElement('form');panel.append(form);
+    const choices=(key:string,labelText:string,entries:[string,string][],value:string)=>{
+      const label=document.createElement('label');label.textContent=labelText;label.style.cssText='display:flex;justify-content:space-between;margin:9px 0;gap:8px';
+      const select=document.createElement('select');select.name=key;select.setAttribute('aria-label',labelText);select.style.maxWidth='175px';
+      for(const [v,name] of entries){const option=document.createElement('option');option.value=v;option.textContent=name;select.append(option);}select.value=value;label.append(select);form.append(label);
+    };
+    choices('ship','Target',Object.values(BLUEPRINTS).map(b=>[b.id,b.name]),bp.id);
+    choices('weapon','Weapon',[...Object.values(GUNS).map(g=>[g.id,g.name] as [string,string]),...Object.values(MISSILES).map(m=>[m.id,m.name] as [string,string]),['capital-lance','CAPITAL LANCE']],weapon);
+    choices('charge','Initial shields',[['1','Full'],['0.05','Weak (5%)'],['0','Hull exposed']],String(charge));
+    choices('distance','Firing distance',[['100','100 m'],['300','300 m'],['1000','1 km'],['2500','2.5 km']],String(distance));
+    choices('listener','Camera stand-off',[['40','40 m'],['100','100 m'],['500','500 m'],['2000','2 km']],String(listener));
+    choices('listenerMode','Gun sound',[['external','At emitter'],['cockpit','In cockpit']],q.get('listenerMode')??'external');
+    const apply=document.createElement('button');apply.textContent='Apply / restart';form.append(apply);
+    const reset=document.createElement('button');reset.type='button';reset.textContent='Restore target';reset.addEventListener('click',restore);form.append(reset);
+    form.addEventListener('submit',event=>{event.preventDefault();const next=new URLSearchParams({scene:'combat',stage:'audition'});for(const [key,value] of new FormData(form))next.set(key,String(value));location.search=next.toString();});
+    panel.addEventListener('keydown',e=>e.stopPropagation());panel.addEventListener('pointerdown',e=>e.stopPropagation());
+    this.audioMeter=document.createElement('output');this.audioMeter.style.cssText='display:block;margin-top:12px;line-height:1.6';panel.append(this.audioMeter);
+    document.getElementById('ui-root')!.append(panel);this.auditionPanel=panel;
+    return 0;
+  }
 
   private spawnWing(bp: string, faction: 'concord' | 'choir' | 'rustwake', n: number, at: Vector3, dir: Vector3, spacing = 40): ShipEntity[] {
     const out: ShipEntity[] = [];
@@ -529,6 +602,7 @@ export class CombatTestScene implements GameScene {
     }
     this.capitals.step(dt);
     this.fleet.step(dt);
+    this.auditionStep?.();
     for (const sc of this.scripted) sc.ship.flight.velocity.copy(sc.ship.flight.forward(_v)).multiplyScalar(sc.speed);
     this.weapons.step(dt);
     this.missiles.step(dt);
@@ -546,6 +620,7 @@ export class CombatTestScene implements GameScene {
   }
 
   update({ dt }: FrameContext): void {
+    const advanced = !this.frozen;
     if (!this.frozen) {
       this.liveT += dt;
       this.step(dt, true);
@@ -557,9 +632,18 @@ export class CombatTestScene implements GameScene {
     this.camera.lookAt(look.sub(this.world.eye));
     this.backdrop.follow(this.camera);
     const vdt = this.frozen ? 0 : dt;
-    this.visuals.consume();
+    if (advanced) this.visuals.consume();
     this.visuals.update(this.world, vdt);
     this.combatFx.update(vdt, this.world.eye);
+    this.audioFrame.dt = dt;
+    this.audioFrame.weaponEvents = advanced ? this.weapons.events : [];
+    this.audioFrame.missileEvents = advanced ? this.missiles.events : [];
+    this.audioFrame.beams = advanced ? this.weapons.beams : [];
+    this.audio.update(this.audioFrame);
+    if (this.audioMeter) {
+      const e=this.audio.engine;
+      this.audioMeter.textContent=`${e.running ? e.outputMode : 'Click Audio to enable sound'} · voices ${e.activeVoices()}/40 · dropped ${e.metrics.dropped} · stolen ${e.metrics.stolen} · compression ${Math.abs(e.compressor?.reduction ?? 0).toFixed(1)} dB`;
+    }
     if (this.hudOn) {
       const blast = this.combatFx.destruction;
       this.hud.flash = blast.screenFlash * Math.max(0, 1 - blast.lastBlast.distanceTo(this.world.eye) / 9000);
@@ -572,6 +656,8 @@ export class CombatTestScene implements GameScene {
     this.camera.updateProjectionMatrix();
     this.hud.resize(w, h);
   }
+
+  dispose(): void { this.auditionPanel?.remove(); this.audio.sfx.updateBeams([],this.world.eye); }
 
   cameraLabel(): string {
     const t = this.tally;

@@ -1,0 +1,329 @@
+[
+  {
+    "name": "sfx-lasers",
+    "rmsDb": -29.59569186145997,
+    "silentPct": 0,
+    "longestSilence": 0,
+    "centroid": 3642.4237143790356,
+    "centSeries": [
+      4559,
+      1775,
+      471
+    ],
+    "rmsSeries": [
+      -27,
+      -33,
+      -34
+    ],
+    "onsetRate": 7.4,
+    "tempo": 176,
+    "pulse": 0.4186329712435448,
+    "pan": [
+      0,
+      0,
+      0,
+      5,
+      3,
+      -1,
+      -2,
+      -1,
+      0,
+      0
+    ],
+    "peak": 0.3690550625324249,
+    "clipped": 0,
+    "maxVoices": 7,
+    "file": "C:\\projects\\spacepixel\\scratchpad\\combat-audio-review/sfx-lasers.wav",
+    "ms": 580
+  },
+  {
+    "name": "sfx-pan",
+    "rmsDb": -26.794014649422483,
+    "silentPct": 37.77777777777778,
+    "longestSilence": 0.8500000000000001,
+    "centroid": 1641.3127667452873,
+    "centSeries": [
+      1652,
+      1682,
+      596
+    ],
+    "rmsSeries": [
+      -28,
+      -28,
+      -30
+    ],
+    "onsetRate": 3.111111111111111,
+    "tempo": 148,
+    "pulse": 0.46150843988810175,
+    "pan": [
+      19,
+      19,
+      19,
+      -19,
+      -19,
+      -19,
+      0,
+      0,
+      0
+    ],
+    "peak": 0.5875571966171265,
+    "clipped": 0,
+    "maxVoices": 3,
+    "file": "C:\\projects\\spacepixel\\scratchpad\\combat-audio-review/sfx-pan.wav",
+    "ms": 331
+  },
+  {
+    "name": "sfx-impacts",
+    "rmsDb": -28.895680263461387,
+    "silentPct": 1,
+    "longestSilence": 0.05,
+    "centroid": 2098.9839902120675,
+    "centSeries": [
+      2514,
+      2044,
+      809
+    ],
+    "rmsSeries": [
+      -31,
+      -27,
+      -34
+    ],
+    "onsetRate": 5,
+    "tempo": 67,
+    "pulse": 0.37766789738145556,
+    "pan": [
+      2,
+      1,
+      -5,
+      -4,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "peak": 0.5888161659240723,
+    "clipped": 0,
+    "maxVoices": 3,
+    "file": "C:\\projects\\spacepixel\\scratchpad\\combat-audio-review/sfx-impacts.wav",
+    "ms": 443
+  },
+  {
+    "name": "sfx-batch6",
+    "rmsDb": -26.105230391502083,
+    "silentPct": 0.625,
+    "longestSilence": 0.05,
+    "centroid": 2791.4986996135194,
+    "centSeries": [
+      2918,
+      3739,
+      2259,
+      2247
+    ],
+    "rmsSeries": [
+      -30,
+      -28,
+      -23,
+      -32
+    ],
+    "onsetRate": 3.625,
+    "tempo": 60,
+    "pulse": 0.07512386177047857,
+    "pan": [
+      0,
+      0,
+      1,
+      1,
+      2,
+      0,
+      2,
+      0,
+      -3,
+      0,
+      2,
+      2,
+      2,
+      0,
+      1,
+      0
+    ],
+    "peak": 0.6538900136947632,
+    "clipped": 0,
+    "maxVoices": 3,
+    "file": "C:\\projects\\spacepixel\\scratchpad\\combat-audio-review/sfx-batch6.wav",
+    "ms": 642
+  },
+  {
+    "name": "sfx-explosions",
+    "rmsDb": -26.76856305648696,
+    "silentPct": 0.625,
+    "longestSilence": 0.05,
+    "centroid": 2316.3112785500084,
+    "centSeries": [
+      2686,
+      2268,
+      815,
+      2535
+    ],
+    "rmsSeries": [
+      -28,
+      -25,
+      -34,
+      -26
+    ],
+    "onsetRate": 2.25,
+    "tempo": 60,
+    "pulse": 0.10735384138543523,
+    "pan": [
+      3,
+      0,
+      -4,
+      0,
+      3,
+      0,
+      4,
+      2,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "peak": 0.6337409615516663,
+    "clipped": 0,
+    "maxVoices": 2,
+    "file": "C:\\projects\\spacepixel\\scratchpad\\combat-audio-review/sfx-explosions.wav",
+    "ms": 631
+  },
+  {
+    "name": "sfx-missiles",
+    "rmsDb": -30.53108290907479,
+    "silentPct": 1,
+    "longestSilence": 0.05,
+    "centroid": 6014.353410658771,
+    "centSeries": [
+      6650,
+      5300,
+      4464
+    ],
+    "rmsSeries": [
+      -29,
+      -32,
+      -33
+    ],
+    "onsetRate": 8.4,
+    "tempo": 165.5,
+    "pulse": 0.7097508781747465,
+    "pan": [
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "peak": 0.2875100076198578,
+    "clipped": 0,
+    "maxVoices": 7,
+    "file": "C:\\projects\\spacepixel\\scratchpad\\combat-audio-review/sfx-missiles.wav",
+    "ms": 399
+  },
+  {
+    "name": "mix-combat",
+    "rmsDb": -24.61065212248203,
+    "silentPct": 0,
+    "longestSilence": 0,
+    "centroid": 3900.5689961507906,
+    "centSeries": [
+      1945,
+      4768,
+      4862,
+      3953,
+      3113,
+      2905
+    ],
+    "rmsSeries": [
+      -29,
+      -23,
+      -28,
+      -28,
+      -21,
+      -25
+    ],
+    "onsetRate": 9.25,
+    "tempo": 78,
+    "pulse": 0.3005803672606701,
+    "pan": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      3,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "peak": 0.6136186122894287,
+    "clipped": 0,
+    "maxVoices": 13,
+    "file": "C:\\projects\\spacepixel\\scratchpad\\combat-audio-review/mix-combat.wav",
+    "ms": 2321
+  },
+  {
+    "name": "stress",
+    "rmsDb": -13.114744021205013,
+    "silentPct": 0,
+    "longestSilence": 0,
+    "centroid": 2408.4969838920156,
+    "centSeries": [
+      2303,
+      2518
+    ],
+    "rmsSeries": [
+      -14,
+      -14
+    ],
+    "onsetRate": 1.5,
+    "tempo": 165.5,
+    "pulse": 0.11498180303287689,
+    "pan": [
+      -6,
+      -5,
+      -6,
+      -5,
+      -6,
+      -6,
+      -3,
+      -4
+    ],
+    "peak": 0.7390768527984619,
+    "clipped": 0,
+    "maxVoices": 40,
+    "file": "C:\\projects\\spacepixel\\scratchpad\\combat-audio-review/stress.wav",
+    "ms": 7504
+  }
+]

@@ -1,8 +1,9 @@
 import { AudioEngine, type AudioEngineOptions, type BusName } from './AudioEngine';
-import { Sfx, type CruiseState, type Faction, type JumpPhase, type PlayOpts, type QuatLike, type RadioKind, type SfxKind, type UiKind, type Vec3Like } from './Sfx';
+import { Sfx, type BeamSound, type CruiseState, type Faction, type JumpPhase, type PlayOpts, type QuatLike, type RadioKind, type SfxKind, type UiKind, type Vec3Like } from './Sfx';
 import { Music, MOODS, type Mood, type StingerKind } from './Music';
 import { SCORE_IDS, SCORE_INFO, scoreFor, type ScoreId, type ScorePick } from './score/catalog';
-import { installSettingsKeys, onSettings, setSoundtrackProbe, settings } from '@/game/Settings';
+import { installSettingsKeys, onSettings, setSettings, setSoundtrackProbe, settings } from '@/game/Settings';
+import { installAudioSettings } from '@/ui/AudioSettings';
 
 export { AudioEngine, Sfx, Music, MOODS, SCORE_IDS, SCORE_INFO, scoreFor };
 export type { BusName, CruiseState, Faction, JumpPhase, Mood, PlayOpts, QuatLike, RadioKind, ScoreId, ScorePick, SfxKind, StingerKind, UiKind, Vec3Like };
@@ -31,7 +32,10 @@ export interface AudioWeaponEvent {
   readonly ship: AudioShip | null;
   readonly shooter: AudioShip | null;
   /** Weapon family voice (src/sim/Loadouts.ts GunSpec): 'laser' | 'cannon', with a faction timbre. */
-  readonly gun?: { readonly sfx: 'laser' | 'cannon'; readonly timbre: string } | null;
+  readonly gun?: { readonly id?: string; readonly sound?: string; readonly sfx: 'laser' | 'cannon'; readonly timbre: string } | null;
+  readonly amount?: number;
+  readonly hullDamage?: number;
+  readonly shieldDamage?: number;
   /** Damage type of an impact (hit, shield, beam-hit): picks the hull sound. */
   readonly type?: 'kinetic' | 'laser' | 'harmonic' | 'explosive';
   /** beam-hit on a shield rather than plating. */
@@ -56,6 +60,11 @@ export interface AudioMissileEvent {
   readonly position: Vec3Like;
   readonly target: AudioShip | null;
   readonly shooter: AudioShip | null;
+  readonly intercepted?: boolean;
+  readonly shielded?: boolean;
+  readonly hullDamage?: number;
+  readonly shieldDamage?: number;
+  readonly spec?: { readonly id: string; readonly damage?: number };
 }
 
 export interface AudioPlayerState {
@@ -83,6 +92,7 @@ export interface AudioFrame {
   player: AudioPlayerState;
   weaponEvents: readonly AudioWeaponEvent[];
   missileEvents: readonly AudioMissileEvent[];
+  beams?: readonly BeamSound[];
   jumpPhase: JumpPhase;
   /** 0..1 — how hot the fight is (drives music layers + auto cruise↔combat). */
   combatIntensity: number;
@@ -156,6 +166,10 @@ export class GameAudio {
   private topFire = new TopK(MAX_REMOTE_FIRE);
   private topHit = new TopK(MAX_HITS);
   private topKill = new TopK(MAX_KILLS);
+  private topBeam = new TopK(3);
+  private topBleed = new TopK(2);
+  private topDetonate = new TopK(MAX_DETONATIONS);
+  private topLaunch = new TopK(3);
   // Where the player is, for the soundtrack (see setPlace).
   private placeSystem: string | null = null;
   private placeFaction: string | null = null;
@@ -171,11 +185,24 @@ export class GameAudio {
     this.music = new Music(this.engine);
     // Live renders follow the player's soundtrack setting; offline renders pick scores explicitly.
     if (this.engine.live) {
-      this.offSettings = onSettings(() => this.applyPlace(3));
+      this.offSettings = onSettings(() => {
+        this.applyAudioSettings();
+        if (settings.soundtrack !== this.placeSetting) this.applyPlace(3);
+      });
+      this.applyAudioSettings();
+      installAudioSettings(this);
       setSoundtrackProbe(() => SCORE_INFO[this.pick.id].title);
       // Shift+F7 must work wherever there is music, not only once a subtitle/comms UI exists.
       installSettingsKeys();
     }
+  }
+
+  private applyAudioSettings(): void {
+    const a = settings.audio;
+    this.engine.setVolume('master', a.master); this.engine.setVolume('music', a.music);
+    this.engine.setVolume('sfx', a.effects); this.engine.setVolume('voice', a.dialogue);
+    this.engine.setDynamicRange(a.range);
+    if (this.engine.requestedOutput !== a.output) void this.engine.setOutputMode(a.output);
   }
 
   /**
@@ -237,6 +264,7 @@ export class GameAudio {
 
   setVolume(bus: BusName, v: number): void {
     this.engine.setVolume(bus, v);
+    if (this.engine.live) setSettings({ audio: { ...settings.audio, [bus === 'sfx' ? 'effects' : bus === 'voice' ? 'dialogue' : bus]: v } });
   }
 
   ui(kind: UiKind): void {
@@ -270,6 +298,7 @@ export class GameAudio {
     sfx.setJumpPhase(f.jumpPhase);
     this.weaponEvents(f.weaponEvents, f.eye, e.now);
     this.missileEvents(f.missileEvents, f.eye, e.now);
+    sfx.updateBeams(f.beams ?? [], f.eye);
 
     const ci = f.combatIntensity;
     this.music.setIntensity(ci);
@@ -299,6 +328,8 @@ export class GameAudio {
     fire.reset();
     hit.reset();
     kill.reset();
+    this.topBeam.reset();
+    this.topBleed.reset();
     for (let i = 0; i < events.length; i++) {
       const ev = events[i];
       switch (ev.kind) {
@@ -307,23 +338,20 @@ export class GameAudio {
             if (now - this.lastPlayerFire < 0.03) break;
             this.lastPlayerFire = now;
             this.fireSide = -this.fireSide;
-            sfx.playRaw(ev.gun?.sfx ?? 'laser', 0.75, 0.12 * this.fireSide, timbreOf(ev), 5);
-          } else fire.consider(i, sfx.audibility('laser', ev.position, eye));
+            if (ev.gun?.id) sfx.weapon(ev.gun.sound ?? ev.gun.id, ev.position, eye, 0.8, true, 0.12 * this.fireSide);
+            else sfx.playRaw(ev.gun?.sfx ?? 'laser', 0.75, 0.12 * this.fireSide, timbreOf(ev), 5);
+          } else fire.consider(i, sfx.audibility(ev.gun?.sound === 'capital-lance' ? 'explosionLarge' : 'laser', ev.position, eye));
           break;
         case 'hit':
         case 'shield':
           if (ev.ship?.isPlayer) {
             if (now - this.lastPlayerHit < 0.065) break;
             this.lastPlayerHit = now;
-            if (ev.kind === 'hit') sfx.playAtRaw('playerHit', ev.position, eye, 1);
-            else sfx.playAtRaw('shieldHit', ev.position, eye, 1, 'concord', 6);
+            this.impactEvent(ev, eye);
           } else hit.consider(i, sfx.audibility('hullHit', ev.position, eye));
           break;
         case 'beam-hit':
-          if (now - this.lastBeam < 0.09) break;
-          this.lastBeam = now;
-          if (ev.shielded) sfx.playAtRaw('shieldHit', ev.position, eye, 0.55);
-          else sfx.playAtRaw('beamHit', ev.position, eye, 0.8);
+          this.topBeam.consider(i, ev.ship?.isPlayer ? 10 : sfx.audibility('beamHit', ev.position, eye));
           break;
         case 'subsystem': {
           // Mounts shear off; generators take their facing's shell with them; hangars, engines and bridges go up.
@@ -334,15 +362,17 @@ export class GameAudio {
           break;
         }
         case 'shield-down':
-          sfx.playAtRaw('shieldDown', ev.position, eye, ev.ship?.isPlayer ? 1 : 0.8);
+          if (ev.ship?.isPlayer) sfx.playRaw('shieldDown', 0.85, 0, 'concord', 8);
+          else sfx.playAtRaw('shieldDown', ev.position, eye, 0.8);
           break;
         case 'shield-up':
-          sfx.playAtRaw('shieldUp', ev.position, eye, ev.ship?.isPlayer ? 0.9 : 0.6);
+          if (ev.ship?.isPlayer) sfx.playRaw('shieldUp', 0.65, 0, 'concord', 7);
+          else sfx.playAtRaw('shieldUp', ev.position, eye, 0.6);
           break;
         case 'shield-bleed':
-          if (now - this.lastBleed < 0.12) break;
-          this.lastBleed = now;
-          sfx.playAtRaw(ev.ship?.isPlayer ? 'playerHit' : hullSound(ev.type), ev.position, eye, 0.45);
+          // A normal hit with explicit hull damage already supplies this layer.
+          if (!events.some(other => other !== ev && other.ship === ev.ship && (other.kind === 'shield' || other.kind === 'beam-hit') && (other.hullDamage ?? 0) > 0))
+            this.topBleed.consider(i, ev.ship?.isPlayer ? 10 : sfx.audibility(hullSound(ev.type), ev.position, eye));
           break;
         case 'reactor-critical':
           // The core breached: containment failing (a falling whine) under a hard crack.
@@ -384,21 +414,40 @@ export class GameAudio {
       if (i < 0) continue;
       const ev = events[i];
       // A failing facing (low charge) rings thinner; plating answers by damage type.
-      if (ev.kind === 'shield') sfx.playAtRaw('shieldHit', ev.position, eye, 0.75 * (ev.strength !== undefined && ev.strength >= 0 ? 0.6 + 0.4 * ev.strength : 1));
-      else sfx.playAtRaw(hullSound(ev.type), ev.position, eye, 0.8);
+      this.impactEvent(ev, eye);
+    }
+    if (now - this.lastBeam >= 0.09) {
+      for (const i of this.topBeam.idx) if (i >= 0) { this.impactEvent(events[i], eye, 0.6); this.lastBeam = now; }
+    }
+    if (now - this.lastBleed >= 0.12) {
+      for (const i of this.topBleed.idx) if (i >= 0) {
+        const ev = events[i];
+        sfx.impact(false, ev.position, eye, { type: ev.type, radius: ev.ship?.radius }, !!ev.ship?.isPlayer, 0.45);
+        this.lastBleed = now;
+      }
     }
     if (now - this.lastRemoteFire < 0.02) return;
     for (let k = 0; k < fire.idx.length; k++) {
       const i = fire.idx[k];
       if (i < 0) continue;
       this.lastRemoteFire = now;
-      sfx.playAtRaw(events[i].gun?.sfx ?? 'laser', events[i].position, eye, 0.6, timbreOf(events[i]));
+      const ev = events[i];
+      if (ev.gun?.id) sfx.weapon(ev.gun.sound ?? ev.gun.id, ev.position, eye, 0.65);
+      else sfx.playAtRaw(ev.gun?.sfx ?? 'laser', ev.position, eye, 0.6, timbreOf(ev));
     }
+  }
+
+  private impactEvent(ev: AudioWeaponEvent, eye: Vec3Like, gain = 0.8): void {
+    const shield = ev.kind === 'shield' || !!ev.shielded;
+    const voice = { type: ev.type, amount: ev.amount, strength: ev.strength, radius: ev.ship?.radius, faction: ev.ship?.faction };
+    this.sfx.impact(shield, ev.position, eye, voice, !!ev.ship?.isPlayer, gain);
+    if (shield && (ev.hullDamage ?? 0) > 0) this.sfx.impact(false, ev.position, eye, voice, !!ev.ship?.isPlayer, gain * 0.65);
   }
 
   private missileEvents(events: readonly AudioMissileEvent[], eye: Vec3Like, now: number): void {
     const sfx = this.sfx;
-    let det = 0;
+    this.topDetonate.reset();
+    this.topLaunch.reset();
     for (let i = 0; i < events.length; i++) {
       const ev = events[i];
       if (ev.kind === 'launch') {
@@ -407,21 +456,32 @@ export class GameAudio {
           if (now - this.lastPlayerLaunch < 0.07) continue;
           this.lastPlayerLaunch = now;
           this.launchSide = -this.launchSide;
-          sfx.playRaw('missileLaunch', 0.7, 0.3 * this.launchSide, 'concord', 4);
+          sfx.warhead(ev.spec?.id, true, false, ev.position, eye, true, 0.3 * this.launchSide);
         } else {
           const g = sfx.audibility('missileLaunch', ev.position, eye);
           sfx.swarmPulse(g * 0.35);
-          if (g < 0.05 || now - this.lastRemoteLaunch < 0.09) continue;
-          this.lastRemoteLaunch = now;
-          sfx.playAtRaw('missileLaunch', ev.position, eye, 0.55);
+          this.topLaunch.consider(i, g);
         }
       } else if (ev.kind === 'detonate') {
-        if (ev.target?.isPlayer) sfx.playAtRaw('playerHit', ev.position, eye, 1);
-        if (det >= MAX_DETONATIONS || now - this.lastDetonate < 0.025) continue;
-        det++;
-        this.lastDetonate = now;
-        sfx.playAtRaw('missileHit', ev.position, eye, 0.8);
+        if (ev.target?.isPlayer && !ev.intercepted && now - this.lastPlayerHit >= 0.065) {
+          const voice = { type: 'explosive' as const, amount: ev.spec?.damage, radius: ev.target.radius };
+          if (ev.shielded) sfx.impact(true, ev.position, eye, voice, true);
+          if ((ev.hullDamage ?? (ev.shielded ? 0 : 1)) > 0) sfx.impact(false, ev.position, eye, voice, true);
+          this.lastPlayerHit = now;
+        }
+        this.topDetonate.consider(i, sfx.audibility(ev.spec?.id === 'torpedo' ? 'explosionLarge' : 'missileHit', ev.position, eye));
       }
+    }
+    if (now - this.lastRemoteLaunch >= 0.09) for (const i of this.topLaunch.idx) if (i >= 0) {
+      const ev = events[i];
+      sfx.warhead(ev.spec?.id, true, false, ev.position, eye);
+      this.lastRemoteLaunch = now;
+    }
+    if (now - this.lastDetonate >= 0.025) for (const i of this.topDetonate.idx) if (i >= 0) {
+      const ev = events[i];
+      sfx.warhead(ev.spec?.id, false, !!ev.intercepted, ev.position, eye);
+      if (ev.shielded && !ev.intercepted && !ev.target?.isPlayer) sfx.impact(true, ev.position, eye, { type: 'explosive', amount: ev.spec?.damage, radius: ev.target?.radius }, false, 0.55);
+      this.lastDetonate = now;
     }
   }
 

@@ -1,0 +1,878 @@
+{
+  "hulls": [
+    {
+      "id": "vf27-kestrel",
+      "name": "Kestrel",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 8.546982675101445,
+      "collisionRadius": 5.128189605060867,
+      "shell": [
+        9.808996837221649,
+        3.66248417479811,
+        10.85153060904141
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "vf31-harrier",
+      "name": "Harrier",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 12.610226750821115,
+      "collisionRadius": 7.566136050492668,
+      "shell": [
+        12.77911440240126,
+        4.819418062805557,
+        15.673533727590932
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "choir-cantor",
+      "name": "Cantor",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 7.697239866806487,
+      "collisionRadius": 4.618343920083892,
+      "shell": [
+        10.289015568259698,
+        3.9156904331786255,
+        8.44320736497164
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "rw-scrapjack",
+      "name": "Scrapjack",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 8.648734997973145,
+      "collisionRadius": 5.189240998783887,
+      "shell": [
+        8.974261938302979,
+        4.326062331602064,
+        10.380244875841923
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "sb9-warhorse",
+      "name": "Warhorse",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 18.332144976638574,
+      "collisionRadius": 10.999286985983144,
+      "shell": [
+        19.413777761163995,
+        6.274114878266025,
+        26.56874689301188
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "choir-psalter",
+      "name": "Psalter",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 13.251356238673013,
+      "collisionRadius": 7.950813743203808,
+      "shell": [
+        10.708966195826603,
+        5.416751833389739,
+        19.518791154111344
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "ffc-lantern-guard",
+      "name": "Lantern Guard",
+      "capital": true,
+      "facings": 4,
+      "requestedFacings": 4,
+      "radius": 85.61096885495212,
+      "collisionRadius": 51.36658131297127,
+      "shell": [
+        33.33101693356257,
+        48.19829467105758,
+        117.57414199066677
+      ],
+      "missedShellAxes": [
+        {
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "a": [
+            0,
+            13.81863784790039,
+            114.24988341057345
+          ],
+          "d": [
+            0,
+            0,
+            -2.3514828398133356
+          ]
+        },
+        {
+          "axis": [
+            0,
+            0,
+            -1
+          ],
+          "a": [
+            0,
+            13.81863784790039,
+            -123.24988341057345
+          ],
+          "d": [
+            0,
+            0,
+            2.3514828398133356
+          ]
+        }
+      ]
+    },
+    {
+      "id": "choir-vesper",
+      "name": "Vesper",
+      "capital": true,
+      "facings": 4,
+      "requestedFacings": 4,
+      "radius": 87.79676977452377,
+      "collisionRadius": 52.67806186471426,
+      "shell": [
+        47.06799157106849,
+        54.3998139924574,
+        125.26860594639612
+      ],
+      "missedShellAxes": [
+        {
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "a": [
+            0,
+            3,
+            139.37129047998118
+          ],
+          "d": [
+            0,
+            0,
+            -2.5053721189279226
+          ]
+        },
+        {
+          "axis": [
+            0,
+            0,
+            -1
+          ],
+          "a": [
+            0,
+            3,
+            -113.671293531739
+          ],
+          "d": [
+            0,
+            0,
+            2.5053721189279226
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cvs07-hesperus-dawn",
+      "name": "Hesperus Dawn",
+      "capital": true,
+      "facings": 6,
+      "requestedFacings": 6,
+      "radius": 803.7993376961995,
+      "collisionRadius": 281.3297681936698,
+      "shell": [
+        495.2786179340012,
+        409.895279408577,
+        1105.4732718603593
+      ],
+      "missedShellAxes": [
+        {
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "a": [
+            0,
+            125.59768486022952,
+            1102.528004578963
+          ],
+          "d": [
+            0,
+            0,
+            -22.109465437207188
+          ]
+        },
+        {
+          "axis": [
+            0,
+            0,
+            -1
+          ],
+          "a": [
+            0,
+            125.59768486022952,
+            -1130.528004578963
+          ],
+          "d": [
+            0,
+            0,
+            22.109465437207188
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bb-indomitable",
+      "name": "Indomitable",
+      "capital": true,
+      "facings": 6,
+      "requestedFacings": 6,
+      "radius": 1138.3088254446766,
+      "collisionRadius": 398.40808890563676,
+      "shell": [
+        453.52364239332246,
+        553.2861174631746,
+        1648.2864738986802
+      ],
+      "missedShellAxes": [
+        {
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "a": [
+            0,
+            234.2611680712019,
+            1709.769338637667
+          ],
+          "d": [
+            0,
+            0,
+            -32.9657294779736
+          ]
+        },
+        {
+          "axis": [
+            0,
+            0,
+            -1
+          ],
+          "a": [
+            0,
+            234.2611680712019,
+            -1619.769338637667
+          ],
+          "d": [
+            0,
+            0,
+            32.9657294779736
+          ]
+        }
+      ]
+    },
+    {
+      "id": "choir-cathedral",
+      "name": "Cathedral",
+      "capital": true,
+      "facings": 6,
+      "requestedFacings": 6,
+      "radius": 1560.7859800233416,
+      "collisionRadius": 546.2750930081695,
+      "shell": [
+        614.0733296442095,
+        1133.3033735249955,
+        1827.771204705706
+      ],
+      "missedShellAxes": [
+        {
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "a": [
+            0,
+            288.3333435058594,
+            1811.048916752763
+          ],
+          "d": [
+            0,
+            0,
+            -36.55542409411412
+          ]
+        },
+        {
+          "axis": [
+            0,
+            0,
+            -1
+          ],
+          "a": [
+            0,
+            288.3333435058594,
+            -1881.048916752763
+          ],
+          "d": [
+            0,
+            0,
+            36.55542409411412
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vf27s-super-kestrel",
+      "name": "Super Kestrel",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 8.673311424586931,
+      "collisionRadius": 5.203986854752158,
+      "shell": [
+        9.719204496988796,
+        3.583137331753564,
+        10.73078506624603
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "vf40-gauntlet",
+      "name": "Gauntlet",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 14.171815200557706,
+      "collisionRadius": 8.503089120334623,
+      "shell": [
+        13.020599430107989,
+        5.286395365729895,
+        19.817095824820676
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "gs12-bulwark",
+      "name": "Bulwark",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 28.84747334389029,
+      "collisionRadius": 17.308484006334172,
+      "shell": [
+        20.187433014221643,
+        13.1387561200647,
+        37.7071582667299
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "cr5-resolute",
+      "name": "Resolute",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 4,
+      "radius": 93.47887101012618,
+      "collisionRadius": 56.08732260607571,
+      "shell": [
+        55.413183062377755,
+        32.16961491376885,
+        156.9772244861326
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "ffl3-valiant",
+      "name": "Valiant",
+      "capital": true,
+      "facings": 4,
+      "requestedFacings": 4,
+      "radius": 200.0999442358375,
+      "collisionRadius": 70.03498048254312,
+      "shell": [
+        91.97215644195757,
+        84.20532638324919,
+        306.73007636610294
+      ],
+      "missedShellAxes": [
+        {
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "a": [
+            0,
+            16.75714111328125,
+            307.79737712976396
+          ],
+          "d": [
+            0,
+            0,
+            -6.134601527322059
+          ]
+        },
+        {
+          "axis": [
+            0,
+            0,
+            -1
+          ],
+          "a": [
+            0,
+            16.75714111328125,
+            -311.79737712976396
+          ],
+          "d": [
+            0,
+            0,
+            6.134601527322059
+          ]
+        }
+      ]
+    },
+    {
+      "id": "choir-seraph",
+      "name": "Seraph",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 10.42890680941641,
+      "collisionRadius": 6.257344085649846,
+      "shell": [
+        7.630838138351222,
+        7.630838138351222,
+        12.914772836462221
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "rw-knuckleduster",
+      "name": "Knuckleduster",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 16.532938923305238,
+      "collisionRadius": 9.919763353983143,
+      "shell": [
+        10.428817678569603,
+        5.294743109472182,
+        23.44293323210514
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "rw-gaff",
+      "name": "Gaff",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 9.878522804547583,
+      "collisionRadius": 5.9271136827285495,
+      "shell": [
+        6.260224340031942,
+        3.695422890661181,
+        14.014191664320618
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "rw-bulldog",
+      "name": "Bulldog",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 34.591580025508065,
+      "collisionRadius": 20.754948015304837,
+      "shell": [
+        13.60971173842239,
+        15.128341913640346,
+        54.29718270084
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "rw-mother-lode",
+      "name": "Mother Lode",
+      "capital": true,
+      "facings": 6,
+      "requestedFacings": 6,
+      "radius": 222.73758758039932,
+      "collisionRadius": 77.95815565313976,
+      "shell": [
+        90.15399068469313,
+        61.46376080716627,
+        327.5858420072047
+      ],
+      "missedShellAxes": [
+        {
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "a": [
+            4.245960235595703,
+            12.09999942779541,
+            341.36170042727673
+          ],
+          "d": [
+            0,
+            0,
+            -6.551716840144094
+          ]
+        },
+        {
+          "axis": [
+            0,
+            0,
+            -1
+          ],
+          "a": [
+            4.245960235595703,
+            12.09999942779541,
+            -320.36170042727673
+          ],
+          "d": [
+            0,
+            0,
+            6.551716840144094
+          ]
+        }
+      ]
+    },
+    {
+      "id": "civ-swallow",
+      "name": "Swallow",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 2,
+      "radius": 14.862974781684699,
+      "collisionRadius": 8.917784869010818,
+      "shell": [
+        12.355744317961223,
+        4.3777913766037,
+        20.467595835209714
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "civ-tallow",
+      "name": "Tallow",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 4,
+      "radius": 81.05974253118391,
+      "collisionRadius": 48.63584551871035,
+      "shell": [
+        26.674827275623247,
+        30.288374094431976,
+        120.0395450425554
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "civ-longhaul",
+      "name": "Longhaul",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 4,
+      "radius": 129.33278354568986,
+      "collisionRadius": 77.59967012741392,
+      "shell": [
+        46.01833370031678,
+        31.470194700877908,
+        201.00723009187143
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "civ-umbra",
+      "name": "Umbra",
+      "capital": false,
+      "facings": 2,
+      "requestedFacings": 4,
+      "radius": 148.3508816331896,
+      "collisionRadius": 89.01052897991376,
+      "shell": [
+        60.52797095380525,
+        36.202066745446615,
+        212.05034317010052
+      ],
+      "missedShellAxes": []
+    },
+    {
+      "id": "civ-meridian-star",
+      "name": "Meridian Star",
+      "capital": true,
+      "facings": 6,
+      "requestedFacings": 6,
+      "radius": 219.00504280737564,
+      "collisionRadius": 76.65176498258147,
+      "shell": [
+        99.32824958710484,
+        67.7301298799089,
+        346.71281272142926
+      ],
+      "missedShellAxes": [
+        {
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "a": [
+            0,
+            21.795464515686035,
+            360.1799408486436
+          ],
+          "d": [
+            0,
+            0,
+            -6.934256254428585
+          ]
+        },
+        {
+          "axis": [
+            0,
+            0,
+            -1
+          ],
+          "a": [
+            0,
+            21.795464515686035,
+            -340.1799408486436
+          ],
+          "d": [
+            0,
+            0,
+            6.934256254428585
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ddg40-arbiter",
+      "name": "Arbiter",
+      "capital": true,
+      "facings": 6,
+      "requestedFacings": 6,
+      "radius": 325.35033222947624,
+      "collisionRadius": 113.87261628031668,
+      "shell": [
+        127.99013264605388,
+        137.23403831939646,
+        458.6382969443504
+      ],
+      "missedShellAxes": [
+        {
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "a": [
+            0,
+            29.960072781489444,
+            435.47467991379386
+          ],
+          "d": [
+            0,
+            0,
+            -9.172765938887007
+          ]
+        },
+        {
+          "axis": [
+            0,
+            0,
+            -1
+          ],
+          "a": [
+            0,
+            29.960072781489444,
+            -490.97467991379386
+          ],
+          "d": [
+            0,
+            0,
+            9.172765938887007
+          ]
+        }
+      ]
+    },
+    {
+      "id": "choir-canticle",
+      "name": "Canticle",
+      "capital": true,
+      "facings": 6,
+      "requestedFacings": 6,
+      "radius": 244.09049288934966,
+      "collisionRadius": 85.43167251127238,
+      "shell": [
+        147.4022474650013,
+        137.93578530277418,
+        281.5011440372623
+      ],
+      "missedShellAxes": [
+        {
+          "axis": [
+            0,
+            0,
+            1
+          ],
+          "a": [
+            0,
+            26.100006103515625,
+            299.9161463223615
+          ],
+          "d": [
+            0,
+            0,
+            -5.630022880745246
+          ]
+        },
+        {
+          "axis": [
+            0,
+            0,
+            -1
+          ],
+          "a": [
+            0,
+            26.100006103515625,
+            -268.7161646329084
+          ],
+          "d": [
+            0,
+            0,
+            5.630022880745246
+          ]
+        }
+      ]
+    }
+  ],
+  "damageCases": 4860,
+  "damageFailures": [],
+  "audio": {
+    "intercepted": [
+      [
+        "playerHit",
+        {
+          "x": 5,
+          "y": 0,
+          "z": -5
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        1
+      ],
+      [
+        "missileHit",
+        {
+          "x": 5,
+          "y": 0,
+          "z": -5
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        0.8
+      ]
+    ],
+    "shieldAbsorbed": [
+      [
+        "playerHit",
+        {
+          "x": 5,
+          "y": 0,
+          "z": -5
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        1
+      ],
+      [
+        "missileHit",
+        {
+          "x": 5,
+          "y": 0,
+          "z": -5
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        0.8
+      ]
+    ],
+    "threeDetonations": [
+      [
+        "missileHit",
+        {
+          "x": 1,
+          "y": 0,
+          "z": -5
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        0.8
+      ]
+    ],
+    "beamDistantBeforePlayer": [
+      [
+        "beamHit",
+        {
+          "x": 0,
+          "y": 0,
+          "z": -10000000
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        0.8
+      ]
+    ]
+  },
+  "summary": {
+    "hulls": 28,
+    "capitals": 10,
+    "capitalHullsWithMissedShieldProbes": 10,
+    "weaponProfiles": 18,
+    "damageCases": 4860,
+    "damageFailures": 0
+  }
+}

@@ -1,5 +1,6 @@
 import type { AudioEngine, VoiceSlot } from './AudioEngine';
 import { Rng, Smooth, adsr, driveCurve, mtof, perc, sweep } from './dsp';
+import { MISSILE_VOICES, WEAPON_VOICES, type ImpactVoice, type MissileVoiceId, type WeaponVoice } from './combatSounds';
 
 /**
  * Procedural sound effects, 90s-OVA flavoured: bright FM zaps, crunchy
@@ -57,6 +58,14 @@ export interface QuatLike {
   readonly w: number;
 }
 
+export interface BeamSound {
+  id: number;
+  active: boolean;
+  origin: Vec3Like;
+  owner: { isPlayer: boolean; faction: string; radius: number };
+  gun?: { id?: string; sound?: string } | null;
+}
+
 export interface PlayOpts {
   /** Linear gain multiplier (default 1). */
   gain?: number;
@@ -106,6 +115,9 @@ interface Spatial {
   gain: number;
   pan: number;
   cutoff: number;
+  x: number;
+  y: number;
+  z: number;
 }
 
 const SHEPARD_OCTAVES = 7;
@@ -124,7 +136,7 @@ export class Sfx {
   private fy = 0;
   private fz = -1;
   private oriented = false;
-  readonly sp: Spatial = { gain: 1, pan: 0, cutoff: 20000 };
+  readonly sp: Spatial = { gain: 1, pan: 0, cutoff: 20000, x: 0, y: 0, z: -1 };
 
   // ── persistent loops ──
   private loopsReady = false;
@@ -164,6 +176,7 @@ export class Sfx {
   private droneGain: GainNode | null = null;
   private lastRadio = -1;
   private lastUi = -1;
+  private beamVoices = new Map<number, { slot: VoiceSlot; serial: number; gain: GainNode; profile: WeaponVoice }>();
 
   constructor(private engine: AudioEngine) {
     engine.onReady((ctx) => this.initLoops(ctx));
@@ -206,6 +219,10 @@ export class Sfx {
       if (front < -0.2) cutoff *= 0.65;
     }
     const sp = this.sp;
+    const inv = 1 / Math.max(d, 1e-3);
+    sp.x = this.oriented ? (dx * this.rx + dy * this.ry + dz * this.rz) * inv : 0;
+    sp.y = this.oriented ? (dx * (this.ry * this.fz - this.rz * this.fy) + dy * (this.rz * this.fx - this.rx * this.fz) + dz * (this.rx * this.fy - this.ry * this.fx)) * inv : 0;
+    sp.z = this.oriented ? -(dx * this.fx + dy * this.fy + dz * this.fz) * inv : -1;
     sp.gain = g;
     sp.pan = pan < -1 ? -1 : pan > 1 ? 1 : pan;
     sp.cutoff = cutoff;
@@ -231,7 +248,7 @@ export class Sfx {
     const g = this.spatialize(pos, eye, KIND[kind].ref);
     if (g < 0.012) return;
     const sp = this.sp;
-    this.trigger(kind, (opts?.gain ?? 1) * g, sp.pan, sp.cutoff, opts?.faction ?? 'concord', opts?.priority);
+    this.trigger(kind, (opts?.gain ?? 1) * g, sp.pan, sp.cutoff, opts?.faction ?? 'concord', opts?.priority, 1, false);
   }
 
   /** `play` without an options object (per-frame event path). */
@@ -243,17 +260,18 @@ export class Sfx {
   playAtRaw(kind: SfxKind, pos: Vec3Like, eye: Vec3Like, gain: number, faction: Faction = 'concord', priority?: number): void {
     const g = this.spatialize(pos, eye, KIND[kind].ref);
     if (g < 0.012) return;
-    this.trigger(kind, gain * g, this.sp.pan, this.sp.cutoff, faction, priority);
+    this.trigger(kind, gain * g, this.sp.pan, this.sp.cutoff, faction, priority, 1, false);
   }
 
-  private trigger(kind: SfxKind, gain: number, pan: number, cutoff: number, faction: Faction, priority?: number): void {
+  private trigger(kind: SfxKind, gain: number, pan: number, cutoff: number, faction: Faction, priority?: number, pitch = 1, cockpit = true): void {
     const e = this.engine;
     if (!e.running || gain <= 0) return;
     const spec = KIND[kind];
-    const slot = e.acquire(priority ?? spec.prio, Math.min(1, gain), spec.dur, pan, cutoff);
+    const slot = e.acquire(priority ?? spec.prio, Math.min(1, gain), spec.dur, pan, cutoff, cockpit);
     if (!slot) return;
+    if (!cockpit) slot.spatial.position(pan, this.sp, kind === 'explosionLarge' ? 0.16 : 0, slot.t0);
     const t = slot.t0;
-    const v = this.rng.range(0.94, 1.06);
+    const v = this.rng.range(0.96, 1.04) * pitch;
     switch (kind) {
       case 'laser':
         this.laser(slot, t, gain, faction, v);
@@ -318,6 +336,121 @@ export class Sfx {
       case 'jumpExit':
         this.jumpExit(slot, t, gain);
         break;
+    }
+  }
+
+  /** Authored gun body/attack: IDs carry identity, never simulation damage. */
+  weapon(id: string, pos: Vec3Like, eye: Vec3Like, gain: number, cockpit = false, pan = 0): void {
+    const profile = WEAPON_VOICES[id] ?? WEAPON_VOICES.laser;
+    if (!this.engine.running) return;
+    const audible = cockpit ? 1 : this.spatialize(pos, eye, profile.family === 'beam' ? 650 : profile.body >= 0.22 ? 220 : 75);
+    if (audible < 0.015) return;
+    const slot = this.engine.acquire(cockpit ? 6 : 3, gain * audible, profile.decay + 0.25, cockpit ? pan : this.sp.pan, cockpit ? 20000 : this.sp.cutoff, cockpit);
+    if (slot) {
+      slot.spatial.position(cockpit ? pan : this.sp.pan, cockpit ? undefined : this.sp, profile.body >= 0.25 ? 0.08 : 0, slot.t0);
+      this.weaponSynth(slot, profile, gain * audible);
+    }
+  }
+
+  private weaponSynth(slot: VoiceSlot, p: WeaponVoice, g: number): void {
+    const t = slot.t0;
+    const end = t + p.decay + 0.2;
+    const pitch = p.pitch * this.rng.range(0.97, 1.03);
+    const tone = this.gain();
+    perc(tone.gain, t, p.body * g, p.family === 'beam' ? 0.04 : 0.002, p.decay);
+    const o = this.osc(slot, p.family === 'laser' ? 'triangle' : 'sine', pitch, t, end);
+    sweep(o.frequency, t, pitch, p.family === 'kinetic' ? Math.max(42, pitch * 0.045) : pitch * 0.28, p.decay * 0.75);
+    o.connect(tone).connect(slot.input);
+    const noise = this.noise(slot, t, end);
+    const bp = this.filter('bandpass', Math.min(9000, pitch * 1.8), 0.8);
+    const crack = this.gain();
+    perc(crack.gain, t, p.crack * g, 0.001, Math.min(0.16, p.decay * 0.4));
+    noise.connect(bp).connect(crack).connect(slot.input);
+    const ring = this.gain();
+    perc(ring.gain, t, p.ring * g, 0.005, p.decay);
+    this.fm(slot, pitch * 1.3, 1.414, p.family === 'kinetic' ? 0.2 : 1.2, t, end, p.decay).connect(ring).connect(slot.input);
+    // Mechanical recovery/fragment rattle distinguishes slower kinetic guns.
+    if (p.family === 'kinetic' && p.decay > 0.15) {
+      const recoil = this.gain();
+      perc(recoil.gain, t + 0.07, g * 0.065, 0.001, 0.06);
+      noise.connect(this.filter('highpass', 1800)).connect(recoil).connect(slot.input);
+    }
+  }
+
+  impact(shield: boolean, pos: Vec3Like, eye: Vec3Like, voice: ImpactVoice, cockpit = false, gain = 1): void {
+    if (!this.engine.running) return;
+    const size = Math.min(2, Math.max(0.7, Math.pow((voice.amount ?? 6) / 6, 0.15)));
+    const pitch = (voice.type === 'harmonic' ? 1.22 : voice.type === 'explosive' ? 0.62 : voice.type === 'kinetic' ? 0.87 : 1)
+      * ((voice.radius ?? 9) > 60 ? 0.8 : 1) / Math.sqrt(size)
+      * (shield ? 0.75 + 0.25 * Math.max(0, voice.strength ?? 1) : 1);
+    const kind: SfxKind = shield ? 'shieldHit' : voice.type === 'laser' || voice.type === 'harmonic' ? 'hullScorch' : voice.type === 'explosive' ? 'hullCrunch' : 'hullHit';
+    const audible = cockpit ? 1 : this.spatialize(pos, eye, (voice.radius ?? 9) > 60 ? 220 : 90);
+    if (audible < 0.015) return;
+    this.trigger(kind, gain * audible * Math.min(1.2, size), cockpit ? 0 : this.sp.pan, cockpit ? 20000 : this.sp.cutoff, 'concord', cockpit ? 8 : 4, pitch, cockpit);
+  }
+
+  warhead(id: string | undefined, launch: boolean, intercepted: boolean, pos: Vec3Like, eye: Vec3Like, cockpit = false, pan = 0): void {
+    const p = MISSILE_VOICES[(id && id in MISSILE_VOICES ? id : 'micro') as MissileVoiceId];
+    const audible = cockpit ? 1 : this.spatialize(pos, eye, id === 'torpedo' ? 700 : 130);
+    if (audible < 0.015) return;
+    this.trigger(launch ? 'missileLaunch' : intercepted ? 'explosionSmall' : 'missileHit', p.gain * audible * (intercepted ? 0.45 : 1), cockpit ? pan : this.sp.pan, cockpit ? 20000 : this.sp.cutoff, 'concord', cockpit ? 6 : 4, p.pitch, cockpit);
+    if (!launch && !intercepted && this.engine.running) {
+      const slot = this.engine.acquire(4, audible * p.body, p.decay + 0.1, cockpit ? pan : this.sp.pan, 12000, cockpit);
+      if (slot) {
+        slot.spatial.position(cockpit ? pan : this.sp.pan, cockpit ? undefined : this.sp, id === 'torpedo' ? 0.16 : 0, slot.t0);
+        const t = slot.t0; const env = this.gain();
+        perc(env.gain, t, p.body * audible, 0.003, p.decay);
+        const tone = this.osc(slot, id === 'harpoon' ? 'triangle' : 'sine', id === 'harpoon' ? 680 : 85 * p.pitch, t, t + p.decay + 0.1);
+        tone.connect(env).connect(slot.input);
+      }
+    }
+  }
+
+  /** Persistent beam bodies, bounded to eight voices and refreshed from live emitters. */
+  updateBeams(beams: readonly BeamSound[], eye: Vec3Like): void {
+    const e = this.engine;
+    if (!e.running) return;
+    const now = e.now;
+    // Loudest emitters first; release voices that leave the eight-source budget.
+    const selected = beams.filter(b => b.active).map(b => ({ b, gain: b.owner.isPlayer ? 1 : this.spatialize(b.origin, eye, 650) })).filter(v => v.gain >= 0.015).sort((a, b) => b.gain - a.gain).slice(0, 8);
+    for (const [id, voice] of this.beamVoices) {
+      if (voice.slot.serial !== voice.serial) { this.beamVoices.delete(id); continue; }
+      if (!selected.some(({ b }) => b.id === id)) {
+        voice.gain.gain.cancelScheduledValues(now);
+        voice.gain.gain.setTargetAtTime(0, now, 0.02);
+        for (const src of voice.slot.sources) { try { src.stop(now + 0.08); } catch { /* ended */ } }
+        voice.slot.end = now + 0.08;
+        this.beamVoices.delete(id);
+      }
+    }
+    for (const { b } of selected) {
+      const cockpit = b.owner.isPlayer;
+      const g = cockpit ? 1 : this.spatialize(b.origin, eye, 650);
+      if (g < 0.015) continue;
+      let v = this.beamVoices.get(b.id);
+      if (v && (v.slot.serial !== v.serial || v.slot.end <= now)) { this.beamVoices.delete(b.id); v = undefined; }
+      if (!v) {
+        const profile = WEAPON_VOICES[b.gun?.sound ?? b.gun?.id ?? 'capital-lance'] ?? WEAPON_VOICES.lance;
+        const slot = e.acquire(cockpit ? 7 : 4, g, 0.3, cockpit ? 0 : this.sp.pan, cockpit ? 18000 : this.sp.cutoff, cockpit);
+        if (!slot) continue;
+        const gain = this.gain();
+        gain.gain.setValueAtTime(0, slot.t0);
+        const end = slot.t0 + 0.3;
+        this.fm(slot, profile.pitch, 1.414, 0.8, slot.t0, end, 0.2).connect(gain);
+        this.osc(slot, 'sine', profile.pitch * 0.5, slot.t0, end).connect(gain);
+        gain.connect(slot.input);
+        v = { slot, serial: slot.serial, gain, profile };
+        this.beamVoices.set(b.id, v);
+      }
+      const t = Math.max(now, v.slot.t0);
+      v.gain.gain.cancelScheduledValues(t);
+      v.gain.gain.setTargetAtTime(v.profile.body * g * 0.45, t, 0.035);
+      v.gain.gain.setTargetAtTime(0, t + 0.14, 0.025);
+      v.slot.panner.pan.setTargetAtTime(cockpit ? 0 : this.sp.pan, t, 0.02);
+      v.slot.spatial.position(cockpit ? 0 : this.sp.pan, cockpit ? undefined : this.sp, v.profile.pitch < 200 ? 0.08 : 0, t);
+      v.slot.filter.frequency.setTargetAtTime(Math.min(cockpit ? 18000 : this.sp.cutoff, e.ctx!.sampleRate / 2), t, 0.02);
+      v.slot.end = t + 0.3;
+      for (const src of v.slot.sources) { try { src.stop(t + 0.3); } catch { /* ended */ } }
     }
   }
 
@@ -921,7 +1054,7 @@ export class Sfx {
     const now = e.now;
     if (kind === 'tick' && now - this.lastUi < 0.025) return;
     this.lastUi = now;
-    const slot = e.acquire(9, 0.5, UI_DUR[kind] + 0.05, 0, 20000);
+    const slot = e.acquire(9, 0.5, UI_DUR[kind] + 0.05, 0, 20000, true);
     if (!slot) return;
     const t = slot.t0;
     const out = slot.input;

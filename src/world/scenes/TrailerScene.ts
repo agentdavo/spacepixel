@@ -84,6 +84,7 @@ export class TrailerScene implements GameScene {
       camera: this.camera.quaternion,
       player: { position: zero, velocity: zero, throttle: 0, boosting: false, cruise: 'off', lockProgress: 0, locked: false, incomingMissile: false, alive: false },
       weaponEvents: this.weapons.events,
+      beams: this.weapons.beams,
       missileEvents: this.missiles.events,
       jumpPhase: 'none',
       combatIntensity: 0,
