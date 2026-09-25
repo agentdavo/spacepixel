@@ -526,9 +526,14 @@ export function tierFor(roll: number, shipT: Tier, rep: number): Tier {
  * The board at `station` right now: priority orders first (Directorate
  * stations, while an episode is pending), then 2–6 seeded offers.
  */
+/** Generic offers require an authored issuer belonging to the posting polity. */
+export function hasContractClients(faction: EconFaction): boolean {
+  return CLIENTS.some(client => client.faction === faction);
+}
+
 export function generateBoard(input: BoardInput): Contract[] {
   const found = findStation(input.reach, input.station);
-  if (!found) return [];
+  if (!found || !hasContractClients(found.station.faction)) return [];
   const { station, system } = found;
   const rep = input.rep[station.faction] ?? 0;
   const epoch = boardEpoch(input.clock);
@@ -561,7 +566,7 @@ export function generateBoard(input: BoardInput): Contract[] {
  */
 export function makeOffer(input: BoardInput, kind: ContractKind, tier: Tier, key: string): Contract | null {
   const found = findStation(input.reach, input.station);
-  if (!found) return null;
+  if (!found || !hasContractClients(found.station.faction)) return null;
   const { station, system } = found;
   const rep = input.rep[station.faction] ?? 0;
   const rnd = mulberry32(hashStr(key));
@@ -580,11 +585,11 @@ interface GenCtx {
   epoch: number;
 }
 
-function pickClient(g: GenCtx, kind: ContractKind): Client {
+function pickClient(g: GenCtx, kind: ContractKind): Client | undefined {
   const pool = CLIENTS.filter((x) => x.faction === g.station.faction && x.kinds.includes(kind));
   const local = pool.filter((x) => x.posts.includes(g.station.kind));
   const from = local.length ? local : pool.length ? pool : CLIENTS.filter((x) => x.faction === g.station.faction);
-  return from[Math.floor(g.rnd() * from.length)] ?? CLIENTS[0];
+  return from[Math.floor(g.rnd() * from.length)];
 }
 
 /** Systems `min..max` jumps away (optionally filtered), nearest first. */
@@ -619,6 +624,7 @@ function enemyFor(s: ReachSystem, rnd: () => number): ContractOp['enemy'] {
 function makeContract(g: GenCtx, kind: ContractKind, tier: Tier, id: string): Contract | null {
   const { station, system, rnd, rep } = g;
   const client = pickClient(g, kind);
+  if (!client) return null;
   const base = {
     id,
     kind,

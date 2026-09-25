@@ -60,6 +60,10 @@ try {
     return { systems: scene.universe.systems.size, station, docked, finite: scene.fleet.ships.every(s => Number.isFinite(s.hull) && Number.isFinite(s.flight.position.x)) };
   });
   assert.equal(runtime.systems, 28); assert.equal(runtime.docked, true); assert.equal(runtime.finite, true);
+  await page.getByRole('button', { name: /CONTRACTS$/ }).click();
+  assert.match(await page.locator('.ct').innerText(), /No local contract issuers.*FIRST CONTACT/);
+  assert.doesNotMatch(await page.locator('.ct').innerText(), /Halloran|REPOST IN/);
+  assert.equal(await page.locator('.ct-list .ct-row').count(), 0);
   await page.getByRole('button', { name: /FIRST CONTACT/ }).click();
   const deliver = page.getByRole('button', { name: 'Deliver supplies', exact: true }).first();
   await deliver.focus(); await page.keyboard.press('Enter');

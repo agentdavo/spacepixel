@@ -3,7 +3,7 @@ import { registerDockTab, type DockContext, type DockTabApi } from './DockScreen
 import { drawPortrait, portraitKind } from './Portrait';
 import { getAudio } from '@/audio';
 import { FACTION_LABEL, type TradeLedger } from '@/game/economy';
-import { KIND_LABEL, MAX_ACTIVE, TIER_LABEL, formatClock, payableAt, type Contract } from '@/game/contracts/contracts';
+import { KIND_LABEL, MAX_ACTIVE, TIER_LABEL, formatClock, hasContractClients, payableAt, type Contract } from '@/game/contracts/contracts';
 import type { ContractDesk, LedgerIO } from '@/game/contracts/ContractDesk';
 
 /**
@@ -184,9 +184,13 @@ class ContractsTab {
     this.collect();
     if (restartTeletype) this.t0 = performance.now();
     const ledger = ctx.ledger();
+    const hasIssuers = hasContractClients(ctx.station.faction);
+    const emptyBoard = hasIssuers
+      ? 'Nothing posted for a pilot of your standing. Check back after the repost.'
+      : 'No local contract issuers are registered at this port.' + (ctx.station.id.startsWith('marches:') ? ' Use FIRST CONTACT for local supply agreements.' : '');
     const sections: [Row['section'], string][] = [
       ['priority', 'PRIORITY'],
-      ['board', `BOARD // ${this.rows.filter((r) => r.section === 'board').length} POSTED · REPOST IN ${formatClock(d.repostIn())}`],
+      ['board', hasIssuers ? `BOARD // ${this.rows.filter((r) => r.section === 'board').length} POSTED · REPOST IN ${formatClock(d.repostIn())}` : 'BOARD // NO LOCAL ISSUERS'],
       ['accepted', `ACCEPTED // ${d.book.active.length}/${MAX_ACTIVE}`],
     ];
     const list = sections
@@ -195,7 +199,7 @@ class ContractsTab {
         if (!rows.length && sec === 'priority') return '';
         const body = rows.length
           ? rows.map(({ r, i }) => this.rowHtml(r, i, ledger)).join('')
-          : `<div class="ct-empty">${sec === 'board' ? 'Nothing posted for a pilot of your standing. Check back after the repost.' : 'No contracts in hand.'}</div>`;
+          : `<div class="ct-empty">${sec === 'board' ? emptyBoard : 'No contracts in hand.'}</div>`;
         return `<h3 class="ct-h ${sec}">${head}</h3>${body}`;
       })
       .join('');
