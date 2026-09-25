@@ -654,6 +654,63 @@ export async function renderScenario(name: string, sampleRate = 44100, frames: R
   return { name, seconds, sampleRate, peak, clipped, maxVoices, wav: wavBase64(L, R, sampleRate) };
 }
 
+/** V3 edit stems: events come only from the selected gameplay frames. */
+export async function renderCapturedStem(
+  frames: (RecordedAudioFrame & Partial<AudioFrame>)[], seconds: number,
+  stem: 'music' | 'sfx', cues: { at: number; mood: Mood; intensity: number; fade?: number }[],
+): Promise<RenderStats> {
+  const sampleRate = 48000;
+  const length = Math.ceil(seconds * sampleRate);
+  const ctx = new OfflineAudioContext({ numberOfChannels: 2, length, sampleRate });
+  const audio = new GameAudio({ context: ctx });
+  audio.autoMood = false;
+  audio.setScore('nexus', 0, 0);
+  audio.setVolume('music', stem === 'music' ? 1 : 0);
+  audio.setVolume('sfx', stem === 'sfx' ? 1 : 0);
+  let frameCursor = 0, cueCursor = 0, maxVoices = 0;
+  let intensity = 0.3;
+  const frame: AudioFrame = {
+    dt: 1024/sampleRate, eye: { x: 0, y: 0, z: 0 },
+    player: { position: { x: 0, y: 0, z: 0 }, velocity: { x: 0, y: 0, z: 0 }, throttle: 0, boosting: false, cruise: 'off', lockProgress: 0, locked: false, incomingMissile: false },
+    weaponEvents: [], missileEvents: [], jumpPhase: 'none', combatIntensity: 0,
+  };
+  const step = () => {
+    const t = ctx.currentTime;
+    while (cueCursor < cues.length && cues[cueCursor].at <= t) {
+      const cue = cues[cueCursor++];
+      intensity = cue.intensity;
+      if (stem === 'music') audio.music.setMood(cue.mood, cue.fade ?? 3);
+    }
+    const weapons: AudioWeaponEvent[] = [], missiles: AudioMissileEvent[] = [];
+    while (frameCursor < frames.length && frames[frameCursor].at < t + frame.dt) {
+      const f = frames[frameCursor++];
+      frame.eye = f.eye; frame.camera = f.camera;
+      if (f.player) frame.player = f.player;
+      frame.jumpPhase = f.jumpPhase ?? 'none';
+      frame.combatIntensity = f.combatIntensity ?? 0;
+      if (stem === 'sfx') { weapons.push(...f.weaponEvents); missiles.push(...f.missileEvents); }
+    }
+    frame.weaponEvents = weapons; frame.missileEvents = missiles;
+    audio.update(frame);
+    audio.music.setIntensity(intensity);
+    maxVoices = Math.max(maxVoices, audio.engine.activeVoices());
+  };
+  step();
+  for (let k = 1; k*1024 < length; k++) {
+    void ctx.suspend(k*1024/sampleRate).then(() => { step(); void ctx.resume(); });
+  }
+  const buffer = await ctx.startRendering();
+  audio.music.dispose();
+  const L = buffer.getChannelData(0), R = buffer.getChannelData(1);
+  let peak = 0, clipped = 0;
+  for (let i = 0; i < L.length; i++) {
+    peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i]));
+    if (Math.abs(L[i]) >= 0.999) clipped++;
+    if (Math.abs(R[i]) >= 0.999) clipped++;
+  }
+  return { name: `v3-${stem}`, seconds, sampleRate, peak, clipped, maxVoices, wav: wavBase64(L,R,sampleRate) };
+}
+
 function wavBase64(L: Float32Array, R: Float32Array, sr: number): string {
   const n = L.length;
   const buf = new ArrayBuffer(44 + n * 4);

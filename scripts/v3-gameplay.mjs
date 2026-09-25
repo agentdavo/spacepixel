@@ -18,6 +18,7 @@ const from = Number(opt('from', '0'));
 const replayPath = opt('replay', '');
 const replay = replayPath ? JSON.parse(readFileSync(replayPath, 'utf8')) : null;
 const camera = opt('camera', '');
+const pilot = args.includes('--pilot');
 const plan = opt('inputs', '') ? JSON.parse(readFileSync(opt('inputs', ''), 'utf8')) : [];
 if (existsSync(`${out}/events.jsonl`)) throw new Error('Choose a new output directory; capture logs cannot be appended to old takes');
 mkdirSync(out, { recursive: true });
@@ -34,8 +35,8 @@ try {
   const query = q.toString();
   await page.goto(`http://127.0.0.1:${port}/?${query}`, { waitUntil: 'commit' });
   await page.waitForFunction(() => window.__VANGUARD__?.error || (window.__VANGUARD__?.ready && window.__VANGUARD__?.hooks?.step), null, { timeout: 300000 });
-  const status = await page.evaluate(() => ({ error: window.__VANGUARD__.error, backend: window.__VANGUARD__.backend }));
-  if (status.error || status.backend !== 'WebGPU') throw new Error(JSON.stringify(status));
+  const status = await page.evaluate(() => { const v=window.__VANGUARD__, device=v.hooks.renderer().backend.device; return { error:v.error, backend:v.backend, device:device?.constructor.name, queue:!!device?.queue }; });
+  if (status.error || status.backend !== 'WebGPU' || !status.queue) throw new Error(JSON.stringify(status));
   await page.evaluate(() => document.fonts.ready);
   await page.addStyleTag({ content: `.hud-debug,.hud-graph,.replay-deck,.replay-toast {display:none!important}${args.includes('--clean') ? '#ui-root {visibility:hidden!important}' : ''}` });
   if (replay) {
@@ -59,8 +60,9 @@ try {
     S.audio.update = f => { window.__v3.audio.push({ tick: S.simTick, ...snapshotAudioFrame(f), player: { ...f.player, position: { ...f.player.position }, velocity: { ...f.player.velocity } }, jumpPhase: f.jumpPhase, combatIntensity: f.combatIntensity }); audioUpdate(f); };
     return subjects.map(s => ({ id: s.id, name: s.name, blueprint: s.model.blueprint.id, pos: s.flight.position.toArray(), orientation: s.flight.orientation.toArray(), hull: s.hull, hullMax: s.hullMax, shield: s.shield, shieldMax: s.shieldMax, loadout: s.combat.loadout }));
   });
-  const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
-  writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, initial, kind: 'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits.', inputs: plan }, null, 2));
+  const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
+  const scenery = await page.evaluate(() => window.__v3.S.loreFlight?.provenance ?? null);
+  writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, pilot, initial, scenery, kind: 'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot option reads aim and sends ordinary mouse/keyboard controls.', inputs: plan }, null, 2));
   let ended = false;
   let cameraApplied = false;
   let f = -1;
@@ -74,6 +76,23 @@ try {
     for (const cue of plan) {
       if (tick === Math.round(cue.at*60)) await page.keyboard.down(cue.key);
       if (tick === Math.round((cue.at+(cue.dur ?? 1/30))*60)) await page.keyboard.up(cue.key);
+    }
+    if (pilot && !replay) {
+      const aim = await page.evaluate(() => {
+        const S=window.__v3.S, t=S.lock.target, p=S.player.flight;
+        if (!t?.alive) return null;
+        const range=t.flight.position.distanceTo(p.position);
+        const v=t.flight.position.clone().addScaledVector(t.flight.velocity,range/2000).sub(p.position).applyQuaternion(p.orientation.clone().invert());
+        return { yaw:Math.atan2(v.x,v.z),pitch:Math.atan2(v.y,Math.hypot(v.x,v.z)),range,locked:S.lock.locked };
+      });
+      if (aim) {
+        const clamp=x=>Math.max(-0.95,Math.min(0.95,x));
+        await page.mouse.move(640*(1+clamp(aim.yaw*2)),360*(1-clamp(aim.pitch*2)));
+        if (Math.abs(aim.yaw)<0.14 && Math.abs(aim.pitch)<0.14 && aim.range<1500) await page.keyboard.down('Space'); else await page.keyboard.up('Space');
+        if (aim.range>1000) await page.keyboard.down('KeyW'); else await page.keyboard.up('KeyW');
+        if (aim.range<350) await page.keyboard.down('KeyS'); else await page.keyboard.up('KeyS');
+        if (aim.locked && tick%180===0) await page.keyboard.down('KeyF'); else await page.keyboard.up('KeyF');
+      }
     }
     f++;
     if (probe && f % 30 !== 0) {

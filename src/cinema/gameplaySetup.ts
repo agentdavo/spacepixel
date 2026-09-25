@@ -29,3 +29,20 @@ export function stageV3Battle(fleet: Fleet, player: ShipEntity, escorts = 2): Sh
   player.target = target;
   return target;
 }
+
+/** Healthy fighter encounter; only the starting formation is authored. */
+export function stageV3Pursuit(player: ShipEntity, wing: ShipEntity[], enemies: ShipEntity[]): void {
+  const origin = player.flight.position.clone().add(new Vector3(-8000, 500, 8000));
+  const place = (s: ShipEntity, p: number[], forward: number[]) => {
+    const direction = new Vector3(...forward).normalize();
+    s.flight.position.copy(origin).add(new Vector3(...p));
+    faceAlong(s.flight.orientation, direction);
+    s.flight.velocity.copy(direction).multiplyScalar(160);
+    s.flight.throttle = 0.65;
+    s.model.root.position.copy(s.flight.position);
+    s.model.root.quaternion.copy(s.flight.orientation);
+  };
+  place(player, [0, 40, -700], [0, 0, 1]);
+  wing.forEach((s,i) => place(s, [i ? 70 : -70, 20, -770-i*40], [0,0,1]));
+  enemies.forEach((s,i) => place(s, i ? [i === 1 ? 400 : -500, i*50, i*500] : [0,0,0], i ? [0,0,-1] : [0,0,1]));
+}
