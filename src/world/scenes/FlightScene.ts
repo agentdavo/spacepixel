@@ -567,6 +567,9 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.campaign?.preStep(dt);
       this.contracts.preStep(dt);
     }
+    // Previous-tick traffic/guidance consumers have run. Flight and contacts
+    // can now emit damage/kill events which must survive the weapons phase.
+    this.weapons.beginTick();
     this.fleet.step(dt);
     this.docking.update(dt);
     // Hulls are solid: bounce / scrape off stations and capitals (not while guidance owns the ship).
@@ -592,7 +595,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
 
     // 4. Weapons + missiles sim.
-    this.weapons.step(dt);
+    this.weapons.step(dt, true);
     this.missiles.step(dt);
     // 4'. Salvage: flying slow and close to a wreck piece cuts its lot into the hold.
     this.stepSalvage(dt);

@@ -12,6 +12,7 @@ import { Weapons } from './Weapons';
 import { Missiles, type LockState } from './Missiles';
 import { Capitals } from './Capitals';
 import { FighterCollisions } from './FighterCollisions';
+import { CapitalCollisions } from './CapitalCollisions';
 import { issueOrder, setFormation, updateAI } from './ai';
 import { Rng } from './Rng';
 import { StateHasher, hashWorld, hex } from './StateHash';
@@ -126,6 +127,7 @@ interface World {
   capitals: Capitals;
   turrets: ShipTurrets | null;
   bumps: FighterCollisions;
+  hullContacts?: CapitalCollisions;
   traffic: Traffic | null;
   player: ShipEntity;
   wing: ShipEntity[];
@@ -299,14 +301,16 @@ function tick(w: World, i: number): void {
   updateAI(w.fleet, DT, t);
   w.capitals.step(DT);
   w.turrets?.step(DT, w.lock.target);
+  w.weapons.beginTick();
   w.fleet.step(DT);
+  (w.hullContacts ??= new CapitalCollisions()).step(w.fleet.ships, DT, (s, amount, point, normal, other) => w.fleet.hit(s, amount, 'kinetic', point, normal, other));
   w.bumps.step(w.fleet.ships, DT, (s, d) => w.fleet.damage(s, d));
   if (w.player.alive) {
     if (c.nextTarget || !w.lock.target?.alive) cycleTarget(w);
     Missiles.updateLock(w.lock, w.player, DT);
     if (c.missile && w.lock.locked && w.lock.target) w.missiles.salvo(w.player, w.lock.target);
   }
-  w.weapons.step(DT);
+  w.weapons.step(DT, true);
   w.missiles.step(DT);
   w.upkeep(i);
 }
