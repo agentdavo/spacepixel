@@ -2,7 +2,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { createServer, type ViteDevServer } from 'vite';
-import { deliverContact } from '../src/game/expansion/contact.ts';
+import { CONTACT_ASSIGNMENTS, contactAvailable, deliverContact, normalizeContact } from '../src/game/expansion/contact.ts';
+import { normaliseLedger, buy } from '../src/game/economy.ts';
 
 const KEY = 'vanguard.trade.v1', BACKUP = `${KEY}.pre-expansion`;
 const legacy = JSON.stringify({ credits: 9876, capacity: 32, cargo: { medical: 2 }, missiles: 4, clock: 123, rep: { concord: 42, choir: -16, rustwake: 12 }, lastDock: 'meridian-orbital-0', pressure: {} });
@@ -71,4 +72,28 @@ test('without an optional backup, failed save never deletes the primary', () => 
   const s = storage(legacy.length);
   assert.equal(profile.saveLedger(profile.loadLedger()), false);
   assert.equal(s.getItem(KEY), legacy); assert.equal(s.getItem(BACKUP), null);
+});
+
+test('future contact subdocument survives real load, ordinary trade, save and reload without enabling contact mutations', () => {
+  const s = storage();
+  const future = { version: 2, completed: ['pelagic-1', 'pelagic-4'], receipts: { 'pelagic-4': { reward: 3300, revision: 2 } } };
+  s.setItem(KEY, JSON.stringify({ ...JSON.parse(legacy), contact: future }));
+  const loaded = profile.loadLedger();
+  assert.equal(loaded.credits, 9876); assert.deepEqual(loaded.contact, future);
+  assert.deepEqual(normaliseLedger(loaded).contact, future);
+  for (const assignment of CONTACT_ASSIGNMENTS) {
+    assert.equal(contactAvailable(loaded, assignment), false);
+    const result = deliverContact(loaded, `${assignment.system}-freeport-0`, assignment.id);
+    assert.equal(result.ledger, loaded); assert.match(result.error!, /unsupported version/);
+  }
+  const traded = buy(loaded, { id: 'meridian-orbital-0', kind: 'freeport', faction: 'concord' }, 'medical', 1);
+  assert.equal(traded.units, 1); assert.equal(profile.saveLedger(traded.ledger), true);
+  assert.deepEqual(JSON.parse(s.getItem(KEY)!).contact, future);
+  assert.deepEqual(profile.loadLedger().contact, future);
+});
+
+test('supported contact records still clean corrupt, duplicate and orphaned completions', () => {
+  assert.deepEqual(normalizeContact({ version: 1, completed: ['pelagic-2', 'mantle-3', 'unknown', null, 1] }), { version: 1, completed: [] });
+  assert.deepEqual(normalizeContact({ version: 1, completed: ['pelagic-2', 'pelagic-1', 'pelagic-1', 'mantle-1', 'unknown'] }), { version: 1, completed: ['pelagic-1', 'pelagic-2', 'mantle-1'] });
+  assert.deepEqual(normalizeContact({ version: 1, completed: 'broken' }), { version: 1, completed: [] });
 });

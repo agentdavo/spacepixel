@@ -89,7 +89,7 @@ test('contact agreements consume actual cargo and award once across reload', () 
     ledger = normaliseLedger(result.ledger); assert.equal(ledger.cargo[a.cargo] ?? 0, 0); assert.equal(ledger.credits, previous.credits + a.reward);
     assert.equal(deliverContact(ledger, `${a.system}-freeport-0`, a.id).ledger, ledger);
   }
-  assert.equal(ledger.contact?.completed.length, 6); assert.equal(ledger.rep.pelagic, 15); assert.equal(ledger.rep.mantle, 15);
+  assert.deepEqual(ledger.contact, { version: 1, completed: CONTACT_ASSIGNMENTS.map(a => a.id) }); assert.equal(ledger.rep.pelagic, 15); assert.equal(ledger.rep.mantle, 15);
 });
 test('essential contact meanings survive unknown language; optional meanings unlock', () => {
   for (const line of CONTACT_LINES.filter(l => l.essential)) assert.equal(interpretContact(line.id, 'nacric', 0).text, line.meaning);

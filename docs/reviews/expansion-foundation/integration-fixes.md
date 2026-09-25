@@ -15,3 +15,9 @@ Ledger loading no longer writes a backup. `saveLedger` returns success/failure, 
 First Contact uses a durable commit callback: session cargo, reward, standing, receipt and replay ledger event change only after storage succeeds. Failure is visible inside the active tab and leaves the delivery retryable. Existing market/session behavior outside this bounded adapter is unchanged.
 
 Validation: four focused real Profile load/save tests passed (read-only load, quota recovery, failed retry, failure without backup); TypeScript passed. GPU-disabled browser check injected a real Storage write failure, verified the visible error and unchanged session/persisted cargo and reward, restored storage, retried using Enter, and verified one payment across reload.
+
+## Future contact documents
+
+Trade-ledger normalization preserves contact documents with unsupported explicit versions opaquely, including unknown receipt IDs and metadata. Contact eligibility and delivery refuse mutations while normal trade remains available. FIRST CONTACT displays an update-required message and no delivery actions. Supported v1 documents still remove corrupt, duplicate and orphaned completion entries.
+
+Validation: 18 expansion/persistence tests passed, including the reviewer's exact version-2 example through real Profile load, a commodity purchase, save and reload. TypeScript passed. GPU-disabled browser check verified the visible unsupported-version message, absence of delivery buttons and unchanged future receipt document after a real berth/save.

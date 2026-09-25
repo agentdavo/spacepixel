@@ -94,9 +94,22 @@ try {
     document.getElementById('frontier-atlas').remove();
     const { FlightScene } = await import('/src/world/scenes/FlightScene.ts');
     const scene = new FlightScene();
+    window.__frontierTestScene = scene;
     return { dock: scene.ledger.lastDock, done: scene.ledger.contact.completed, credits: scene.ledger.credits, systems: scene.universe.systems.size };
   });
   assert.equal(resumed.dock, runtime.station); assert.deepEqual(resumed.done, ['pelagic-1']); assert.equal(resumed.credits, 3600);
+  const futureContact = { version: 2, completed: ['pelagic-1', 'pelagic-4'], receipts: { 'pelagic-4': { reward: 3300, revision: 2 } } };
+  await page.evaluate(async contact => {
+    const scene = window.__frontierTestScene;
+    const { normaliseLedger } = await import('/src/game/economy.ts');
+    scene.ledger = normaliseLedger({ ...scene.ledger, contact });
+    scene.berthAt(scene.ledger.lastDock);
+    scene.dockScreen.showTab('contact');
+  }, futureContact);
+  assert.equal(await page.locator('.dock-panel').getByRole('status').isVisible(), true);
+  assert.match(await page.locator('.dock-panel').innerText(), /unsupported version.*saved records are preserved/);
+  assert.equal(await page.getByRole('button', { name: 'Deliver supplies', exact: true }).count(), 0);
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('vanguard.trade.v1')).contact), futureContact);
   assert.deepEqual(errors, []);
   console.log('PASS: CPU-only FlightScene construction, 120 ticks, 28 systems, real dock/contact tab, unsupported issuer message, failed-save delivery rollback, successful keyboard retry, single payment and save/reload. Fixture supplies were injected; this is not a flown playthrough or renderer/performance validation.');
 } finally { await browser?.close(); await server.close(); }

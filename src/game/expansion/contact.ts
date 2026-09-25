@@ -13,8 +13,19 @@ export const CONTACT_ASSIGNMENTS: ContactAssignment[] = [
   { id: 'mantle-3', polity: 'mantle', system: 'marches:survey-005', title: 'Shared maintenance', jaTitle: '共同整備', brief: 'A survey outpost will share its workshop with both peoples. Deliver a sealed reactor core to bring the workshop online.', jaBrief: '調査拠点の工房を両者で共有します。工房を稼働させるため、密封された原子炉コアを1基届けてください。', cargo: 'cores', units: 1, reward: 2600, after: 'mantle-2' },
 ];
 export interface ContactProgress { version: 1; completed: string[]; }
-export function normalizeContact(raw: unknown): ContactProgress {
+/** Unsupported documents are carried through trade saves without interpreting their fields. */
+export type ContactState = ContactProgress | Readonly<Record<string, unknown>>;
+export function isContactProgress(raw: unknown): raw is ContactProgress {
+  if (!raw || typeof raw !== 'object') return false;
+  const r = raw as Partial<ContactProgress>;
+  return r.version === 1 && Array.isArray(r.completed) && r.completed.every(id => typeof id === 'string');
+}
+export function contactBlocked(ledger: TradeLedger): boolean {
+  return ledger.contact !== undefined && !isContactProgress(ledger.contact);
+}
+export function normalizeContact(raw: unknown): ContactState {
   if (!raw || typeof raw !== 'object') return { version: 1, completed: [] };
+  if (Object.hasOwn(raw, 'version') && (raw as { version: unknown }).version !== 1) return raw as Readonly<Record<string, unknown>>;
   const r = raw as Partial<ContactProgress>;
   const known = new Set(CONTACT_ASSIGNMENTS.map(a => a.id));
   const requested = new Set(Array.isArray(r.completed) ? r.completed.filter(id => known.has(id)) : []);
@@ -24,10 +35,12 @@ export function normalizeContact(raw: unknown): ContactProgress {
   return { version: 1, completed };
 }
 export function contactAvailable(ledger: TradeLedger, a: ContactAssignment): boolean {
-  const done = ledger.contact?.completed ?? [];
+  if (contactBlocked(ledger)) return false;
+  const done = isContactProgress(ledger.contact) ? ledger.contact.completed : [];
   return !done.includes(a.id) && (!a.after || done.includes(a.after));
 }
 export function deliverContact(ledger: TradeLedger, station: string, assignment: string): { ledger: TradeLedger; error?: string } {
+  if (contactBlocked(ledger)) return { ledger, error: 'Contact records use an unsupported version. Update Vanguard to continue these agreements; saved records are preserved.' };
   const a = CONTACT_ASSIGNMENTS.find(x => x.id === assignment);
   if (!a || !contactAvailable(ledger, a)) return { ledger, error: 'Assignment unavailable or already completed' };
   if (!station.startsWith(`${a.system}-`)) return { ledger, error: `Deliver at ${a.system}` };
@@ -36,6 +49,6 @@ export function deliverContact(ledger: TradeLedger, station: string, assignment:
   return { ledger: { ...ledger, credits: ledger.credits + a.reward,
     cargo: { ...ledger.cargo, [a.cargo]: (ledger.cargo[a.cargo] ?? 0) - a.units },
     rep: { ...ledger.rep, [a.polity]: Math.min(100, (ledger.rep[a.polity] ?? 0) + 5) },
-    contact: { version: 1, completed: [...(ledger.contact?.completed ?? []), a.id] },
+    contact: { version: 1, completed: [...(isContactProgress(ledger.contact) ? ledger.contact.completed : []), a.id] },
   } };
 }

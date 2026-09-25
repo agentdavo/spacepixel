@@ -35,7 +35,7 @@
 export type CommodityId = 'ebon' | 'relics' | 'cores' | 'spares' | 'rations' | 'munitions' | 'medical' | 'luxury';
 export type StationKind = 'refinery' | 'salvage' | 'bastion' | 'freeport' | 'orbital' | 'carrier' | 'surface';
 import { POLITIES, polityRecord, type PolityId } from '../content/civilizations.ts';
-import { normalizeContact, type ContactProgress } from './expansion/contact.ts';
+import { normalizeContact, type ContactState } from './expansion/contact.ts';
 export type EconFaction = PolityId;
 
 export interface Commodity {
@@ -131,7 +131,7 @@ export interface PressureCell {
 /** Everything the player owns that trading touches. Persisted by Profile.ts. */
 export interface TradeLedger {
   /** Additive first-contact receipts, committed with cargo/payment to prevent duplicate rewards. */
-  contact?: ContactProgress;
+  contact?: ContactState;
   credits: number;
   cargo: Partial<Record<CommodityId, number>>;
   /** Cargo pod capacity, units. */

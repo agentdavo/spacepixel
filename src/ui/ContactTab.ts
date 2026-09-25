@@ -1,5 +1,5 @@
 import { registerDockTab } from './DockScreen';
-import { CONTACT_ASSIGNMENTS, contactAvailable, deliverContact } from '../game/expansion/contact';
+import { CONTACT_ASSIGNMENTS, contactAvailable, contactBlocked, isContactProgress, deliverContact } from '../game/expansion/contact';
 import { browserExpansionStorage, loadExpansion } from '../game/expansion/save';
 import { interpretContact } from '../content/languages';
 
@@ -20,9 +20,13 @@ registerDockTab({
       const explanation = document.createElement('p');
       explanation.textContent = ja ? '市場で物資を購入し、指定された星系の港へ届けてください。' : 'Buy supplies in the market, fly to the named system, and deliver at a local port. Both agreements can progress independently.';
       panel.append(explanation, notice);
+      if (contactBlocked(ctx.ledger())) {
+        notice.textContent = ja ? '交流記録のバージョンに対応していません。記録は保持されています。納入を続けるにはVanguardを更新してください。' : 'Contact records use an unsupported version. Update Vanguard to continue these agreements; saved records are preserved.';
+        return;
+      }
       for (const a of CONTACT_ASSIGNMENTS) {
         const ledger = ctx.ledger();
-        const complete = ledger.contact?.completed.includes(a.id);
+        const complete = isContactProgress(ledger.contact) && ledger.contact.completed.includes(a.id);
         const block = document.createElement('section'); block.style.cssText = 'padding:14px;border-bottom:1px solid #344955;max-width:850px';
         const h = document.createElement('h3'); h.textContent = `${complete ? '✓ ' : ''}${ja ? a.jaTitle : a.title}`;
         const text = document.createElement('p'); text.textContent = ja ? a.jaBrief : a.brief;
