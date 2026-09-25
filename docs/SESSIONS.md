@@ -1,5 +1,42 @@
 # Parallel sessions: who owns what
 
+## Current continuation — 25 September 2026
+
+The previous Claude session table and handoffs below are historical. The
+default branch at `72ced42` includes PRs #1–#4. All seven named feature/session
+branches are ancestors of it; the three paused `worktree-agent-*` prototypes
+retain unique commits but were superseded by the documented ports.
+
+New isolated Codex tasks cover: the finished 720p trailer and synchronized
+soundtrack; point-defence investigation and combat visual QA; voice recording
+coverage and Windows tooling; and a Kessen integration plan for approval.
+The trailer uses already-merged features and does not depend on Kessen
+integration. V2 is delivered; completed PD, voice and cinema changes are
+combined and checked on `codex/integrate-audit-trailer-combat-voices` (code
+checkpoint `2c25431`, followed by documentation/screenshots). No historical
+branches were deleted and no remote push was made.
+The chief task owns direction in [GAME-DIRECTION.md](GAME-DIRECTION.md).
+The user's superseding scope is **Kessen cameos first**, preserving the
+original technical milestones and twenty-episode campaign. The earlier
+side-arc/faction-foundation sequence is deferred. The Kessen handoff through
+`e75d68b` is now integrated. The chief accepted final EP10/19 motion and authorised
+default activation after combined checks; these render-only cameos are on,
+with `kessenCameos=0` for debug comparison. 308 tests/build and native mission,
+state and navigation comparisons pass. No general faction/boarding changes.
+
+Integration follow-up `2c284ab` fixes the reproduced EP01 waypoint/autojump
+blocker. The [first-session report](FIRST-SESSION-2026-09-25.md) separates live
+survey/trade/refit/manual-docking/persistence results from debug harness checks
+and the still-unverified successful combat route. Changes remain local.
+The chief's [trailer editorial review](TRAILER_EDITORIAL_REVIEW.md) is recorded
+without modifying the current cast, clips or V2 export.
+
+Read [AUDIT-2026-09-25.md](AUDIT-2026-09-25.md) for current evidence and scope.
+Historical statements such as "draft PR #1", original-score-only exports and
+unimplemented recorded voices must not override that checkpoint.
+
+## Historical ownership and handoffs
+
 Since 24 Sep all work runs as threads in one Claude project; the original
 sessions have stopped and handed over (their notes are kept below). Each
 thread owns an area. Leave requests for another owner under **Requests**,

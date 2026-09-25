@@ -68,6 +68,10 @@ function skim(alt: number, t: number, o: Vector3): Vector3 {
 }
 
 const SHOTS: Record<SetPieceKind, Shot[]> = {
+  'kessen-cameo': [
+    { name: 'KESSEN · APPROACH', fov: 60, eye: (_t, o) => o.set(-20, 8, 100), look: (_t, o) => o.set(0, 4, 0) },
+    { name: 'KESSEN · INSPECTION', fov: 50, eye: (_t, o) => o.set(-20, 10, 38), look: (_t, o) => o.set(0, 4, 0) },
+  ],
   monolith: [
     {
       name: 'SKY · 6 000 km',

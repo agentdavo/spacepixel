@@ -10,6 +10,7 @@ import { Wreckage } from './Wreckage';
 import { Nebula } from './Nebula';
 import { Bastion } from './Bastion';
 import { Pilgrimage } from './Pilgrimage';
+import { KessenCameo, kessenCameosEnabled } from './KessenCameo';
 
 export type { SetPiece, SetPieceFrame, SetPieceParams } from './types';
 export { Monolith, MegaGate, Derelict, BlackBox, Beacon, Wreckage, Nebula, Bastion, Pilgrimage };
@@ -24,6 +25,10 @@ export { Monolith, MegaGate, Derelict, BlackBox, Beacon, Wreckage, Nebula, Basti
 export function createSetPiece(spec: SetPieceSpec, anchor: Vector3): SetPiece {
   const p = spec.params;
   switch (spec.kind) {
+    case 'kessen-cameo':
+      // Accepted EP10/19 cameos default on; explicit 0 keeps an A/B debug path.
+      // The replay boot query preserves the toggle; off allocates no assets.
+      return new KessenCameo(spec.tag, anchor, p, kessenCameosEnabled(typeof window === 'undefined' ? '' : window.location.search));
     case 'monolith':
       return new Monolith(spec.tag, anchor, p);
     case 'megagate':

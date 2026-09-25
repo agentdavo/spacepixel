@@ -1,0 +1,70 @@
+# Kessen environmental cameos
+
+**Accepted and integrated locally, 25 September 2026.** The chief reviewed the corrected Episode 10 and Episode 19 motion samples and authorised normal-play activation after combined checks. Both cameos now default **on**; `kessenCameos=0` explicitly disables their rendering. The six source commits from `2c284ab..e75d68b` were integrated without conflicts while preserving the newer EP01 fix and first-session report. There is no remote push/default-branch merge.
+
+Combined validation: **308 tests**, typecheck/production build, and native Edge WebGPU comparisons pass. Default-on versus explicit-off yields identical gameplay hashes, runner snapshots, world facts and objective/gate navigation. [Integration evidence](screenshots/kessen/integration-evidence.json) identifies the tested source files by SHA256 as well as the preceding commit, since activation was tested before committing it. Fresh combined player views: [Episode 10](screenshots/kessen/ep10-integrated-player.png), [Episode 19](screenshots/kessen/ep19-integrated-player.png). The separate normal-UI EP01 opening/nav smoke remains part of integration validation.
+
+## What appears
+
+- **Episode 10:** Plumb (7.2 m) and Bellows (9 m) guard a rescue module beside the Graveyard lane, released only by the existing `bastion-destroyed` flag. Its lane-relative offset is **(-160, -14, 100) m**, on the opposite shoulder from the angled Bastion-to-lane lifeboat route. The earlier (65, -14, 100) preview offset was corrected after the clearance audit.
+- **Episode 19:** Plumb and Anvil (11.5 m) stand witness on a maintenance module beside the existing Meridian tuning point. It is 65 m laterally and 100 m behind the beacon, with its deck 14 m below the beacon origin. The first jump's `leg2` flag removes the frames and their module, before the later tuning sites and climax.
+
+Each module has split work decks around an open docking throat, clamp jaws, an underside keel, diagonal supports, drive pods, utility housings, industrial markings and practical work lamps. The frames retain their original size and existing time-derived idle poses. A small baked work-light contribution changes only these instances' vertex surface data. The shared frame material and scene lighting remain untouched.
+
+The cameo has no Fleet actor, collision radius, weapon emission, damage, objective credit, dialogue, rewards, world facts, faction/economy types or save fields. Its registry gate defaults on; explicit `kessenCameos=0` allocates no cameo meshes. Episode 20 is unchanged.
+
+## Reproduce and inspect
+
+Run the independent capture harness from the repository root:
+
+```powershell
+node scripts/kessen-cameo-check.mjs --out docs/screenshots/kessen --port 5251 --approach
+```
+
+It starts its own Vite server and native Microsoft Edge with D3D11. It requires a WebGPU backend and an actual renderer GPUDevice with a queue, failing rather than accepting a fallback. The device's adapter description is unavailable on this host; no specific GPU model is claimed. No existing capture script or package script was changed.
+
+Exact enabled development URLs (while that server is running):
+
+- [Episode 10](http://127.0.0.1:5251/?scene=flight&episode=10&kessenCameos=1&shot=1&record=60&demo=0&hud=1&quality=high&dynres=0)
+- [Episode 19](http://127.0.0.1:5251/?scene=flight&episode=19&kessenCameos=1&shot=1&record=60&demo=0&hud=1&quality=high&dynres=0)
+
+Set `kessenCameos=0` for the matching baseline. These URLs boot the episode; the script performs the documented staging. `record=60` is frame-stepped, so an interactive manual visit should omit `shot` and `record`.
+
+| Evidence | Episode 10 | Episode 19 |
+|---|---|---|
+| Normal chase camera, cameo enabled | [Player view](screenshots/kessen/ep10-on-player.png) | [Player view](screenshots/kessen/ep19-on-player.png) |
+| Same view, cameo disabled | [Baseline](screenshots/kessen/ep10-off-player.png) | [Baseline](screenshots/kessen/ep19-off-player.png) |
+| Close model/support inspection | [Inspection](screenshots/kessen/ep10-inspection.png) | [Inspection](screenshots/kessen/ep19-inspection.png) |
+| Eight-second ordinary-flight approach | [75 m/s approach](screenshots/kessen/ep10-approach.mp4) | [75 m/s approach](screenshots/kessen/ep19-approach.mp4) |
+| Beginning / midpoint / final frame, left to right | [Motion samples](screenshots/kessen/ep10-approach-samples.png) | [Motion samples](screenshots/kessen/ep19-approach-samples.png) |
+
+Player images retain the normal chase camera and complete fighter. Inspection images shorten the chase offset and hide foreground fighter meshes to reveal frame/support contact; they are not player-view evidence. Approach clips start from one staged position, then advance eight seconds through the actual FlightModel at 75 m/s with unchanged chase tuning and visible fighter. There are no camera, visibility, dialogue or objective overrides during the clips. The MP4s are silent visual-review captures, not audio validation.
+
+## Timing and validation limits
+
+Episode 10 staging first places the player within the existing CAP objective's range, then executes 100 seconds of normal fixed simulation ticks through `FlightScene.simStep`, the path used by replay seeking. It skips intermediate renders, not simulation ticks. The existing 72-second attack cue starts the Bastion sequence; the Bastion itself emits its destruction flag. The harness does not call `debugSeek`, inject flags, grant kills or complete objectives. It records a one-second progression trace and asserts the cameo remains absent before destruction and appears afterward, with the player alive throughout. Only then is the ship repositioned to inspect or approach the lane.
+
+The bomber-intercept objective may still be pending in that legitimate aftermath: the timed Bastion loss does not require five player kills. These are reproducible staged mission checks, not a claim of a manual end-to-end battle playthrough. The older early-patrol `debugSeek` screenshots have been replaced.
+
+The five focused tests cover mission timing boundaries, equal runner snapshots/chatter/kills/success with cameo specs removed, a single release across repeated updates, default-on/explicit-off allocation, real frame heights, absolute-time posing, idempotent first-jump disposal without disposing the shared frame material, and physical route clearance. The clearance check flies both actual lifeboat models with the production `flyToPoint` / FlightModel escort logic for 300 seconds, including arrival turns; the minimum conservative model-sphere-to-module-sphere gap is **108.4 m**. Native captures compare enabled/off gameplay hashes, runner snapshots and world facts. [Earlier preview evidence](screenshots/kessen/evidence.json) preserves source commit, URLs, backend/device checks, progression, camera positions, flags and renderer memory accounting; the integration evidence above adds normal default activation and navigation comparisons.
+
+After rebasing onto `2c284ab`, **the full test suite passes**, including all five focused cameo tests and the incoming navigation tests. `npm run build` passes typecheck and the production Vite build. The earlier front-end flow check also passes all title/prologue/episode handoff checks; that separate smoke test used its existing WebGL2 fallback on this host, so it is not counted as native visual evidence. Native visual evidence comes from the Edge capture harness above.
+
+The final stills and `evidence.json` were refreshed after the navigation rebase. The two approach clips/contact sheets retain the accepted art and corrected Episode 10 placement captured immediately before that rebase; [motion-evidence.json](screenshots/kessen/motion-evidence.json) records each clip's original source commit, exact 600 m travel over eight seconds, and live player state. They are not represented as recordings of the later navigation-base build. The post-rebase source checks preserve integration's navigation changes and rerun native enabled/off mission equivalence.
+
+| Post-rebase native A/B | Episode 10 | Episode 19 |
+|---|---:|---:|
+| Gameplay hash, both off and on | 3189088699 | 2330304181 |
+| Extra renderer-accounted bytes with cameo | 1,922,494 | 2,107,278 |
+| Extra geometries / pipelines | 153 / 6 | 154 / 6 |
+| Browser errors | 0 | 0 |
+
+Runner snapshots and world facts match exactly in each pair. The Episode 10 one-second trace has the attack flag at 72.03 s, destruction at 97.03 s, and the cameo present at 98.03 s; it never appears before destruction. Episode 19's existing dwell objective continues to progress during normal flight, and the test suite confirms the first-jump cleanup gate.
+
+Frame timings from a screenshot-stepped process under concurrent development load are not a performance benchmark. Renderer memory accounting measures the incremental resource footprint only; it does not establish a frame-time budget or support extrapolation to crowds. Full manual mission playthrough remains outside this evidence. Chief visual acceptance is recorded separately in GAME-DIRECTION and summarised above.
+
+## Integration handoff
+
+The active scope is recorded in [KESSEN-INTEGRATION-PLAN.md](KESSEN-INTEGRATION-PLAN.md); its original broader faction/boarding/Train proposal is explicitly archived. Rebased checkpoints are `3da9e05` (scope correction), `6075374` (gated preview/tests), `98fde84` (purposeful modules/local contrast), `86e6a6d` (lifeboat clearance), and `420f4ad` (motion evidence/report). Motion metadata references the corresponding pre-rebase art/clearance commits `2cbb81d` and `ddf9e22`.
+
+The source owner's handoff preserved integration's EP01 objective `navTag` changes and did not edit ROADMAP/SESSIONS/GAME-DIRECTION. Integration subsequently updated those records at the chief's explicit request, recording visual acceptance and activation. No PR or remote merge has been made.

@@ -202,12 +202,12 @@ export class FlightHud {
     }
   }
 
-  /** Nav marker for the next Lantern on the route: diamond, name, range, ETA. */
-  drawNav(name: string, universe: Vector3, from: Vector3, cam: PerspectiveCamera, world: WorldSpace, time: number): void {
+  /** Nav marker for a mission destination or the next Lantern: diamond, name and range. */
+  drawNav(name: string, universe: Vector3, from: Vector3, cam: PerspectiveCamera, world: WorldSpace, time: number, mission = false): void {
     const c = this.ctx;
     if (this.glitch()) return;
     const dist = universe.distanceTo(from);
-    const label = `LANTERN → ${name.toUpperCase()}  ${dist > 10_000 ? (dist / 1000).toFixed(0) : (dist / 1000).toFixed(1)} km`;
+    const label = `${mission ? '' : 'LANTERN → '}${name.toUpperCase()}  ${dist > 10_000 ? (dist / 1000).toFixed(0) : (dist / 1000).toFixed(1)} km`;
     const pt = this.project(universe, world, cam);
     const cyan = '#6fe6ff';
     c.strokeStyle = cyan;

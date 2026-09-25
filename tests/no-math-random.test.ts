@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Rng, hashTag, mix32 } from '../src/sim/Rng.ts';
 
 /**
@@ -11,7 +12,7 @@ import { Rng, hashTag, mix32 } from '../src/sim/Rng.ts';
  * Visual-only randomness (particles, HUD noise, camera shake) lives outside
  * these paths.
  */
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 /** Everything that writes sim state: the whole of src/sim plus the sim-side world/game modules. */
 const SIM_PATHS = [

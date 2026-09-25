@@ -1,5 +1,5 @@
 import { Vector3 } from 'three';
-import { hostile, type ShipEntity, type Team } from '../Fleet';
+import { hostile, type ShipEntity, type Shootables, type Team } from '../Fleet';
 import { GUN, leadPoint } from './Pilot';
 import { isCapital } from './state';
 
@@ -78,6 +78,25 @@ export function turretAim(m: TurretMount, target: ShipEntity, out: TurretSolutio
 
 const _best = createTurretSolution();
 const _try = createTurretSolution();
+
+const _ordPos = new Vector3();
+const _ordVel = new Vector3();
+const _ordAim = new Vector3();
+const _ordDir = new Vector3();
+
+/** Select the nearest ordnance with a reachable lead solution, not just the nearest missile. */
+export function turretSelectThreat(m: TurretMount, team: Team, ord: Shootables, range: number, out: TurretSolution): boolean {
+  const canEngage = (pos: Vector3, vel: Vector3) =>
+    leadPoint(m.position, m.velocity, pos, vel, null, _ordAim, m.boltSpeed) > 0 &&
+    turretCanPoint(m, _ordDir.subVectors(_ordAim, m.position).normalize());
+  if (ord.nearestThreat(m.position, team, range, _ordPos, _ordVel, canEngage) < 0) return false;
+  // Filtering may have examined a rejected candidate after the winner.
+  out.time = leadPoint(m.position, m.velocity, _ordPos, _ordVel, null, out.aimPoint, m.boltSpeed);
+  out.aimDir.subVectors(out.aimPoint, m.position).normalize();
+  out.distance = _ordPos.distanceTo(m.position);
+  out.target = null;
+  return true;
+}
 
 /**
  * Choose what a turret should engage. Prefers short flight time, fighters
