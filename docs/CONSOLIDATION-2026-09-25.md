@@ -44,9 +44,14 @@ Archive tags under `archive/2026-09-25/` retain the exact old branch tips:
 | `kessen-faction-foundation` | `e75d68b` | Retired after patch-parity verification. |
 | `voice-recording-repair` | `d11c78b` | Retired after file/manifest parity verification. |
 | `vanguard-trailer-delivery` | `2378e5d` | Retired after ancestry verification. |
-| `kessen-assault-demo` | `706960f` | Archived; integrated as `1adb5fe` / `c465a65`. |
-| `render-ships-m01-m04` | `b9b043a` | Archived; completed fixes reconciled in `b0212de`; excluded proposals preserved by tag. |
-| `universe-expansion` | `8b084f2` | Archived; expansion selectively integrated and unique rendering fixes reconciled. |
+| `kessen-assault-demo` | `706960f` | Retired; integrated as `1adb5fe` / `c465a65`. |
+| `render-ships-m01-m04` | `b9b043a` | Retired; completed fixes reconciled in `b0212de`; excluded proposals preserved by tag. |
+| `universe-expansion` | `8b084f2` | Retired; expansion selectively integrated and unique rendering fixes reconciled. |
+
+The temporary `codex/package-a-reconciliation` branch also retired after its
+tip `b0212de` became an ancestor of canonical `c3c2399`. Eight completed task
+branches are retired at this checkpoint. The rendering worktree is detached at
+`b0212de`, and the Kessen demonstration worktree at `706960f`.
 
 Branch retirement does not delete worktrees. Detached checkouts retain their
 files and media. In particular, `f0d2/scratchpad` holds native source frames,
@@ -96,3 +101,19 @@ Breakup owns contact response and damage. Trailer & Cinematic Capture will
 replace only 42.5–48.5 using fresh ordinary-input capture after accepted fixes,
 continuous source time and restrained framing. V4 remains preserved. The new
 V4.1 cut will keep its 114-second duration and existing narration/music timing.
+
+Escort fix `5cd644c` is integrated as `61c97f6`, with all 27 campaign data,
+runner, snapshot, escort, authoring and Kessen-cameo regression tests passing,
+plus the production build. Evidence is in `reviews/consolidation/escort-tests.txt`
+and `escort-build.txt`. It replaces the
+shared endpoint / 60 m/s arrival behavior with stable per-member lanes and
+zero-speed braking through normal flight controls. All six authored escort
+episodes retain their arrival flags and radius. This proves escort-to-escort
+destination spacing; it does not establish clearance from a target capital
+ship, remove initial authored spawn overlap, or prove a hostile live encounter.
+Collision integration and fresh native EP04 capture remain separate gates.
+
+Future trailer capture now hashes every TypeScript simulation module as well as
+the modular campaign files. This automatically includes new contact solvers,
+flight code, destruction and escort guidance in each take's source inventory.
+The harness syntax check passed; frozen V4 hashes and files are unchanged.

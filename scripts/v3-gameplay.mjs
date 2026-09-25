@@ -30,7 +30,11 @@ mkdirSync(out, { recursive: true });
 // Include the episode modules and their helpers: missions.ts is now only a facade.
 const campaignSources = readdirSync('src/game/campaign', { recursive: true })
   .filter(p => p.endsWith('.ts')).map(p => `src/game/campaign/${p.replaceAll('\\', '/')}`).sort();
-const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts','src/game/CampaignSession.ts','src/game/CampaignRunner.ts',...campaignSources,'src/ui/Comms.ts','src/sim/CameraDirector.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
+// Contact, flight and breakup changes intentionally invalidate old motion proof.
+// Include future solver modules automatically when recording replacement takes.
+const simulationSources = readdirSync('src/sim', { recursive: true })
+  .filter(p => p.endsWith('.ts')).map(p => `src/sim/${p.replaceAll('\\', '/')}`).sort();
+const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts','src/game/CampaignSession.ts','src/game/CampaignRunner.ts',...campaignSources,...simulationSources,'src/ui/Comms.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
 writeFileSync(`${out}/capture-harness.mjs`, readFileSync('scripts/v3-gameplay.mjs'));
 const server = await createServer({ cacheDir: `node_modules/.vite-v3-${port}`, server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: { ignored:['**/*'] } }, logLevel: 'warn', plugins: [{ name: 'v3-replay', configureServer(s) { s.middlewares.use((req,res,next) => { if (req.url !== '/__v3-tape.json') return next(); res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(replay)); }); } }] });
 await server.listen();

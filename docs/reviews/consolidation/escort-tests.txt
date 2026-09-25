@@ -1,0 +1,37 @@
+✔ campaign data: 20 missions, speakers and codex resolve (0.6573ms)
+✔ EP01 navigation follows active survey objectives and clears during combat and on resolution (1.0141ms)
+✔ navigation ignores hidden or unresolved destinations and missions without metadata (0.9865ms)
+✔ campaign data: every mission runs 60 s in the runner without throwing (21.3461ms)
+✔ EP04 escorts brake into separate lanes rather than converge and reverse at the buoy (3033.2894ms)
+ℹ EP04 guidance-only: minimum approach separation 75.95m; tankers-arrived at 26.27s; all five stationary by90s and remain stationary for30s.
+✔ all authored escort routes fit the unchanged arrival radius with real hull clearance (76.9314ms)
+✔ halt and unresolved routes clear stale drive controls, brake normally and resume (21.0885ms)
+✔ casualties, JSON restore and mission retry preserve surviving arrival slots (37.031ms)
+✔ fixed-step escort motion is identical across repeat runs and tick batches (18.0616ms)
+✔ runner: spawns, chatter, objectives, flags, codex (1.53ms)
+✔ runner: player death fails the mission (0.1339ms)
+✔ runner: script cues, escorts, dwell, deferred spawns/pieces (0.4034ms)
+✔ snapshot: fired:null cannot leak time/flags into the fresh-start fallback (2.0566ms)
+✔ snapshot: malformed fields are all rejected before mutation or any host call (4.5743ms)
+✔ snapshot: JSON restore preserves timers, survivors, velocity, objectives, chatter and dwell continuity (0.653ms)
+✔ snapshot: validation does not promise rollback when a host callback throws (0.2519ms)
+✔ all story episodes pass catalog/reference validation without executing predicates (2816.9318ms)
+✔ broken mission links identify the exact mission and authoring field (0.4125ms)
+✔ group prefixes, numbered members, deferred declarations and host tags resolve (0.17ms)
+✔ duplicate IDs and unknown catalog entries fail before running a mission (0.1108ms)
+✔ invalid coordinates, counts and dwell timing receive actionable diagnostics (0.1096ms)
+✔ story episode order is checked separately from generated mission metadata (0.1119ms)
+✔ cameos: only Episodes 10/19, isolated tags and no interaction parameters (0.8682ms)
+✔ cameos: identical runner snapshots, chatter, kills and outcomes with specs removed (12.3011ms)
+✔ cameos: default on, explicit off allocates no meshes; poses are time-derived and side-effect free (2690.5112ms)
+✔ cameos: first jump releases geometry exactly once and preserves shared frame material (22.7546ms)
+Kessen module / actual lifeboat route: minimum conservative clearance 108.4 m
+✔ cameos: rescue module clears actual lifeboat flight and arrival turns (286.1419ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10433.1496
