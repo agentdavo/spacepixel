@@ -1324,6 +1324,11 @@ export class FlightScene implements GameScene, FlightHostScene {
         this.ledger = l;
         saveLedger(l);
       },
+      commitLedger: (l) => {
+        if (!saveLedger(l)) return false;
+        this.ledger = l;
+        return true;
+      },
       hull: () => this.player.hull / this.player.hullMax,
       setHull: (h) => void this.replay.external('hull', h, () => (this.player.hull = h * this.player.hullMax)),
       hullSize: () => Math.sqrt(Math.max(1, this.player.hullMax / 110)),

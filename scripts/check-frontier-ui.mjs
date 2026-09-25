@@ -66,6 +66,24 @@ try {
   assert.equal(await page.locator('.ct-list .ct-row').count(), 0);
   await page.getByRole('button', { name: /FIRST CONTACT/ }).click();
   const deliver = page.getByRole('button', { name: 'Deliver supplies', exact: true }).first();
+  const beforeFailure = await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    window.__restoreStorage = () => { Storage.prototype.setItem = original; };
+    Storage.prototype.setItem = function(key, value) {
+      if (key === 'vanguard.trade.v1') throw new DOMException('Test storage quota', 'QuotaExceededError');
+      return original.call(this, key, value);
+    };
+    return JSON.stringify(window.__frontierTestScene.ledger);
+  });
+  await deliver.click();
+  assert.equal(await page.getByText('Delivery not saved. Cargo and reward are unchanged. Free storage and try again.', { exact: true }).isVisible(), true);
+  assert.equal(await page.evaluate(() => JSON.stringify(window.__frontierTestScene.ledger)), beforeFailure);
+  const failedSave = await page.evaluate(() => {
+    window.__restoreStorage();
+    return JSON.parse(localStorage.getItem('vanguard.trade.v1'));
+  });
+  assert.equal(failedSave.cargo.medical, 2); assert.equal(failedSave.credits, 2500);
+  assert.equal(failedSave.contact, undefined);
   await deliver.focus(); await page.keyboard.press('Enter');
   const settled = await page.evaluate(() => JSON.parse(localStorage.getItem('vanguard.trade.v1')));
   assert.deepEqual(settled.contact.completed, ['pelagic-1']); assert.equal(settled.cargo.medical ?? 0, 0);
@@ -80,5 +98,5 @@ try {
   });
   assert.equal(resumed.dock, runtime.station); assert.deepEqual(resumed.done, ['pelagic-1']); assert.equal(resumed.credits, 3600);
   assert.deepEqual(errors, []);
-  console.log('PASS: CPU-only FlightScene construction, 120 ticks, 28 systems, real dock/contact tab, keyboard cargo delivery, single payment, save/reload and berth resume. Fixture supplies were injected; this is not a flown playthrough or renderer/performance validation.');
+  console.log('PASS: CPU-only FlightScene construction, 120 ticks, 28 systems, real dock/contact tab, unsupported issuer message, failed-save delivery rollback, successful keyboard retry, single payment and save/reload. Fixture supplies were injected; this is not a flown playthrough or renderer/performance validation.');
 } finally { await browser?.close(); await server.close(); }

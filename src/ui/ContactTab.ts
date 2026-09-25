@@ -9,12 +9,17 @@ registerDockTab({
   mount(panel, ctx, api) {
     const prefs = loadExpansion(browserExpansionStorage).save.preferences;
     const ja = prefs.subtitles === 'ja-JP';
+    const notice = document.createElement('p'); notice.setAttribute('role', 'status');
+    const say = (text: string, cls: string) => {
+      notice.textContent = text; notice.style.color = cls === 'err' ? '#ff5f7a' : '#fff';
+      api.say(text, cls);
+    };
     const draw = () => {
       panel.replaceChildren();
       const title = document.createElement('h2'); title.textContent = ja ? '最初の交流 — 物資の納入' : 'FIRST CONTACT — SUPPLY AGREEMENTS'; panel.append(title);
       const explanation = document.createElement('p');
       explanation.textContent = ja ? '市場で物資を購入し、指定された星系の港へ届けてください。' : 'Buy supplies in the market, fly to the named system, and deliver at a local port. Both agreements can progress independently.';
-      panel.append(explanation);
+      panel.append(explanation, notice);
       for (const a of CONTACT_ASSIGNMENTS) {
         const ledger = ctx.ledger();
         const complete = ledger.contact?.completed.includes(a.id);
@@ -30,10 +35,14 @@ registerDockTab({
           button.disabled = !ctx.station.id.startsWith(`${a.system}-`) || (ledger.cargo[a.cargo] ?? 0) < a.units;
           button.onclick = () => {
             const result = deliverContact(ctx.ledger(), ctx.station.id, a.id);
-            if (result.error) { api.say(result.error, 'err'); return; }
-            ctx.setLedger(result.ledger); api.refresh();
+            if (result.error) { say(result.error, 'err'); return; }
+            if (!ctx.commitLedger?.(result.ledger)) {
+              say(ja ? '保存できませんでした。物資と報酬は変更されていません。空き容量を確保してから再試行してください。' : 'Delivery not saved. Cargo and reward are unchanged. Free storage and try again.', 'err');
+              return;
+            }
+            api.refresh();
             const line = interpretContact('contact.thanks', a.polity === 'pelagic' ? 'nacric' : 'orunic', 2, prefs.subtitles);
-            api.say(`${line.text}${prefs.native ? ` / ${line.native}` : ''}`, 'ok'); draw();
+            say(`${line.text}${prefs.native ? ` / ${line.native}` : ''}`, 'ok'); draw();
           };
           block.append(button);
         }

@@ -71,10 +71,6 @@ export function loadLedger(): TradeLedger {
     const raw = localStorage.getItem(LEDGER_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Keep a one-time pre-expansion ledger; a failed backup must not erase a valid career.
-      if (!Object.hasOwn(parsed?.rep ?? {}, 'pelagic')) {
-        try { if (!localStorage.getItem(`${LEDGER_KEY}.pre-expansion`)) localStorage.setItem(`${LEDGER_KEY}.pre-expansion`, raw); } catch { /* retain the loaded career */ }
-      }
       return normaliseLedger(parsed);
     }
   } catch {
@@ -83,12 +79,35 @@ export function loadLedger(): TradeLedger {
   return newLedger();
 }
 
-export function saveLedger(l: TradeLedger): void {
+/** Primary career persistence takes precedence over the optional migration backup. */
+export function saveLedger(l: TradeLedger): boolean {
+  const backupKey = `${LEDGER_KEY}.pre-expansion`;
+  let previous: string | null = null;
+  try { previous = localStorage.getItem(LEDGER_KEY); } catch { /* still attempt the primary write */ }
+  let value: string;
+  try { value = JSON.stringify(l); } catch { return false; }
   try {
-    localStorage.setItem(LEDGER_KEY, JSON.stringify(l));
+    localStorage.setItem(LEDGER_KEY, value);
   } catch {
-    /* storage unavailable — trades last for this session only */
+    // Earlier builds could fill the quota with a backup during load. Evict only
+    // that optional copy; never remove the primary to make room for a write.
+    let backup: string | null = null;
+    try {
+      backup = localStorage.getItem(backupKey);
+      if (backup === null) return false;
+      localStorage.removeItem(backupKey);
+      localStorage.setItem(LEDGER_KEY, value);
+    } catch {
+      // Failed setItem is atomic: the previous primary is still intact.
+      try { if (backup !== null) localStorage.setItem(backupKey, backup); } catch { /* primary remains intact */ }
+      return false;
+    }
   }
+  // Save a legacy copy only AFTER the new primary is durable and only if it fits.
+  try {
+    if (previous && !Object.hasOwn(JSON.parse(previous)?.rep ?? {}, 'pelagic') && !localStorage.getItem(backupKey)) localStorage.setItem(backupKey, previous);
+  } catch { /* optional backup must never turn a successful primary write into failure */ }
+  return true;
 }
 
 // ── Contracts (free-roam career): active jobs, board clock, receipts ──

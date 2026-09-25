@@ -45,6 +45,8 @@ export interface DockContext {
   markets: readonly (MarketSpec & { name: string })[];
   ledger(): TradeLedger;
   setLedger(l: TradeLedger): void;
+  /** Commit durably before changing session state; false leaves both untouched. */
+  commitLedger?(l: TradeLedger): boolean;
   /** Player hull, 0..1. */
   hull(): number;
   setHull(h: number): void;
