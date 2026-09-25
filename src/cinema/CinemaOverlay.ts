@@ -15,6 +15,8 @@ type TypedEl = { el: HTMLElement; text: string; shown: number; plan?: VoicePlan;
  * this instant plus their ages, so a seek renders exactly like playback.
  */
 export class CinemaOverlay {
+  /** Baked video captions remain readable for their entire allotted interval. */
+  fullCaptions = false;
   readonly el: HTMLDivElement;
   private readonly subs: HTMLDivElement;
   private readonly skipEl: HTMLDivElement;
@@ -77,7 +79,7 @@ export class CinemaOverlay {
       for (const t of entry.typedEls) {
         // Narration types with its voice (see narration.ts); the untyped rest
         // is laid out invisibly so the centred line never shifts.
-        const n = t.plan ? Math.min(t.text.length, revealAt(t.plan, age - 0.08)) : typed(t.text, age, c.kind === 'slug' ? 30 : 38);
+        const n = this.fullCaptions && (c.kind ?? 'narration') === 'narration' ? t.text.length : t.plan ? Math.min(t.text.length, revealAt(t.plan, age - 0.08)) : typed(t.text, age, c.kind === 'slug' ? 30 : 38);
         if (n !== t.shown) {
           t.shown = n;
           t.el.textContent = t.text.slice(0, n);

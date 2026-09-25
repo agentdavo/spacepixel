@@ -47,6 +47,20 @@ export class CinemaGunnery {
     return on.length ? on : sockets;
   }
 
+  /** Seekable cinema traverse: stowed → firing solution on shot-local time. */
+  traverse(s: ShipEntity, sockets: string[], target: Vector3, progress: number): void {
+    const p = Math.max(0, Math.min(1, progress));
+    const ease = p * p * (3 - 2 * p);
+    for (const socket of sockets) {
+      this.train(s, socket, target, false);
+      const m = this.mount(s, socket);
+      if (!m) continue;
+      m.drive.yaw *= ease;
+      m.drive.pitch *= ease;
+      poseTurret(s.model, m.rig, m.drive);
+    }
+  }
+
   /** Universe muzzle of the mount's next barrel (the socket for an unrigged one). */
   muzzle(s: ShipEntity, socket: string, out: Vector3): Vector3 {
     const m = this.mount(s, socket);

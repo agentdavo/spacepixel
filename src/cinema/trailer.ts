@@ -103,7 +103,7 @@ export const TRAILER: Shot[] = [
       { at: 0, dur: 2.2, rig: 'deck', units: 'm', from: { eye: [-11, 3.2, -12], look: [0, 3, 6], fov: 50 }, to: { eye: [-11, 3.2, -10], look: [-1, 5, 240], fov: 44 }, ease: 'inOut' },
       { at: 2.2, dur: 1.8, aim: 'lead', units: 'm', from: { eye: [0.036, 1.192, 3.03], look: [0, 0, 8], fov: 34 }, to: { eye: [0.036, 1.192, 3.03], look: [0, 0, 8], fov: 50 }, ease: 'in' },
     ],
-    captions: [{ at: 0.35, dur: 2.5, who: 'kade', kicker: 'KADE · VANGUARD LEAD', text: 'Vanguard, launch! Weapons free!', jp: 'ヴァンガード、発進！' }],
+    captions: [{ at: 0.35, dur: 3.2, who: 'kade', kicker: 'KADE · VANGUARD LEAD', text: 'Vanguard, launch! Weapons free!', jp: 'ヴァンガード、発進！' }],
     fx: [ramp('speed', 2.2, 2.5, 0, 0.7), ramp('boost', 2.2, 2.6, 0, 0.45)],
     music: [{ at: 0, mood: 'combat', fade: 0.2, intensity: 0.95 }],
     sound: [
@@ -153,7 +153,7 @@ export const TRAILER: Shot[] = [
     set: 'fight',
     dur: 6 * B,
     cams: [{ at: 0, dur: 6 * B, rig: 'k0', units: 'm', from: { eye: [-3.2, 1.6, 26], look: [0, 0, -260], fov: 48, roll: 0.05 }, to: { eye: [-3.0, 1.4, 24], look: [0, 0, -260], fov: 50, roll: -0.08 }, ease: 'linear', shake: 0.003 }],
-    captions: [{ at: 0.1, dur: 1.55, who: 'sparrow', kicker: 'SPARROW · VANGUARD 4', text: 'Two on my six! Break, break!' }],
+    captions: [{ at: 0.02, dur: 2.28, who: 'sparrow', kicker: 'SPARROW · VANGUARD 4', text: 'Two on my six! Break, break!' }],
     events: [
       { at: 0.05, id: 'fire:c' },
       { at: 0.9, id: 'fire:k1' },
@@ -239,17 +239,17 @@ export const TRAILER: Shot[] = [
     // Castellan: a ringed giant, the Kestrel skimming the ring plane.
     id: 'giant',
     set: 'reach',
-    dur: 4.6,
+    dur: 5.6,
     cams: [
-      { at: 0, dur: 2.3, rig: 'giant', from: { eye: [-18, 26, 150], look: [0, 0, 0], fov: 42 }, to: { eye: [-15, 24, 140], look: [0, 0, 0], fov: 42 }, ease: 'linear' },
-      { at: 2.3, dur: 2.3, rig: 'kestrel', units: 'm', from: { eye: [9, 3.5, -26], look: [-400, -40, 1500], fov: 54 }, to: { eye: [8, 3.2, -24], look: [-400, -40, 1500], fov: 55 }, ease: 'linear' },
+      { at: 0, dur: 2.8, rig: 'giant', from: { eye: [-18, 26, 150], look: [0, 0, 0], fov: 42 }, to: { eye: [-15, 24, 140], look: [0, 0, 0], fov: 42 }, ease: 'linear' },
+      { at: 2.8, dur: 2.8, rig: 'kestrel', units: 'm', from: { eye: [9, 3.5, -26], look: [-400, -40, 1500], fov: 54 }, to: { eye: [8, 3.2, -24], look: [-400, -40, 1500], fov: 55 }, ease: 'linear' },
     ],
     captions: [
-      { at: 0.3, dur: 2.0, text: 'Twenty-two systems. Six Lanterns.', jp: '二十二の星系。六つのランタン。' },
-      { at: 2.5, dur: 2.0, text: 'A Reach that keeps its own timetable.', jp: '時刻表どおりに生きる宙域。' },
+      { at: 0.15, dur: 2.55, text: 'Twenty-two systems. Six Lanterns.', jp: '二十二の星系。六つのランタン。' },
+      { at: 2.85, dur: 2.6, text: 'A Reach that keeps its own timetable.', jp: '時刻表どおりに生きる宙域。' },
     ],
-    fx: [speed(2.3, 4.6, 0.3)],
-    sound: [{ at: 2.3, sfx: 'cruiseDisengage', gain: 0.6 }],
+    fx: [speed(2.8, 5.6, 0.3)],
+    sound: [{ at: 2.8, sfx: 'cruiseDisengage', gain: 0.6 }],
   },
   {
     // A lane into the Lantern: haulers in a line, one goes through the throat.
@@ -296,7 +296,10 @@ export const TRAILER: Shot[] = [
     set: 'reach',
     dur: 4.6,
     cams: [hold(0, 4.6, [50, -29, -112], [0, -6, 150], 62)].map((m) => ({ ...m, rig: 'bay', units: 'm' as const })),
-    captions: [{ at: 3.2, dur: 1.35, kind: 'label', who: '', kicker: 'CONCOURSE', text: 'Fourteen people.', jp: 'EVERY ONE OF THEM REMEMBERS YOU' }],
+    captions: [
+      { at: 0.1, dur: 3.95, who: '', kicker: 'LUCAN VEY · CONCOURSE', text: 'Be witnessed, Directorate. I am not flying today.' },
+      { at: 3.2, dur: 1.35, kind: 'label', who: '', kicker: 'CONCOURSE', text: 'Fourteen people.', jp: 'EVERY ONE OF THEM REMEMBERS YOU' },
+    ],
   },
 
   // ══ RISE. ═════════════════════════════════════════════════════════════
@@ -339,13 +342,13 @@ export const TRAILER: Shot[] = [
     ],
     captions: [{ at: 0.2, dur: 1.9, who: 'kade', kicker: 'KADE · VANGUARD LEAD', text: 'Broadside. Everything you have.', jp: '全砲門、斉射！' }],
     events: [
-      { at: 0.3, id: 'broadside' },
+      { at: 0.9, id: 'broadside' },
       { at: 1.6, id: 'broadside' },
       { at: 2.6, id: 'broadside' },
       { at: 3.4, id: 'hits' },
     ],
     fx: [pulse('flash', 3.4, 0.35, 0.02, 0.05, 0.4)],
-    sound: [{ at: 0.1, radio: 'open' }, burst(0.3, 6, 0.08, 'cannon', 0.8), { at: 0.3, sfx: 'beamHit', gain: 0.7 }, burst(1.6, 6, 0.08, 'cannon', 0.8), burst(2.6, 6, 0.08, 'cannon', 0.8), { at: 3.4, sfx: 'explosionLarge', gain: 1.2 }, { at: 3.7, sfx: 'explosionLarge', gain: 0.8 }],
+    sound: [{ at: 0.1, radio: 'open' }, burst(0.9, 6, 0.08, 'cannon', 0.8), { at: 0.9, sfx: 'beamHit', gain: 0.7 }, burst(1.6, 6, 0.08, 'cannon', 0.8), burst(2.6, 6, 0.08, 'cannon', 0.8), { at: 3.4, sfx: 'explosionLarge', gain: 1.2 }, { at: 3.7, sfx: 'explosionLarge', gain: 0.8 }],
   },
 
   // ══ TITLE ═════════════════════════════════════════════════════════════

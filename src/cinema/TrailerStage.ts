@@ -442,6 +442,9 @@ export class TrailerStage implements CinemaStage {
   }
 
   animate(shot: Shot, local: number, dt: number, _seeking: boolean): void {
+    // Non-combat sets do not step Weapons; never replay the last combat frame.
+    this.weapons.events.length = 0;
+    this.missiles.events.length = 0;
     const set = this.live;
     if (!set) return;
     this.setClock = local;
@@ -824,6 +827,7 @@ export class TrailerStage implements CinemaStage {
     this.pose(X, _w.set(1300, -60, 700 + 25 * t).add(A), _z, 0, 25);
     V.model.setThrottle(0.6);
     X.model.setThrottle(0.6);
+    this.gunnery.traverse(V, this.valiantTurrets, X.flight.position, t / 0.8);
     // The Canticle answers: choir battery shards off its near side.
     const k = Math.floor(t * 9);
     if (Math.floor((t - 1 / 60) * 9) !== k && t > 0.4) {
@@ -833,6 +837,7 @@ export class TrailerStage implements CinemaStage {
       else toUniverse(X, -120 + 60 * hash(k), 40 * hash(k + 3), 180 * hash(k + 7), _w);
       _v.subVectors(_u, _w).normalize().multiplyScalar(GUNS.battery.speed);
       this.weapons.spawnBolt(_w, _v, 2.2, 5, X, GUNS.battery);
+      this.weapons.muzzleFlash(_w, _v.clone().normalize(), X.flight.velocity, X, GUNS.battery);
     }
   }
 
@@ -1011,6 +1016,7 @@ export class TrailerStage implements CinemaStage {
       else this.weapons.socketPosition(from, 'hull', _w);
       _v.subVectors(c, _w).normalize().add(_u.set(hash(i) * 0.03, hash(i + 7) * 0.03, hash(i + 13) * 0.03)).normalize().multiplyScalar(Math.max(1600, gun.speed));
       this.weapons.spawnBolt(_w, _v, 3.2, 2, from, gun);
+      this.weapons.muzzleFlash(_w, _v.clone().normalize(), from.flight.velocity, from, gun);
     }
   }
 
