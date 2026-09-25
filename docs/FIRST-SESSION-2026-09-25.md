@@ -107,6 +107,33 @@ captures are visual evidence, not an audio listening review or benchmark.
 
 ## Remaining acceptance work
 
+### Bounded attended follow-up
+
+A second fresh-profile attempt on the same source continuously operated normal
+keyboard/mouse controls, including boost, guns, missile requests when locked and
+the wingman attack order. It reached all three buoys at full hull in 31.42
+simulation seconds, then engaged the scavengers without an idle inspection gap.
+The first cutter's hull fell from 200 to 183.11. The player died at 47.98 seconds,
+178 m from the tracked target, and the genuine failure debrief appeared. There
+were no page errors. No kills, objectives or balance settings were changed.
+
+This simple pursuit controller reduced throttle at close range and had no
+evasive or obstacle-avoidance strategy. The loss does not distinguish combat
+damage from a possible collision, and no claim about encounter fairness follows
+from it. The bounded attempt was stopped after this loss; it was not repeatedly
+retuned until passing. Successful EP01 completion remains unverified.
+
+Reproduce this exact automated-input attempt with
+`node scratchpad/first-session/attended-attempt.mjs`. Its read-only telemetry
+trace is `scratchpad/first-session/attended/result.json`, and the continuous
+native-WebGPU recording is
+`attended/video/2935bb776e8b765443ac3d2808f7a972.webm` under the same scratchpad
+directory. It uses a fresh isolated profile and closes its browser/server on
+completion. A human can instead run `npm run dev`, launch EP01 from a separate
+browser profile and use F10 photo mode to pause when inspecting results.
+
+![Attended attempt: real failure debrief, with all three buoys completed](screenshots/first-session-2026-09-25/attended-result.png)
+
 Complete EP01's scavenger combat, Timetable approach and successful delivery in
 an attended normal-control run. Have a player assess control discovery (the
 new stationary opening currently relies on the F3 control help), aiming, flight
