@@ -55,6 +55,13 @@ pair response. Its isolated fix is under development, not accepted yet. The
 trailer also changes source time and camera scale at 46 seconds; that edit must
 be diagnosed separately from simulation defects.
 
+The shared-destination escort bug is corrected in `5cd644c` / `61c97f6` and
+integrated into the canonical branch, with 27 campaign/cameo regression checks
+and the production build passing. The collision task is completing native
+before/after proof and ensuring collision events survive the weapons update
+for mission, audio and telemetry consumers. Fresh V4.1 capture waits for that
+separate integration gate.
+
 The V4 film is a completed review artifact, not blanket acceptance of gameplay.
 The Kessen assault is a standalone authored demonstration. Expansion registries,
 six additional flyable systems and eight hull blockouts are a bounded prototype.

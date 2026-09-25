@@ -53,6 +53,13 @@ tip `b0212de` became an ancestor of canonical `c3c2399`. Eight completed task
 branches are retired at this checkpoint. The rendering worktree is detached at
 `b0212de`, and the Kessen demonstration worktree at `706960f`.
 
+After escort integration, `codex/campaign-escort-arrival` (`5cd644c`) and
+`codex/engine-modularity` (`dc4aead`) also retired by ancestry verification.
+Their worktrees are detached at those unchanged commits. **Ten completed task
+branches are now retired.** The remaining local branches are the canonical
+integration branch, the active `codex/hull-contact-physics` work branch, and
+the original upstream-tracking baseline. No remote refs were changed.
+
 Branch retirement does not delete worktrees. Detached checkouts retain their
 files and media. In particular, `f0d2/scratchpad` holds native source frames,
 rejected takes and earlier film work; `bef8/scratchpad` holds auditions,
@@ -67,9 +74,9 @@ preserves the original hashes. The older Markdown differs by subsequent
 authorization/status notes and a correction distinguishing missed shield-shell
 contact from an unproven shield-damage bypass.
 
-The original tracking baseline is retained. New active physics and escort
-branches are not stale; they have separate source ownership and will return
-through chief review. See [team ownership](TEAM-OWNERSHIP.md).
+The original tracking baseline is retained. The active physics branch is not
+stale and will return through chief review. Escort guidance has been integrated.
+See [team ownership](TEAM-OWNERSHIP.md).
 
 ## Combined validation
 
