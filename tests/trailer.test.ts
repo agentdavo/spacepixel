@@ -18,7 +18,7 @@ test('the trailer runs about 90 s and ends on the title and the end slate', () =
   // Opens on the Signal, then the tagline.
   assert.equal(ids[0], 'signal');
   assert.ok(TRAILER[0].captions?.some((c) => c.kind === 'count'));
-  assert.ok(TRAILER[1].captions?.some((c) => /Long Dark/.test(c.text)));
+  assert.ok(TRAILER[1].captions?.some((c) => /Lantern gates went dark/.test(c.text)));
 });
 
 test('three eyecatch cards — FIGHT. TRADE. RISE. — in that order, a beat pair long', () => {
