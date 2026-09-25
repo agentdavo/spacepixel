@@ -3,6 +3,7 @@ import type { Fleet, ShipEntity } from '@/sim/Fleet';
 import { collideBody, impactDamage, makeHost, placeHost, sphereContact, type Body, type CollisionHost, type Contact, type HitEvent } from '@/sim/Collision';
 import { proxiesFromModel } from '@/sim/CollisionProxies';
 import { FighterCollisions } from '@/sim/FighterCollisions';
+import { CapitalCollisions } from '@/sim/CapitalCollisions';
 import type { Obstacle } from '@/sim/ai';
 import { hostObstacles, proxyObstacles } from '@/sim/ai/Avoid';
 import type { Particles } from '@/fx/Particles';
@@ -37,6 +38,8 @@ export class HullCollisions {
   private shakeT = 0;
   /** Fighter ↔ fighter spheres (rams, blown merges); launch grace built in. */
   readonly fighters = new FighterCollisions();
+  /** Swept, finite-mass large hulls. Fighters retain their existing response. */
+  readonly capitals = new CapitalCollisions();
 
   constructor(
     private fleet: Fleet,
@@ -69,6 +72,15 @@ export class HullCollisions {
    */
   step(dt: number, stations: readonly StationView[], skip: (s: ShipEntity) => boolean, eye: Vector3): void {
     this.events.length = 0;
+    this.capitals.step(this.fleet.ships, dt, (s, amount, point, normal, other) => {
+      this.fleet.hit(s, amount, 'kinetic', point, normal, other);
+    }, skip);
+    for (const e of this.capitals.events) {
+      if (e.energy <= 0) continue;
+      this.fx()?.impact(e.point, e.normal, e.a.flight.velocity, PAL.WARM);
+      getAudio().playAt(e.a.isPlayer || e.b.isPlayer ? 'playerHit' : 'hullHit', e.point, eye, { gain: Math.min(1.2, 0.3 + e.closing / 120) });
+      if (e.a.isPlayer || e.b.isPlayer) this.kick(Math.min(2.6, e.closing * 0.02));
+    }
     // Hosts: this system's stations + living capitals.
     this.hosts.length = 0;
     this.obstacles.length = 0;

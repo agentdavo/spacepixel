@@ -331,8 +331,14 @@ export class Weapons {
     return b;
   }
 
-  step(dt: number): void {
+  /** Start the event window before flight/contact damage. Standalone callers
+   * may keep using step(dt), which starts its own window as before. */
+  beginTick(): void {
     this.events.length = 0;
+  }
+
+  step(dt: number, keepEvents = false): void {
+    if (!keepEvents) this.beginTick();
     const ships = this.fleet.ships;
     for (let i = 0; i < this.flashCount; i++) {
       const q = this.flashes[i];

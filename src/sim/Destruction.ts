@@ -126,9 +126,11 @@ export class Destruction {
         z1,
         pivot,
         position,
-        velocity: f.velocity.clone(),
+        // A contact can leave the parent turning: each fragment inherits the
+        // rigid body's velocity at its pivot, in addition to breakup energy.
+        velocity: new Vector3(-f.bodyRates.x, f.bodyRates.y, f.bodyRates.z).applyQuaternion(f.orientation).cross(_a.copy(pivot).applyQuaternion(f.orientation)).add(f.velocity),
         orientation: f.orientation.clone(),
-        spin: new Vector3(),
+        spin: new Vector3(-f.bodyRates.x, f.bodyRates.y, f.bodyRates.z).applyQuaternion(f.orientation),
         delay,
         kick,
         kickSpin,
