@@ -277,7 +277,9 @@ export class CapitalCollisions {
     this.events.push(e);
     // Damage routing reads the end-of-tick ship pose. Carry the impact's local
     // lever arm along with that pose so a fast sweep still damages its bow/stern.
-    if (damageA > 0) damage(a.ship, damageA, pointA.copy(fa.position).add(ra), e.normal, b.ship);
-    if (damageB > 0) damage(b.ship, damageB, pointB.copy(fb.position).add(rb), tmp2.copy(e.normal).negate(), a.ship);
+    // Contact.normal is the impulse direction on A; damage/FX instead expect
+    // the outward surface normal of the hull which was struck.
+    if (damageA > 0) damage(a.ship, damageA, pointA.copy(fa.position).add(ra), tmp2.copy(e.normal).negate(), b.ship);
+    if (damageB > 0) damage(b.ship, damageB, pointB.copy(fb.position).add(rb), e.normal, a.ship);
   }
 }

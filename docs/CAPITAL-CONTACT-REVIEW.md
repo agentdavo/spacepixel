@@ -106,6 +106,10 @@ and subsystem fields. FlightScene and the headless harness use this adapter.
 Capital contacts no longer call particles or audio directly; ordinary CombatFx,
 EventTap and GameAudio consumers respect the existing fast-forward gate. Camera
 shake remains tied to physical impact. Fighter handling/cues are unchanged.
+The damage callback uses the struck hull's outward normal (opposite A's impulse
+normal, aligned with B's). A bare head-on regression verifies positive
+`(point - hullOrigin) dot normal` on both bodies; the solver's physics normal
+remains B toward A. This avoids inward kinetic sparks/decals.
 
 ## Checks and measurements
 
@@ -122,6 +126,7 @@ The layer-aware follow-up passes the real runtime collision suite, audio and
 EventTap checks and TypeScript. Actual GameAudio spies hear shield cues only for
 absorbed contacts, exactly one cue per damaged layer for penetrating contacts,
 and preserve those layers for a gunless contact which kills the player.
+The outward-normal follow-up passes all sixteen focused physics tests.
 
 The physics fixtures cover stationary and separating overlap, gentle sustained
 thrust, docking exclusion, near misses inside broad spheres, 60 km/s relative
@@ -175,10 +180,10 @@ Evidence root on the task's retained worktree:
 
 - `baseline-native/`: actual detached `c9429e0` source. No contacts/damage/deaths;
   ships visibly interpenetrate. Video, frames and state/provenance JSON preserved.
-- `native-layer-final/`: final layer-aware source; one 360 m/s contact around tick 107,
+- `native-approved/`: final layer/normal-aware source; one 360 m/s contact around tick 107,
   two fore-shield collapses and two structural kill events, four wreck pieces,
   zero page errors. Exact source SHA and file hashes are in `evidence.json`.
-- `native-shield-final/`: same committed source, centres ±1,140 m and opposing
+- `native-shield-approved/`: same committed source, centres ±1,140 m and opposing
   10 m/s inertial velocities. Both hulls remain intact, with two ordinary shield
   impact events and no hull damage. Metadata retains kinetic type and null gun.
 - `targeted-tests.txt`: focused test output, catalog/damage/performance facts.
@@ -188,8 +193,10 @@ Earlier takes are retained, not relabelled: native-01 failed an import before
 capture; native-02 established numeric deaths but its camera looked away;
 native-03 has valid framing/physics but predates the event fix; native-04-events
 is an intermediate event regression take. `native-final/` is the clean dbf1899
-physics/event-boundary fixture before layer-aware feedback review. Use
-native-layer-final and native-shield-final for final acceptance.
+physics/event-boundary fixture before layer-aware feedback review.
+`native-layer-final/` is the clean 59f84b3 layer-aware fixture before the outward
+damage-normal correction. Use native-approved and native-shield-approved for
+final acceptance.
 
 ```sh
 node scripts/collision-capture.mjs --out scratchpad/collision-audit/another-final
