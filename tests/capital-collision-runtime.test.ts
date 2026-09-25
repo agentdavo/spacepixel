@@ -46,6 +46,9 @@ test('real hull contact: catalog envelopes, located shields/structure, determini
         weapons.beginTick();
         for (const s of [a, b]) if (s.alive) s.flight.position.addScaledVector(s.flight.velocity, 1 / 60);
         solver.step(fleet.ships, 1 / 60, (s: any, amount: number, point: any, normal: any, other: any) => {
+          assert.ok(point.clone().sub(s.flight.position).dot(normal) > 0, 'actual hull contact normal points outwards after hull rotation');
+          if (stern && s === b) assert.ok(normal.z < -0.99, 'unrotated engine deck points aft');
+          else assert.ok(normal.z * (s === a ? 1 : -1) > 0.99, 'opposed bows have opposed outward normals');
           const r = weapons.contactHit(s, amount, point, normal, other);
           evidence.push({ id: s.id, amount, hull: s.hull, shield: s.shield, facing: r.facing, hullDamage: r.hullDamage, shieldDamage: r.shieldDamage, sub: r.subsystem?.id, destroyed: r.subsystemDestroyed, cause: s.combat.dmg.structure.death, sections: s.combat.dmg.structure.sections.map((x: any) => x.hp) });
         });
