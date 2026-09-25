@@ -95,8 +95,19 @@ Aim near two minutes; the measured reading and dramatic beats determine the
 length. The old 140–165-second requirement is superseded. Retain substantial
 recognisable gameplay and clear uninterrupted HUD passages, but do not pad the
 film to hit a HUD-seconds quota. Existing footage should supply most of the
-edit. Up to three small native presentation pickups (working-route freighter,
-battle wide, player flyby) are the proposed scope, not new game features.
+edit. The refined pickup proposal uses three existing game situations: an
+EP04 convoy passage, a tactical wide view of the recorded battle, and EP05's
+actual computer response. Reach mission events through ordinary play. If the
+computer response cannot be captured, use narration over the ship/gate image;
+do not force the event or invent a display. No new game features are required.
+
+The rendering task's review adds three selection priorities: establish a
+small craft or turret as a scale reference; avoid frames where white engine
+or weapon glare hides the hull; and select the breakup angle where the gap
+between both wreck sections reads against the background. Alternate clear
+on-ship viewpoints, exterior scale and visible consequences. Its separate
+rendering branch and universe-expansion proposals are not implicitly accepted
+or required by this trailer plan.
 
 ## Coordination
 
@@ -104,5 +115,6 @@ All four other currently listed Spacepixel tasks received David's feedback:
 trailer production, voice, integration/lore audit and rendering/ship review.
 Chief owns this replacement script. The trailer task returned the timestamped
 shot proposal; the voice and lore tasks supplied comprehension and canon checks.
-The rendering/ship task has been asked to contribute within its ongoing work.
+The rendering/ship task returned a bounded composition and readability review
+without new capture work. All four tasks have now responded.
 This handoff contains a new script and edit direction; it is not a rendered V4.
