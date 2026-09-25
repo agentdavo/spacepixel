@@ -29,6 +29,7 @@ missions and reliable saves take priority over a larger framework.
 | Area | Current implementation | Direction / remaining gap |
 | --- | --- | --- |
 | Simulation | `core/Engine.ts` has a fixed 60 Hz update, bounded catch-up, render interpolation and capture stepping. | Simulation owns facts; presentation reads them. Retain seeded/replayable behaviour. |
+| Ship contact | Large-hull swept box contact uses effective mass/inertia, energy-based local damage and existing structural breakup; fighter paths remain separate. | Bounded approximation accepted with replay and native evidence. Rotational CCD, concave geometry, large-ship/station contact and route/spawn clearance need further work; see `CONTACT-INTEGRATION.md`. |
 | Missions | Typed definitions, predicates and a common `CampaignRunner`; `CampaignSession` connects story rules to the world. | One episode per file, static content checks, headless behavioural tests. Extract more scene orchestration only with parity evidence. |
 | Contracts | `contracts/ContractDesk.ts` runs generated operations with their own lifecycle and persistence. | Reuse runner mechanisms, preserve distinct story and contract policies. |
 | Cel shading | TSL cel materials/rim light, explicit ink channels, MRT and a post-processing pipeline. WebGPU and WebGL2 paths exist. | Rendering owns materials, GPU resources and capabilities; missions request effects through adapters. Test each backend honestly. |

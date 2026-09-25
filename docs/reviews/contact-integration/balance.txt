@@ -1,0 +1,144 @@
+
+> project-vanguard@0.1.0 balance
+> node scripts/balance.mjs
+
+
+■ damage types (seconds to strip 100 points, all hits)
+  shield: laser 1.39 · autocannon 2.50 · hymn 0.70
+  hull: laser 1.39 · autocannon 0.89 · hymn 1.98
+  PASS  autocannon weak vs shields (× laser time): 1.8  (> 1.5)
+  PASS  autocannon strong vs hull (× laser time): 0.64  (< 0.8)
+  PASS  hymn strips shields fastest (× laser time): 0.5  (< 0.8)
+  PASS  hymn weak vs hull (× laser time): 1.43  (> 1.3)
+
+■ fighter time-to-kill (sustained fire, aim σ = 1% of range)
+  kestrelVsCantor: 4.75 s @ 51% hits
+  laserOnly: 5.88 s
+  autocannonOnly: 5.47 s
+  matrix: harrier→cantor 4.8s  warhorse→cantor 4.3s  scrapjack→cantor 7.4s  cantor→kestrel 4.5s  cantor→scrapjack 6.8s  kestrel→scrapjack 4.4s  kestrel→warhorse 3.7s  psalter→kestrel 4.2s
+  PASS  Kestrel vs Cantor TTK, gun switching (s): 4.75  (3..8)
+  PASS  switching beats laser only: 1.13  (> 0)
+  PASS  switching beats autocannon only: 0.72  (> 0)
+  PASS  hit rate (%): 50.77  (30..80)
+  PASS  harrier vs cantor TTK (s): 4.82  (2..20)
+  PASS  warhorse vs cantor TTK (s): 4.28  (2..20)
+  PASS  scrapjack vs cantor TTK (s): 7.38  (2..20)
+  PASS  cantor vs kestrel TTK (s): 4.5  (2..20)
+  PASS  cantor vs scrapjack TTK (s): 6.78  (2..20)
+  PASS  kestrel vs scrapjack TTK (s): 4.38  (2..20)
+  PASS  kestrel vs warhorse TTK (s): 3.73  (2..20)
+  PASS  psalter vs kestrel TTK (s): 4.22  (2..20)
+  PASS  scattergun: point blank beats long range: Infinity  (> 0)
+  INFO  scattergun 150 m TTK (s): 3.58  (Scrapjack vs Cantor)
+  INFO  scattergun 600 m TTK (s): Infinity  (Scrapjack vs Cantor)
+
+■ capital turret kill (wing of 4 Kestrels, 900 m, aim σ = 0.8% of range)
+  cathedralBattery: 10.3 s (facing down at 6.2 s)
+  indomitableSecondary: 9.1 s (facing down at 6.4 s)
+  hesperusPD: 7.0 s
+  lanternGuardMain: 9.8 s
+  cathedralSpireLance: 16.3 s
+  PASS  Cathedral battery (s): 10.33  (5..15)
+  PASS  Indomitable secondary turret (s): 9.07  (5..15)
+  PASS  Hesperus Dawn point defence (s): 7.05  (5..15)
+  PASS  Lantern Guard main turret (s): 9.82  (2..15)
+  INFO  Cathedral spire lance (s): 16.33  (bigger subsystem, no band)
+
+■ capital kill (squadron: 4 Kestrels + 2 Warhorses with torpedoes)
+  cathedral: 99 s · 14 torpedoes · 2 subsystems down
+  indomitable: 111 s · 15 torpedoes · 8 subsystems down
+  hesperus: 79 s · 11 torpedoes
+  lanternGuard: 15 s · 6 torpedoes
+  PASS  Cathedral (s): 99.43  (60..180)
+  PASS  Indomitable (s): 110.52  (60..180)
+  PASS  Hesperus Dawn (s): 78.53  (60..180)
+  PASS  Lantern Guard corvette (s): 14.77  (8..60)
+
+■ subsystem effects + torpedo point defence
+  torpedoes: 3 pairs launched · 5 shot down · 1 hit
+  capitalSpeed: 14.2 m/s before engines lost
+  PASS  point defence shoots torpedoes down: 5  (>= 1)
+  PASS  some torpedoes get through: 1  (>= 1)
+  PASS  engines destroyed → drifting: 1  (== 1)
+  PASS  shield generator destroyed → no regen: 1  (== 1)
+  PASS  bridge destroyed → fire control lost: 0.35  (< 1)
+
+■ micro-missile swarms vs point defence (3 × 12 from 2.2 km)
+  lanternGuard: 36 launched · 14 shot down · 22 hit
+  resoluteMk3: 36 launched · 2 shot down · 34 hit
+  PASS  Lantern Guard PD thins the swarm (% shot down): 38.89  (10..60)
+  PASS  … and the swarm still matters (% hit): 61.11  (>= 35)
+  PASS  Resolute PD turrets thin the swarm (% shot down): 5.56  (5..60)
+  PASS  … and the swarm still matters (% hit): 94.44  (>= 35)
+
+■ outfitting: fitted hulls vs AI warships (scripted helm at standoff, turrets live on both sides)
+  resoluteGoodVsLanternGuard: 70.4 s · hull left 58% · 8 torpedoes (5 shot down) · 85.2/109.2 MW · took shield/hull: laser 688/216, kinetic 166/2262
+  resoluteStockVsLanternGuard: 89.9 s · hull left 28% · 9 torpedoes (7 shot down) · 76.4/84 MW · took shield/hull: laser 538/163, kinetic 160/3562
+  valiantGoodVsVesper: 68.7 s · hull left 54% · 4 torpedoes (4 shot down) · 140.1/179.4 MW · took shield/hull: harmonic 3211/5388, kinetic 1/0
+  valiantStockVsVesper: 83.6 s · hull left 22% · 2 torpedoes (2 shot down) · 125.3/138 MW · took shield/hull: harmonic 2851/7037, kinetic 1/0
+  bulwarkGoodVsLanternGuard: Infinity s · hull left 0% · 0 torpedoes (0 shot down) · 40.5/53.3 MW · took shield/hull: laser 328/55, kinetic 32/741
+  PASS  Resolute (Mk III fit) solo kills a Lantern Guard (s): 70.38  (60..120)
+  PASS  … and it costs (hull left %): 57.64  (30..80)
+  PASS  Mk III fit beats stock (hull left, points): 29.62  (> 0)
+  PASS  Valiant (Mk III fit) wins a duel with a Vesper (s): 68.72  (45..120)
+  PASS  … and it costs (hull left %): 53.94  (30..80)
+  PASS  … not on torpedoes alone: the Vesper PD shoots some down: 4  (>= 1)
+  PASS  Resolute (stock) solo kills a Lantern Guard (s): 89.88  (< 300)
+  PASS  … narrowly (hull left %): 28.02  (5..35)
+  PASS  Valiant (stock) wins a duel with a Vesper (s): 83.62  (< 300)
+  PASS  … with some margin (hull left %): 21.81  (15..40)
+  PASS  Valiant Mk III fit beats stock (hull left, points): 32.13  (>= 10)
+  PASS  stock fits are legal on the power budget: -7.6  (<= 0)
+  PASS  good fits are legal on the power budget: -24  (<= 0)
+  PASS  stock Kestrel through the fit layer = legacy Kestrel: 1  (== 1)
+  INFO  Bulwark (Mk III) vs Lantern Guard (s): Infinity  (gunship: not what it is for · hull left 0%)
+
+■ subsystem targeting (aimed hits, torpedo splash, AI wing on the lead's pick)
+  cathedralBattery: 100% of hull hits on the selected mount · killed in 8.1 s
+  lanternGuardMain: 89% on the mount (450 m) · killed in 2.1 s
+  torpedo: one torpedo on a shield-less Cathedral's battery: 1 mounts destroyed · 4 damaged
+  wing: wing kills the lead's pick in 6.2 s · then 6 more exposed mounts in 60 s (3 through standing shields)
+  PASS  aimed hits on a Cathedral battery (% of hull hits): 100  (>= 60)
+  PASS  aimed hits on a Lantern Guard turret (% of hull hits): 88.89  (>= 40)
+  PASS  one torpedo on a bare hull: mounts destroyed + damaged: 5  (>= 3)
+  PASS  wing kills the lead's selected mount (s): 6.23  (< 60)
+  PASS  … then strips exposed mounts on its own (in 60 s): 6  (>= 1)
+
+■ kill paths (squadron: 4 Kestrels + 2 Warhorses, going for one way to kill her)
+  cathedral structural: 77 s · structural · 14 torpedoes · 3 subsystems down · 2 wreck pieces, 20 salvage lots
+  cathedral reactor: 33 s · reactor (critical at 15 s) · 6 torpedoes · 1 subsystems down · 1 wreck pieces, 4 salvage lots · escort took 1628
+  cathedral bridge: 42 s · bridge · 8 torpedoes · 2 subsystems down · 1 wreck pieces, 20 salvage lots
+  cathedral hull: 99 s · hull · 3 wreck pieces
+  indomitable structural: 89 s · structural · 16 torpedoes · 5 subsystems down · 2 wreck pieces, 20 salvage lots
+  indomitable reactor: 36 s · reactor (critical at 18 s) · 6 torpedoes · 1 subsystems down · 1 wreck pieces, 4 salvage lots · escort took 1964
+  indomitable bridge: 42 s · bridge · 8 torpedoes · 1 subsystems down · 1 wreck pieces, 20 salvage lots
+  indomitable hull: 111 s · hull · 3 wreck pieces
+  dawn structural: 62 s · structural · 12 torpedoes · 2 subsystems down · 2 wreck pieces, 20 salvage lots
+  dawn reactor: 33 s · reactor (critical at 15 s) · 6 torpedoes · 2 subsystems down · 1 wreck pieces, 4 salvage lots · escort took 520
+  dawn bridge: 35 s · bridge · 6 torpedoes · 4 subsystems down · 1 wreck pieces, 20 salvage lots
+  dawn hull: 79 s · hull · 3 wreck pieces
+  lanternGuard structural: 13 s · structural · 4 torpedoes · 14 subsystems down · 2 wreck pieces, 10 salvage lots
+  lanternGuard reactor: 11 s · reactor (critical at 4 s) · 2 torpedoes · 15 subsystems down · 1 wreck pieces, 2 salvage lots · escort took 0
+  lanternGuard bridge: 12 s · bridge · 2 torpedoes · 1 subsystems down · 1 wreck pieces, 10 salvage lots
+  cathedral reactor, fire lifted at critical: vented 28 s after the start
+  PASS  cathedral structural kill (s): 77.05  (30..150 by that path, 2 wreck piece(s))
+  PASS  cathedral reactor kill (s): 32.63  (30..150 by that path, 1 wreck piece(s))
+  PASS  cathedral reactor shockwave hits the escort: 1627.7  (> 0)
+  PASS  cathedral bridge kill (s): 42.33  (30..150 by that path, 1 wreck piece(s))
+  PASS  cathedral hull depletion (s): 99.43  (60..180 by the hull, 3 sections)
+  PASS  indomitable structural kill (s): 89.4  (30..150 by that path, 2 wreck piece(s))
+  PASS  indomitable reactor kill (s): 35.68  (30..150 by that path, 1 wreck piece(s))
+  PASS  indomitable reactor shockwave hits the escort: 1964.21  (> 0)
+  PASS  indomitable bridge kill (s): 41.65  (30..150 by that path, 1 wreck piece(s))
+  PASS  indomitable hull depletion (s): 110.52  (60..180 by the hull, 3 sections)
+  PASS  dawn structural kill (s): 61.7  (30..150 by that path, 2 wreck piece(s))
+  PASS  dawn reactor kill (s): 32.67  (30..150 by that path, 1 wreck piece(s))
+  PASS  dawn reactor shockwave hits the escort: 520.46  (> 0)
+  PASS  dawn bridge kill (s): 34.7  (30..150 by that path, 1 wreck piece(s))
+  PASS  dawn hull depletion (s): 78.53  (60..180 by the hull, 3 sections)
+  PASS  Lantern Guard structural kill (s): 13.02  (8..60 by that path)
+  PASS  Lantern Guard reactor kill (s): 11.4  (8..60 by that path)
+  PASS  Lantern Guard bridge kill (s): 11.82  (8..60 by that path)
+  PASS  lift fire from a critical core → the crew vents it: 1  (== 1)
+
+ALL PASS · 9.0 s

@@ -1,0 +1,55 @@
+{"capitalRuntimeEvidence":{"catalog":[{"id":"cvs07-hesperus-dawn","massTonnes":283262.41523899074,"boxes":6,"radius":281.3297681936698},{"id":"bb-indomitable","massTonnes":433097.6288616249,"boxes":6,"radius":398.40808890563676},{"id":"choir-cathedral","massTonnes":2102227.612453342,"boxes":6,"radius":546.2750930081695},{"id":"ffl3-valiant","massTonnes":2262.7054198555925,"boxes":6,"radius":70.03498048254312},{"id":"rw-mother-lode","massTonnes":2414.9573697310652,"boxes":6,"radius":77.95815565313976},{"id":"civ-longhaul","massTonnes":336.03197672526045,"boxes":6,"radius":77.59967012741392},{"id":"civ-umbra","massTonnes":749.9996196950356,"boxes":6,"radius":89.01052897991376},{"id":"civ-meridian-star","massTonnes":1844.587038304718,"boxes":6,"radius":76.65176498258147},{"id":"ddg40-arbiter","massTonnes":7409.66495834993,"boxes":6,"radius":113.87261628031668},{"id":"choir-canticle","massTonnes":8191.4046782825435,"boxes":6,"radius":85.43167251127238},{"id":"mc-bastion","massTonnes":854.8930991622722,"boxes":6,"radius":63.52932328240289}],"minor":[{"id":1,"amount":401.33487834973437,"hull":48000,"shield":8799.332560825133,"facing":0,"hullDamage":0,"shieldDamage":200.66743917486718,"destroyed":false,"cause":null,"sections":[40800,36000,40800]},{"id":2,"amount":401.33487834973437,"hull":48000,"shield":8799.332560825133,"facing":0,"hullDamage":0,"shieldDamage":200.66743917486718,"destroyed":false,"cause":null,"sections":[40800,36000,40800]}],"severe":[{"id":1,"amount":154724.15119616425,"hull":0,"shield":7500,"facing":0,"hullDamage":212413.81167462995,"shieldDamage":1500,"destroyed":false,"cause":"structural","sections":[0,36000,40800]},{"id":2,"amount":154724.15119616425,"hull":0,"shield":7500,"facing":0,"hullDamage":212413.81167462995,"shieldDamage":1500,"destroyed":false,"cause":"structural","sections":[0,36000,40800]}],"local":[{"id":1,"amount":17123.62147625533,"hull":24026.929933242536,"shield":0,"facing":0,"hullDamage":23973.070066757464,"shieldDamage":0,"destroyed":false,"cause":null,"sections":[16826.929933242536,36000,40800]},{"id":2,"amount":17123.62147625533,"hull":24026.929933242536,"shield":0,"facing":0,"hullDamage":23973.070066757464,"shieldDamage":0,"destroyed":false,"cause":null,"sections":[16826.929933242536,36000,40800]}],"engine":[{"id":1,"amount":17129.196385277854,"hull":24019.125060611008,"shield":0,"facing":0,"hullDamage":23980.874939388992,"shieldDamage":0,"destroyed":false,"cause":null,"sections":[16819.125060611008,36000,40800]},{"id":2,"amount":17129.196385277854,"hull":36009.562530305506,"shield":0,"facing":1,"hullDamage":11990.437469694496,"shieldDamage":0,"sub":"engine-0","destroyed":true,"cause":null,"sections":[40800,36000,28809.562530305506]}],"maxWrecks":16,"wreckMsPerTick":0.001108999999999772}}
+✔ real hull contact: catalog envelopes, located shields/structure, deterministic breakup and bounded wrecks (4344.3939ms)
+{"capitalContactCost":{"ships":200,"ticks":120,"msPerTick":0.24226499999999998,"pairTests":19900,"boxTests":0}}
+{"capitalCloseCost":{"ships":200,"ticks":120,"msPerTick":0.5710574999999999,"pairTests":19900,"boxTests":13320}}
+✔ large hull bow impact conserves momentum, dissipates energy and damages once (6.327ms)
+✔ glancing contact retains tangential velocity and has much less damage (6.1443ms)
+✔ swept hulls catch a 60km/s crossing whose endpoints do not overlap (0.5447ms)
+✔ unequal geometric masses exchange momentum; handling mass is irrelevant (1.0764ms)
+✔ off-centre collision produces angular response without adding total energy (0.3872ms)
+✔ stationary spawn overlap settles without damage, velocity or NaNs (2.5956ms)
+✔ separating spawn overlap does not charge damage or reverse velocity (0.5961ms)
+✔ persistent gentle thrust against a hull never repeatedly charges damage (5.7203ms)
+✔ parallel narrow hulls pass inside broad spheres without a false collision (0.7238ms)
+✔ docking-owned ships and fighters stay out of the capital solver (0.261ms)
+✔ repeat, reversed ship insertion order and reconstructed solver are identical (3.8058ms)
+✔ linear contact damage and final pose agree at 30, 60 and 120Hz (1.7508ms)
+✔ 200 separated large hulls have bounded cheap pair checks and zero narrow-phase checks (39.7051ms)
+✔ rotated touching hulls remain finite and impulses do not create energy (7.9318ms)
+✔ 200 close but non-touching capital hulls have bounded narrow-phase cost (72.0456ms)
+✔ signed distance: sphere, capsule, box (outside, edge, inside) (0.8324ms)
+✔ signed distance: rotated box, Z-cylinder and ring (0.1868ms)
+✔ sphere contact picks the deepest proxy and ignores far ones (0.3503ms)
+✔ response: push out, bounce with restitution, scrape keeps most slide (0.1331ms)
+✔ impact damage: nudges are free, then proportional to speed (0.0918ms)
+✔ fast movers are swept: no tunnelling through a thin bulkhead (0.1969ms)
+✔ hosts move and spin their proxies (station ring spokes, a steaming carrier) (0.1453ms)
+✔ combat audio preserves impact truth and selects audible simultaneous contacts (2671.1964ms)
+✔ three sections along the keel: bow, midships, stern (capitals only) (0.703ms)
+✔ structural failure: raking the midships snaps the spine in the middle; the ends tear off at their joint (0.532ms)
+✔ untargeted damage (collisions, blasts without a point) never snaps a hull (0.1142ms)
+✔ bridge kill: the command deck gone and the hull under STRIKE_HULL — she strikes; before that she fights blind (0.1868ms)
+✔ reactor shockwave: damage falls off with distance; capitals feel it as a fraction of the dead ship (0.1147ms)
+✔ settleDeath: a pending path kills her by that cause; plot armour refuses it (the spine holds by a thread); the player never strikes (0.1602ms)
+✔ structural kill: two burning pieces split at the break, flying apart and tumbling (2.1435ms)
+✔ bridge kill: one whole hull, dark and slow — the richest salvage; reactor: one charred piece and a shockwave (0.2982ms)
+✔ wreck pieces are deterministic: the same death leaves the same pieces (0.8413ms)
+✔ the shockwave crosses the ships around the blast once each, strongest close in (0.5079ms)
+✔ wrecks persist for a while, then clear; hull depletion leaves three sections; fighters leave nothing (0.6077ms)
+✔ salvage: close and slow to cut; the lot fills the hold, relics first, what does not fit stays aboard (0.2572ms)
+✔ determinism: dogfight — same seed, same script, recorded replay → bit-identical (3690.5075ms)
+✔ determinism: capital — same seed, same script, recorded replay → bit-identical (752.3732ms)
+✔ determinism: traffic — same seed, same script, recorded replay → bit-identical (821.8515ms)
+✔ two simulation ticks retain ordered events, turret sound and death cause across pool reuse (2593.7551ms)
+✔ fighter collisions: head-on ram bounces both and hurts by closing speed (1.1634ms)
+✔ fighter collisions: a formation nudge is free; heavier ships move less (0.4457ms)
+✔ fighter collisions: launch grace — spawned overlapping, no contact until the grace ends (0.913ms)
+✔ fighter collisions: skip() exempts ships (docking guidance) and capitals are ignored (0.1751ms)
+ℹ tests 44
+ℹ suites 0
+ℹ pass 44
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16583.3969

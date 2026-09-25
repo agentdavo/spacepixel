@@ -50,17 +50,18 @@ improvements. Existing task history and raw production media remain available.
 ## Acceptance limits
 
 The collision task's initial source audit found that ships above the existing
-fighter contact cutoff act as obstacles for smaller craft but have no large-ship
-pair response. Its isolated fix is under development, not accepted yet. The
+fighter contact cutoff act as obstacles for smaller craft but had no large-ship
+pair response. The bounded contact/damage fix is accepted through `dee8042`;
+combined validation and limitations are in [the contact review](CONTACT-INTEGRATION.md). The
 trailer also changes source time and camera scale at 46 seconds; that edit must
 be diagnosed separately from simulation defects.
 
 The shared-destination escort bug is corrected in `5cd644c` / `61c97f6` and
 integrated into the canonical branch, with 27 campaign/cameo regression checks
-and the production build passing. The collision task is completing native
-before/after proof and ensuring collision events survive the weapons update
-for mission, audio and telemetry consumers. Fresh V4.1 capture waits for that
-separate integration gate.
+and the production build passing. Native collision before/after proof and
+exactly-once event, damage-layer and surface-normal reviews are complete.
+The next gate is fresh ordinary-input Episode 4 capture/replay and the V4.1
+replacement shot; neither old tapes nor controlled collision fixtures prove it.
 
 The V4 film is a completed review artifact, not blanket acceptance of gameplay.
 The Kessen assault is a standalone authored demonstration. Expansion registries,

@@ -1,0 +1,644 @@
+{
+  "source": "dee8042d6512428eb6ca3c54fa64e62af4a8fa91",
+  "baseline": false,
+  "fixture": "shield",
+  "sourceFiles": {
+    "src/sim/CapitalCollisions.ts": "d03800edde3f4a6df4be43b4bae321b16ee30d1c36c5b4e9a07ca6ea75cfc4dc",
+    "src/sim/Destruction.ts": "b4b82a4b1290ad7a394c4f4145f26c21c470a4b7435debc23d92a2f7a5e7400f",
+    "src/world/HullCollisions.ts": "e7b25b0444ea1dea5485d441f0e3926f80aebe8b8c0f675b2398757c1174b589",
+    "src/sim/Weapons.ts": "77c5112d3fa27532dce36eaaf8f11fdfa2ee92b738758890c44ece375b13dd45",
+    "src/world/scenes/FlightScene.ts": "f49007ac6aaa13e2f1c799c4a377843f4908760bcdd94433ce0fe4238f47e30a"
+  },
+  "harnessSha256": "a08083993cb8b9d4612ead142cb27cdbb6b4dcf96fee0a9c30a73a95885a0790",
+  "policy": "Authored initial two-ship inertial approach, fixed presentation camera; ordinary FlightScene sim thereafter, no injected damage or post-start poses. This is a collision fixture, not campaign/trailer footage.",
+  "initial": {
+    "backend": "WebGPU",
+    "device": "GPUDevice",
+    "seed": 1994,
+    "startTick": 0,
+    "origin": [
+      2413445.8511167895,
+      169026.98893804103,
+      -1148847.1577342357
+    ],
+    "ships": [
+      {
+        "id": 9,
+        "blueprint": "bb-indomitable",
+        "position": [
+          2413445.8511167895,
+          169026.98893804103,
+          -1149987.1577342357
+        ],
+        "orientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "velocity": [
+          0,
+          0,
+          10
+        ],
+        "hull": 48000,
+        "shield": 9000
+      },
+      {
+        "id": 10,
+        "blueprint": "bb-indomitable",
+        "position": [
+          2413445.8511167895,
+          169026.98893804103,
+          -1147707.1577342357
+        ],
+        "orientation": [
+          0,
+          1,
+          0,
+          0
+        ],
+        "velocity": [
+          0,
+          0,
+          -10
+        ],
+        "hull": 48000,
+        "shield": 9000
+      }
+    ]
+  },
+  "states": [
+    {
+      "seconds": 0.06666666666666667,
+      "ships": [
+        {
+          "id": 9,
+          "alive": true,
+          "hull": 48000,
+          "shield": 9000,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1149986.4910675688
+          ],
+          "velocity": [
+            0,
+            0,
+            10
+          ],
+          "rates": [
+            0,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        },
+        {
+          "id": 10,
+          "alive": true,
+          "hull": 48000,
+          "shield": 9000,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1147707.8244009027
+          ],
+          "velocity": [
+            0,
+            0,
+            -10
+          ],
+          "rates": [
+            0,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        }
+      ],
+      "wrecks": []
+    },
+    {
+      "seconds": 1.0666666666666667,
+      "ships": [
+        {
+          "id": 9,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8799.062560825136,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1149977.1922996542
+          ],
+          "velocity": [
+            0,
+            0,
+            -0.36848127350295634
+          ],
+          "rates": [
+            -0.0001208442249386999,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        },
+        {
+          "id": 10,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8799.062560825136,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1147717.1231688173
+          ],
+          "velocity": [
+            0,
+            0,
+            0.36848127350295634
+          ],
+          "rates": [
+            -0.0001208442249386999,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        }
+      ],
+      "wrecks": []
+    },
+    {
+      "seconds": 2.066666666666667,
+      "ships": [
+        {
+          "id": 9,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8795.012560825155,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1149977.560780928
+          ],
+          "velocity": [
+            0,
+            0,
+            -0.36848127350295634
+          ],
+          "rates": [
+            -1.5303912702756766e-18,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        },
+        {
+          "id": 10,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8795.012560825155,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1147716.7546875435
+          ],
+          "velocity": [
+            0,
+            0,
+            0.36848127350295634
+          ],
+          "rates": [
+            -1.5303912702756766e-18,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        }
+      ],
+      "wrecks": []
+    },
+    {
+      "seconds": 3.066666666666667,
+      "ships": [
+        {
+          "id": 9,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8790.962560825177,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1149977.9292622018
+          ],
+          "velocity": [
+            0,
+            0,
+            -0.36848127350295634
+          ],
+          "rates": [
+            -1.9381128401659787e-32,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        },
+        {
+          "id": 10,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8790.962560825177,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1147716.3862062697
+          ],
+          "velocity": [
+            0,
+            0,
+            0.36848127350295634
+          ],
+          "rates": [
+            -1.9381128401659787e-32,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        }
+      ],
+      "wrecks": []
+    },
+    {
+      "seconds": 4.066666666666666,
+      "ships": [
+        {
+          "id": 9,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8786.912560825196,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1149978.2977434755
+          ],
+          "velocity": [
+            0,
+            0,
+            -0.36848127350295634
+          ],
+          "rates": [
+            -2.454458186068717e-46,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        },
+        {
+          "id": 10,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8786.912560825196,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1147716.017724996
+          ],
+          "velocity": [
+            0,
+            0,
+            0.36848127350295634
+          ],
+          "rates": [
+            -2.454458186068717e-46,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        }
+      ],
+      "wrecks": []
+    },
+    {
+      "seconds": 5.066666666666666,
+      "ships": [
+        {
+          "id": 9,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8782.862560825219,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1149978.6662247493
+          ],
+          "velocity": [
+            0,
+            0,
+            -0.36848127350295634
+          ],
+          "rates": [
+            -3.108366480170374e-60,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        },
+        {
+          "id": 10,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8782.862560825219,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1147715.6492437222
+          ],
+          "velocity": [
+            0,
+            0,
+            0.36848127350295634
+          ],
+          "rates": [
+            -3.108366480170374e-60,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        }
+      ],
+      "wrecks": []
+    },
+    {
+      "seconds": 6.066666666666666,
+      "ships": [
+        {
+          "id": 9,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8778.812560825238,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1149979.034706023
+          ],
+          "velocity": [
+            0,
+            0,
+            -0.36848127350295634
+          ],
+          "rates": [
+            -3.936486769213294e-74,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        },
+        {
+          "id": 10,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8778.812560825238,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1147715.2807624484
+          ],
+          "velocity": [
+            0,
+            0,
+            0.36848127350295634
+          ],
+          "rates": [
+            -3.936486769213294e-74,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        }
+      ],
+      "wrecks": []
+    },
+    {
+      "seconds": 7.066666666666666,
+      "ships": [
+        {
+          "id": 9,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8774.76256082526,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1149979.4031872968
+          ],
+          "velocity": [
+            0,
+            0,
+            -0.36848127350295634
+          ],
+          "rates": [
+            -4.985232012713622e-88,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        },
+        {
+          "id": 10,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8774.76256082526,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1147714.9122811747
+          ],
+          "velocity": [
+            0,
+            0,
+            0.36848127350295634
+          ],
+          "rates": [
+            -4.985232012713622e-88,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        }
+      ],
+      "wrecks": []
+    },
+    {
+      "seconds": 8.066666666666666,
+      "ships": [
+        {
+          "id": 9,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8773.750060825265,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1149979.7716685706
+          ],
+          "velocity": [
+            0,
+            0,
+            -0.36848127350295634
+          ],
+          "rates": [
+            -6.313380350964951e-102,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        },
+        {
+          "id": 10,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8773.750060825265,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1147714.543799901
+          ],
+          "velocity": [
+            0,
+            0,
+            0.36848127350295634
+          ],
+          "rates": [
+            -6.313380350964951e-102,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        }
+      ],
+      "wrecks": []
+    },
+    {
+      "seconds": 9.066666666666666,
+      "ships": [
+        {
+          "id": 9,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8787.250060825265,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1149980.1401498443
+          ],
+          "velocity": [
+            0,
+            0,
+            -0.36848127350295634
+          ],
+          "rates": [
+            -7.995369393901881e-116,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        },
+        {
+          "id": 10,
+          "alive": true,
+          "hull": 48000,
+          "shield": 8787.250060825265,
+          "position": [
+            2413445.8511167895,
+            169026.98893804103,
+            -1147714.1753186272
+          ],
+          "velocity": [
+            0,
+            0,
+            0.36848127350295634
+          ],
+          "rates": [
+            -7.995369393901881e-116,
+            0,
+            0
+          ],
+          "death": null,
+          "breakZ": null
+        }
+      ],
+      "wrecks": []
+    }
+  ],
+  "contacts": [
+    {
+      "tick": 60,
+      "a": 9,
+      "b": 10,
+      "closing": 20,
+      "impulse": 4490564.654450292,
+      "energy": 36211913.37348715,
+      "damageA": 401.33487834973363,
+      "damageB": 401.33487834973363,
+      "point": [
+        2413445.8511167895,
+        168996.0968071478,
+        -1148847.1577342357
+      ],
+      "normal": [
+        0,
+        0,
+        -1
+      ]
+    }
+  ],
+  "damageEvents": [
+    {
+      "tick": 60,
+      "kind": "shield",
+      "ship": 9,
+      "cause": null,
+      "facing": 0,
+      "amount": 401.33487834973363,
+      "shielded": true,
+      "hullDamage": 0,
+      "shieldDamage": 200.66743917486681,
+      "type": "kinetic",
+      "gun": null
+    },
+    {
+      "tick": 60,
+      "kind": "shield",
+      "ship": 10,
+      "cause": null,
+      "facing": 0,
+      "amount": 401.33487834973363,
+      "shielded": true,
+      "hullDamage": 0,
+      "shieldDamage": 200.66743917486681,
+      "type": "kinetic",
+      "gun": null
+    }
+  ],
+  "errors": []
+}

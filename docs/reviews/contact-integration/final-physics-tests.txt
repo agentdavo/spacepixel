@@ -1,0 +1,26 @@
+{"capitalContactCost":{"ships":200,"ticks":120,"msPerTick":0.22783833333333353,"pairTests":19900,"boxTests":0}}
+{"capitalCloseCost":{"ships":200,"ticks":120,"msPerTick":0.5962791666666666,"pairTests":19900,"boxTests":13320}}
+✔ large hull bow impact conserves momentum, dissipates energy and damages once (6.922ms)
+✔ glancing contact retains tangential velocity and has much less damage (7.1794ms)
+✔ swept hulls catch a 60km/s crossing whose endpoints do not overlap (0.6857ms)
+✔ damage normals point out of the struck hull while impulse normals separate it (0.8188ms)
+✔ unequal geometric masses exchange momentum; handling mass is irrelevant (1.5448ms)
+✔ off-centre collision produces angular response without adding total energy (0.5458ms)
+✔ stationary spawn overlap settles without damage, velocity or NaNs (2.3708ms)
+✔ separating spawn overlap does not charge damage or reverse velocity (0.8019ms)
+✔ persistent gentle thrust against a hull never repeatedly charges damage (5.8727ms)
+✔ parallel narrow hulls pass inside broad spheres without a false collision (0.6624ms)
+✔ docking-owned ships and fighters stay out of the capital solver (0.2378ms)
+✔ repeat, reversed ship insertion order and reconstructed solver are identical (3.9117ms)
+✔ linear contact damage and final pose agree at 30, 60 and 120Hz (1.9894ms)
+✔ 200 separated large hulls have bounded cheap pair checks and zero narrow-phase checks (36.0589ms)
+✔ rotated touching hulls remain finite and impulses do not create energy (12.3165ms)
+✔ 200 close but non-touching capital hulls have bounded narrow-phase cost (76.6012ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 311.9982

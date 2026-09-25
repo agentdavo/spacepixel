@@ -124,3 +124,14 @@ Future trailer capture now hashes every TypeScript simulation module as well as
 the modular campaign files. This automatically includes new contact solvers,
 flight code, destruction and escort guidance in each take's source inventory.
 The harness syntax check passed; frozen V4 hashes and files are unchanged.
+
+## Capital contact follow-up
+
+The new collision task delivered `dbf1899`, `59f84b3`, `2a13afe` and test-only
+`dee8042`. They are integrated with the escort and rendering fixes. Full
+integration tests, targeted review followups, build, balance, long replays and
+native before/after evidence are distinguished by source revision in
+[CONTACT-INTEGRATION.md](CONTACT-INTEGRATION.md). The accepted work closes the
+missing large-ship pair response and fixes event retention, shield/hull cue
+selection, replay-seek silence and outward impact normals. Ordinary-input
+Episode 4 recapture and the six-second V4.1 replacement remain the next gate.

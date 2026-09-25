@@ -1,0 +1,356 @@
+{
+  "branch": "codex/hull-contact-physics",
+  "tip": "dee8042d6512428eb6ca3c54fa64e62af4a8fa91",
+  "productionCommit": "2a13afe1fc300416d5b640648bb3ebb1233001df",
+  "baselineCommit": "c9429e04c18e45339486c96b3360c3a40a99a857",
+  "shieldCaptureCommit": "dee8042d6512428eb6ca3c54fa64e62af4a8fa91",
+  "sourceHashesMatchCurrent": true,
+  "renderer": "WebGPU",
+  "before": {
+    "contacts": 0,
+    "finalShips": [
+      {
+        "id": 9,
+        "alive": true,
+        "hull": 48000,
+        "shield": 9000,
+        "position": [
+          2413445.8511167895,
+          169026.98893804103,
+          -1148665.1577342357
+        ],
+        "velocity": [
+          0,
+          0,
+          180
+        ],
+        "rates": [
+          0,
+          0,
+          0
+        ],
+        "death": null,
+        "breakZ": null
+      },
+      {
+        "id": 10,
+        "alive": true,
+        "hull": 48000,
+        "shield": 9000,
+        "position": [
+          2413445.8511167895,
+          169026.98893804103,
+          -1149029.1577342357
+        ],
+        "velocity": [
+          0,
+          0,
+          -180
+        ],
+        "rates": [
+          0,
+          0,
+          0
+        ],
+        "death": null,
+        "breakZ": null
+      }
+    ]
+  },
+  "after": {
+    "contacts": [
+      {
+        "tick": 107,
+        "a": 9,
+        "b": 10,
+        "closing": 360,
+        "impulse": 80830163.78010526,
+        "energy": 13960554793.89295,
+        "damageA": 154724.15119616396,
+        "damageB": 154724.15119616396,
+        "point": [
+          2413445.8511167895,
+          168996.0968071478,
+          -1148847.1577342357
+        ],
+        "normal": [
+          0,
+          0,
+          -1
+        ]
+      }
+    ],
+    "damageEvents": [
+      {
+        "tick": 107,
+        "kind": "shield-down",
+        "ship": 9,
+        "cause": null,
+        "facing": 0,
+        "amount": 0,
+        "shielded": false,
+        "hullDamage": 0,
+        "shieldDamage": 0,
+        "gun": null
+      },
+      {
+        "tick": 107,
+        "kind": "kill",
+        "ship": 9,
+        "cause": "structural",
+        "facing": -1,
+        "amount": 0,
+        "shielded": false,
+        "hullDamage": 0,
+        "shieldDamage": 0,
+        "gun": null
+      },
+      {
+        "tick": 107,
+        "kind": "shield",
+        "ship": 9,
+        "cause": null,
+        "facing": 0,
+        "amount": 154724.15119616396,
+        "shielded": true,
+        "hullDamage": 212413.81167462954,
+        "shieldDamage": 1500,
+        "type": "kinetic",
+        "gun": null
+      },
+      {
+        "tick": 107,
+        "kind": "shield-down",
+        "ship": 10,
+        "cause": null,
+        "facing": 0,
+        "amount": 0,
+        "shielded": false,
+        "hullDamage": 0,
+        "shieldDamage": 0,
+        "gun": null
+      },
+      {
+        "tick": 107,
+        "kind": "kill",
+        "ship": 10,
+        "cause": "structural",
+        "facing": -1,
+        "amount": 0,
+        "shielded": false,
+        "hullDamage": 0,
+        "shieldDamage": 0,
+        "gun": null
+      },
+      {
+        "tick": 107,
+        "kind": "shield",
+        "ship": 10,
+        "cause": null,
+        "facing": 0,
+        "amount": 154724.15119616396,
+        "shielded": true,
+        "hullDamage": 212413.81167462954,
+        "shieldDamage": 1500,
+        "type": "kinetic",
+        "gun": null
+      }
+    ],
+    "finalShips": [
+      {
+        "id": 9,
+        "alive": false,
+        "hull": 0,
+        "shield": 7500,
+        "position": [
+          2413445.8511167895,
+          169026.98893804103,
+          -1149977.2045823631
+        ],
+        "velocity": [
+          0,
+          0,
+          -6.63266292305326
+        ],
+        "rates": [
+          -0.018365100125590696,
+          0,
+          0
+        ],
+        "death": "structural",
+        "breakZ": 406.6666666666667
+      },
+      {
+        "id": 10,
+        "alive": false,
+        "hull": 0,
+        "shield": 7500,
+        "position": [
+          2413445.8511167895,
+          169026.98893804103,
+          -1147717.1108861084
+        ],
+        "velocity": [
+          0,
+          0,
+          6.63266292305326
+        ],
+        "rates": [
+          -0.018365100125590696,
+          0,
+          0
+        ],
+        "death": "structural",
+        "breakZ": 406.6666666666667
+      }
+    ],
+    "wrecks": [
+      {
+        "ship": 9,
+        "cause": "structural",
+        "position": [
+          2413428.484434111,
+          169146.06155661764,
+          -1149131.154783364
+        ]
+      },
+      {
+        "ship": 9,
+        "cause": "structural",
+        "position": [
+          2413463.5221777987,
+          169295.75809075884,
+          -1150405.9658788028
+        ]
+      },
+      {
+        "ship": 10,
+        "cause": "structural",
+        "position": [
+          2413430.838419853,
+          169148.64772119737,
+          -1148563.8643602286
+        ]
+      },
+      {
+        "ship": 10,
+        "cause": "structural",
+        "position": [
+          2413453.5853860807,
+          169295.4402359353,
+          -1147287.0581394588
+        ]
+      }
+    ]
+  },
+  "absorbed": {
+    "contacts": [
+      {
+        "tick": 60,
+        "a": 9,
+        "b": 10,
+        "closing": 20,
+        "impulse": 4490564.654450292,
+        "energy": 36211913.37348715,
+        "damageA": 401.33487834973363,
+        "damageB": 401.33487834973363,
+        "point": [
+          2413445.8511167895,
+          168996.0968071478,
+          -1148847.1577342357
+        ],
+        "normal": [
+          0,
+          0,
+          -1
+        ]
+      }
+    ],
+    "damageEvents": [
+      {
+        "tick": 60,
+        "kind": "shield",
+        "ship": 9,
+        "cause": null,
+        "facing": 0,
+        "amount": 401.33487834973363,
+        "shielded": true,
+        "hullDamage": 0,
+        "shieldDamage": 200.66743917486681,
+        "type": "kinetic",
+        "gun": null
+      },
+      {
+        "tick": 60,
+        "kind": "shield",
+        "ship": 10,
+        "cause": null,
+        "facing": 0,
+        "amount": 401.33487834973363,
+        "shielded": true,
+        "hullDamage": 0,
+        "shieldDamage": 200.66743917486681,
+        "type": "kinetic",
+        "gun": null
+      }
+    ],
+    "finalShips": [
+      {
+        "id": 9,
+        "alive": true,
+        "hull": 48000,
+        "shield": 8787.250060825265,
+        "position": [
+          2413445.8511167895,
+          169026.98893804103,
+          -1149980.1401498443
+        ],
+        "velocity": [
+          0,
+          0,
+          -0.36848127350295634
+        ],
+        "rates": [
+          -7.995369393901881E-116,
+          0,
+          0
+        ],
+        "death": null,
+        "breakZ": null
+      },
+      {
+        "id": 10,
+        "alive": true,
+        "hull": 48000,
+        "shield": 8787.250060825265,
+        "position": [
+          2413445.8511167895,
+          169026.98893804103,
+          -1147714.1753186272
+        ],
+        "velocity": [
+          0,
+          0,
+          0.36848127350295634
+        ],
+        "rates": [
+          -7.995369393901881E-116,
+          0,
+          0
+        ],
+        "death": null,
+        "breakZ": null
+      }
+    ]
+  },
+  "pageErrors": [],
+  "validation": {
+    "focusedBaselineTests": 44,
+    "normalPhysicsTests": 16,
+    "actualHullRuntime": "pass, including recorded/replayed collision and outward normal assertions",
+    "typecheck": "pass",
+    "build": "pass before layer-only followup; chief combined build also passed",
+    "fullSuite": "chief owned combined suite; no duplicate owner full run"
+  },
+  "originalV4Sha256": "c5c709830ab871a50616aac4c14d462d734d3ab0e3010c39da026577d9f21c6d"
+}
