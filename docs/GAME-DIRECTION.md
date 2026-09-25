@@ -84,12 +84,19 @@ This supersedes the chief task's earlier side-arc-first authorisation.
   damage requires an actual breach route. The proposed 2 m/s approach and
   30-tick validation are tuning hypotheses, not accepted balance numbers.
 
-The next Kessen deliverable is a revised cameo plan with exact file boundaries
-and minimal canon support. The earlier broad phases 0–1 foundation scope is
-superseded; keep any completed work isolated for review. Chief technical review
-will authorise the bounded cameo implementation. No boarding or shield-bypass
-mechanic is authorised for this introduction. Preserve existing saves, economy
-domains, Rustwake facts and seeded world generation.
+The revised cameo plan is committed as `e9ed923` on the isolated Kessen branch.
+Chief review authorises a bounded preview: at most 2–4 existing frames guarding
+an Episode 10 evacuation route and standing witness near an Episode 19 tuning
+approach. Use render-only set pieces with deterministic mission gates, no
+combat or objective credit, and no new voice dependency. Keep the development
+gate off until chief review of player-camera and close-up screenshots, scene
+timing and integration checks. Final visual evidence must use verified native
+WebGPU; a software WebGL baseline establishes composition only.
+
+The earlier broad phases 0–1 faction-foundation scope is superseded. No boarding
+or shield-bypass mechanic is authorised for this introduction. Preserve existing
+saves, economy domains, Rustwake facts and seeded world generation. Cameos must
+not require an unbuilt side arc or interrupt protected dialogue and the climax.
 
 ## Owners and handoffs
 
