@@ -77,6 +77,19 @@ test('swept hulls catch a 60km/s crossing whose endpoints do not overlap', () =>
   assert.ok(a.flight.position.x < b.flight.position.x, 'never swap sides');
 });
 
+test('damage normals point out of the struck hull while impulse normals separate it', () => {
+  const a = ship(1, 0, -151, 0, 100), b = ship(2, 0, 151, 0, -100);
+  const w = new CapitalCollisions();
+  advance([a, b], DT);
+  const normals: number[] = [];
+  w.step([a, b], DT, (s, _amount, point, normal) => {
+    assert.ok(point.clone().sub(s.flight.position).dot(normal) > 0, 'outward damage/FX normal');
+    normals.push(normal.z);
+  });
+  assert.deepEqual(normals, [1, -1]);
+  assert.equal(w.events[0].normal.z, -1, 'physics normal remains B toward A');
+});
+
 test('unequal geometric masses exchange momentum; handling mass is irrelevant', () => {
   const a = ship(1, -110, 0, 80), b = ship(2, 110, 0, -20, 0, 2);
   const w = new CapitalCollisions();
