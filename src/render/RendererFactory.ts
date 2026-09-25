@@ -11,8 +11,9 @@ export interface RendererInfo {
 
 /**
  * Creates the WebGPU renderer. Three.js transparently falls back to its WebGL2
- * backend when `navigator.gpu` is unavailable; systems that rely on raw WGSL
- * (ink edges, compute particles) query `isWebGPU` and select their TSL twins.
+ * backend when `navigator.gpu` is unavailable. Ink/shield surfaces use portable
+ * TSL on the fallback; compute particles disable themselves
+ * on WebGL2. Compatibility mode preserves gameplay, with reduced effects.
  *
  * The universe spans ~7 orders of magnitude (cockpit bolts to gas giants), so we
  * run a reversed-Z float depth buffer for stable precision at range.
@@ -39,13 +40,15 @@ export async function createRenderer(canvas: HTMLCanvasElement): Promise<Rendere
   const backend = renderer.backend as unknown as {
     isWebGPUBackend?: boolean;
     adapter?: GPUAdapter;
+    device?: GPUDevice;
   };
   const isWebGPU = backend.isWebGPUBackend === true;
 
   let adapterDescription = 'n/a';
   if (isWebGPU) {
-    const adapter = backend.adapter ?? (await navigator.gpu?.requestAdapter());
-    const info = adapter?.info;
+    // Read the device actually used by Three. A second requestAdapter() can
+    // select a different GPU and would make performance evidence misleading.
+    const info = backend.device?.adapterInfo ?? backend.adapter?.info;
     if (info) adapterDescription = [info.vendor, info.architecture, info.description].filter(Boolean).join(' / ');
   }
 

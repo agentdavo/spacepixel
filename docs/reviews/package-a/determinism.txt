@@ -1,0 +1,24 @@
+
+> project-vanguard@0.1.0 determinism
+> node scripts/determinism.mjs
+
+
+■ dogfight · 10 simulated min · 600 checkpoints (1/s) · 1592 ms/run
+  world: 8 ships spawned · 9491 gun shots · 564 missiles · 93 kills · final hash 994c22e2
+  PASS  same seed + script, run twice: 600/600 checkpoints bit-identical
+  PASS  recorded input replayed: 600/600 checkpoints bit-identical · replay 56.3 KB (5.63 KB/min base64, 4 commands)
+  PASS  a different seed gives a different world (hash sensitivity)
+
+■ capital · 10 simulated min · 600 checkpoints (1/s) · 3138 ms/run
+  world: 139 ships spawned · 14853 gun shots · 1319 missiles · 130 kills · final hash 327644c3
+  PASS  same seed + script, run twice: 600/600 checkpoints bit-identical
+  PASS  recorded input replayed: 600/600 checkpoints bit-identical · replay 56.3 KB (5.63 KB/min base64, 4 commands)
+  PASS  a different seed gives a different world (hash sensitivity)
+
+■ traffic · 10 simulated min · 600 checkpoints (1/s) · 1459 ms/run
+  world: 27 ships spawned · 6269 gun shots · 136 missiles · 25 kills · final hash 28020b5c
+  PASS  same seed + script, run twice: 600/600 checkpoints bit-identical
+  PASS  recorded input replayed: 600/600 checkpoints bit-identical · replay 56.3 KB (5.63 KB/min base64, 4 commands)
+  PASS  a different seed gives a different world (hash sensitivity)
+
+ALL PASS · 19.0 s

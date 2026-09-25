@@ -19,6 +19,8 @@ import { disposeTree, DISPOSE_PARTS, GpuEpoch, releaseRendererCaches } from '@/c
 import { PhotoMode } from '@/ui/PhotoMode';
 import { getAudio } from '@/audio';
 import { DynamicResolution } from '@/core/DynamicResolution';
+import { installRendererRecovery } from '@/render/RendererRecovery';
+import { installSettingsKeys } from '@/game/Settings';
 import { episodeCompleted, syncStory } from '@/game/world/live';
 import { installStorageShim, loadReplay, replayBootUrl, setPendingReplay } from '@/game/ReplayDirector';
 
@@ -79,8 +81,10 @@ async function boot(): Promise<void> {
   await prepareReplay();
   const canvas = document.getElementById('viewport') as HTMLCanvasElement;
   const uiRoot = document.getElementById('ui-root')!;
+  installSettingsKeys();
   const info = await createRenderer(canvas);
   const engine = new Engine(info);
+  installRendererRecovery(info.renderer, uiRoot, () => engine.clearSystems());
 
   let ink: InkPipeline | null = null;
   let debugHud: DebugHud | null = null;
@@ -156,7 +160,22 @@ async function boot(): Promise<void> {
     backend: info.backendName,
     hooks: {
       ...window.__VANGUARD__?.hooks,
-      perf: () => engine.perf.summary(),
+      perf: () => ({
+        ...engine.perf.summary(),
+        backend: info.backendName, adapter: info.adapterDescription,
+        renderScale: ink?.renderScale ?? 1, pixelRatio: info.renderer.getPixelRatio(),
+        droppedSimulationFrames: engine.droppedFrames,
+        drawCalls: info.renderer.info.render.drawCalls,
+        triangles: info.renderer.info.render.triangles,
+        computeCalls: info.renderer.info.compute.frameCalls,
+      }),
+      ...(new URLSearchParams(location.search).has('rendercheck') ? {
+        loadScene: async (name: string) => {
+          if (!SCENES[name]) throw new Error('Unknown scene');
+          await load(name);
+        },
+        renderScale: (scale: number) => ink?.setRenderScale(scale),
+      } : {}),
       step: (n: number) => engine.step(n),
       /** The renderer itself (leak probes, dev tools). */
       renderer: () => info.renderer,

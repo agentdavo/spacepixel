@@ -1,0 +1,23 @@
+{
+  "source": "4ef419b",
+  "browser": "msedge",
+  "mode": "headless native WebGPU staged stills",
+  "size": [
+    1280,
+    720
+  ],
+  "evidence": [
+    {
+      "name": "capital",
+      "query": "scene=combat&stage=capital",
+      "backend": "WebGPU",
+      "errors": []
+    },
+    {
+      "name": "structural",
+      "query": "scene=combat&stage=kill&path=structural",
+      "backend": "WebGPU",
+      "errors": []
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "timestamp": "2026-09-25T18:30:16.327Z",
+  "scene": "combat",
+  "size": "1280x720",
+  "query": "stage=capital&scene=combat&hud=0&voice=off&dynres=0&backend=webgpu&demo=1",
+  "browser": "153.0.4234.48",
+  "requestedGpu": "native",
+  "nativeVerified": true,
+  "softwareAdapter": false,
+  "status": "fail",
+  "budgets": {
+    "cpuBudget": 4,
+    "gpuBudget": 8,
+    "frameBudget": 16.7
+  },
+  "gates": {
+    "backend": true,
+    "cpu": false,
+    "gpu": false,
+    "interval": false,
+    "pageErrors": true
+  },
+  "perf": {
+    "frames": 240,
+    "budgetMs": 16.67,
+    "gpuMode": "timestamp",
+    "timingErrors": 0,
+    "gpuSamples": 93,
+    "gpuRender": {
+      "samples": 93,
+      "p95": 17.41
+    },
+    "gpuCompute": {
+      "samples": 93,
+      "p95": 0.03
+    },
+    "cpu": {
+      "p50": 3.9,
+      "p95": 7.1,
+      "max": 10.9
+    },
+    "gpu": {
+      "p50": 7.18,
+      "p95": 17.45,
+      "max": 22.62
+    },
+    "interval": {
+      "p50": 16.7,
+      "p95": 33.4
+    },
+    "inputToSubmit": {
+      "p50": 0,
+      "p95": 0
+    },
+    "inputToGpu": {
+      "p50": 0,
+      "p95": 0
+    },
+    "overBudgetPct": 0,
+    "hitches": 0,
+    "backend": "WebGPU",
+    "adapter": "intel / xe-lpg",
+    "renderScale": 1,
+    "pixelRatio": 1,
+    "droppedSimulationFrames": 0,
+    "drawCalls": 167,
+    "triangles": 45613,
+    "computeCalls": 1
+  },
+  "memory": {
+    "attributes": 390,
+    "attributesSize": 28494956,
+    "geometries": 89,
+    "indexAttributes": 30,
+    "indexAttributesSize": 62040,
+    "indirectStorageAttributes": 0,
+    "indirectStorageAttributesSize": 0,
+    "programs": 50,
+    "programsSize": 372321,
+    "readbackBuffers": 0,
+    "readbackBuffersSize": 0,
+    "renderTargets": 13,
+    "storageAttributes": 5,
+    "storageAttributesSize": 8650752,
+    "textures": 20,
+    "texturesSize": 43621376,
+    "uniformBuffers": 292,
+    "uniformBuffersSize": 180064,
+    "total": 81381509,
+    "pipelines": 33
+  },
+  "features": [
+    "depth32float-stencil8",
+    "rg11b10ufloat-renderable",
+    "texture-formats-tier1",
+    "bgra8unorm-storage",
+    "texture-compression-bc",
+    "dual-source-blending",
+    "core-features-and-limits",
+    "float32-filterable",
+    "indirect-first-instance",
+    "float32-blendable",
+    "depth-clip-control",
+    "texture-compression-bc-sliced-3d",
+    "timestamp-query",
+    "clip-distances",
+    "texture-formats-tier2",
+    "shader-f16",
+    "subgroups"
+  ],
+  "errors": [],
+  "steppedMsPerFrame": null
+}

@@ -26,7 +26,7 @@ import { MISSILE_CAPACITY, type Missiles } from '@/sim/Missiles';
 import { FACTIONS } from '@/assets/Factions';
 import { GUN_LIST, type BoltStyle, type DamageType } from '@/sim/Loadouts';
 import type { ShipEntity } from '@/sim/Fleet';
-import { fxHex } from '@/fx/shaders.wgsl';
+import { fxHex } from '@/fx/shaders';
 import { MAX_FACINGS, facingAt, facingFrac, facingLayout, shellDir, shellScale } from './ShieldGeometry';
 
 /** What the renderer reads from the weapons sim (the live Weapons, or the kill-cam's recorded frame). */
