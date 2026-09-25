@@ -17,6 +17,13 @@ superseded; its files remain preserved as a previous review cut.
 
 ## The experience we are building
 
+Engine ownership and the staged codebase reform are defined in
+[ENGINE-ARCHITECTURE.md](ENGINE-ARCHITECTURE.md). The first maintenance slice
+separates twenty mission modules, adds build-time content checks, and validates
+loaded runner snapshots before mutation. [MISSION-AUTHORING.md](MISSION-AUTHORING.md)
+sets the authoring and bug-fix workflow. This proceeds alongside the authorised
+V4 render without changing its capture baseline.
+
 A cinematic third-person space combat game inside a vast, failing industrial
 civilisation, with intimate squadron radio and a sweeping literary campaign.
 The player should feel the weight of a ship, recognise who is speaking on the

@@ -6,7 +6,8 @@
   "description": "Retro OVA cel-shaded space combat — Three.js WebGPU",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && node scripts/check-campaign.mjs && vite build",
+    "check:campaign": "node scripts/check-campaign.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "shot": "node scripts/screenshot.mjs",
