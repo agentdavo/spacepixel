@@ -4,7 +4,8 @@ import type { Weapons, Beam } from '@/sim/Weapons';
 import type { Capitals } from '@/sim/Capitals';
 import type { Rng } from '@/sim/Rng';
 import { GUNS, type GunSpec, type Loadout, type MountSpec } from '@/sim/Loadouts';
-import { createTurretSolution, issueOrder, leadPoint, turretAim, turretCanPoint, turretSelectTarget, TURRET_DEFAULTS, type TurretMount, type TurretSolution } from '@/sim/ai';
+import { createTurretSolution, issueOrder, leadPoint, turretAim, turretSelectTarget, TURRET_DEFAULTS, type TurretMount, type TurretSolution } from '@/sim/ai';
+import { turretSelectThreat } from '@/sim/ai/Turret';
 import { PD_TOL, createDrive, gateTolerance, mountFromRig, muzzleLocal, nextMuzzle, poseTurret, restoreDrive, rigFor, stepDrive, wreckDrive, type TurretDrive, type TurretRig } from '@/sim/TurretRig';
 import { CATALOG_BY_ID } from '@/game/shipyard/catalog';
 import { computeFit, stockFit } from './fit';
@@ -256,15 +257,7 @@ export class ShipTurrets {
       g.engaged = false;
       if (!hold) {
         // Flak mounts break off for inbound torpedoes.
-        if (ord && PD_GUNS.has(g.gun.id) && ord.nearestThreat(m.position, team, PD_RANGE, _tp, _tv) >= 0) {
-          if (leadPoint(m.position, m.velocity, _tp, _tv, null, _w, g.gun.speed) > 0 && turretCanPoint(m, _v.subVectors(_w, m.position).normalize())) {
-            g.sol.aimDir.copy(_v);
-            g.sol.aimPoint.copy(_w);
-            g.sol.distance = _tp.distanceTo(m.position);
-            g.sol.target = null;
-            aimed = pd = true;
-          }
-        }
+        if (ord && PD_GUNS.has(g.gun.id)) aimed = pd = turretSelectThreat(m, team, ord, PD_RANGE, g.sol);
         const pref = preferred && preferred.alive && hostile(preferred, s) ? preferred : null;
         if (!aimed && pref) aimed = turretAim(m, pref, g.sol);
         if (!aimed && !onlyTarget) {

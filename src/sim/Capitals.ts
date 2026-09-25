@@ -1,7 +1,7 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { hostile, type Fleet, type ShipEntity } from './Fleet';
 import type { Weapons, Beam } from './Weapons';
-import { createTurretSolution, turretAim, turretCanPoint, turretSelectTarget, TURRET_DEFAULTS, type TurretMount, type TurretSolution } from './ai/Turret';
+import { createTurretSolution, turretAim, turretSelectThreat, turretSelectTarget, TURRET_DEFAULTS, type TurretMount, type TurretSolution } from './ai/Turret';
 import { issueOrder, leadPoint } from './ai';
 import { CAPITAL_LANCE, GUNS, type BatterySpec, type GunSpec } from './Loadouts';
 import { facingOf, facingUp, type Subsystem } from './Damage';
@@ -209,15 +209,7 @@ export class Capitals {
   /** Point defence: lead on the nearest inbound ordnance in arc (solution in g.sol). */
   private layPd(c: Capital, g: Gun, range: number): boolean {
     const ord = this.fleet.ordnance;
-    const m = g.mount;
-    if (!ord || ord.nearestThreat(m.position, c.ship.team, range, _tp, _tv) < 0) return false;
-    const tof = leadPoint(m.position, m.velocity, _tp, _tv, null, _w, c.gun.speed);
-    if (tof <= 0 || !turretCanPoint(m, _v.subVectors(_w, m.position).normalize())) return false;
-    g.sol.aimDir.copy(_v);
-    g.sol.aimPoint.copy(_w);
-    g.sol.distance = _tp.distanceTo(m.position);
-    g.sol.target = null;
-    return true;
+    return !!ord && turretSelectThreat(g.mount, c.ship.team, ord, range, g.sol);
   }
 
   /** Keep the current lay (between picks). False when it's lost. */

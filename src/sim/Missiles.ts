@@ -401,14 +401,14 @@ export class Missiles implements Shootables {
     return false;
   }
 
-  nearestThreat(from: Vector3, team: Team, range: number, pos: Vector3, vel: Vector3): number {
+  nearestThreat(from: Vector3, team: Team, range: number, pos: Vector3, vel: Vector3, accept?: (pos: Vector3, vel: Vector3) => boolean): number {
     let best = -1;
     let bd = range;
     for (const i of this.shootable) {
       const o = this.owner[i];
       if (!this.alive[i] || !o || o.team === team || o.team === 'neutral') continue;
       const d = this.pos[i].distanceTo(from);
-      if (d < bd) {
+      if (d < bd && (!accept || accept(this.pos[i], this.vel[i]))) {
         bd = d;
         best = i;
       }

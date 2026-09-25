@@ -85,8 +85,8 @@ export type HitEventKind = 'kill' | 'subsystem' | 'shield-down' | 'shield-bleed'
 export interface Shootables {
   /** Swept test of a hostile bolt; applies damage and returns true on a hit. */
   shoot(ax: number, ay: number, az: number, dx: number, dy: number, dz: number, team: Team, damage: number): boolean;
-  /** Nearest live shootable hostile to `team` within `range` of `from`, or −1. Writes its position/velocity. */
-  nearestThreat(from: Vector3, team: Team, range: number, pos: Vector3, vel: Vector3): number;
+  /** Nearest live shootable hostile within range that passes `accept`, or −1. Writes its position/velocity. */
+  nearestThreat(from: Vector3, team: Team, range: number, pos: Vector3, vel: Vector3, accept?: (pos: Vector3, vel: Vector3) => boolean): number;
 }
 
 export function emptyControls(): ControlState {
