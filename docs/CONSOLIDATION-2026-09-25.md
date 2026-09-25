@@ -56,7 +56,7 @@ branches are retired at this checkpoint. The rendering worktree is detached at
 After escort integration, `codex/campaign-escort-arrival` (`5cd644c`) and
 `codex/engine-modularity` (`dc4aead`) also retired by ancestry verification.
 Their worktrees are detached at those unchanged commits. **Ten completed task
-branches are now retired.** The remaining local branches are the canonical
+branches are now retired.** At that escort checkpoint the remaining local branches were the canonical
 integration branch, the active `codex/hull-contact-physics` work branch, and
 the original upstream-tracking baseline. No remote refs were changed.
 
@@ -135,3 +135,12 @@ native before/after evidence are distinguished by source revision in
 missing large-ship pair response and fixes event retention, shield/hull cue
 selection, replay-seek silence and outward impact normals. Ordinary-input
 Episode 4 recapture and the six-second V4.1 replacement remain the next gate.
+
+At accepted collision baseline `34243ac`, the completed
+`codex/hull-contact-physics` (`dee8042`) and `codex/contact-integration`
+(`34243ac`) branches also retired by ancestry verification. Their worktrees,
+native media and nested baseline checkout remain intact. **Twelve completed
+task branches have been retired.** The only ongoing source branch is the
+V4.1 capture task, alongside the canonical integration branch and original
+upstream-tracking baseline. Its camera/telemetry changes return through chief
+review before recording. No remote branch was deleted or pushed.
