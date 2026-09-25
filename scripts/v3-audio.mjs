@@ -3,6 +3,7 @@ import { createServer } from 'vite';
 import { chromium } from 'playwright';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 const [ledgerPath, out = 'scratchpad/delivery/v3/stems'] = process.argv.slice(2);
+const prefix=process.argv.includes('--prefix')?process.argv[process.argv.indexOf('--prefix')+1]:'v3';
 if (!ledgerPath) throw new Error('Usage: node scripts/v3-audio.mjs edit-ledger.json output-directory');
 const ledger = JSON.parse(readFileSync(ledgerPath,'utf8'));
 const frames = [];
@@ -30,7 +31,8 @@ try {
       const {renderCapturedStem}=await import('/src/audio/offline.ts');
       return renderCapturedStem(frames,ledger.duration,stem,ledger.music??[]);
     },{frames,ledger,stem});
-    writeFileSync(`${out}/v3-${stem}.wav`,Buffer.from(result.wav,'base64'));
+    result.name=`${prefix}-${stem}`;
+    writeFileSync(`${out}/${prefix}-${stem}.wav`,Buffer.from(result.wav,'base64'));
     delete result.wav; audit.push(result); console.log(result);
   }
   writeFileSync(`${out}/audio-audit.json`,JSON.stringify(audit,null,2));

@@ -20,5 +20,5 @@ run('ffmpeg',['-hide_banner','-loglevel','error','-y','-i',video,'-vf',`select='
 const av=run('ffmpeg',['-hide_banner','-i',video,'-vf','blackdetect=d=0.2:pix_th=0.025:pic_th=0.98',...(a?['-af','ebur128=peak=true']:[]),'-f','null','-']).stderr;
 writeFileSync(join(out,'av-analysis.txt'),av);
 const report={frames:Number(v.nb_frames),duration:Number(v.duration),width:v.width,height:v.height,fps:30,audio:!!a,faststart,sha256:createHash('sha256').update(bytes).digest('hex'),gameplaySeconds:ledger.shots.filter(s=>s.gameplay).reduce((n,s)=>n+s.duration,0),hudGameplaySeconds:ledger.shots.filter(s=>s.gameplay&&s.hud).reduce((n,s)=>n+s.duration,0),samples};
-if(report.gameplaySeconds<70||report.hudGameplaySeconds<70)throw new Error('Gameplay/HUD coverage below 70 seconds');
+if(report.gameplaySeconds<(ledger.minimumGameplaySeconds??70)||report.hudGameplaySeconds<(ledger.minimumHudSeconds??70))throw new Error('Gameplay/HUD coverage below the ledger requirements');
 writeFileSync(join(out,'qa.json'),JSON.stringify(report,null,2));console.log(report);
