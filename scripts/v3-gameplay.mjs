@@ -21,7 +21,7 @@ const camera = opt('camera', '');
 const cameraScale = Number(opt('camera-scale', '1'));
 const cameraTag = opt('camera-tag','');
 const pilot = args.includes('--pilot');
-const episode = opt('episode', '');
+const episode = opt('episode', replay?.commands?.find(c=>c.c==='episode')?.a??'');
 const route = opt('route','') ? JSON.parse(readFileSync(opt('route',''),'utf8')) : [];
 const routeUntil = Number(opt('route-until','1e9'));
 const plan = opt('inputs', '') ? JSON.parse(readFileSync(opt('inputs', ''), 'utf8')) : [];
@@ -65,7 +65,7 @@ try {
       const v = window.__v3;
       v.inputs.push({ tick: S.simTick, ...S.player.controls });
       for (const e of S.weapons.events) v.ticks.push({ tick: S.simTick, kind: e.kind, ship: e.ship?.id, shooter: e.shooter?.id, sub: e.sub?.id, amount: e.amount, cause: e.cause, turret: e.turret });
-      if (target && !target.alive && v.deadAt === null) v.deadAt = S.simTick / 60;
+      if (!S.campaign && target && !target.alive && v.deadAt === null) v.deadAt = S.simTick / 60;
     };
     const audioUpdate = S.audio.update.bind(S.audio);
     S.audio.update = f => { window.__v3.audio.push({ tick: S.simTick, ...snapshotAudioFrame(f), player: { ...f.player, position: { ...f.player.position }, velocity: { ...f.player.velocity } }, jumpPhase: f.jumpPhase, combatIntensity: f.combatIntensity }); audioUpdate(f); };
@@ -124,7 +124,7 @@ try {
       await page.evaluate(async () => { const S = window.__v3.S, {input}=await import('/src/core/Input.ts'); input.sample(S.simTick/60); input.beginTick(true); S.simStep(); input.beginTick(false); S.simStep(); input.endTicks(2,false); S.update({ dt: 1/30, time: S.simTick/60, alpha: 0, frame: S.simTick/2, ticks: 2 }); });
     } else await page.evaluate(() => window.__VANGUARD__.hooks.step(1));
     const sample = await page.evaluate(() => {
-      const v = window.__v3, S = v.S, t = v.target;
+      const v = window.__v3, S = v.S, t = S.campaign ? S.lock.target : v.target;
       const frame = { tick: S.simTick, at: S.simTick/60, audio: v.audio.splice(0), events: v.ticks.splice(0), camera: S.cameraLabel(), controls: v.inputs.splice(0) };
       if (S.simTick % 60 === 0) frame.state = { player: { hull: S.player.hull, shield: S.player.shield }, target: t && { alive: t.alive, hull: t.hull, shield: t.shield, facings: t.combat.dmg.facings, subsystems: t.combat.dmg.subsystems.map(s => ({ id: s.id, hp: s.hp, destroyed: s.destroyed })), structure: t.combat.dmg.structure }, wrecks: S.fleet.destruction.wrecks.map(w => ({ ship: w.ship.id, cause: w.cause, position: w.position.toArray(), age: w.age })), deadAt: v.deadAt };
       if (frame.state && S.campaign) frame.state.campaign={mission:S.campaign.mission.id,time:S.campaign.runner.time,state:[...S.campaign.runner.state],flags:[...S.campaign.runner.flags],outcome:S.campaign.runner.outcome,comms:S.campaign.comms.typedEl.textContent,position:S.player.flight.position.toArray(),ships:S.campaign.runner.snapshot().ships};

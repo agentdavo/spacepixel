@@ -21,5 +21,9 @@ for(const dir of new Set(ledger.shots.filter(s=>s.events).map(s=>s.frames))){
  const missiles={};for(const r of rows)for(const a of r.audio)for(const m of a.missileEvents)missiles[m.kind]=(missiles[m.kind]??0)+1;
  report.takes.push({dir,frames:rows.length,firstFrame:first,lastFrame:rows.at(-1).frame,frameAggregateSHA256:aggregate.digest('hex'),eventsSHA256:hash(join(root,'events.jsonl')),provenance:p,replayStatus:status,sourceTape:tape,sourceTapeSHA256:hash(tape),audioWeapons,tickWeapons,missiles,deathTimes:[...new Set(rows.map(r=>r.state?.deadAt).filter(x=>x!=null))],maxWrecks:Math.max(...rows.map(r=>r.state?.wrecks.length??0))});
 }
-for(const s of ledger.shots){const n=Math.round(s.duration*30),first=Math.round(s.from*30);for(let i=0;i<n;i++)if(!existsSync(join(s.frames,`f_${String(first+i).padStart(5,'0')}.jpg`)))throw new Error(`Missing edited frame ${s.id}`);report.shots.push({...s,framesCount:n});}
+for(const s of ledger.shots){const n=Math.round(s.duration*30),first=Math.round(s.from*30);for(let i=0;i<n;i++)if(!existsSync(join(s.frames,`f_${String(first+i).padStart(5,'0')}.jpg`)))throw new Error(`Missing edited frame ${s.id}`);
+ const selected=s.events?readFileSync(s.events,'utf8').trim().split(/\r?\n/).map(x=>JSON.parse(x)).filter(r=>r.frame>=first&&r.frame<first+n&&r.state):[];
+ const minimumPlayerHull=selected.length?Math.min(...selected.map(r=>r.state.player.hull)):null;
+ if(ledger.requirePlayerAlive&&minimumPlayerHull!==null&&minimumPlayerHull<=0)throw new Error(`Player death in selected shot ${s.id}`);
+ report.shots.push({...s,framesCount:n,minimumPlayerHull,campaignOutcomes:[...new Set(selected.map(r=>r.state.campaign?.outcome).filter(Boolean))]});}
 writeFileSync(process.argv[3],JSON.stringify(report,null,2));console.log('Verified',report.takes.length,'takes and',report.shots.length,'shots');
