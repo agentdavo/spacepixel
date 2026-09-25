@@ -10,9 +10,13 @@ import { str } from './types';
 
 /**
  * A small environmental tableau, never a Fleet actor or a mission objective.
- * The default-off preview gate is passed by the registry, so tests can build
+ * The presentation toggle is passed by the registry, so tests can build
  * the piece without a browser. Frames retain their real metre-scale Statures.
  */
+export function kessenCameosEnabled(search: string): boolean {
+  return new URLSearchParams(search).get('kessenCameos') !== '0';
+}
+
 export class KessenCameo implements SetPiece {
   readonly kind: SetPieceKind = 'kessen-cameo';
   readonly group = new Group();
@@ -25,7 +29,7 @@ export class KessenCameo implements SetPiece {
   private readonly hideWhen: string;
   private disposed = false;
 
-  constructor(readonly tag: string, anchor: Vector3, params?: SetPieceParams, enabled = false) {
+  constructor(readonly tag: string, anchor: Vector3, params?: SetPieceParams, enabled = true) {
     this.position.copy(anchor);
     this.group.position.copy(anchor);
     this.group.name = `setpiece:kessen-cameo:${tag}`;

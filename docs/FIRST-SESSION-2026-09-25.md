@@ -139,5 +139,7 @@ an attended normal-control run. Have a player assess control discovery (the
 new stationary opening currently relies on the F3 control help), aiming, flight
 feel and the readability of dialogue against the HUD. Review trailer/voice
 performance by listening; the separate [editorial review](TRAILER_EDITORIAL_REVIEW.md)
-records the narration and pitch concerns. Keep Kessen cameos gated until their
-motion, timing and navigation checks are accepted.
+records the narration and pitch concerns. Subsequent to this first-session run,
+the chief accepted the Kessen motion/timing evidence and combined navigation
+checks passed; the bounded EP10/19 cameos are now active. That separate visual
+acceptance does not close the EP01 combat playthrough gap.

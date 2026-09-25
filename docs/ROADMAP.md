@@ -32,6 +32,13 @@ loss; successful EP01 completion is still an acceptance gap. See the
 Trailer V2 remains the current review artifact; the chief's
 [editorial review](TRAILER_EDITORIAL_REVIEW.md) records pending voice/script work.
 
+The chief has now accepted and activated the **EP10/19 Kessen environmental
+cameos** on this local integration branch. Combined validation: 308 tests/build
+and native WebGPU default-on versus `kessenCameos=0` comparisons pass, including
+mission progress and navigation. They add no combat, collision, economy or save
+mechanics. See [cameo evidence](KESSEN-CAMEO-PREVIEW.md) for timing, motion
+provenance and the 108.4 m lifeboat clearance check.
+
 Guiding rules (after Carmack): one ship flying well first; performance and
 latency measured from day one with pass/fail numbers; camera-relative
 rendering designed in; direct code over architecture; strict TypeScript;

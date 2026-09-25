@@ -87,15 +87,19 @@ test('cameos: identical runner snapshots, chatter, kills and outcomes with specs
   }
 });
 
-test('cameos: default off allocates no meshes; enabled poses are time-derived and side-effect free', async () => {
-  const { KessenCameo } = await load();
+test('cameos: default on, explicit off allocates no meshes; poses are time-derived and side-effect free', async () => {
+  const { KessenCameo, kessenCameosEnabled } = await load();
+  assert.equal(kessenCameosEnabled(''), true);
+  assert.equal(kessenCameosEnabled('?episode=10'), true);
+  assert.equal(kessenCameosEnabled('?kessenCameos=1'), true);
+  assert.equal(kessenCameosEnabled('?episode=19&kessenCameos=0'), false);
   const anchor = new Vector3(2_400_000, 150_000, -1_100_000);
-  const off = new KessenCameo('off', anchor);
+  const off = new KessenCameo('off', anchor, undefined, kessenCameosEnabled('?kessenCameos=0'));
   assert.equal(off.frames.length, 0);
   assert.equal(off.group.children.length, 0);
   assert.equal(off.radius, 0);
   off.dispose();
-  const a = new KessenCameo('a', anchor, { tableau: 'witness' }, true);
+  const a = new KessenCameo('a', anchor, { tableau: 'witness' });
   const b = new KessenCameo('b', anchor, { tableau: 'witness' }, true);
   assert.equal(a.frames.length, 2);
   assert.deepEqual(a.frames.map((f: any) => f.height), [7.2, 11.5]);

@@ -18,9 +18,11 @@ branches were deleted and no remote push was made.
 The chief task owns direction in [GAME-DIRECTION.md](GAME-DIRECTION.md).
 The user's superseding scope is **Kessen cameos first**, preserving the
 original technical milestones and twenty-episode campaign. The earlier
-side-arc/faction-foundation sequence is deferred. The Kessen task has built an
-isolated, default-off render-only cameo preview and is completing motion/timing
-evidence; it is not yet integrated or enabled here.
+side-arc/faction-foundation sequence is deferred. The Kessen handoff through
+`e75d68b` is now integrated. The chief accepted final EP10/19 motion and authorised
+default activation after combined checks; these render-only cameos are on,
+with `kessenCameos=0` for debug comparison. 308 tests/build and native mission,
+state and navigation comparisons pass. No general faction/boarding changes.
 
 Integration follow-up `2c284ab` fixes the reproduced EP01 waypoint/autojump
 blocker. The [first-session report](FIRST-SESSION-2026-09-25.md) separates live

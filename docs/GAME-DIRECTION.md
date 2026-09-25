@@ -84,14 +84,23 @@ This supersedes the chief task's earlier side-arc-first authorisation.
   damage requires an actual breach route. The proposed 2 m/s approach and
   30-tick validation are tuning hypotheses, not accepted balance numbers.
 
-The revised cameo plan is committed as `e9ed923` on the isolated Kessen branch.
-Chief review authorises a bounded preview: at most 2–4 existing frames guarding
-an Episode 10 evacuation route and standing witness near an Episode 19 tuning
-approach. Use render-only set pieces with deterministic mission gates, no
-combat or objective credit, and no new voice dependency. Keep the development
-gate off until chief review of player-camera and close-up screenshots, scene
-timing and integration checks. Final visual evidence must use verified native
-WebGPU; a software WebGL baseline establishes composition only.
+The revised cameo plan began at `e9ed923` on the isolated Kessen branch. Chief
+review on 25 September subsequently accepted the service-module geometry, local
+lighting, corrected EP10 placement and both EP10/19 normal-approach motion
+samples, and authorised integration and default activation after combined checks.
+Those checks pass: 308 tests/build and native WebGPU default-on/explicit-off
+comparisons preserve gameplay hashes, runner progress, world facts and navigation.
+The two render-only cameos are enabled in normal EP10/19 play, with
+`kessenCameos=0` retained for debug comparison. EP10 appears only after the
+Bastion's actual destruction; EP19 is removed on `leg2`. There is no combat or
+objective credit, new voice dependency, collision actor or save change.
+
+The lifeboat clearance test covers both real corvettes and their arrival turns,
+with 108.4 m minimum conservative clearance. Motion samples are silent staged
+visual evidence from the final geometry before the navigation rebase; combined
+native stills and state comparisons were rerun after integration. This accepts
+the bounded visual cameos, not a full manual mission or crowd-performance claim.
+See [cameo evidence](KESSEN-CAMEO-PREVIEW.md).
 
 The earlier broad phases 0–1 faction-foundation scope is superseded. No boarding
 or shield-bypass mechanic is authorised for this introduction. Preserve existing

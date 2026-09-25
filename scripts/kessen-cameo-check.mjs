@@ -8,7 +8,8 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -21,7 +22,7 @@ const episodes = opt('episodes', '10,19').split(',').map(Number);
 assert.ok(episodes.length > 0 && episodes.every((ep) => [10, 19].includes(ep)), 'episodes must be 10 and/or 19');
 const framesRoot = args.includes('--approach') ? resolve(opt('frames-dir', '') || mkdtempSync(resolve(tmpdir(), 'vanguard-kessen-'))) : null;
 mkdirSync(out, { recursive: true });
-const server = await createServer({ cacheDir: resolve(`node_modules/.vite-kessen-${port}`), server: { port, host: '127.0.0.1', strictPort: true, hmr: false }, logLevel: 'warn' });
+const server = await createServer({ cacheDir: resolve(`node_modules/.vite-kessen-${port}`), server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: null }, logLevel: 'warn' });
 await server.listen();
 let browser;
 const reports = [];
@@ -34,7 +35,7 @@ try {
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
     await page.addInitScript(() => { let seed = 0x56414e47; Math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296); });
-    const url = `http://127.0.0.1:${port}/?scene=flight&episode=${episode}&kessenCameos=${enabled ? 1 : 0}&shot=1&record=60&demo=0&hud=1&quality=high&dynres=0`;
+    const url = `http://127.0.0.1:${port}/?scene=flight&episode=${episode}${enabled ? '' : '&kessenCameos=0'}&shot=1&record=60&demo=0&hud=1&quality=high&dynres=0`;
     await page.goto(url, { waitUntil: 'commit' });
     await page.waitForFunction(() => window.__VANGUARD__?.error || (window.__VANGUARD__?.hooks?.step && window.__VANGUARD__.hooks.scene?.campaign), null, { timeout: 180_000 });
     const device = await page.evaluate(() => {
@@ -80,7 +81,9 @@ try {
       const p = s.campaign.pieces.find((p) => p.kind === 'kessen-cameo');
       const b = p.position.clone().sub(s.world.eye);
       b.project(s.camera);
-      return { hash: s.worldHash(), runner: s.campaign.runner.snapshot(), facts: s.worldRt.state.facts, frames: p.frames.length, camera: s.director.kind, cameoNdc: b.toArray(), playerPosition: s.player.flight.position.toArray(), cameoPosition: p.position.toArray(), flags: [...s.campaign.runner.flags], memory: h.memory() };
+      const gate = s.navGate();
+      const navigation = { objective: s.campaign.runner.navigation()?.tag ?? null, gateTo: gate?.link.to ?? null, gatePosition: gate?.center.toArray() ?? null };
+      return { hash: s.worldHash(), runner: s.campaign.runner.snapshot(), facts: s.worldRt.state.facts, navigation, frames: p.frames.length, camera: s.director.kind, cameoNdc: b.toArray(), playerPosition: s.player.flight.position.toArray(), cameoPosition: p.position.toArray(), flags: [...s.campaign.runner.flags], memory: h.memory() };
     });
     assert.equal(state.frames, enabled ? 2 : 0);
     if (episode === 10) {
@@ -154,9 +157,11 @@ try {
     assert.equal(on.hash, off.hash, `Episode ${episode}: gameplay hash`);
     assert.deepEqual(on.runner, off.runner, `Episode ${episode}: runner progress`);
     assert.deepEqual(on.facts, off.facts, `Episode ${episode}: world facts`);
+    assert.deepEqual(on.navigation, off.navigation, `Episode ${episode}: objective and gate navigation`);
   }
-  writeFileSync(`${out}/${opt('evidence', 'evidence.json')}`, JSON.stringify({ sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), note: 'Staged real mission sites; Episode 10 fast-forwards 100 seconds of actual fixed simulation ticks from CAP range, with no Bastion seek, flag or kill injection. Player screenshots use normal chase tuning. Inspection screenshots use a shorter chase offset with foreground player meshes hidden. Memory records renderer resource accounting, not frame timing or a crowd performance guarantee. This is not a manual end-to-end battle playthrough.', reports }, null, 2));
-  console.log('PASS: native WebGPU captures, enabled/off gameplay hashes, runner snapshots and world facts match.');
+  const sourceFiles = Object.fromEntries(['src/world/setpieces/KessenCameo.ts', 'src/world/setpieces/index.ts', 'src/game/campaign/missions.ts', 'src/world/scenes/FlightScene.ts', 'scripts/kessen-cameo-check.mjs'].map((path) => [path, createHash('sha256').update(readFileSync(path)).digest('hex')]));
+  writeFileSync(`${out}/${opt('evidence', 'evidence.json')}`, JSON.stringify({ sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, note: 'Default-on versus explicit kessenCameos=0. Source hashes identify tested working files, including uncommitted integration changes. Staged real mission sites; Episode 10 fast-forwards 100 seconds of actual fixed simulation ticks from CAP range, with no Bastion seek, flag or kill injection. Player screenshots use normal chase tuning. Inspection screenshots use a shorter chase offset with foreground player meshes hidden. Memory records renderer resource accounting, not frame timing or a crowd performance guarantee. This is not a manual end-to-end battle playthrough.', reports }, null, 2));
+  console.log('PASS: native WebGPU captures, default-on/explicit-off gameplay hashes, runner snapshots, world facts and navigation match.');
 } finally {
   await browser?.close();
   await server.close();
