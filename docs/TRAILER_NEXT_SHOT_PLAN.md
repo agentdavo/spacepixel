@@ -1,8 +1,10 @@
 # Next trailer: cinematic revision proposal
 
-Review of the delivered V3 clarity cut, 25 September 2026. This is a shot plan,
-not an approved new edit. V3 is preserved. No narration or full render has been
-started. The chief owns the full script rewrite and final duration.
+Review of the delivered V3 clarity cut, 25 September 2026. David has authorised
+production: "go, render when ready". This plan is approved with the chief's
+canonical `TRAILER_V4_SCRIPT.md` direction. V3 is preserved. Fresh narration,
+bounded pickups, editing and final rendering may proceed; the chief owns the
+script and final editorial review.
 
 Revision 2 incorporates the chief's replacement twelve-line script: gates let
 ships travel; failure cuts worlds off; scarce fuel makes reopened routes worth

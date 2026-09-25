@@ -6,6 +6,11 @@ nonsensical. The new introduction must make sense to a twelve-year-old hearing
 it once, without requiring knowledge of the lore. This supersedes V3's words
 and its fixed timing. V3 remains preserved as a previous review cut.
 
+Production authorised by David: **"go, render when ready"**. Proceed with the
+fresh narration, bounded mission/presentation pickups, edit, sound mix and
+final render. Chief reviews the assembled picture and delivery checks; no
+further user approval is required to produce the film.
+
 ## Replacement narration
 
 Long ago, enormous gates in space let ships travel between distant worlds.
@@ -117,4 +122,9 @@ Chief owns this replacement script. The trailer task returned the timestamped
 shot proposal; the voice and lore tasks supplied comprehension and canon checks.
 The rendering/ship task returned a bounded composition and readability review
 without new capture work. All four tasks have now responded.
-This handoff contains a new script and edit direction; it is not a rendered V4.
+V4 production is now underway. The trailer task owns capture/edit/mix/render;
+the voice task supplies fresh measured line masters and a timed narration stem.
+The integration task advises ordinary mission capture and reviews provenance.
+Chief owns final editorial review and copying the verified delivery to the main
+workspace. The rendering task's separate work must not contend for the capture
+GPU during this production pass.
