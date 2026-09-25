@@ -2,6 +2,7 @@ import type { GameScene } from '../GameScene';
 
 /** Scene registry: `?scene=<name>`. Lazy so each scene only loads what it needs. */
 export const SCENES: Record<string, () => Promise<GameScene>> = {
+  shipreview: async () => new (await import('./ShipReviewScene')).ShipReviewScene(),
   flight: async () => new (await import('./FlightScene')).FlightScene(),
   showcase: async () => new (await import('../ShowcaseScene')).ShowcaseScene(),
   spatial: async () => new (await import('./SpatialTestScene')).SpatialTestScene(),

@@ -1,0 +1,726 @@
+[
+  {
+    "id": "shield-720-dark",
+    "query": "stage=impacts&side=shield",
+    "width": 1280,
+    "height": 720,
+    "scale": 0.8,
+    "requestedBackend": "webgpu",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Authored Meridian backdrop",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "timestamp",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGPU",
+      "adapter": "intel / xe-lpg",
+      "renderScale": 0.8,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgpu-shield-720-dark.mp4"
+  },
+  {
+    "id": "hull-720-bright",
+    "query": "stage=impacts&side=hull",
+    "width": 1280,
+    "height": 720,
+    "scale": 0.6,
+    "bright": true,
+    "requestedBackend": "webgpu",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Synthetic light grey background for contrast stress",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "timestamp",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGPU",
+      "adapter": "intel / xe-lpg",
+      "renderScale": 0.6,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgpu-hull-720-bright.mp4"
+  },
+  {
+    "id": "reactor-1080-bright",
+    "query": "stage=kill&path=reactor&kt=0",
+    "width": 1920,
+    "height": 1080,
+    "scale": 0.8,
+    "bright": true,
+    "requestedBackend": "webgpu",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Synthetic light grey background for contrast stress",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "timestamp",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGPU",
+      "adapter": "intel / xe-lpg",
+      "renderScale": 0.8,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgpu-reactor-1080-bright.mp4"
+  },
+  {
+    "id": "structural-720-dark",
+    "query": "stage=kill&path=structural&kt=0",
+    "width": 1280,
+    "height": 720,
+    "scale": 0.6,
+    "requestedBackend": "webgpu",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Authored Meridian backdrop",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "timestamp",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGPU",
+      "adapter": "intel / xe-lpg",
+      "renderScale": 0.6,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgpu-structural-720-dark.mp4"
+  },
+  {
+    "id": "capital-1080-reduced",
+    "query": "stage=capital&calm=1",
+    "width": 1920,
+    "height": 1080,
+    "scale": 1,
+    "requestedBackend": "webgpu",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Authored Meridian backdrop",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "timestamp",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGPU",
+      "adapter": "intel / xe-lpg",
+      "renderScale": 1,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgpu-capital-1080-reduced.mp4"
+  },
+  {
+    "id": "capital-1080-dark",
+    "query": "stage=capital",
+    "width": 1920,
+    "height": 1080,
+    "scale": 1,
+    "requestedBackend": "webgl",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Authored Meridian backdrop",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "none",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGL2",
+      "adapter": "n/a",
+      "renderScale": 1,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgl-capital-1080-dark.mp4"
+  },
+  {
+    "id": "shield-720-dark",
+    "query": "stage=impacts&side=shield",
+    "width": 1280,
+    "height": 720,
+    "scale": 0.8,
+    "requestedBackend": "webgl",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Authored Meridian backdrop",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "none",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGL2",
+      "adapter": "n/a",
+      "renderScale": 0.8,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgl-shield-720-dark.mp4"
+  },
+  {
+    "id": "hull-720-bright",
+    "query": "stage=impacts&side=hull",
+    "width": 1280,
+    "height": 720,
+    "scale": 0.6,
+    "bright": true,
+    "requestedBackend": "webgl",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Synthetic light grey background for contrast stress",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "none",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGL2",
+      "adapter": "n/a",
+      "renderScale": 0.6,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgl-hull-720-bright.mp4"
+  },
+  {
+    "id": "reactor-1080-bright",
+    "query": "stage=kill&path=reactor&kt=0",
+    "width": 1920,
+    "height": 1080,
+    "scale": 0.8,
+    "bright": true,
+    "requestedBackend": "webgl",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Synthetic light grey background for contrast stress",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "none",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGL2",
+      "adapter": "n/a",
+      "renderScale": 0.8,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgl-reactor-1080-bright.mp4"
+  },
+  {
+    "id": "structural-720-dark",
+    "query": "stage=kill&path=structural&kt=0",
+    "width": 1280,
+    "height": 720,
+    "scale": 0.6,
+    "requestedBackend": "webgl",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Authored Meridian backdrop",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "none",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGL2",
+      "adapter": "n/a",
+      "renderScale": 0.6,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgl-structural-720-dark.mp4"
+  },
+  {
+    "id": "capital-1080-reduced",
+    "query": "stage=capital&calm=1",
+    "width": 1920,
+    "height": 1080,
+    "scale": 1,
+    "requestedBackend": "webgl",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Authored Meridian backdrop",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "none",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGL2",
+      "adapter": "n/a",
+      "renderScale": 1,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgl-capital-1080-reduced.mp4"
+  },
+  {
+    "id": "capital-1080-dark",
+    "query": "stage=capital",
+    "width": 1920,
+    "height": 1080,
+    "scale": 1,
+    "requestedBackend": "webgpu",
+    "errors": [],
+    "fps": 24,
+    "frames": 48,
+    "brightDescription": "Authored Meridian backdrop",
+    "perf": {
+      "frames": 48,
+      "budgetMs": 16.67,
+      "gpuMode": "timestamp",
+      "timingErrors": 0,
+      "gpuSamples": 0,
+      "gpuRender": {
+        "samples": 0,
+        "p95": null
+      },
+      "gpuCompute": {
+        "samples": 0,
+        "p95": null
+      },
+      "cpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "gpu": {
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "interval": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToSubmit": {
+        "p50": 0,
+        "p95": 0
+      },
+      "inputToGpu": {
+        "p50": 0,
+        "p95": 0
+      },
+      "overBudgetPct": 0,
+      "hitches": 0,
+      "backend": "WebGPU",
+      "adapter": "n/a",
+      "renderScale": 1,
+      "pixelRatio": 1,
+      "droppedSimulationFrames": 0,
+      "drawCalls": 0,
+      "triangles": 0,
+      "computeCalls": 0
+    },
+    "file": "webgpu-capital-1080-dark.mp4"
+  }
+]

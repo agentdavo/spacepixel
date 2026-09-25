@@ -42,7 +42,7 @@ import type { ShaderNode as Node } from '@/render/tsl';
 import { LightRig } from '@/render/LightRig';
 import { DEPTH_SCALE, hashInkId, noInkMRT } from '@/render/materials/InkChannels';
 import { PK } from './kinds';
-import { fxHex } from './shaders.wgsl';
+import { fxHex } from './shaders';
 
 /** GPU handles shared by the particle system and its materials. */
 export interface ParticleGpu {

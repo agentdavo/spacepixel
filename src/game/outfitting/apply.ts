@@ -10,6 +10,7 @@ import type { CatalogEntry } from '@/game/shipyard/catalog';
 import { baseStats, computeFit, slotSockets, slotsFor, stockFit, type Fit, type FitResult } from './fit';
 import { item, SIZE_RANK, type GunItem, type MissileItem } from './items';
 import { TRANSFER_RATE, setShieldCapacity, syncShield } from '@/sim/Damage';
+import { disposeTree } from '@/core/dispose';
 
 /**
  * Runtime side of a fit: push hull + fit into a live ShipEntity — combat
@@ -52,9 +53,15 @@ export function applyFit(ship: ShipEntity, e: CatalogEntry, fit: Fit): FitResult
   Object.assign(ship.flight.spec, spec);
   // Pools: keep the hull fraction, refill shields (refits happen berthed).
   const hf = ship.hullMax > 0 ? ship.hull / ship.hullMax : 1;
+  const hullScale = ship.hullMax > 0 ? r.stats.hull / ship.hullMax : 1;
   ship.hullMax = r.stats.hull;
   ship.hull = Math.max(1, hf * ship.hullMax);
   const d = c.dmg;
+  // Fitted plating protects installed systems too; keep both their damage fraction and destroyed state.
+  for (const sub of d.subsystems) {
+    sub.hpMax *= hullScale;
+    sub.hp *= hullScale;
+  }
   d.shieldRegen = r.stats.shieldRegen;
   d.shieldDelay = r.stats.shieldDelay;
   d.transfer = (d.capital ? TRANSFER_RATE.capital : TRANSFER_RATE.small) * (r.stats.shieldTransfer ?? 1);
@@ -80,7 +87,12 @@ export function fitVisuals(ship: ShipEntity, e: CatalogEntry, fit: Fit): void {
   const m = ship.model;
   // Clear previous pods.
   for (const o of m.sockets.values()) {
-    for (const ch of [...o.children]) if (ch.userData.tag === POD_TAG) o.remove(ch);
+    for (const ch of [...o.children]) if (ch.userData.tag === POD_TAG) {
+      // Pods own their geometry/material instances; ramp textures remain shared.
+      // Disposing the material also releases Three's per-object uniform bindings.
+      disposeTree(ch, { geometries: true, materials: true, textures: false });
+      o.remove(ch);
+    }
   }
   const stock = stockFit(e);
   const k = Math.max(1, Math.pow(m.length / 17, 0.55));
@@ -135,6 +147,9 @@ function pod(it: GunItem | MissileItem, k: number, faction: Blueprint['faction']
   }
   const model = buildShip(bp);
   const mesh = model.hull;
+  // ShipBuilder caches cel materials. Give each removable pod its own disposable
+  // instance so refitting releases bindings without invalidating other hulls.
+  mesh.material = Array.isArray(mesh.material) ? mesh.material.map((m) => m.clone()) : mesh.material.clone();
   mesh.removeFromParent();
   mesh.scale.setScalar(k);
   mesh.userData.tag = POD_TAG;

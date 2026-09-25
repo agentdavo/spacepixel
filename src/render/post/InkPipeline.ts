@@ -33,6 +33,7 @@ import { inkEdgeWGSL } from './shaders/inkEdge.wgsl';
 import { makeInkEdgeTSL } from './shaders/inkEdge.tsl';
 import type { DebugView } from '@/core/Flags';
 import { postFx } from './PostFx';
+import { settings as playerSettings } from '@/game/Settings';
 import { cos as tslCos, abs as tslAbs, cross as tslCross, step as tslStep } from 'three/tsl';
 
 export interface InkSettings {
@@ -107,6 +108,7 @@ export class InkPipeline {
   private readonly hazeParams = uniform(new Vector4());
   private readonly inkOn = uniform(1);
   private readonly grainSeed = uniform(0);
+  private readonly grainAmount = uniform(0.025);
   private readonly boost = uniform(0);
   private readonly speed = uniform(0);
   private readonly jump = uniform(0);
@@ -200,7 +202,7 @@ export class InkPipeline {
     const speedLines = streak.mul(max(this.boost, this.jump)).mul(0.75);
     const graded = display.rgb
       .mul(mix(0.78, 1.0, vignette))
-      .add(grain.mul(0.025))
+      .add(grain.mul(this.grainAmount))
       .add(vec3(0.85, 0.95, 1.0).mul(speedLines));
     const setGraded = setPieceGrade(graded, centered, this.invert, this.hue, this.solarize, this.fade, this.radiation, this.grainSeed);
     const flashed = mix(setGraded, vec3(1.0, 0.98, 0.95), this.flash);
@@ -271,7 +273,10 @@ export class InkPipeline {
     this.boost.value = postFx.boost;
     this.speed.value = postFx.speed;
     this.jump.value = postFx.jump;
-    this.flash.value = postFx.flash;
+    const reduced = playerSettings.reducedEffects;
+    this.flash.value = postFx.flash * (reduced ? 0.2 : 1);
+    this.grainAmount.value = reduced ? 0 : 0.025;
+    this.params2.value.y = reduced ? 0 : this.settings.boilAmount;
     this.fog.value = postFx.fog;
     this.fogColor.value.copy(postFx.fogColor);
     this.fogRange.value = postFx.fogRange;

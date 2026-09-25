@@ -330,3 +330,61 @@ test('warships leave the yard with Mk II kit that really counts (base numbers as
   assert.ok(mk3.stats.shield > rs.stats.shield);
   assert.ok(rs.power.draw <= rs.power.output && vs.power.draw <= vs.power.output);
 });
+
+test('armour upgrades and downgrades scale subsystem pools once while preserving damage and destroyed state', async () => {
+  const vite = await ssr();
+  const { Group, Vector3 } = await vite.ssrLoadModule('three');
+  const { Fleet } = await vite.ssrLoadModule('/src/sim/Fleet.ts');
+  const { applyFit } = await vite.ssrLoadModule('/src/game/outfitting/apply.ts');
+  const fleet = new Fleet(new Group()), entry = CATALOG_BY_ID['cr5-resolute'];
+  const ship = fleet.spawn(entry.id, 'concord', new Vector3(), new Vector3(0, 0, 1));
+  const fit = baselineFit(entry);
+  applyFit(ship, entry, fit);
+  const subs = ship.combat.dmg.subsystems;
+  assert.ok(subs.length > 1);
+  const initial = subs.map((sub: any) => sub.hpMax), hull = ship.hullMax;
+  for (const sub of subs) sub.hp = sub.hpMax * .37;
+  subs[0].hp = 0; subs[0].destroyed = true;
+  const upgraded = { ...fit, armour: fit.armour!.replace(/-mk\d+$/, '-mk4') };
+  applyFit(ship, entry, upgraded);
+  assert.ok(ship.hullMax > hull);
+  const ratio = ship.hullMax / hull;
+  for (let i = 0; i < subs.length; i++) assert.ok(Math.abs(subs[i].hpMax / initial[i] - ratio) < 1e-10);
+  const upgradedPools = subs.map((sub: any) => sub.hpMax);
+  for (let n = 0; n < 20; n++) applyFit(ship, entry, upgraded);
+  assert.deepEqual(subs.map((sub: any) => sub.hpMax), upgradedPools);
+  applyFit(ship, entry, fit);
+  for (let i = 0; i < subs.length; i++) {
+    assert.ok(Math.abs(subs[i].hpMax / initial[i] - 1) < 1e-10);
+    assert.ok(Math.abs(subs[i].hp / subs[i].hpMax - (i === 0 ? 0 : .37)) < 1e-10);
+  }
+  assert.equal(subs[0].destroyed, true);
+});
+
+test('refits dispose removed pod geometry and owned materials without disposing another ship or shared textures', async () => {
+  const vite = await ssr();
+  const { Group, Vector3, Texture } = await vite.ssrLoadModule('three');
+  const { Fleet } = await vite.ssrLoadModule('/src/sim/Fleet.ts');
+  const { applyFit } = await vite.ssrLoadModule('/src/game/outfitting/apply.ts');
+  const fleet = new Fleet(new Group()), entry = CATALOG_BY_ID['vf27-kestrel'];
+  const a = fleet.spawn(entry.id, 'concord', new Vector3(), new Vector3(0, 0, 1));
+  const b = fleet.spawn(entry.id, 'concord', new Vector3(200, 0, 0), new Vector3(0, 0, 1));
+  const base = stockFit(entry), alt = { ...base, 'gun:gun': itemId('g-twin', 4) };
+  applyFit(a, entry, alt); applyFit(b, entry, alt);
+  const pods = (ship: any): any[] => [...ship.model.sockets.values()].flatMap((o: any) => o.children).filter((o: any) => o.userData.tag === 'outfit-pod');
+  const removed = pods(a), retained = pods(b);
+  assert.ok(removed.length > 0 && retained.length > 0);
+  const mats = (list: any[]) => [...new Set(list.flatMap(p => Array.isArray(p.material) ? p.material : [p.material]))];
+  const am = mats(removed), bm = mats(retained), shared = new Texture();
+  assert.ok(am.every(m => !bm.includes(m)), 'Each pod owns its disposable material');
+  let geometries = 0, materials = 0, otherMaterials = 0, textures = 0;
+  for (const g of new Set(removed.map(p => p.geometry))) g.addEventListener('dispose', () => geometries++);
+  for (const m of am) { m.map = shared; m.addEventListener('dispose', () => materials++); }
+  for (const m of bm) { m.map = shared; m.addEventListener('dispose', () => otherMaterials++); }
+  shared.addEventListener('dispose', () => textures++);
+  applyFit(a, entry, base);
+  assert.equal(pods(a).length, 0); assert.ok(removed.every(p => p.parent === null));
+  assert.equal(geometries, new Set(removed.map(p => p.geometry)).size);
+  assert.equal(materials, am.length); assert.equal(otherMaterials, 0); assert.equal(textures, 0);
+  assert.deepEqual(pods(b), retained);
+});

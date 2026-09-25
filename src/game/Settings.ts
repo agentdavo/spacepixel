@@ -45,10 +45,12 @@ export interface GameSettings {
   /** 'auto' follows the galaxy / episode; a score id pins that score everywhere. */
   soundtrack: SoundtrackSetting;
   audio: AudioSettings;
+  /** Optional reduction of animated ink, grain and post flashes. Default visuals remain unchanged. */
+  reducedEffects: boolean;
 }
 
 const KEY = 'vanguard.settings.v1';
-const DEFAULTS: GameSettings = { voice: 'cast', subtitles: true, subSize: 'm', subSecond: true, soundtrack: 'auto', audio: DEFAULT_AUDIO };
+const DEFAULTS: GameSettings = { voice: 'cast', subtitles: true, subSize: 'm', subSecond: true, soundtrack: 'auto', audio: DEFAULT_AUDIO, reducedEffects: false };
 
 const VOICES: VoiceMode[] = ['cast', 'synth', 'speech', 'off'];
 const SIZES: SubSize[] = ['s', 'm', 'l'];
@@ -67,6 +69,7 @@ function load(): GameSettings {
       if (typeof r.subSecond === 'boolean') s.subSecond = r.subSecond;
       if (SOUNDTRACK_SETTINGS.includes(r.soundtrack as SoundtrackSetting)) s.soundtrack = r.soundtrack as SoundtrackSetting;
       s.audio = normaliseAudio(r.audio);
+      if (typeof r.reducedEffects === 'boolean') s.reducedEffects = r.reducedEffects;
     }
   } catch {
     /* storage unavailable */
@@ -79,6 +82,7 @@ function load(): GameSettings {
     const z = q.get('subsize');
     if (SIZES.includes(z as SubSize)) s.subSize = z as SubSize;
     if (q.get('jp')) s.subSecond = q.get('jp') !== '0';
+    if (q.has('calm')) s.reducedEffects = q.get('calm') === '1';
     const sc = q.get('score');
     if (SOUNDTRACK_SETTINGS.includes(sc as SoundtrackSetting)) s.soundtrack = sc as SoundtrackSetting;
   } catch {
@@ -114,7 +118,7 @@ export function describeSettings(s: GameSettings = settings): string {
   const v = s.voice === 'cast' ? 'CAST' : s.voice === 'synth' ? 'SYNTH' : s.voice === 'speech' ? 'SPEECH' : 'OFF';
   const sub = s.subtitles ? s.subSize.toUpperCase() : 'OFF';
   const score = s.soundtrack === 'auto' ? 'AUTO' : s.soundtrack.toUpperCase();
-  return `VOICE ${v} [F7] · SUBTITLES ${sub} [F8] · 日本語 ${s.subSecond ? 'ON' : 'OFF'} [F9] · SCORE ${score} [⇧F7]`;
+  return `VOICE ${v} [F7] · SUBTITLES ${sub} [F8] · 日本語 ${s.subSecond ? 'ON' : 'OFF'} [F9] · SCORE ${score} [⇧F7] · EFFECTS ${s.reducedEffects ? 'REDUCED' : 'FULL'} [⇧F9]`;
 }
 
 /** What the score probe reports for 'auto' (set by the audio layer; null before audio exists). */
@@ -131,6 +135,7 @@ function applyCss(): void {
   r.style.setProperty('--sub-scale', SCALE[settings.subSize]);
   r.classList.toggle('subs-off', !settings.subtitles);
   r.classList.toggle('subs-mono', !settings.subSecond);
+  r.classList.toggle('reduced-effects', settings.reducedEffects);
 }
 
 let toastEl: HTMLDivElement | null = null;
@@ -155,6 +160,12 @@ export function installSettingsKeys(): void {
   if (installed || typeof window === 'undefined') return;
   installed = true;
   window.addEventListener('keydown', (e) => {
+    if (e.code === 'F9' && e.shiftKey) {
+      setSettings({ reducedEffects: !settings.reducedEffects });
+      e.preventDefault();
+      toast(describeSettings());
+      return;
+    }
     if (e.code === 'F7' && e.shiftKey) {
       const next = SOUNDTRACK_SETTINGS[(SOUNDTRACK_SETTINGS.indexOf(settings.soundtrack) + 1) % SOUNDTRACK_SETTINGS.length];
       setSettings({ soundtrack: next });

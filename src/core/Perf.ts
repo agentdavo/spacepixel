@@ -47,6 +47,8 @@ export type GpuTimingMode = 'timestamp' | 'queue' | 'none';
 export class Perf {
   readonly cpu = new Ring();
   readonly gpu = new Ring();
+  readonly gpuRender = new Ring();
+  readonly gpuCompute = new Ring();
   readonly interval = new Ring();
   readonly inputToSubmit = new Ring();
   readonly inputToGpu = new Ring();
@@ -63,6 +65,8 @@ export class Perf {
   private lastRaf = -1;
   private gpuPending = false;
   private device: GPUDevice | null = null;
+  private computeCalls = 0;
+  timingErrors = 0;
 
   constructor(
     private renderer: WebGPURenderer,
@@ -78,7 +82,8 @@ export class Perf {
 
   begin(rafTime: number): void {
     this.frameStart = performance.now();
-    if (this.lastRaf >= 0) this.interval.push(rafTime - this.lastRaf);
+    this.computeCalls = this.renderer.info.compute.calls;
+    if (this.lastRaf >= 0 && this.frames >= this.warmupFrames) this.interval.push(rafTime - this.lastRaf);
     this.lastRaf = rafTime;
   }
 
@@ -97,12 +102,20 @@ export class Perf {
     if (this.gpuPending) return;
     if (this.gpuMode === 'timestamp') {
       this.gpuPending = true;
-      this.renderer
-        .resolveTimestampsAsync('render')
-        .then((ms) => {
-          if (typeof ms === 'number' && ms > 0) this.gpu.push(ms);
+      const calls = this.renderer.info.compute.calls;
+      const computed = calls !== this.computeCalls;
+      Promise.all([
+        this.renderer.resolveTimestampsAsync('render'),
+        computed ? this.renderer.resolveTimestampsAsync('compute') : Promise.resolve(0),
+      ])
+        .then(([render, compute]) => {
+          if (typeof render === 'number' && Number.isFinite(render) && render > 0) this.gpuRender.push(render);
+          if (typeof compute === 'number' && Number.isFinite(compute) && compute >= 0) this.gpuCompute.push(compute);
+          if (typeof render === 'number' && Number.isFinite(render) && render > 0 && typeof compute === 'number' && Number.isFinite(compute) && compute >= 0)
+            this.gpu.push(render + compute);
           if (consumedInputTime >= 0) this.inputToGpu.push(performance.now() - consumedInputTime);
         })
+        .catch(() => { this.timingErrors++; })
         .finally(() => (this.gpuPending = false));
     } else if (this.gpuMode === 'queue' && this.device) {
       this.gpuPending = true;
@@ -114,6 +127,7 @@ export class Perf {
           this.gpu.push(done - submitted);
           if (consumedInputTime >= 0) this.inputToGpu.push(done - consumedInputTime);
         })
+        .catch(() => { this.timingErrors++; })
         .finally(() => (this.gpuPending = false));
     }
   }
@@ -124,6 +138,10 @@ export class Perf {
       frames: this.frames,
       budgetMs: r(this.budgetMs),
       gpuMode: this.gpuMode,
+      timingErrors: this.timingErrors,
+      gpuSamples: this.gpu.count,
+      gpuRender: { samples: this.gpuRender.count, p95: this.gpuRender.count ? r(this.gpuRender.percentile(0.95)) : null },
+      gpuCompute: { samples: this.gpuCompute.count, p95: this.gpuCompute.count ? r(this.gpuCompute.percentile(0.95)) : null },
       cpu: { p50: r(this.cpu.percentile(0.5)), p95: r(this.cpu.percentile(0.95)), max: r(this.cpu.max()) },
       gpu: { p50: r(this.gpu.percentile(0.5)), p95: r(this.gpu.percentile(0.95)), max: r(this.gpu.max()) },
       interval: { p50: r(this.interval.percentile(0.5)), p95: r(this.interval.percentile(0.95)) },
