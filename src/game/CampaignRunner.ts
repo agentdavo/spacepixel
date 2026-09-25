@@ -1,4 +1,5 @@
 import { Vector3 } from 'three';
+import { validateRunnerSnapshot } from './campaign/validateRunnerSnapshot.ts';
 import type { FactionId } from '@/assets/Blueprint';
 import type { ShipEntity } from '@/sim/Fleet';
 import type {
@@ -360,8 +361,11 @@ export class CampaignRunner {
    * flags come back silently (no chatter, no script commands), released
    * groups respawn where they were (survivors only, at their hull), pending
    * spawns keep their timers, dwell rings keep their progress.
+   * Invalid snapshot data throws before any state changes or host calls.
+   * Exceptions from host callbacks are not rolled back.
    */
-  restore(snap: RunnerSnapshot): void {
+  restore(snap: unknown): void {
+    validateRunnerSnapshot(snap, this.mission);
     this.time = snap.time;
     for (const [f, t] of snap.flags) {
       this.flags.add(f);
