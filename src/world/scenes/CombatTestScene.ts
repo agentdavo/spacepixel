@@ -47,6 +47,7 @@ import { CombatHud } from '@/ui/CombatHud';
  *                   stage=impacts (default bb-indomitable; &faction=choir|rustwake
  *                   picks the shield shell style)
  *   &freeze=S       stop the sim S seconds into the live section (screenshots)
+ *   &firefor=S      impacts: stop firing after S live seconds (inspect cooling marks)
  *   &cam=0..2       alternate framings
  *
  * The fight is fast-forwarded without FX to `pre` seconds, then runs live so
@@ -114,6 +115,7 @@ export class CombatTestScene implements GameScene {
 
   constructor() {
     const q = new URLSearchParams(location.search);
+    this.combatFx.fx.enabled = this.fxOn;
     this.stage = (['capital', 'shield', 'smoke', 'weapons', 'impacts', 'kill'] as const).find((s) => s === q.get('stage')) ?? 'capital';
     this.freeze = Number(q.get('freeze') ?? NaN);
     this.camMode = Number(q.get('cam') ?? 0) || 0;
@@ -360,6 +362,7 @@ export class CombatTestScene implements GameScene {
     };
     const mid = plating(0.03, new Vector3());
     const fire = side !== 'regen' && side !== 'subsystem';
+    const fireFor = Number(new URLSearchParams(location.search).get('firefor') ?? Infinity);
     lineUp.forEach(([bp, gun, z, sweep], i) => {
       const at = toUniverse(cap, st.cx + st.halfW + 600, st.cy + st.halfH * (0.3 + i * 0.25), st.cz + st.halfL * z, new Vector3());
       const s = this.fleet.spawn(bp, bp.startsWith('choir') ? 'choir' : 'concord', at, new Vector3(-1, 0, 0), { name: `${bp} ${i}`, plotArmour: true });
@@ -369,7 +372,7 @@ export class CombatTestScene implements GameScene {
         ship: s,
         aim: () => plating(z + sweep(this.simT), new Vector3()),
         speed: 0,
-        fire: (t) => fire && (gun === 1 && bp === 'choir-cantor' ? t % 0.8 < 0.5 : true),
+        fire: (t) => fire && this.liveT < fireFor && (gun === 1 && bp === 'choir-cantor' ? t % 0.8 < 0.5 : true),
       });
       if (i === 0) this.player = s;
     });
@@ -387,13 +390,24 @@ export class CombatTestScene implements GameScene {
       this.collapseAfter = after;
     }
     if (side === 'subsystem') {
-      const blow = (kind: string, at: number) => {
-        const sub = st.subsystems.find((x) => x.kind === kind && !x.destroyed);
-        if (sub) this.timed.push({ at, fn: () => this.fleet.hit(cap, sub.hpMax * 3, 'explosive', subsystemPosition(cap, sub, new Vector3()), null, null) });
+      // Exercise the actual wreck drive and event consumers with exposed mounts.
+      st.facings.fill(0);
+      st.cooldown.fill(1e3);
+      cap.shield = 0;
+      this.capitals.register(cap);
+      for (const gun of this.capitals.list[0].guns) gun.cooldown = Infinity;
+      const blow = (kind: string, at: number, droop = false) => {
+        this.timed.push({ at, fn: () => {
+          const sub = st.subsystems.find((x) => x.kind === kind && !x.destroyed && (kind !== 'turret' || x.x > st.cx));
+          if (!sub) return;
+          if (droop) sub.hp = sub.hpMax * 0.05;
+          this.fleet.hit(cap, droop ? sub.hpMax * 0.1 : sub.hpMax * 3, droop ? 'kinetic' : 'explosive', subsystemPosition(cap, sub, new Vector3()), null, null, sub);
+        } });
       };
       blow('hangar', 0.05);
       blow('engine', 0.35);
       blow('turret', 0.6);
+      blow('turret', 0.8, true);
     }
     const view = Number(new URLSearchParams(location.search).get('cam') ?? 0) || 0;
     const side3 = new Vector3(1, 0.35, 0.25).applyQuaternion(cap.flight.orientation).normalize();
@@ -411,7 +425,8 @@ export class CombatTestScene implements GameScene {
         look.copy(mid);
       }
     };
-    return side === 'regen' || side === 'subsystem' ? 0.02 : 0.7;
+    // One-shot FX must happen in the live section, where the visual consumers run.
+    return side === 'regen' || side === 'subsystem' || side === 'collapse' ? 0 : 0.7;
   }
 
   /**
@@ -517,7 +532,14 @@ export class CombatTestScene implements GameScene {
     for (const sc of this.scripted) sc.ship.flight.velocity.copy(sc.ship.flight.forward(_v)).multiplyScalar(sc.speed);
     this.weapons.step(dt);
     this.missiles.step(dt);
-    if (fx && this.fxOn) this.combatFx.consume(dt);
+    // Weapons.step clears its event list: staged hits must run afterwards so
+    // their collapse / subsystem / kill events reach the same frame's FX.
+    if (fx) for (let i = this.timed.length - 1; i >= 0; i--) {
+      if (this.liveT < this.timed[i].at) continue;
+      this.timed[i].fn();
+      this.timed.splice(i, 1);
+    }
+    if (fx) this.combatFx.consume(dt);
     this.hud.consume(this.weapons.events, this.player, this.simT);
     if (fx) for (const e of this.weapons.events) this.tally[e.kind] = (this.tally[e.kind] ?? 0) + 1;
     if (this.freezeOnCollapse && fx && this.weapons.events.some((e) => e.kind === 'shield-down') && !Number.isFinite(this.freeze)) this.freeze = this.liveT + this.collapseAfter;
@@ -526,11 +548,6 @@ export class CombatTestScene implements GameScene {
   update({ dt }: FrameContext): void {
     if (!this.frozen) {
       this.liveT += dt;
-      for (let i = this.timed.length - 1; i >= 0; i--) {
-        if (this.liveT < this.timed[i].at) continue;
-        this.timed[i].fn();
-        this.timed.splice(i, 1);
-      }
       this.step(dt, true);
       if (Number.isFinite(this.freeze) && this.liveT >= this.freeze) this.frozen = true;
     }
