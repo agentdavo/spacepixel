@@ -1,0 +1,2921 @@
+{
+  "note": "Staged real mission sites; Episode 10 fast-forwards 100 seconds of actual fixed simulation ticks from CAP range, with no Bastion seek, flag or kill injection. Player screenshots use normal chase tuning. Inspection screenshots use a shorter chase offset with foreground player meshes hidden. Memory records renderer resource accounting, not frame timing or a crowd performance guarantee. This is not a manual end-to-end battle playthrough.",
+  "reports": [
+    {
+      "episode": 10,
+      "enabled": false,
+      "url": "http://127.0.0.1:5251/?scene=flight&episode=10&kessenCameos=0&shot=1&record=60&demo=0&hud=1&quality=high&dynres=0",
+      "backend": "WebGPU",
+      "deviceCreated": true,
+      "adapter": "unreported",
+      "hash": 3189088699,
+      "runner": {
+        "time": 100.56666666666224,
+        "flags": [
+          [
+            "halt:lifeboats",
+            0.016666666666666666
+          ],
+          [
+            "depart:allocation",
+            55.016666666664825
+          ],
+          [
+            "bastion-attack",
+            72.01666666666387
+          ],
+          [
+            "bastion-destroyed",
+            97.03333333332911
+          ]
+        ],
+        "state": [
+          "done",
+          "active",
+          "locked",
+          "locked",
+          "done",
+          "done",
+          "done"
+        ],
+        "fired": [
+          "open",
+          "pryce",
+          "early",
+          "lantern",
+          "attack",
+          "fall"
+        ],
+        "kills": [],
+        "released": [
+          3,
+          2,
+          1,
+          0,
+          5,
+          4,
+          8,
+          6,
+          7
+        ],
+        "ships": [
+          {
+            "spawn": 3,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2419797.9084644904,
+              148550.90770740563,
+              -1087156.7007831763
+            ],
+            "vel": [
+              60.80294453992656,
+              7.405301195819483,
+              -31.03450066196228
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 2,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2419751.853057543,
+              148555.1298743732,
+              -1087076.7887696875
+            ],
+            "vel": [
+              55.56187543921004,
+              4.68519491532111,
+              -26.283831621924463
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 1,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2419729.3688632175,
+              148550.61888213627,
+              -1087036.9784605685
+            ],
+            "vel": [
+              55.52695465737265,
+              4.480924224855148,
+              -26.39030378192043
+            ],
+            "hull": 0.8967871657754011
+          },
+          {
+            "spawn": 0,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2419821.1247959193,
+              148548.4410928852,
+              -1087136.2628997616
+            ],
+            "vel": [
+              57.921155634569075,
+              -1.991938804969233,
+              29.169569086140857
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 5,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2417620.5498548085,
+              147851.1790762502,
+              -1090352.017998499
+            ],
+            "vel": [
+              0,
+              0,
+              -5e-324
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 5,
+            "member": 1,
+            "alive": true,
+            "pos": [
+              2417685.476318241,
+              147864.14529768587,
+              -1090400.7115115828
+            ],
+            "vel": [
+              0,
+              0,
+              0
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 4,
+            "member": 0,
+            "alive": false,
+            "pos": [
+              2417756.0977219106,
+              148912.36076148914,
+              -1094328.282641412
+            ],
+            "vel": [
+              -38.74460988357221,
+              48.73531841342883,
+              -409.29173451721647
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 8,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2413916.341455186,
+              150492.5245510871,
+              -1072240.953783633
+            ],
+            "vel": [
+              3.79215437220173,
+              -1.896077186100865,
+              -15.16861748880692
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 8,
+            "member": 1,
+            "alive": true,
+            "pos": [
+              2413975.0364572685,
+              150503.99716614626,
+              -1072286.2118245123
+            ],
+            "vel": [
+              3.747964868526742,
+              -1.913935359257819,
+              -15.17735519729548
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2417803.6954542324,
+              148657.90988175306,
+              -1086356.2156346375
+            ],
+            "vel": [
+              18.208724780191204,
+              -15.622310709143072,
+              -437.4603606324368
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 1,
+            "alive": true,
+            "pos": [
+              2417802.911023973,
+              148653.54642023653,
+              -1086397.888950239
+            ],
+            "vel": [
+              -9.96662190455738,
+              -21.729385854854268,
+              -438.4186276088161
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 2,
+            "alive": true,
+            "pos": [
+              2419425.723482302,
+              148629.17290684427,
+              -1086075.8407005044
+            ],
+            "vel": [
+              92.07775938226189,
+              -20.491528015081194,
+              -272.45797619463116
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 3,
+            "alive": true,
+            "pos": [
+              2419464.858892727,
+              148628.2743705221,
+              -1086131.9103086179
+            ],
+            "vel": [
+              85.41675787024106,
+              -16.559996753286544,
+              -267.4658192045136
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 4,
+            "alive": true,
+            "pos": [
+              2419491.895932812,
+              148633.1117962322,
+              -1086128.2503598137
+            ],
+            "vel": [
+              102.71936177293439,
+              -27.401610059499514,
+              -282.89833947122025
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 5,
+            "alive": true,
+            "pos": [
+              2419504.6796442647,
+              148630.8012692089,
+              -1086186.8374126353
+            ],
+            "vel": [
+              88.39758739989941,
+              -22.384388389992456,
+              -269.8317961789535
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 7,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2418687.2036679266,
+              148751.86924461045,
+              -1081870.787837867
+            ],
+            "vel": [
+              -57.23785183734078,
+              -1.5656818689109497,
+              -390.6900183061409
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 7,
+            "member": 1,
+            "alive": true,
+            "pos": [
+              2418807.260859712,
+              148499.0478386388,
+              -1081910.0696206342
+            ],
+            "vel": [
+              -57.895579146495855,
+              -27.025908455830283,
+              -389.47399438317274
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 7,
+            "member": 2,
+            "alive": true,
+            "pos": [
+              2418660.4607528015,
+              148759.84656112423,
+              -1081920.0251851229
+            ],
+            "vel": [
+              -38.97248950322683,
+              0.9428643116725823,
+              -391.9066788319646
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 7,
+            "member": 3,
+            "alive": true,
+            "pos": [
+              2418870.756450792,
+              148493.42237916155,
+              -1081956.0424259102
+            ],
+            "vel": [
+              -57.18083682582996,
+              -27.307802252012984,
+              -389.55859350385765
+            ],
+            "hull": 1
+          }
+        ],
+        "dwells": []
+      },
+      "facts": {},
+      "frames": 0,
+      "camera": "chase",
+      "cameoNdc": [
+        -0.41487973074194684,
+        -0.16002425165395973,
+        0.0020450616696828226
+      ],
+      "playerPosition": [
+        2411704.352113886,
+        148648.5192216467,
+        -1101572.996419156
+      ],
+      "cameoPosition": [
+        2411644.352113886,
+        148634.5192216467,
+        -1101692.996419156
+      ],
+      "flags": [
+        "halt:lifeboats",
+        "depart:allocation",
+        "bastion-attack",
+        "bastion-destroyed"
+      ],
+      "memory": {
+        "attributes": 354,
+        "attributesSize": 26907180,
+        "geometries": 81,
+        "indexAttributes": 50,
+        "indexAttributesSize": 361224,
+        "indirectStorageAttributes": 0,
+        "indirectStorageAttributesSize": 0,
+        "programs": 81,
+        "programsSize": 460919,
+        "readbackBuffers": 0,
+        "readbackBuffersSize": 0,
+        "renderTargets": 13,
+        "storageAttributes": 5,
+        "storageAttributesSize": 8650752,
+        "textures": 24,
+        "texturesSize": 68353152,
+        "uniformBuffers": 246,
+        "uniformBuffersSize": 164608,
+        "total": 104897835,
+        "pipelines": 51
+      },
+      "progression": [
+        {
+          "time": 0.03333333333333333,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 1.0333333333333345,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 2.033333333333331,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 3.0333333333333274,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 4.033333333333324,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 5.033333333333321,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 6.033333333333317,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 7.033333333333314,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 8.033333333333312,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 9.033333333333362,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 10.033333333333411,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 11.033333333333461,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 12.03333333333351,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 13.03333333333356,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 14.03333333333361,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 15.03333333333366,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 16.033333333333704,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 17.033333333333648,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 18.03333333333359,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 19.033333333333534,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 20.033333333333477,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 21.03333333333342,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 22.033333333333363,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 23.033333333333307,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 24.03333333333325,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 25.033333333333193,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 26.033333333333136,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 27.03333333333308,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 28.033333333333022,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 29.033333333332966,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 30.03333333333291,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 31.033333333332852,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 32.0333333333328,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 33.03333333333274,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 34.033333333332685,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 35.03333333333263,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 36.03333333333257,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 37.033333333332514,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 38.03333333333246,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 39.0333333333324,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 40.033333333332344,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 41.03333333333229,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 42.03333333333223,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 43.03333333333217,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 44.033333333332116,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 45.03333333333206,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 46.033333333332,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 47.033333333331946,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 48.03333333333189,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 49.03333333333183,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 50.033333333331775,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 51.03333333333172,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 52.03333333333166,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 53.033333333331605,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 54.03333333333155,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 55.03333333333149,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 56.033333333331434,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 57.03333333333138,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 58.03333333333132,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 59.033333333331264,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 60.03333333333121,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 61.03333333333115,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 62.03333333333109,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 63.033333333331036,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 64.03333333333099,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 65.03333333333093,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 66.03333333333087,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 67.03333333333082,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 68.03333333333076,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 69.0333333333307,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 70.03333333333065,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 71.03333333333059,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 72.03333333333053,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 73.03333333333048,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 74.03333333333042,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 75.03333333333036,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 76.0333333333303,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 77.03333333333025,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 78.03333333333019,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 79.03333333333013,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 80.03333333333008,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 81.03333333333002,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 82.03333333332996,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 83.0333333333299,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 84.03333333332985,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 85.0333333333298,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 86.03333333332974,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 87.03333333332968,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 88.03333333332962,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 89.03333333332957,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 90.03333333332951,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 91.03333333332945,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 92.0333333333294,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 93.03333333332934,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 94.03333333332928,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 95.03333333332922,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 96.03333333332917,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 97.03333333332911,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack",
+            "bastion-destroyed"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 98.03333333332905,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack",
+            "bastion-destroyed"
+          ],
+          "cameoReleased": true,
+          "alive": true
+        },
+        {
+          "time": 99.033333333329,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack",
+            "bastion-destroyed"
+          ],
+          "cameoReleased": true,
+          "alive": true
+        },
+        {
+          "time": 100.03333333332894,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack",
+            "bastion-destroyed"
+          ],
+          "cameoReleased": true,
+          "alive": true
+        }
+      ],
+      "errors": [],
+      "sourceCommit": "ddf9e225322ea74045b307360a273007f322b565"
+    },
+    {
+      "episode": 10,
+      "enabled": true,
+      "url": "http://127.0.0.1:5251/?scene=flight&episode=10&kessenCameos=1&shot=1&record=60&demo=0&hud=1&quality=high&dynres=0",
+      "backend": "WebGPU",
+      "deviceCreated": true,
+      "adapter": "unreported",
+      "hash": 3189088699,
+      "runner": {
+        "time": 100.56666666666224,
+        "flags": [
+          [
+            "halt:lifeboats",
+            0.016666666666666666
+          ],
+          [
+            "depart:allocation",
+            55.016666666664825
+          ],
+          [
+            "bastion-attack",
+            72.01666666666387
+          ],
+          [
+            "bastion-destroyed",
+            97.03333333332911
+          ]
+        ],
+        "state": [
+          "done",
+          "active",
+          "locked",
+          "locked",
+          "done",
+          "done",
+          "done"
+        ],
+        "fired": [
+          "open",
+          "pryce",
+          "early",
+          "lantern",
+          "attack",
+          "fall"
+        ],
+        "kills": [],
+        "released": [
+          3,
+          2,
+          1,
+          0,
+          5,
+          4,
+          8,
+          6,
+          7
+        ],
+        "ships": [
+          {
+            "spawn": 3,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2419797.9084644904,
+              148550.90770740563,
+              -1087156.7007831763
+            ],
+            "vel": [
+              60.80294453992656,
+              7.405301195819483,
+              -31.03450066196228
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 2,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2419751.853057543,
+              148555.1298743732,
+              -1087076.7887696875
+            ],
+            "vel": [
+              55.56187543921004,
+              4.68519491532111,
+              -26.283831621924463
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 1,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2419729.3688632175,
+              148550.61888213627,
+              -1087036.9784605685
+            ],
+            "vel": [
+              55.52695465737265,
+              4.480924224855148,
+              -26.39030378192043
+            ],
+            "hull": 0.8967871657754011
+          },
+          {
+            "spawn": 0,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2419821.1247959193,
+              148548.4410928852,
+              -1087136.2628997616
+            ],
+            "vel": [
+              57.921155634569075,
+              -1.991938804969233,
+              29.169569086140857
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 5,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2417620.5498548085,
+              147851.1790762502,
+              -1090352.017998499
+            ],
+            "vel": [
+              0,
+              0,
+              -5e-324
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 5,
+            "member": 1,
+            "alive": true,
+            "pos": [
+              2417685.476318241,
+              147864.14529768587,
+              -1090400.7115115828
+            ],
+            "vel": [
+              0,
+              0,
+              0
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 4,
+            "member": 0,
+            "alive": false,
+            "pos": [
+              2417756.0977219106,
+              148912.36076148914,
+              -1094328.282641412
+            ],
+            "vel": [
+              -38.74460988357221,
+              48.73531841342883,
+              -409.29173451721647
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 8,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2413916.341455186,
+              150492.5245510871,
+              -1072240.953783633
+            ],
+            "vel": [
+              3.79215437220173,
+              -1.896077186100865,
+              -15.16861748880692
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 8,
+            "member": 1,
+            "alive": true,
+            "pos": [
+              2413975.0364572685,
+              150503.99716614626,
+              -1072286.2118245123
+            ],
+            "vel": [
+              3.747964868526742,
+              -1.913935359257819,
+              -15.17735519729548
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2417803.6954542324,
+              148657.90988175306,
+              -1086356.2156346375
+            ],
+            "vel": [
+              18.208724780191204,
+              -15.622310709143072,
+              -437.4603606324368
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 1,
+            "alive": true,
+            "pos": [
+              2417802.911023973,
+              148653.54642023653,
+              -1086397.888950239
+            ],
+            "vel": [
+              -9.96662190455738,
+              -21.729385854854268,
+              -438.4186276088161
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 2,
+            "alive": true,
+            "pos": [
+              2419425.723482302,
+              148629.17290684427,
+              -1086075.8407005044
+            ],
+            "vel": [
+              92.07775938226189,
+              -20.491528015081194,
+              -272.45797619463116
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 3,
+            "alive": true,
+            "pos": [
+              2419464.858892727,
+              148628.2743705221,
+              -1086131.9103086179
+            ],
+            "vel": [
+              85.41675787024106,
+              -16.559996753286544,
+              -267.4658192045136
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 4,
+            "alive": true,
+            "pos": [
+              2419491.895932812,
+              148633.1117962322,
+              -1086128.2503598137
+            ],
+            "vel": [
+              102.71936177293439,
+              -27.401610059499514,
+              -282.89833947122025
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 6,
+            "member": 5,
+            "alive": true,
+            "pos": [
+              2419504.6796442647,
+              148630.8012692089,
+              -1086186.8374126353
+            ],
+            "vel": [
+              88.39758739989941,
+              -22.384388389992456,
+              -269.8317961789535
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 7,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2418687.2036679266,
+              148751.86924461045,
+              -1081870.787837867
+            ],
+            "vel": [
+              -57.23785183734078,
+              -1.5656818689109497,
+              -390.6900183061409
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 7,
+            "member": 1,
+            "alive": true,
+            "pos": [
+              2418807.260859712,
+              148499.0478386388,
+              -1081910.0696206342
+            ],
+            "vel": [
+              -57.895579146495855,
+              -27.025908455830283,
+              -389.47399438317274
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 7,
+            "member": 2,
+            "alive": true,
+            "pos": [
+              2418660.4607528015,
+              148759.84656112423,
+              -1081920.0251851229
+            ],
+            "vel": [
+              -38.97248950322683,
+              0.9428643116725823,
+              -391.9066788319646
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 7,
+            "member": 3,
+            "alive": true,
+            "pos": [
+              2418870.756450792,
+              148493.42237916155,
+              -1081956.0424259102
+            ],
+            "vel": [
+              -57.18083682582996,
+              -27.307802252012984,
+              -389.55859350385765
+            ],
+            "hull": 1
+          }
+        ],
+        "dwells": []
+      },
+      "facts": {},
+      "frames": 2,
+      "camera": "chase",
+      "cameoNdc": [
+        -0.41487973074194684,
+        -0.16002425165395973,
+        0.0020450616696828226
+      ],
+      "playerPosition": [
+        2411704.352113886,
+        148648.5192216467,
+        -1101572.996419156
+      ],
+      "cameoPosition": [
+        2411644.352113886,
+        148634.5192216467,
+        -1101692.996419156
+      ],
+      "flags": [
+        "halt:lifeboats",
+        "depart:allocation",
+        "bastion-attack",
+        "bastion-destroyed"
+      ],
+      "memory": {
+        "attributes": 846,
+        "attributesSize": 28762956,
+        "geometries": 234,
+        "indexAttributes": 50,
+        "indexAttributesSize": 361224,
+        "indirectStorageAttributes": 0,
+        "indirectStorageAttributesSize": 0,
+        "programs": 88,
+        "programsSize": 487509,
+        "readbackBuffers": 0,
+        "readbackBuffersSize": 0,
+        "renderTargets": 13,
+        "storageAttributes": 5,
+        "storageAttributesSize": 8650752,
+        "textures": 24,
+        "texturesSize": 68353152,
+        "uniformBuffers": 399,
+        "uniformBuffersSize": 204736,
+        "total": 106820329,
+        "pipelines": 57
+      },
+      "progression": [
+        {
+          "time": 0.03333333333333333,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 1.0333333333333345,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 2.033333333333331,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 3.0333333333333274,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 4.033333333333324,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 5.033333333333321,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 6.033333333333317,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 7.033333333333314,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 8.033333333333312,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 9.033333333333362,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 10.033333333333411,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 11.033333333333461,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 12.03333333333351,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 13.03333333333356,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 14.03333333333361,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 15.03333333333366,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 16.033333333333704,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 17.033333333333648,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 18.03333333333359,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 19.033333333333534,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 20.033333333333477,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 21.03333333333342,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 22.033333333333363,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 23.033333333333307,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 24.03333333333325,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 25.033333333333193,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 26.033333333333136,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 27.03333333333308,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 28.033333333333022,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 29.033333333332966,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 30.03333333333291,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 31.033333333332852,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 32.0333333333328,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 33.03333333333274,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 34.033333333332685,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 35.03333333333263,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 36.03333333333257,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 37.033333333332514,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 38.03333333333246,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 39.0333333333324,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 40.033333333332344,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 41.03333333333229,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 42.03333333333223,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 43.03333333333217,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 44.033333333332116,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 45.03333333333206,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 46.033333333332,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 47.033333333331946,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 48.03333333333189,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 49.03333333333183,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 50.033333333331775,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 51.03333333333172,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 52.03333333333166,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 53.033333333331605,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 54.03333333333155,
+          "flags": [
+            "halt:lifeboats"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 55.03333333333149,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 56.033333333331434,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 57.03333333333138,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 58.03333333333132,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 59.033333333331264,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 60.03333333333121,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 61.03333333333115,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 62.03333333333109,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 63.033333333331036,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 64.03333333333099,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 65.03333333333093,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 66.03333333333087,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 67.03333333333082,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 68.03333333333076,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 69.0333333333307,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 70.03333333333065,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 71.03333333333059,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 72.03333333333053,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 73.03333333333048,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 74.03333333333042,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 75.03333333333036,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 76.0333333333303,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 77.03333333333025,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 78.03333333333019,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 79.03333333333013,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 80.03333333333008,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 81.03333333333002,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 82.03333333332996,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 83.0333333333299,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 84.03333333332985,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 85.0333333333298,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 86.03333333332974,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 87.03333333332968,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 88.03333333332962,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 89.03333333332957,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 90.03333333332951,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 91.03333333332945,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 92.0333333333294,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 93.03333333332934,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 94.03333333332928,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 95.03333333332922,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 96.03333333332917,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 97.03333333332911,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack",
+            "bastion-destroyed"
+          ],
+          "cameoReleased": false,
+          "alive": true
+        },
+        {
+          "time": 98.03333333332905,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack",
+            "bastion-destroyed"
+          ],
+          "cameoReleased": true,
+          "alive": true
+        },
+        {
+          "time": 99.033333333329,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack",
+            "bastion-destroyed"
+          ],
+          "cameoReleased": true,
+          "alive": true
+        },
+        {
+          "time": 100.03333333332894,
+          "flags": [
+            "halt:lifeboats",
+            "depart:allocation",
+            "bastion-attack",
+            "bastion-destroyed"
+          ],
+          "cameoReleased": true,
+          "alive": true
+        }
+      ],
+      "errors": [],
+      "approach": {
+        "fps": 30,
+        "seconds": 8,
+        "start": {
+          "position": [
+            2411606.352113886,
+            148652.5192216467,
+            -1101012.996419156
+          ],
+          "speed": 75,
+          "throttle": 0.3409090909090909,
+          "camera": "chase"
+        },
+        "end": {
+          "position": [
+            2411606.352113886,
+            148652.5192216467,
+            -1101612.996419156
+          ],
+          "speed": 75,
+          "alive": true,
+          "hash": 3636008142
+        },
+        "note": "Initial placement only; eight seconds of real normal-speed flight. No camera, visibility, dialogue or objective overrides during clip. Silent visual-review clip."
+      },
+      "sourceCommit": "ddf9e225322ea74045b307360a273007f322b565"
+    },
+    {
+      "episode": 19,
+      "enabled": false,
+      "url": "http://127.0.0.1:5251/?scene=flight&episode=19&kessenCameos=0&shot=1&record=60&demo=0&hud=1&quality=high&dynres=0",
+      "backend": "WebGPU",
+      "deviceCreated": true,
+      "adapter": "unreported",
+      "hash": 2330304181,
+      "runner": {
+        "time": 0.5333333333333333,
+        "flags": [],
+        "state": [
+          "active",
+          "locked",
+          "locked",
+          "locked",
+          "locked",
+          "locked"
+        ],
+        "fired": [
+          "open"
+        ],
+        "kills": [],
+        "released": [
+          2,
+          1,
+          0
+        ],
+        "ships": [
+          {
+            "spawn": 2,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2409450.855552042,
+              150188.1149359728,
+              -1117858.4177135534
+            ],
+            "vel": [
+              8.965381042161004,
+              2.017210734486226,
+              -20.172107344862262
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 1,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2413571.5638833423,
+              151085.2519672842,
+              -1127007.8949606628
+            ],
+            "vel": [
+              58.134342821621,
+              20.493711952817907,
+              -68.59726331088862
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 0,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2413434.1156793972,
+              151100.73398599753,
+              -1126950.7692714275
+            ],
+            "vel": [
+              60.85159814783388,
+              23.91159854556466,
+              -63.65768919417972
+            ],
+            "hull": 1
+          }
+        ],
+        "dwells": [
+          [
+            "tune-meridian",
+            0.024999999999999984
+          ]
+        ]
+      },
+      "facts": {},
+      "frames": 0,
+      "camera": "chase",
+      "cameoNdc": [
+        -0.44940101171698915,
+        -0.16000572680651295,
+        0.002045061669682822
+      ],
+      "playerPosition": [
+        2413445.8511167895,
+        151486.98893804103,
+        -1122067.1577342357
+      ],
+      "cameoPosition": [
+        2413510.8511167895,
+        151472.98893804103,
+        -1121947.1577342357
+      ],
+      "flags": [],
+      "memory": {
+        "attributes": 488,
+        "attributesSize": 29055884,
+        "geometries": 117,
+        "indexAttributes": 44,
+        "indexAttributesSize": 409536,
+        "indirectStorageAttributes": 0,
+        "indirectStorageAttributesSize": 0,
+        "programs": 67,
+        "programsSize": 229267,
+        "readbackBuffers": 0,
+        "readbackBuffersSize": 0,
+        "renderTargets": 13,
+        "storageAttributes": 0,
+        "storageAttributesSize": 0,
+        "textures": 24,
+        "texturesSize": 68289664,
+        "uniformBuffers": 244,
+        "uniformBuffersSize": 184000,
+        "total": 98168351,
+        "pipelines": 42
+      },
+      "progression": [],
+      "errors": [],
+      "sourceCommit": "2cbb81de3c63c2e67a8af019ce27f55dce6fda60"
+    },
+    {
+      "episode": 19,
+      "enabled": true,
+      "url": "http://127.0.0.1:5251/?scene=flight&episode=19&kessenCameos=1&shot=1&record=60&demo=0&hud=1&quality=high&dynres=0",
+      "backend": "WebGPU",
+      "deviceCreated": true,
+      "adapter": "unreported",
+      "hash": 2330304181,
+      "runner": {
+        "time": 0.5333333333333333,
+        "flags": [],
+        "state": [
+          "active",
+          "locked",
+          "locked",
+          "locked",
+          "locked",
+          "locked"
+        ],
+        "fired": [
+          "open"
+        ],
+        "kills": [],
+        "released": [
+          2,
+          1,
+          0
+        ],
+        "ships": [
+          {
+            "spawn": 2,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2409450.855552042,
+              150188.1149359728,
+              -1117858.4177135534
+            ],
+            "vel": [
+              8.965381042161004,
+              2.017210734486226,
+              -20.172107344862262
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 1,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2413571.5638833423,
+              151085.2519672842,
+              -1127007.8949606628
+            ],
+            "vel": [
+              58.134342821621,
+              20.493711952817907,
+              -68.59726331088862
+            ],
+            "hull": 1
+          },
+          {
+            "spawn": 0,
+            "member": 0,
+            "alive": true,
+            "pos": [
+              2413434.1156793972,
+              151100.73398599753,
+              -1126950.7692714275
+            ],
+            "vel": [
+              60.85159814783388,
+              23.91159854556466,
+              -63.65768919417972
+            ],
+            "hull": 1
+          }
+        ],
+        "dwells": [
+          [
+            "tune-meridian",
+            0.024999999999999984
+          ]
+        ]
+      },
+      "facts": {},
+      "frames": 2,
+      "camera": "chase",
+      "cameoNdc": [
+        -0.44940101171698915,
+        -0.16000572680651295,
+        0.002045061669682822
+      ],
+      "playerPosition": [
+        2413445.8511167895,
+        151486.98893804103,
+        -1122067.1577342357
+      ],
+      "cameoPosition": [
+        2413510.8511167895,
+        151472.98893804103,
+        -1121947.1577342357
+      ],
+      "flags": [],
+      "memory": {
+        "attributes": 982,
+        "attributesSize": 31096172,
+        "geometries": 271,
+        "indexAttributes": 44,
+        "indexAttributesSize": 409536,
+        "indirectStorageAttributes": 0,
+        "indirectStorageAttributesSize": 0,
+        "programs": 74,
+        "programsSize": 255857,
+        "readbackBuffers": 0,
+        "readbackBuffersSize": 0,
+        "renderTargets": 13,
+        "storageAttributes": 0,
+        "storageAttributesSize": 0,
+        "textures": 24,
+        "texturesSize": 68289664,
+        "uniformBuffers": 398,
+        "uniformBuffersSize": 224400,
+        "total": 100275629,
+        "pipelines": 48
+      },
+      "progression": [],
+      "errors": [],
+      "approach": {
+        "fps": 30,
+        "seconds": 8,
+        "start": {
+          "position": [
+            2413472.8511167895,
+            151490.98893804103,
+            -1122627.1577342357
+          ],
+          "speed": 75,
+          "throttle": 0.3409090909090909,
+          "camera": "chase"
+        },
+        "end": {
+          "position": [
+            2413472.8511167895,
+            151490.98893804103,
+            -1122027.1577342357
+          ],
+          "speed": 75,
+          "alive": true,
+          "hash": 2246381418
+        },
+        "note": "Initial placement only; eight seconds of real normal-speed flight. No camera, visibility, dialogue or objective overrides during clip. Silent visual-review clip."
+      },
+      "sourceCommit": "2cbb81de3c63c2e67a8af019ce27f55dce6fda60"
+    }
+  ]
+}

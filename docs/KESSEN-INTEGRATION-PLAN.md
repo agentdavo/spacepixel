@@ -6,7 +6,7 @@
 
 The race design, provisional name and five Statures remain approved. The chief's earlier D1 approval of an initial four-step arc is **superseded**. D2 (successful material intervention, not mere presence, makes one active engagement decisive) and D3 (validated slow hull-relative entry with a real breach) remain **future design directions only**. They authorise no current combat, Schedule or shield implementation. The suggested 2 m/s and 30 ticks are unvalidated tuning hypotheses.
 
-**Current bounded deliverable: this revised plan and a reviewable commit.** No gameplay, shared faction/type, or other canon file has been changed in this task. The branch is isolated as `codex/kessen-faction-foundation` from `72ced42`; its name records the earlier scope, not a promise to deliver it. Later technical approval comes from the chief task, without another routine design approval request to David.
+**Current bounded deliverable: an isolated, default-off environmental cameo preview, authorised by the chief after this scope correction.** The implementation is on `codex/kessen-faction-foundation`, rebased onto integration's combined `cafc28b`; its branch name records the earlier scope, not a promise to deliver it. The only shared type addition is a set-piece kind. General faction types and other canon files remain unchanged. The chief decides release enablement after the screenshot review, without another routine design approval request to David. See [the preview evidence and reproduction notes](KESSEN-CAMEO-PREVIEW.md).
 
 ## Least invasive cameo proposal for the chief
 
@@ -27,18 +27,18 @@ Use existing deferred set-piece flags and resolved local placement; never wall-c
 
 ## Exact file boundary and minimum canon support
 
-**Touched by this delivery:** `docs/KESSEN-INTEGRATION-PLAN.md` only. Dependency installation has not changed the lockfile or package manifest. A baseline screenshot is captured outside the repository as a reference to already-landed art, not evidence that a cameo exists.
+**Touched by this preview:** this plan, `KessenCameo.ts`, its registry and `SetPieceKind`, two mission specs, isolated `SetPieceScene.ts` inspection presets, focused tests, an independent native capture script, and the preview report/screenshots. Dependency installation has not changed the lockfile or package manifest. No existing cinema/capture script was edited.
 
-**Proposed next implementation, subject to chief technical review:**
+**Approved preview boundary (implemented unless noted):**
 
 - New `src/world/setpieces/KessenCameo.ts`; register it in `src/world/setpieces/index.ts`; add its kind to `src/game/campaign/types.ts`.
 - `src/game/campaign/missions.ts`: optional presentation-only placements for Episodes 10/19. If the current mission construction cannot cleanly carry the A/B toggle, propose the smallest session-construction edit to the chief before touching `CampaignSession.ts` or `main.ts`.
-- New focused cameo tests and limited extensions of campaign-data/runner tests for enabled/disabled equivalence; screenshots of actual Episode 10/19 compositions and the off baseline.
-- `docs/LORE.md`: narrowly qualify public fossil-tech knowledge and add the hidden Standing/TAW-9 exception, preserving one of the forty wrecks and the distinction from the Clavis. `docs/CAMPAIGN.md`: brief optional cameo notes only. `docs/KESSEN.md`: mark combat/arc features deferred and link this current scope. Full culture integration need not precede two visual appearances.
+- Four focused cameo tests covering mission boundaries, runner equivalence, absolute-time posing, and cleanup/material ownership; screenshots of actual Episode 10/19 compositions and the off baseline. The toggle is contained in the registry; no session or main entry edit was needed.
+- Deferred until a release/canon review needs them: `docs/LORE.md` fossil-tech/Standing qualification, `docs/CAMPAIGN.md` optional appearance notes, and `docs/KESSEN.md` release-status notes. These files have not been edited for a default-off preview.
 
 **Deferred entirely:** `FactionId`, faction/team numeric indices, ship/equipment/market types, economy and save changes, general NPC identity plumbing, side-arc registry, dialogue/voices, score, PD, weapons, collision, boarding, consist AI and Train batching. No mechanical shield bypass. No 200-frame delivery or performance promise. The archived engineering audit below remains useful if a later reviewed scope needs those systems.
 
-Integration task `01a0d8f2-bc9d-7713-8f66-cf8baee8ec58` confirmed that it owns `docs/ROADMAP.md` and `docs/SESSIONS.md`; leave both untouched and supply a phase summary for integration. Chief owns `docs/GAME-DIRECTION.md`. Incoming PD, voice and trailer changes must be integrated first by the integration task; do not cherry-pick them here. Await its combined local branch/hash and rebase before final validation of any subsequent implementation. Avoid `package.json`, `public/voice`, dialogue/audio and cinema/capture behavior changes.
+Integration task `01a0d8f2-bc9d-7713-8f66-cf8baee8ec58` owns `docs/ROADMAP.md` and `docs/SESSIONS.md`; both remain untouched. Chief owns `docs/GAME-DIRECTION.md`. The preview was rebased onto integration's combined PD/voice/trailer base `cafc28b` before final validation. Integration's subsequent EP01 `CampaignObjective.navTag` and objective metadata changes are acknowledged as non-overlapping hunks to preserve. Avoid `package.json`, `public/voice`, dialogue/audio and cinema/capture behavior changes.
 
 ## Verification, screenshot and commit checkpoints
 
@@ -48,7 +48,7 @@ For the proposed cameo slice, run typecheck and focused campaign/cameo tests, th
 
 Supply screenshot pairs at each meaningful visual checkpoint: Episode 10 composition on/off, Episode 19 composition on/off, and a closer inspection of true frame scale/support contact. Identify the trigger, mission state and backend with each capture. A Kessen viewer image is a baseline art reference only. Keep chief informed with those images and narrow commits; do not represent an image from the viewer as campaign integration.
 
-Commit sequence: (1) this scope correction; (2) after technical agreement, the small set-piece/placement slice with tests and screenshots; (3) only necessary canon notes and final validation after rebasing on integration's combined base. Stop and report if implementation requires a broader actor/type, save or camera change than described here. No PR, push or merge has been requested for this task.
+Review checkpoints: (1) scope correction `3a73ff4`; (2) gated set-piece/placement slice and tests `58c1797`; (3) native screenshot evidence and final report. Both source commits are based on `cafc28b`. Stop and report if further implementation requires a broader actor/type, save or camera change than described here. No PR, push or merge has been requested for this task.
 
 ## Archived full-integration proposal — reference only
 
