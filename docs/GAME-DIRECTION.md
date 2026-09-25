@@ -5,6 +5,16 @@ Decision record: 25 September 2026. David appointed task
 control. This task owns creative direction, scope and acceptance decisions.
 Specific later instructions from David take precedence.
 
+## Latest trailer direction
+
+David's review of V3 says the picture is roughly acceptable but insufficiently
+cinematic, and the narration needs a full rewrite that makes sense to a
+twelve-year-old hearing it once. `TRAILER_V4_SCRIPT.md` is the current chief
+replacement text and editorial direction. Explain gates, their failure, fuel,
+war and the player's role through concrete cause and effect. Preserve an epic
+tone through image, sound and pacing. V3's narration and fixed duration are
+superseded; its files remain preserved as a previous review cut.
+
 ## The experience we are building
 
 A cinematic third-person space combat game inside a vast, failing industrial
