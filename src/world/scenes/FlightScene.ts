@@ -4,6 +4,7 @@ import type { GameScene } from '../GameScene';
 import { WorldSpace } from '@/core/WorldSpace';
 import { input, type ControlState } from '@/core/Input';
 import { flags } from '@/core/Flags';
+import { stageV3Battle } from '@/cinema/gameplaySetup';
 import { ChaseCamera } from '@/sim/ChaseCamera';
 import { CameraDirector, type Subject } from '@/sim/CameraDirector';
 import { Fleet, faceAlong, type ShipEntity } from '@/sim/Fleet';
@@ -362,8 +363,8 @@ export class FlightScene implements GameScene, FlightHostScene {
       eye: this.world.eye,
       camera: this.camera.quaternion,
       player: { position: pf0.position, velocity: pf0.velocity, throttle: 0, boosting: false, cruise: 'off', lockProgress: 0, locked: false, incomingMissile: false, alive: true },
-      weaponEvents: this.weapons.events,
-      missileEvents: this.missiles.events,
+      weaponEvents: this.frameEvents.weapons,
+      missileEvents: this.frameEvents.missiles,
       jumpPhase: 'none',
       combatIntensity: 0,
     };
@@ -443,6 +444,13 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (q.get('dockui') === '0') this.dockScreen.close();
     // ?reach=body|ring|lane|ambush [&sys=<id>] …: living-Reach captures (world/ReachStage.ts).
     if (q.get('reach')) this.reachFlag(q.get('reach')!, q);
+    // Explicit staged-gameplay capture. Replays retain the boot query, so the
+    // same healthy stock encounter is rebuilt before the first recorded tick.
+    if (q.get('captureSetup') === 'v3-capital') {
+      this.lock.target = stageV3Battle(this.fleet, this.player);
+      for (const b of this.bandits) b.deadFor = -1;
+      this.chase.snap(this.player.flight);
+    }
     this.killCam = new KillCam(document.getElementById('ui-root')!, this.fleet, this.visuals, this.fxOn ? this.combatFx : null);
     this.killCam.onEnd = () => this.chase.snap(this.player.flight);
     this.replay.booting = false;

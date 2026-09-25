@@ -62,6 +62,8 @@ export function copyWeaponEvent(e: WeaponEvent, o: WeaponEvent): WeaponEvent {
   o.type = e.type;
   o.amount = e.amount;
   o.shielded = e.shielded;
+  o.turret = e.turret;
+  o.cause = e.cause;
   return o;
 }
 
