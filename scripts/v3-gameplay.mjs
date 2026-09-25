@@ -20,6 +20,13 @@ const replay = replayPath ? JSON.parse(readFileSync(replayPath, 'utf8')) : null;
 const camera = opt('camera', '');
 const cameraScale = Number(opt('camera-scale', '1'));
 const cameraTag = opt('camera-tag','');
+// Fixed world-space viewing direction for a steady native track shot. The
+// subject's position stays live; its simulation velocity is never modified.
+const trackDirectionArg = opt('camera-track-direction', '');
+const cameraTrackDirection = trackDirectionArg ? trackDirectionArg.split(',').map(Number) : null;
+if (cameraTrackDirection && (camera !== 'track' || trackDirectionArg.split(',').some(v => !v.trim()) || cameraTrackDirection.length !== 3 || !cameraTrackDirection.every(Number.isFinite) || !Number.isFinite(Math.hypot(...cameraTrackDirection)) || Math.hypot(...cameraTrackDirection) < 1e-6 || Math.hypot(cameraTrackDirection[0], cameraTrackDirection[2]) < 1e-6)) {
+  throw new Error('--camera-track-direction requires --camera track and three finite, nonzero, nonvertical world-space components x,y,z');
+}
 const pilot = args.includes('--pilot');
 const episode = opt('episode', replay?.commands?.find(c=>c.c==='episode')?.a??'');
 const route = opt('route','') ? JSON.parse(readFileSync(opt('route',''),'utf8')) : [];
@@ -79,7 +86,7 @@ try {
     return subjects.map(s => ({ id: s.id, name: s.name, blueprint: s.model.blueprint.id, pos: s.flight.position.toArray(), orientation: s.flight.orientation.toArray(), hull: s.hull, hullMax: s.hullMax, shield: s.shield, shieldMax: s.shieldMax, loadout: s.combat.loadout }));
   });
   const scenery = await page.evaluate(() => window.__v3.S.loreFlight?.provenance ?? null);
-  writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, cameraScale, cameraTag, pilot, episode, route, routeUntil, fastPreroll:args.includes("--fast-preroll"), replayFromStart:args.includes("--replay-from-start"), initial, scenery, kind: episode?'native campaign gameplay':'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot/route options read positions and send ordinary mouse/keyboard controls. Episode starts through the normal recorded campaign API before the first tick; mission flags are never forced.', inputs: plan }, null, 2));
+  writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, cameraScale, cameraTag, cameraTrackDirection, pilot, episode, route, routeUntil, fastPreroll:args.includes("--fast-preroll"), replayFromStart:args.includes("--replay-from-start"), initial, scenery, kind: episode?'native campaign gameplay':'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot/route options read positions and send ordinary mouse/keyboard controls. Episode starts through the normal recorded campaign API before the first tick; mission flags are never forced.', inputs: plan }, null, 2));
   let ended = false;
   let cameraApplied = false;
   let f = -1;
@@ -90,7 +97,19 @@ try {
     const tick = await page.evaluate(() => window.__v3.S.simTick);
     if (tick / 60 >= seconds) break;
     if (!cameraApplied && camera && tick / 60 >= from - 1) {
-      await page.evaluate(({camera,cameraScale,cameraTag}) => { const { S, target } = window.__v3,t=cameraTag?S.campaign?.runner.shipsTagged(cameraTag)[0]:target; if(cameraTag&&!t)throw new Error('Missing camera subject '+cameraTag); if(camera==='tactical')S.director.tacticalHeight=1800*cameraScale; S.director.cut(camera,t?{position:t.flight.position,velocity:t.flight.velocity,radius:t.radius*cameraScale}:null,Infinity,S.player.flight); }, {camera,cameraScale,cameraTag});
+      await page.evaluate(({camera,cameraScale,cameraTag,cameraTrackDirection}) => {
+        const { S, target } = window.__v3;
+        const t = cameraTag ? S.campaign?.runner.shipsTagged(cameraTag)[0] : target;
+        if (cameraTag && !t) throw new Error('Missing camera subject ' + cameraTag);
+        if (cameraTrackDirection && !t) throw new Error('Steady track requires a camera subject');
+        if (camera === 'tactical') S.director.tacticalHeight = 1800 * cameraScale;
+        // Native track normalizes this vector, falling back to player heading
+        // below 1 m/s. Length 2 avoids that fallback without touching the ship.
+        const velocity = cameraTrackDirection
+          ? t.flight.velocity.clone().fromArray(cameraTrackDirection).divideScalar(Math.hypot(...cameraTrackDirection)).multiplyScalar(2)
+          : t?.flight.velocity;
+        S.director.cut(camera, t ? {position:t.flight.position, velocity, radius:t.radius*cameraScale} : null, Infinity, S.player.flight);
+      }, {camera,cameraScale,cameraTag,cameraTrackDirection});
       cameraApplied = true;
     }
     for (const cue of plan) {
