@@ -3,7 +3,7 @@ import type { WorldSpace } from '@/core/WorldSpace';
 import type { Fleet, ShipEntity, Team } from '@/sim/Fleet';
 import type { Weapons } from '@/sim/Weapons';
 import type { Capitals } from '@/sim/Capitals';
-import { brainOf, flyToPoint, issueOrder, setFormation } from '@/sim/ai';
+import { brainOf, issueOrder, setFormation } from '@/sim/ai';
 import { postFx } from '@/render/post/PostFx';
 import { createSetPiece, type SetPiece, type SetPieceFrame } from '@/world/setpieces';
 import { Comms } from '@/ui/Comms';
@@ -12,6 +12,7 @@ import { CAMPAIGN } from './campaign';
 import { PLOT_ARMOUR } from './campaign/missions';
 import type { CampaignMission, SpawnSpec } from './campaign/types';
 import { CampaignRunner, type CampaignHost, type SetPieceHandle } from './CampaignRunner';
+import { EscortGuidance } from './campaign/EscortGuidance';
 
 /**
  * Glue between one CampaignMission (data + CampaignRunner) and the live
@@ -48,12 +49,14 @@ export class CampaignSession {
   /** Codex titles unlocked during this mission (for the debrief). */
   readonly unlockedTitles: string[] = [];
   private outcomeAt = -1;
+  private escortGuidance: EscortGuidance;
 
   constructor(
     readonly mission: CampaignMission,
     private host: FlightHostScene,
     uiRoot: HTMLElement,
   ) {
+    this.escortGuidance = new EscortGuidance(mission);
     this.comms = new Comms(uiRoot, CAMPAIGN.cast);
     this.codex = new Codex(uiRoot, CAMPAIGN.codex, { key: 'KeyL' });
     const p = host.player;
@@ -130,6 +133,7 @@ export class CampaignSession {
     s.plotArmour = PLOT_ARMOUR.some((t) => tag === t || tag.startsWith(t + '-'));
     if (spec.role === 'capital') this.host.capitals.register(s, { launchBlueprint: null });
     if (spec.role === 'static') this.statics.push(s);
+    if (spec.role === 'escort') this.escortGuidance.register(s, spec, i);
     if (spec.role === 'wing') {
       const wing = this.host.fleet.ships.filter((x) => x.alive && x !== p && x.team === p.team && brainOf(x).order === 'formUp');
       setFormation([...wing, s], 'fingerFour', 45);
@@ -170,19 +174,7 @@ export class CampaignSession {
       c.fire = false;
       c.afterburner = false;
     }
-    for (const e of this.runner.escorts) {
-      for (const s of e.ships) {
-        if (!s.alive) continue;
-        if (e.halted || !e.target) {
-          s.controls.throttleSet = 0;
-          s.controls.pitch = s.controls.yaw = s.controls.roll = 0;
-          s.controls.fire = false;
-          continue;
-        }
-        flyToPoint(s.controls, s.flight, e.target, 60, brainOf(s).pilot, dt);
-        s.controls.fire = false;
-      }
-    }
+    this.escortGuidance.step(this.runner.escorts, dt);
     for (const d of this.departing) {
       const s = d.ship;
       if (!s.alive) continue;
