@@ -326,7 +326,13 @@ export class CombatFx {
       shieldSplash(this.fx, _p, _n, v, e.velocity, cap ? 2.4 : 1, e.type === 'harmonic' && this.rand() < 0.3 ? 'harmonic' : 'laser', shieldPalette(s));
       return;
     }
-    beamBurn(this.fx, e.position, e.normal, v, cap ? 3 : 1, e.type === 'harmonic', this.rand() < 0.12);
+    _p.copy(e.position);
+    _n.copy(e.normal);
+    if (!cap) {
+      shellPoint(s, shellDir(s, e.position, _d), _p, _n);
+      _p.lerp(s.flight.position, 0.3);
+    }
+    beamBurn(this.fx, _p, _n, v, cap ? 3 : 1, e.type === 'harmonic', this.rand() < 0.12);
     if (!cap || !e.shooter) return;
     // Cut line: chain capsule segments behind the contact as the beam sweeps.
     const w = e.shooter.combat.dmg.capital ? 3.2 : 1.4;

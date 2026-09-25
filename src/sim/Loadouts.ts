@@ -131,6 +131,8 @@ export interface GunSpec {
   length: number;
   /** Synth voice + timbre for the audio façade. */
   sfx: 'laser' | 'cannon';
+  /** Optional sound identity for authored emitters sharing an equipment spec. */
+  sound?: string;
   timbre: FactionId;
   /** Explosive rounds: blast radius (m) that splashes subsystems around a burst on the plating (Subsystems.ts). */
   blast?: number;
@@ -208,6 +210,7 @@ export interface LanceSpec {
   dpsFighter: number;
 }
 export const CAPITAL_LANCE: LanceSpec = { type: 'harmonic', range: 6000, width: 5, duration: 2.2, dpsCapital: 900, dpsFighter: 60 };
+export const CAPITAL_LANCE_GUN: GunSpec = { ...GUNS.greatlance, sound: 'capital-lance', beam: { length: CAPITAL_LANCE.range, width: CAPITAL_LANCE.width, duration: CAPITAL_LANCE.duration, dps: CAPITAL_LANCE.dpsCapital } };
 
 // ── missiles ──────────────────────────────────────────────────────────
 

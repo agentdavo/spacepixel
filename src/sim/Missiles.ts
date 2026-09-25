@@ -4,6 +4,7 @@ import { MISSILES, type MissileSpec } from './Loadouts';
 import type { Subsystem } from './Damage';
 import type { Rng } from './Rng';
 import { createRayHit, missileOf, raycastShip, segmentSphere, selectedSubsystem, subsystemPosition } from './Combat';
+import { provoke } from './Weapons';
 
 export type { MissileSpec } from './Loadouts';
 
@@ -50,6 +51,9 @@ export interface MissileEvent {
   intercepted: boolean;
   /** detonate on a target: a shield layer took the blast (presentation only). */
   shielded?: boolean;
+  /** Actual damage, retained before secondary explosions can reuse hit scratch. */
+  hullDamage?: number;
+  shieldDamage?: number;
   /** detonate on a target: surface normal at the blast (presentation only). */
   normal?: Vector3;
 }
@@ -153,6 +157,7 @@ export class Missiles implements Shootables {
     e.spec = this.spec[i];
     e.intercepted = intercepted;
     e.shielded = false;
+    e.hullDamage = e.shieldDamage = 0;
     e.normal?.set(0, 0, 0);
     this.events.push(e);
     return e;
@@ -278,7 +283,7 @@ export class Missiles implements Shootables {
         _v.subVectors(tgt.flight.velocity, v);
         const dist2 = _r.lengthSq();
         const dist = Math.sqrt(dist2);
-        if (this.fuze(i, tgt, dist, speed, dt)) continue;
+        if (this.fuze(i, tgt, speed, dt)) continue;
         _los.copy(_r).divideScalar(dist);
         _omega.crossVectors(_r, _v).divideScalar(dist2);
         const closing = -_v.dot(_los);
@@ -309,30 +314,19 @@ export class Missiles implements Shootables {
     }
   }
 
-  /** Warhead: proximity on fighters; on capitals, contact with the shield shell or plating. */
-  private fuze(i: number, tgt: ShipEntity, dist: number, speed: number, dt: number): boolean {
+  /** Warhead: short forward proximity sweep against the visible shield shell or hull. */
+  private fuze(i: number, tgt: ShipEntity, speed: number, dt: number): boolean {
     const spec = this.spec[i];
     const p = this.pos[i];
-    let hit = false;
-    let sub: Subsystem | null = null;
-    if (tgt.combat.dmg.capital) {
-      _seg.copy(this.vel[i]).divideScalar(speed || 1).multiplyScalar(speed * dt + spec.fuse);
-      if (raycastShip(tgt, p, _seg, 0, _hit)) {
-        p.copy(_hit.point);
-        sub = _hit.sub;
-        hit = true;
-      }
-    } else if (dist < spec.fuse + Math.max(0, tgt.radius - 10)) {
-      // (Big non-capital hulls — gunships, corvettes — fuse on their skin, not their centre.)
-      _hit.normal.subVectors(p, tgt.flight.position).normalize();
-      // Homed on a mount with the bubble down: the warhead finds it.
-      const aim = this.aimSub[i];
-      if (aim && !aim.destroyed && tgt.shield <= 0) sub = aim;
-      hit = true;
-    }
-    if (!hit) return false;
-    const r = this.fleet.hit(tgt, spec.damage, spec.type, p, _hit.normal, this.owner[i], sub);
+    _seg.copy(this.vel[i]).divideScalar(speed || 1).multiplyScalar(speed * dt + spec.fuse);
+    if (!raycastShip(tgt, p, _seg, 0, _hit)) return false;
+    p.copy(_hit.point);
+    const owner = this.owner[i];
+    if (owner) provoke(tgt, owner);
+    const r = this.fleet.hit(tgt, spec.damage, spec.type, p, _hit.normal, owner, _hit.sub);
     const shielded = r.shielded;
+    const hullDamage = r.hullDamage;
+    const shieldDamage = r.shieldDamage;
     // A burst on the plating (not on a standing shield) splashes the mounts around it — centred on the mount it struck.
     if (spec.blast && !r.shielded) {
       const struck = r.subsystem;
@@ -342,6 +336,8 @@ export class Missiles implements Shootables {
     const e = this.emit('detonate', i);
     if (e) {
       e.shielded = shielded;
+      e.hullDamage = hullDamage;
+      e.shieldDamage = shieldDamage;
       e.normal?.copy(_hit.normal);
     }
     this.kill(i);
@@ -379,14 +375,16 @@ export class Missiles implements Shootables {
 
   // ── Shootables (torpedoes, micro-missiles) ──────────────────────────────────────
 
-  shoot(ax: number, ay: number, az: number, dx: number, dy: number, dz: number, team: Team, damage: number): boolean {
+  shoot(ax: number, ay: number, az: number, dx: number, dy: number, dz: number, team: Team, damage: number, dt = 0): boolean {
     if (!this.shootable.length) return false;
     _r.set(ax, ay, az);
-    _v.set(dx, dy, dz);
     for (let k = 0; k < this.shootable.length; k++) {
       const i = this.shootable[k];
       const o = this.owner[i];
       if (!this.alive[i] || (o && o.team === team)) continue;
+      // Bolts and missiles both move this tick. Test their relative sweep so
+      // a fast micro-missile cannot jump across a point-defence round.
+      _v.set(dx, dy, dz).addScaledVector(this.vel[i], -dt);
       // Torpedoes are big; a micro-missile is a pencil (but PD flak is proximity-fused).
       if (segmentSphere(_r, _v, this.pos[i], this.spec[i].salvo > 1 ? 4 : 6) > 1) continue;
       this.hp[i] -= damage;

@@ -411,6 +411,7 @@ export class Capitals {
         const L = CAPITAL_LANCE;
         l.beam = this.weapons.fireBeam(s, l.socket, LANCE_RANGE, L.width, L.duration, best.radius > 60 ? L.dpsCapital : L.dpsFighter, L.type);
         l.beam.aimTarget = best;
+        this.weapons.muzzleFlash(l.beam.origin, l.beam.dir, f.velocity, s, l.beam.gun!);
         l.cooldown = (7 + rng.next() * 5) / (0.55 + 0.45 * fx.coordination) / fx.power;
       }
 

@@ -84,7 +84,7 @@ export type HitEventKind = 'kill' | 'subsystem' | 'shield-down' | 'shield-bleed'
  */
 export interface Shootables {
   /** Swept test of a hostile bolt; applies damage and returns true on a hit. */
-  shoot(ax: number, ay: number, az: number, dx: number, dy: number, dz: number, team: Team, damage: number): boolean;
+  shoot(ax: number, ay: number, az: number, dx: number, dy: number, dz: number, team: Team, damage: number, dt?: number): boolean;
   /** Nearest live shootable hostile within range that passes `accept`, or −1. Writes its position/velocity. */
   nearestThreat(from: Vector3, team: Team, range: number, pos: Vector3, vel: Vector3, accept?: (pos: Vector3, vel: Vector3) => boolean): number;
 }
@@ -246,6 +246,9 @@ export class Fleet {
    */
   hit(s: ShipEntity, amount: number, type: DamageType, point: Vector3 | null, normal: Vector3 | null, shooter: ShipEntity | null, sub: Subsystem | null = null): HitResult & { killed: boolean } {
     const r = damageShip(s, amount, type, point, sub, shooter);
+    // Destruction shockwaves can recursively overwrite damageShip's scratch.
+    // Preserve the direct hit so its shield/hull cue and blast routing stay correct.
+    const direct = r.killed || (r.subsystemDestroyed && r.subsystem?.kind === 'hangar') ? { ...r } : null;
     const ev = this.onEvent;
     if (ev) {
       const p = point ?? s.flight.position;
@@ -259,11 +262,14 @@ export class Fleet {
       if (r.killed) ev('kill', s, s.flight.position, n, shooter, null, -1);
     }
     if (r.killed) {
-      const killed = r.killed;
       this.destruction.onKill(s, s.combat.dmg.structure.death ?? 'hull', shooter);
-      r.killed = killed; // (shared scratch: a shockwave may have hit someone in between)
+      if (direct) Object.assign(r, direct);
     }
-    if (r.subsystemDestroyed && r.subsystem?.kind === 'hangar' && this.cookOff(s, r.subsystem, shooter, 1)) r.killed = true;
+    if (r.subsystemDestroyed && r.subsystem?.kind === 'hangar') {
+      const killed = this.cookOff(s, r.subsystem, shooter, 1);
+      if (direct) Object.assign(r, direct);
+      r.killed ||= killed;
+    }
     return r;
   }
 

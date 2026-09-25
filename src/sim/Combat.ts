@@ -80,8 +80,10 @@ export interface CombatState {
   dmg: DamageState;
   /** Voxel hull (capitals) for exact hits. */
   grid: HullGrid | null;
-  /** Shield shell: ellipsoid half axes around the hull centre (capitals stop bolts on it; fighters draw their skin on it). */
+  /** Shield shell: collision and visual ellipsoid half axes around the hull centre. */
   shell: Vector3;
+  /** Conservative origin-centred bound of shield, hull and targetable mounts. */
+  hitBound: number;
   /** Undamaged flight spec; damage scales the ship's own copy. */
   baseSpec: FlightSpec;
   /** Selected gun / missile (index into the loadout). */
@@ -111,7 +113,12 @@ const _q = new Quaternion();
 
 /** Capital for combat purposes: 4+ shield facings, subsystems, voxel hull (corvettes included). */
 export function isCapitalModel(model: ShipModel): boolean {
-  return (SHIP_STATS[model.blueprint.id]?.facings ?? 1) >= 4 || model.radius > 200;
+  return statsFor(model.blueprint.id, model).facings >= 4;
+}
+
+function statsFor(id: string, model: ShipModel): ShipStats {
+  const yard = CATALOG_BY_ID[id];
+  return SHIP_STATS[id] ?? (yard && !yard.legacy ? statsFromCatalog(yard) : model.radius > 200 ? DEFAULT_CAPITAL_STATS : DEFAULT_FIGHTER_STATS);
 }
 
 /** Flight spec for a design: class base × stats multipliers (+ exact overrides). */
@@ -147,11 +154,11 @@ function modelBox(model: ShipModel, out: Box3): Box3 {
 }
 
 export function createCombat(blueprintId: string, model: ShipModel, faction: FactionId): CombatState {
-  const capital = isCapitalModel(model);
   // Shipyard hulls not in the combat table take their numbers from the catalogue.
   const yard = SHIP_STATS[blueprintId] ? undefined : CATALOG_BY_ID[blueprintId];
   const fromYard = yard && !yard.legacy ? yard : undefined;
-  const stats = SHIP_STATS[blueprintId] ?? (fromYard ? statsFromCatalog(fromYard) : capital ? DEFAULT_CAPITAL_STATS : DEFAULT_FIGHTER_STATS);
+  const stats = statsFor(blueprintId, model);
+  const capital = stats.facings >= 4;
   const loadout = LOADOUTS[blueprintId] ?? DEFAULT_LOADOUT[faction];
   const grid = capital ? hullGridFor(blueprintId, model.root, model.meshes) : null;
   if (grid) {
@@ -167,12 +174,16 @@ export function createCombat(blueprintId: string, model: ShipModel, faction: Fac
   else if (model.radius >= MOUNT_MIN_RADIUS) addMountSubsystems(dmg, model, stats.hull);
   // Every ship starts with its shield officer on (the player's keys take over: , . /).
   dmg.trimAuto = true;
+  const shell = fitShell(blueprintId, model, c, h);
+  let hitBound = Math.max(model.radius, c.length() + Math.max(shell.x, shell.y, shell.z));
+  for (const sub of dmg.subsystems) hitBound = Math.max(hitBound, Math.hypot(sub.x, sub.y, sub.z) + sub.radius);
   return {
     stats,
     loadout,
     dmg,
     grid,
-    shell: fitShell(blueprintId, model, c, h),
+    shell,
+    hitBound,
     // Flight class follows size (corvettes keep the fighter base the AI and escort routes were tuned on).
     baseSpec: fromYard ? yardFlightSpec(fromYard, KESTREL_SPEC) : flightSpecFor(stats, model.radius > 200),
     gun: 0,
@@ -553,36 +564,14 @@ export function raycastShip(s: ShipEntity, a: Vector3, d: Vector3, pad: number, 
   const c = s.combat;
   const f = s.flight;
   out.sub = null;
-  if (!c.dmg.capital || !c.grid) {
-    const t = segmentSphere(a, d, f.position, s.radius + pad);
-    if (t > 1) return false;
-    out.t = t;
-    out.point.copy(a).addScaledVector(d, t);
-    out.normal.subVectors(out.point, f.position).normalize();
-    toLocal(s, out.point, out.local);
-    const st = c.dmg;
-    out.onShield = st.facings.length > 0 && st.facings[facingOf(st, out.local)] > 0;
-    if (!out.onShield && st.subsystems.length) {
-      // Through a down facing: mounts sit inside the bounding sphere, so look along the whole chord this step.
-      _lo.copy(out.local);
-      const dl = Math.max(d.length(), 1e-6);
-      _ld.copy(d).applyQuaternion(_q.copy(f.orientation).invert()).multiplyScalar((dl + 2 * (s.radius + pad)) / dl);
-      const sub = segmentSubsystem(st.subsystems, _lo.x, _lo.y, _lo.z, _ld.x, _ld.y, _ld.z, pad, 1, _sh);
-      if (sub) {
-        out.local.copy(_lo).addScaledVector(_ld, _sh.c);
-        toUniverse(s, out.local.x, out.local.y, out.local.z, out.point);
-        subNormal(s, sub, out);
-        out.sub = sub;
-      }
-    }
-    return true;
-  }
-  // Broad phase: full bounding sphere.
-  if (segmentSphere(a, d, f.position, s.model.radius + pad) > 1) return false;
+  out.onShield = false;
+  const st = c.dmg;
+  // The offset shield can extend well beyond the hull. Include mounts too;
+  // rejecting against the hull alone lets short steps cross a live shield.
+  if (segmentSphere(a, d, f.position, c.hitBound + pad) > 1) return false;
   _q.copy(f.orientation).invert();
   _lo.subVectors(a, f.position).applyQuaternion(_q);
   _ld.copy(d).applyQuaternion(_q);
-  const st = c.dmg;
   // Shield shell: an ellipsoid; the facing under the entry point decides whether it holds.
   const sx = c.shell.x + pad;
   const sy = c.shell.y + pad;
@@ -608,6 +597,26 @@ export function raycastShip(s: ShipEntity, a: Vector3, d: Vector3, pad: number, 
         return true;
       }
     }
+  }
+  if (!st.capital || !c.grid) {
+    // Bare small hulls retain their forgiving gameplay sphere. Shield
+    // contact, however, uses the same fitted shell as every rendered ship.
+    const t = segmentSphere(a, d, f.position, s.radius + pad);
+    const sub = st.subsystems.length ? segmentSubsystem(st.subsystems, _lo.x, _lo.y, _lo.z, _ld.x, _ld.y, _ld.z, pad, Math.min(t, 1), _sh) : null;
+    if (sub) {
+      out.t = _sh.c;
+      out.local.copy(_lo).addScaledVector(_ld, out.t);
+      out.point.copy(a).addScaledVector(d, out.t);
+      out.sub = sub;
+      subNormal(s, sub, out);
+      return true;
+    }
+    if (t > 1) return false;
+    out.t = t;
+    out.point.copy(a).addScaledVector(d, t);
+    out.normal.subVectors(out.point, f.position).normalize();
+    out.local.copy(_lo).addScaledVector(_ld, t);
+    return true;
   }
   const onGrid = raycastGrid(c.grid, _lo.x, _lo.y, _lo.z, _ld.x, _ld.y, _ld.z, _gh);
   const tg = onGrid ? _gh.t : 1;

@@ -62,6 +62,8 @@ export function copyWeaponEvent(e: WeaponEvent, o: WeaponEvent): WeaponEvent {
   o.type = e.type;
   o.amount = e.amount;
   o.shielded = e.shielded;
+  o.hullDamage = e.hullDamage;
+  o.shieldDamage = e.shieldDamage;
   o.turret = e.turret;
   o.cause = e.cause;
   return o;
@@ -77,6 +79,8 @@ export function copyMissileEvent(e: MissileEvent, o: MissileEvent): MissileEvent
   o.spec = e.spec;
   o.intercepted = e.intercepted;
   o.shielded = e.shielded;
+  o.hullDamage = e.hullDamage;
+  o.shieldDamage = e.shieldDamage;
   if (e.normal) (o.normal ??= new Vector3()).copy(e.normal);
   else o.normal?.set(0, 0, 0);
   return o;

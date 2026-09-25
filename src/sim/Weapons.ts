@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
 import type { Fleet, HitEventKind, ShipEntity, Team } from './Fleet';
 import type { FactionId } from '@/assets/Blueprint';
-import { GUNS, GUN_INDEX, GUN_LIST, type DamageType, type GunSpec } from './Loadouts';
+import { CAPITAL_LANCE_GUN, GUNS, GUN_INDEX, GUN_LIST, type DamageType, type GunSpec } from './Loadouts';
 import { facingStrength, type Subsystem } from './Damage';
 import { chooseGun, createRayHit, cycleSubsystem, gunOf, pickSubsystemAtCrosshair, raycastShip } from './Combat';
 import type { Rng } from './Rng';
@@ -78,6 +78,8 @@ export interface WeaponEvent {
   amount?: number;
   /** beam-hit: the contact point is on a shield (a beam's shield contact is mostly reported as beam-hit). */
   shielded?: boolean;
+  hullDamage?: number;
+  shieldDamage?: number;
   /** fire: a turret mount's shot (`muzzleFlash`), not the pilot's own guns. Presentation only (sound). */
   turret?: boolean;
   /**
@@ -89,6 +91,8 @@ export interface WeaponEvent {
 }
 
 export interface Beam {
+  /** Presentation lifetime identity; not part of simulation decisions. */
+  id: number;
   active: boolean;
   owner: ShipEntity;
   socket: string | null;
@@ -113,6 +117,7 @@ export interface Beam {
 }
 
 const GUN_SOCKETS = ['gun', 'gun.L'];
+let nextBeamSoundId = 1;
 
 /** The Directorate pulse laser (kept for callers that want "the" default gun). */
 export const LASER: GunSpec = GUNS.laser;
@@ -200,6 +205,7 @@ export class Weapons {
     e.type = gun?.type;
     e.amount = 0;
     e.shielded = false;
+    e.hullDamage = e.shieldDamage = 0;
     e.turret = false;
     e.cause = null;
     this.events.push(e);
@@ -311,10 +317,12 @@ export class Weapons {
   fireBeam(owner: ShipEntity, socket: string | null, length: number, width: number, duration: number, dps: number, type: DamageType = 'harmonic'): Beam {
     let b = this.beams.find((x) => !x.active);
     if (!b) {
-      b = { active: false, owner, socket, origin: new Vector3(), dir: new Vector3(), length, width, life: 0, maxLife: duration, dps, type, faction: owner.faction, team: owner.team, end: new Vector3(), aimTarget: null, gun: null, muzzle: null };
+      b = { id: 0, active: false, owner, socket, origin: new Vector3(), dir: new Vector3(), length, width, life: 0, maxLife: duration, dps, type, faction: owner.faction, team: owner.team, end: new Vector3(), aimTarget: null, gun: null, muzzle: null };
       this.beams.push(b);
     }
     Object.assign(b, { active: true, owner, socket, length, width, life: duration, maxLife: duration, dps, type, faction: owner.faction, team: owner.team, aimTarget: null, gun: null, muzzle: null });
+    b.id = nextBeamSoundId++;
+    b.gun = CAPITAL_LANCE_GUN;
     // Place it now so a beam fired this frame draws from the right spot.
     if (socket) this.socketPosition(owner, socket, b.origin);
     else b.origin.copy(owner.flight.position);
@@ -390,6 +398,8 @@ export class Weapons {
           e.bleed = r.bleed;
           e.amount = this.damage[i];
           e.shielded = shielded;
+          e.hullDamage = r.hullDamage;
+          e.shieldDamage = r.shieldDamage;
           subOnEvent(e, r.subsystem);
         }
         // Explosive rounds splash the mounts around the burst (Subsystems.splashSubsystems).
@@ -397,7 +407,7 @@ export class Weapons {
         this.life[i] = 0;
         continue;
       }
-      if (ord && ord.shoot(_a.x, _a.y, _a.z, _d.x, _d.y, _d.z, TEAM_LIST[tm], this.damage[i])) {
+      if (ord && ord.shoot(_a.x, _a.y, _a.z, _d.x, _d.y, _d.z, TEAM_LIST[tm], this.damage[i], dt)) {
         this.life[i] = 0;
         continue;
       }
@@ -438,6 +448,7 @@ export class Weapons {
       }
       b.end.copy(b.origin).addScaledVector(_d, Math.min(hitT, 1));
       if (hitShip) {
+        provoke(hitShip, b.owner);
         const r = this.fleet.hit(hitShip, b.dps * dt, b.type, b.end, _c, b.owner, hitSub);
         const e = this.emit(r.shielded ? 'shield' : 'beam-hit', b.end, _c, hitShip.flight.velocity, hitShip, b.owner, b.gun);
         if (e) {
@@ -447,6 +458,8 @@ export class Weapons {
           e.type = b.type;
           e.amount = b.dps * dt;
           e.shielded = r.shielded;
+          e.hullDamage = r.hullDamage;
+          e.shieldDamage = r.shieldDamage;
           subOnEvent(e, r.subsystem);
           // Beam shield contact is continuous: only flash the ripple now and then.
           if (r.shielded && this.rand() > 0.12) e.kind = 'beam-hit';

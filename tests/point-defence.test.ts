@@ -59,4 +59,9 @@ test('Lantern Guard PD skips nearer ordnance outside the mount arc', async () =>
   gun.scan = 0;
   capitals.step(1 / 60);
   assert.equal(gun.aim, 'none');
+  // A fast missile crosses the bolt halfway through a tick, but neither
+  // endpoint overlaps. Point-only tests used to miss this interception.
+  missiles.pos[0].set(0, 10, 0); missiles.vel[0].set(0, -1200, 0);
+  assert.equal(missiles.shoot(-10, 0, 0, 20, 0, 0, guard.team, 1000), false);
+  assert.equal(missiles.shoot(-10, 0, 0, 20, 0, 0, guard.team, 1000, 1 / 60), true);
 });

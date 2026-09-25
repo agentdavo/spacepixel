@@ -88,7 +88,7 @@ const _zero = new Vector3();
 const Y = new Vector3(0, 1, 0);
 
 function blankBeam(owner: ShipEntity): Beam {
-  return { active: true, owner, socket: null, origin: new Vector3(), dir: new Vector3(0, 0, 1), length: 0, width: 1, life: 0, maxLife: 1, dps: 0, type: 'harmonic', faction: owner.faction, team: owner.team, end: new Vector3(), aimTarget: null, gun: null };
+  return { id: -1, active: true, owner, socket: null, origin: new Vector3(), dir: new Vector3(0, 0, 1), length: 0, width: 1, life: 0, maxLife: 1, dps: 0, type: 'harmonic', faction: owner.faction, team: owner.team, end: new Vector3(), aimTarget: null, gun: null };
 }
 
 export class KillCam {
