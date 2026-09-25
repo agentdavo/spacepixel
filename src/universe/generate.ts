@@ -7,6 +7,8 @@ import type { StarSystem, Universe } from './Universe';
 import { placeStations, systemRisk } from './stations';
 import { surveySystem } from './bodies';
 import { surfacePorts } from './surfacePorts';
+import { buildRegion, contentSeed } from './expansion';
+import { REGIONS } from '../content/regions';
 
 /**
  * Seeded Meridian Reach generator. Six hand-placed key systems anchor the
@@ -199,6 +201,43 @@ function weighted<T extends { w: number }>(rnd: () => number, items: T[]): T {
   let r = rnd() * items.reduce((s, x) => s + x.w, 0);
   for (const it of items) if ((r -= it.w) <= 0) return it;
   return items[items.length - 1];
+}
+
+/** Additive six-system playable prototype. Legacy coordinates and random streams remain intact. */
+export function generateFrontierUniverse(seed = 1994): Universe {
+  const u = generateUniverse(seed);
+  const region = REGIONS.find(r => r.id === 'marches')!;
+  const sites = buildRegion(seed, { ...region, count: 6 });
+  for (const site of sites) {
+    const rnd = mulberry32(contentSeed(seed, site.id));
+    const faction = site.owner === 'mixed' ? 'pelagic' : site.owner;
+    const hue = faction === 'pelagic' ? .48 : .09;
+    const starColor = new Color(faction === 'pelagic' ? '#d2f5ef' : '#ffe1b4');
+    const planet = makePlanet(rnd, `${site.name} I`);
+    const sys: StarSystem = { id: site.id, name: site.name, faction, map: { x: site.x, y: site.y }, starColor, starClass: 'K',
+      light: makeLight(rnd, starColor, hue, site.name), backdrop: makeBackdrop(rnd, hue, site.name),
+      planets: [{ preset: planet, position: new Vector3(220000, 10000, -80000), tilt: [.1, .2, 0] }],
+      gates: [], stations: [], threat: .18, blurb: site.description };
+    u.systems.set(sys.id, sys);
+  }
+  const connect = (a: string, b: string) => {
+    for (const [from, to] of [[a, b], [b, a]]) {
+      const s = u.systems.get(from)!, target = u.systems.get(to)!;
+      if (s.gates.some(g => g.to === to)) continue;
+      const dir = new Vector3(target.map.x - s.map.x, 0, target.map.y - s.map.y).normalize();
+      s.gates.push({ to, position: dir.clone().multiplyScalar(24000).add(new Vector3(0, 3000 + s.gates.length * 2500, 0)), normal: dir });
+    }
+  };
+  for (const site of sites) for (const to of site.links) connect(site.id, to);
+  connect('rustwake', 'marches:threshold');
+  for (const site of sites) {
+    const s = u.systems.get(site.id)!;
+    // Shared functional dock kit for the prototype; bespoke civilization stations remain an art gate.
+    s.stations = placeStations(seed, { ...s, planets: s.planets.map(p => ({ name: p.preset.name, position: p.position, radius: p.preset.radius })) });
+    for (const st of s.stations) st.risk = s.threat;
+  }
+  u.start = sites[0].id;
+  return u;
 }
 
 const hsl = (h: number, s: number, l: number) => '#' + new Color().setHSL(((h % 1) + 1) % 1, s, l).getHexString();

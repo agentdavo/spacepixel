@@ -34,7 +34,9 @@
 
 export type CommodityId = 'ebon' | 'relics' | 'cores' | 'spares' | 'rations' | 'munitions' | 'medical' | 'luxury';
 export type StationKind = 'refinery' | 'salvage' | 'bastion' | 'freeport' | 'orbital' | 'carrier' | 'surface';
-export type EconFaction = 'concord' | 'choir' | 'rustwake';
+import { POLITIES, polityRecord, type PolityId } from '../content/civilizations.ts';
+import { normalizeContact, type ContactProgress } from './expansion/contact.ts';
+export type EconFaction = PolityId;
 
 export interface Commodity {
   id: CommodityId;
@@ -69,6 +71,7 @@ export const KIND_LABEL: Record<StationKind, string> = {
 };
 
 export const FACTION_LABEL: Record<EconFaction, string> = {
+  ...polityRecord(id => POLITIES[id].name.toUpperCase()),
   concord: 'TERRAN DIRECTORATE',
   choir: 'ZENITH HEGEMONY',
   rustwake: 'RUSTWAKE CLANS',
@@ -91,6 +94,9 @@ const KIND_MUL: Record<StationKind, Partial<Record<CommodityId, number>>> = {
 };
 
 const FACTION_MUL: Record<EconFaction, Partial<Record<CommodityId, number>>> = {
+  ...polityRecord(() => ({})),
+  pelagic: { medical: 1.2, spares: 1.15, rations: 0.85 },
+  mantle: { spares: 0.8, cores: 0.9, medical: 1.15 },
   // The Board rations Ebon and feeds everyone.
   concord: { ebon: 1.08, rations: 0.92, cores: 0.95, luxury: 1.1 },
   // Tessaly's fields, Hesper's foundry-gardens; relics are relics of the fall.
@@ -124,6 +130,8 @@ export interface PressureCell {
 
 /** Everything the player owns that trading touches. Persisted by Profile.ts. */
 export interface TradeLedger {
+  /** Additive first-contact receipts, committed with cargo/payment to prevent duplicate rewards. */
+  contact?: ContactProgress;
   credits: number;
   cargo: Partial<Record<CommodityId, number>>;
   /** Cargo pod capacity, units. */
@@ -150,7 +158,7 @@ export function newLedger(): TradeLedger {
     credits: 2500,
     cargo: { rations: 2 },
     capacity: 16,
-    rep: { concord: 20, choir: -20, rustwake: 0 },
+    rep: { ...polityRecord(() => 0), concord: 20, choir: -20, rustwake: 0 },
     missiles: MISSILE_MAX,
     clock: 0,
     pressure: {},
@@ -173,6 +181,7 @@ export function normaliseLedger(raw: unknown): TradeLedger {
   const rep = { ...base.rep };
   for (const f of Object.keys(rep) as EconFaction[]) rep[f] = clamp(num(r.rep?.[f], rep[f]), -100, 100);
   return {
+    ...(r.contact ? { contact: normalizeContact(r.contact) } : {}),
     credits: Math.max(0, Math.floor(num(r.credits, base.credits))),
     cargo: r.cargo ? cargo : base.cargo,
     capacity: Math.max(1, Math.floor(num(r.capacity, base.capacity))),
@@ -496,6 +505,7 @@ export function bestAsk(markets: readonly MarketSpec[], cid: CommodityId, l: Tra
 type Named = MarketSpec & { name: string };
 
 const NEWS: Record<EconFaction | 'any', string[]> = {
+  ...polityRecord(id => [`${POLITIES[id].name}: local port services are open to registered traffic.`]),
   any: [
     'NULL PICKETS: SIGNAL BURST LOGGED AGAIN. BOTH BOARDS DECLINE COMMENT.',
     'Anchorage timetable beacon still promising service will resume shortly. Year 431 of the delay.',

@@ -201,7 +201,8 @@ export interface Blueprint {
   notes?: string;
 }
 
-export type FactionId = 'concord' | 'choir' | 'rustwake';
+export type LegacyFactionId = 'concord' | 'choir' | 'rustwake';
+export type FactionId = import('../content/civilizations').PolityId;
 
 export interface Livery {
   primary: string;

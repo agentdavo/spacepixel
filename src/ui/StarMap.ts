@@ -2,6 +2,7 @@ import type { Universe, StarSystem } from '@/universe/Universe';
 import { route } from '@/universe/Universe';
 import { systemTraffic, type TrafficSummary } from '@/universe/traffic';
 import { KIND_LABEL } from '@/universe/bodies';
+import { POLITIES, polityRecord } from '../content/civilizations';
 
 /**
  * Milestone 15 — sector star map (M). A full-screen CRT-style overlay of the
@@ -10,6 +11,7 @@ import { KIND_LABEL } from '@/universe/bodies';
  * the in-flight NAV marker.
  */
 const FACTION_COLOR: Record<string, string> = {
+  ...polityRecord(id => POLITIES[id].color),
   concord: '#6fe6ff',
   choir: '#ff5fb4',
   rustwake: '#ffc46b',
@@ -71,8 +73,13 @@ export class StarMap {
     const h = window.innerHeight;
     // The survey panel takes the right-hand 400 px on wide screens.
     const panel = w > 1000 ? 400 : 0;
-    const s = Math.min((w - 120 - panel) / 100, (h - 160) / 64);
-    return { ox: (w - panel - 100 * s) / 2, oy: (h - 64 * s) / 2 + 20, s };
+    const systems = [...this.universe.systems.values()];
+    const minX = Math.min(0, ...systems.map(s => s.map.x - 6));
+    const minY = Math.min(0, ...systems.map(s => s.map.y - 6));
+    const spanX = Math.max(100, ...systems.map(s => s.map.x + 6)) - minX;
+    const spanY = Math.max(64, ...systems.map(s => s.map.y + 6)) - minY;
+    const s = Math.max(.1, Math.min((w - 120 - panel) / spanX, (h - 160) / spanY));
+    return { ox: (w - panel - spanX * s) / 2 - minX * s, oy: (h - spanY * s) / 2 + 20 - minY * s, s };
   }
 
   private toScreen(sys: StarSystem) {
@@ -213,7 +220,7 @@ export class StarMap {
     // Header + hover details.
     c.fillStyle = '#ffffff';
     c.font = '700 18px "Oxanium", sans-serif';
-    c.fillText('MERIDIAN REACH // LANTERN NETWORK', 40, 44);
+    c.fillText(this.universe.systems.size > 22 ? 'OPEN HORIZON // FRONTIER NETWORK' : 'MERIDIAN REACH // LANTERN NETWORK', 40, 44);
     c.font = '12px "Share Tech Mono", monospace';
     c.fillStyle = '#7dffb2';
     c.fillText(`CURRENT  ${this.universe.systems.get(cur)?.name.toUpperCase()}`, 40, 68);

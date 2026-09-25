@@ -881,7 +881,7 @@ export class ContractDesk {
     input.override = null;
     s.quiet();
     this.book = { ...this.book, active: [], seen: [] };
-    s.ledger = { ...s.ledger, credits: Math.max(s.ledger.credits, 6400), rep: { concord: 42, choir: -24, rustwake: 12 } };
+    s.ledger = { ...s.ledger, credits: Math.max(s.ledger.credits, 6400), rep: { ...s.ledger.rep, concord: 42, choir: -24, rustwake: 12 } };
     this.acceptSchedule(e);
     const k = this.book.active[0];
     if (!k?.op) return;
@@ -917,7 +917,7 @@ export class ContractDesk {
     input.override = null;
     s.quiet();
     this.book = { ...this.book, active: [], seen: [] };
-    s.ledger = { ...s.ledger, credits: Math.max(s.ledger.credits, 6400), rep: { concord: 42, choir: -24, rustwake: 12 } };
+    s.ledger = { ...s.ledger, credits: Math.max(s.ledger.credits, 6400), rep: { ...s.ledger.rep, concord: 42, choir: -24, rustwake: 12 } };
     const sys = s.currentSystemId();
     const here = this.reach.systems.find((x) => x.id === sys)!;
     const stations = q.get('cstation') ? [q.get('cstation')!] : here.stations.map((st) => st.id);

@@ -1,3 +1,4 @@
+import { POLITIES, polityRecord, type PolityId } from '../../content/civilizations';
 import { BoxGeometry, ConeGeometry, CylinderGeometry, Group, InstancedMesh, Matrix4, Mesh, Quaternion, RingGeometry, Vector3, type BufferGeometry } from 'three';
 import type { SurfaceTerrain } from '@/universe/Universe';
 import { CelMaterial } from '@/render/materials/CelMaterial';
@@ -35,10 +36,11 @@ export interface CitySpec {
   ground: GroundSpec;
   terrain: SurfaceTerrain;
   seed: number;
-  faction: 'concord' | 'choir' | 'rustwake';
+  faction: PolityId;
 }
 
 const PALETTE: Record<CitySpec['faction'], { walls: string[]; trim: string; window: string; pad: string; mark: string; lights: string }> = {
+  ...polityRecord(id => ({ walls: ['#d2d3ca', '#929b9a'], trim: '#40555a', window: POLITIES[id].color, pad: '#32383d', mark: POLITIES[id].color, lights: POLITIES[id].color })),
   concord: { walls: ['#c9cdd6', '#9aa3b4', '#e4e0d4'], trim: '#3f5a8a', window: '#ffd08a', pad: '#3a3f4a', mark: '#ffd24f', lights: '#6fe6ff' },
   choir: { walls: ['#e8d6de', '#c7b0c8', '#f2ece2'], trim: '#6a3f7a', window: '#ff9fe2', pad: '#3d3344', mark: '#ff9fe2', lights: '#ff5fd0' },
   rustwake: { walls: ['#b08d6c', '#8a6a52', '#c9b08a'], trim: '#6b3a22', window: '#ffb45e', pad: '#3b332c', mark: '#ffb04f', lights: '#ffb04f' },

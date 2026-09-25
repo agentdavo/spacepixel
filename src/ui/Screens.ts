@@ -12,7 +12,7 @@ import { labelOf } from './SignalCounter';
  * style.css with the CRT treatment. Each screen resolves a promise when the
  * player moves on, so the boot flow in main.ts reads top to bottom.
  */
-export type TitleChoice = 'launch' | 'free' | 'map' | 'hangar' | 'paint' | 'showcase' | 'prologue' | 'trailer' | 'attract';
+export type TitleChoice = 'launch' | 'free' | 'map' | 'hangar' | 'paint' | 'showcase' | 'prologue' | 'trailer' | 'attract' | 'frontier';
 
 export interface TitleOptions {
   /** Resolve with 'attract' after this long with no input (the prologue / trailer play as attract reels). */
@@ -31,6 +31,7 @@ export function titleScreen(root: HTMLElement, opts: TitleOptions = {}): Promise
     { id: 'paint', label: 'PAINT SHOP' },
     { id: 'hangar', label: 'HANGAR / MODEL SHEETS' },
     { id: 'showcase', label: 'SHOWCASE' },
+    { id: 'frontier', label: 'OPEN HORIZON — FRONTIER ATLAS' },
   ];
   // The Signal, once a career has heard it (Episode 5): the count waits on the title card.
   const signal = career ? labelOf(signalState(backfillStory(loadWorld(), profile.episode))) : '';

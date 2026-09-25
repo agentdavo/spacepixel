@@ -1,4 +1,5 @@
 import './dock.css';
+import { POLITY_IDS } from '../content/civilizations';
 import {
   COMMODITIES,
   COMMODITY,
@@ -383,7 +384,7 @@ export class DockScreen {
     el.querySelector<HTMLButtonElement>('[data-act="repair"]')?.addEventListener('click', () => this.repair());
     el.querySelector<HTMLButtonElement>('[data-act="rearm"]')?.addEventListener('click', () => this.rearm());
 
-    const fac: EconFaction[] = ['concord', 'choir', 'rustwake'];
+    const fac: EconFaction[] = POLITY_IDS.filter(id => id === 'concord' || id === 'choir' || id === 'rustwake' || id === st.faction || l.rep[id] !== 0);
     el.querySelector('.dock-rep')!.innerHTML = fac
       .map((k) => {
         const r = l.rep[k];

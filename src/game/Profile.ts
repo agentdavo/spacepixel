@@ -69,7 +69,14 @@ const LEDGER_KEY = 'vanguard.trade.v1';
 export function loadLedger(): TradeLedger {
   try {
     const raw = localStorage.getItem(LEDGER_KEY);
-    if (raw) return normaliseLedger(JSON.parse(raw));
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Keep a one-time pre-expansion ledger; a failed backup must not erase a valid career.
+      if (!Object.hasOwn(parsed?.rep ?? {}, 'pelagic')) {
+        try { if (!localStorage.getItem(`${LEDGER_KEY}.pre-expansion`)) localStorage.setItem(`${LEDGER_KEY}.pre-expansion`, raw); } catch { /* retain the loaded career */ }
+      }
+      return normaliseLedger(parsed);
+    }
   } catch {
     /* storage unavailable */
   }

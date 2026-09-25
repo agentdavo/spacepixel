@@ -351,7 +351,9 @@ export class Traffic {
     const fwd = _dir.subVectors(lane.to.position, lane.from.position).normalize().clone();
     const man = manifest(s);
     // A defector's own side hunts them: its patrols fly as renegades (world reader).
-    const team: Team = s.role === 'patrol' ? (s.flag === 'rustwake' ? 'neutral' : patrolHostile(s.flag) ? 'renegade' : s.flag) : 'neutral';
+    // First-contact patrols protect civilian lanes; a new political identity is not a declaration of war.
+    const legacyMilitary = s.flag === 'concord' || s.flag === 'choir';
+    const team: Team = s.role === 'patrol' && legacyMilitary ? (patrolHostile(s.flag) ? 'renegade' : s.flag) : 'neutral';
     // Departing a station early in the sailing: come out of the bay, not out of thin air.
     const st = lane.from.kind === 'station' && tau < 12 ? this.view?.stations.find((x) => x.site.id === lane.from.id) : undefined;
     if (st) pos.copy(st.bay).addScaledVector(st.axis, 200);

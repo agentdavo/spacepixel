@@ -1,4 +1,4 @@
-import type { FactionId } from '@/assets/Blueprint';
+import type { LegacyFactionId as FactionId } from '@/assets/Blueprint';
 import { GUNS, MISSILES, type GunId, type GunSpec, type MissileId } from '../../sim/Loadouts.ts';
 
 /**

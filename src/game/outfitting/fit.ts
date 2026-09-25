@@ -133,7 +133,8 @@ export function fits(it: Item, slot: Slot): boolean {
 // ── stock fits ───────────────────────────────────────────────────────
 
 type Yard = 'concord' | 'choir' | 'rustwake';
-const yardOf = (e: CatalogEntry): Yard => (e.faction === 'civil' ? 'concord' : (e.faction as Yard));
+// Pilot frontier hulls use compatible existing equipment pending their own maker ranges.
+const yardOf = (e: CatalogEntry): Yard => e.faction === 'choir' || e.faction === 'rustwake' ? e.faction : 'concord';
 const UTIL_MAKER: Record<Yard, Record<'shield' | 'armour' | 'engine' | 'reactor', MakerId>> = {
   concord: { shield: 'aegis', armour: 'castellan', engine: 'anchorage', reactor: 'castellan' },
   choir: { shield: 'hesper', armour: 'cantus', engine: 'hesper', reactor: 'cantus' },

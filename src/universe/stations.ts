@@ -20,7 +20,7 @@ import type { StationSite } from './Universe';
 export interface StationSystemInput {
   id: string;
   name: string;
-  faction: 'concord' | 'choir' | 'rustwake' | 'contested' | 'unknown';
+  faction: EconFaction | 'contested' | 'unknown';
   planets: { name: string; position: Vector3; radius: number }[];
   gates: { position: Vector3; normal: Vector3 }[];
 }
@@ -119,7 +119,8 @@ function proceduralPlan(sys: StationSystemInput, rnd: () => number): Plan[] {
       if (kinds[0].kind === 'salvage') kinds[2] = { kind: 'freeport', faction: 'rustwake' };
       break;
     default:
-      kinds = [{ kind: 'bastion', faction: 'concord' }];
+      kinds = sys.faction === 'unknown' ? [{ kind: 'bastion', faction: 'concord' }]
+        : [{ kind: 'freeport', faction: sys.faction }, { kind: 'orbital', faction: sys.faction }];
   }
   if (!hasPlanet) kinds = kinds.filter((k) => k.kind !== 'orbital');
   const count = Math.min(kinds.length, 1 + Math.floor(rnd() * 3));

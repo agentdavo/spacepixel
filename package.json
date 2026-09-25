@@ -3,10 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Retro OVA cel-shaded space combat — Three.js WebGPU",
+  "description": "Retro OVA cel-shaded space combat \u2014 Three.js WebGPU",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && node scripts/check-campaign.mjs && vite build",
+    "build": "tsc --noEmit && npm run check:campaign && npm run check:expansion && vite build",
     "check:campaign": "node scripts/check-campaign.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -23,7 +23,8 @@
     "career-check": "node scripts/career-check.mjs",
     "determinism": "node scripts/determinism.mjs",
     "latency": "node scripts/latency.mjs",
-    "attract-check": "node scripts/attract-check.mjs"
+    "attract-check": "node scripts/attract-check.mjs",
+    "check:expansion": "node --experimental-transform-types --no-warnings scripts/check-expansion.mjs"
   },
   "dependencies": {
     "three": "^0.186.0"

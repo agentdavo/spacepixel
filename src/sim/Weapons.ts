@@ -476,9 +476,10 @@ function subOnEvent(e: WeaponEvent, sub: Subsystem | null): void {
   e.subHp = sub.hp / sub.hpMax;
 }
 
-export const FACTION_INDEX: Record<FactionId, number> = { concord: 0, choir: 1, rustwake: 2 };
-export const TEAM_INDEX: Record<Team, number> = { concord: 0, choir: 1, rustwake: 2, renegade: 3, neutral: 4 };
-const TEAM_LIST: Team[] = ['concord', 'choir', 'rustwake', 'renegade', 'neutral'];
+// Existing wire indices must never change: recorded tapes encode these numbers.
+export const FACTION_INDEX: Record<FactionId, number> = { concord: 0, choir: 1, rustwake: 2, standing: 3, pelagic: 4, mantle: 5, migrant: 6, linked: 7, seedward: 8, archive: 9 };
+export const TEAM_INDEX: Record<Team, number> = { concord: 0, choir: 1, rustwake: 2, renegade: 3, neutral: 4, standing: 5, pelagic: 6, mantle: 7, migrant: 8, linked: 9, seedward: 10, archive: 11 };
+const TEAM_LIST: Team[] = ['concord', 'choir', 'rustwake', 'renegade', 'neutral', 'standing', 'pelagic', 'mantle', 'migrant', 'linked', 'seedward', 'archive'];
 
 /** A neutral that gets shot turns on its attacker's side. */
 export function provoke(victim: ShipEntity, attacker: ShipEntity): void {

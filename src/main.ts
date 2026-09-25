@@ -71,6 +71,11 @@ async function prepareReplay(): Promise<boolean> {
 }
 
 async function boot(): Promise<void> {
+  if (new URLSearchParams(location.search).get('atlas') === '1') {
+    const { mountFrontierAtlas } = await import('./ui/FrontierAtlas');
+    mountFrontierAtlas(document.getElementById('ui-root')!);
+    return;
+  }
   await prepareReplay();
   const canvas = document.getElementById('viewport') as HTMLCanvasElement;
   const uiRoot = document.getElementById('ui-root')!;
@@ -276,6 +281,7 @@ async function boot(): Promise<void> {
       continue;
     }
     getAudio().ui('confirm');
+    if (choice === 'frontier') { location.assign('/?atlas=1'); return; }
     if (choice === 'launch' || choice === 'free') {
       await runCampaign(choice === 'free');
       return;

@@ -6,6 +6,7 @@ import { LANTERN_GUARD, HESPERUS_DAWN, INDOMITABLE } from './concord-fleet';
 import { PSALTER, VESPER, CATHEDRAL } from './choir-fleet';
 import { SCRAPJACK } from './rustwake';
 import { SHIPYARD_ROSTER } from './shipyard';
+import { PILOT_HULLS, pilotBlueprint } from '../../content/pilotHulls';
 
 export { KESTREL, CANTOR, CATHEDRAL, HARRIER, WARHORSE, SCRAPJACK, PSALTER, VESPER, LANTERN_GUARD, HESPERUS_DAWN, INDOMITABLE };
 
@@ -24,6 +25,7 @@ export const ROSTER: Blueprint[] = [
   CATHEDRAL,
   // Shipyard: progression line, Rustwake clans, civilian traffic, mid-tier warships.
   ...SHIPYARD_ROSTER,
+  ...PILOT_HULLS.map(pilotBlueprint),
 ];
 
 export const BLUEPRINTS: Record<string, Blueprint> = Object.fromEntries(ROSTER.map((b) => [b.id, b]));

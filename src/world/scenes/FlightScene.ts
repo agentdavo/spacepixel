@@ -33,7 +33,7 @@ import { Hyperspace } from '../Hyperspace';
 import { SpaceDust } from '../SpaceDust';
 import { bayDust } from '../BayDust';
 import { MultiplaneSky } from '../MultiplaneSky';
-import { generateUniverse, specialSystem } from '@/universe/generate';
+import { generateUniverse, generateFrontierUniverse, specialSystem } from '@/universe/generate';
 import { CampaignSession, type FlightHostScene } from '@/game/CampaignSession';
 import { SYSTEM_FALLBACK } from '@/game/campaign/missions';
 import { getAudio, combatIntensity, type AudioFrame } from '@/audio';
@@ -79,6 +79,7 @@ import { GuildRuntime } from '@/game/guilds/GuildRuntime';
 import { sanitizeWorld, world } from '@/game/world/WorldState'; // guilds, arcs, outposts (+ the GUILD HALL / OUTPOST dock tabs)
 import { applyWorldDiff } from '@/game/world/diff';
 import '@/ui/ThreadsTab'; // registers the THREADS dock tab (NPC arcs, rivals) — last, so earlier tabs keep their digits
+import '@/ui/ContactTab'; // frontier supply agreements; only visible at Marches ports
 
 /**
  * Milestones 4–6 + 10–11: one ship flying well, then shooting.
@@ -146,7 +147,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   private planesBase = 1;
   /** ?traffic=0 disables ambient traffic (A/B perf checks). */
   private trafficOn = new URLSearchParams(location.search).get('traffic') !== '0';
-  readonly universe: Universe = generateUniverse(1994);
+  readonly frontier = new URLSearchParams(location.search).get('expansion') === 'pilot';
+  readonly universe: Universe = this.frontier ? generateFrontierUniverse(1994) : generateUniverse(1994);
   private systemId: string;
   private view: StarSystemView;
   readonly starMap: StarMap;
@@ -467,6 +469,10 @@ export class FlightScene implements GameScene, FlightHostScene {
     }
     this.killCam = new KillCam(document.getElementById('ui-root')!, this.fleet, this.visuals, this.fxOn ? this.combatFx : null);
     this.killCam.onEnd = () => this.chase.snap(this.player.flight);
+    if (this.frontier) {
+      this.quiet();
+      if (!q.get('dock') && !this.replay.playing && this.ledger.lastDock?.startsWith('marches:')) this.berthAt(this.ledger.lastDock);
+    }
     this.replay.booting = false;
     window.__VANGUARD__ = { ...(window.__VANGUARD__ ?? { ready: false, frame: () => 0, backend: '' }), hooks: { ...window.__VANGUARD__?.hooks, scene: this, replay: this.replay.api() } };
   }
@@ -1502,7 +1508,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       (sel && /^\d+$/.test(sel) ? list[Number(sel)] : undefined) ??
       [...list].filter((x) => x.station).sort((a, b) => a.bay.distanceTo(p0) - b.bay.distanceTo(p0))[0];
     if (!d) return;
-    if (demoCargo) this.ledger = { ...this.ledger, credits: 18_450, cargo: { ebon: 4, relics: 3, rations: 2, medical: 1 }, missiles: 3, rep: { concord: 34, choir: -22, rustwake: 12 } };
+    if (demoCargo) this.ledger = { ...this.ledger, credits: 18_450, cargo: { ebon: 4, relics: 3, rations: 2, medical: 1 }, missiles: 3, rep: { ...this.ledger.rep, concord: 34, choir: -22, rustwake: 12 } };
     const pf = this.player.flight;
     const place = (out: number, lat: number) => {
       const right = _v.crossVectors(d.up, d.axis);

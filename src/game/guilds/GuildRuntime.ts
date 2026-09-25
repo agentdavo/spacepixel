@@ -243,7 +243,7 @@ export class GuildRuntime {
         if (q.get('choice')) w = { ...w, facts: { ...w.facts, [`arc.${g}.pending`]: arcOf(g)[3].id, [`arc.${g}.1`]: true, [`arc.${g}.2`]: true, [`arc.${g}.3`]: true, [`arc.${g}.4`]: true } };
       }
       world().update(() => w);
-      s.ledger = { ...s.ledger, credits: Math.max(s.ledger.credits, 24_000), rep: { concord: 40, choir: 30, rustwake: 20 } };
+      s.ledger = { ...s.ledger, credits: Math.max(s.ledger.credits, 24_000), rep: { ...s.ledger.rep, concord: 40, choir: 30, rustwake: 20 } };
     }
   }
 

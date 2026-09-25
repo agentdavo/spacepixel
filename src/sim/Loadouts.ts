@@ -387,6 +387,14 @@ export interface MountSpec {
 }
 
 export const LOADOUTS: Record<string, Loadout> = {
+  'pa-skimmer': { guns: ['laser'], missiles: [] },
+  'pa-lifeline': { guns: [], missiles: [] },
+  'pa-basin': { guns: [], missiles: [], turret: 'flak' },
+  'pa-breakwater': { guns: ['heavylaser'], missiles: [], turret: 'flak' },
+  'mc-flint': { guns: ['autocannon'], missiles: [] },
+  'mc-keystone': { guns: [], missiles: [] },
+  'mc-foundry': { guns: [], missiles: [], turret: 'flak' },
+  'mc-bastion': { guns: ['cannon'], missiles: [], turret: 'flak' },
   'vf27-kestrel': { guns: ['laser', 'autocannon'], missiles: ['micro', 'torpedo'] },
   'vf31-harrier': { guns: ['autocannon', 'laser'], missiles: ['micro'] },
   'sb9-warhorse': { guns: ['autocannon', 'laser'], missiles: ['torpedo', 'micro'] },
@@ -413,6 +421,13 @@ export const LOADOUTS: Record<string, Loadout> = {
 };
 
 export const DEFAULT_LOADOUT: Record<FactionId, Loadout> = {
+  standing: { guns: [], missiles: [], turret: 'flak' },
+  pelagic: { guns: ['laser'], missiles: ['micro'], turret: 'flak' },
+  mantle: { guns: ['autocannon'], missiles: ['micro'], turret: 'flak' },
+  migrant: { guns: ['laser'], missiles: ['micro'], turret: 'flak' },
+  linked: { guns: ['laser'], missiles: ['micro'], turret: 'flak' },
+  seedward: { guns: ['laser'], missiles: [], turret: 'flak' },
+  archive: { guns: ['laser'], missiles: [], turret: 'flak' },
   concord: { guns: ['laser', 'autocannon'], missiles: ['micro'], turret: 'flak' },
   choir: { guns: ['hymn', 'lance'], missiles: [], turret: 'battery' },
   rustwake: { guns: ['scatter', 'laser'], missiles: ['harpoon'], turret: 'rustflak' },
@@ -436,6 +451,10 @@ export interface CapitalLayout {
 }
 
 export const CAPITAL_LAYOUT: Record<string, CapitalLayout> = {
+  'pa-basin': { bridge: { socket: 'bridge', x: 0, z: .44 }, shieldGen: { x: .65, z: -.2 }, reactor: { x: 0, z: -.24, below: true }, sensors: { x: 0, z: .44 } },
+  'pa-breakwater': { bridge: { socket: 'bridge', x: 0, z: .44 }, shieldGen: { x: .65, z: -.1 }, reactor: { x: 0, z: -.2, below: true }, sensors: { x: 0, z: .44 } },
+  'mc-foundry': { bridge: { socket: 'bridge', x: 0, z: .44 }, shieldGen: { x: -.5, z: -.2 }, reactor: { x: 0, z: -.35, below: true }, sensors: { x: .2, z: .55 } },
+  'mc-bastion': { bridge: { socket: 'bridge', x: 0, z: .44 }, shieldGen: { x: -.5, z: -.25 }, reactor: { x: 0, z: -.2, below: true }, sensors: { x: .2, z: .55 } },
   'ffc-lantern-guard': { bridge: { socket: 'bridge', x: 0, z: 0.1 }, shieldGen: { x: 0, z: -0.35 }, reactor: { x: 0, z: -0.5 } },
   'choir-vesper': { bridge: { x: 0, z: 0.35 }, shieldGen: { x: 0, z: -0.25 }, reactor: { x: 0, z: -0.45 } },
   'cvs07-hesperus-dawn': { bridge: { x: 0.42, z: -0.03 }, shieldGen: { x: -0.25, z: -0.62 }, reactor: { x: 0, z: -0.3, below: true } },

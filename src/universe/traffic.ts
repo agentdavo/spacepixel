@@ -1,3 +1,4 @@
+import { POLITIES, polityRecord, isPolity } from '../content/civilizations.ts';
 import { Vector3 } from 'three';
 import type { Livery } from '../assets/Blueprint';
 import type { CommodityId, EconFaction, StationKind, TradeLedger } from '../game/economy';
@@ -53,7 +54,7 @@ const HAULER_PAINT: Partial<Record<EconFaction, Partial<Livery>>> = {
 export const TRAFFIC_ROLES: Record<TrafficRole, RoleDef> = {
   freighter: {
     label: 'freighter',
-    hulls: { concord: ['civ-longhaul', 'ffc-lantern-guard'], choir: ['civ-longhaul', 'choir-vesper'], rustwake: ['civ-longhaul', 'rw-mother-lode', 'ffc-lantern-guard'] },
+    hulls: { ...polityRecord(() => ['civ-longhaul']), pelagic: ['pa-basin'], mantle: ['mc-foundry'], concord: ['civ-longhaul', 'ffc-lantern-guard'], choir: ['civ-longhaul', 'choir-vesper'], rustwake: ['civ-longhaul', 'rw-mother-lode', 'ffc-lantern-guard'] },
     livery: HAULER_PAINT,
     speed: 110,
     laneSpeed: 1700,
@@ -64,7 +65,7 @@ export const TRAFFIC_ROLES: Record<TrafficRole, RoleDef> = {
   },
   tanker: {
     label: 'Ebon tanker',
-    hulls: { concord: ['civ-umbra', 'ffc-lantern-guard'], choir: ['civ-umbra', 'choir-vesper'], rustwake: ['civ-umbra', 'choir-vesper'] },
+    hulls: { ...polityRecord(() => ['civ-longhaul']), pelagic: ['pa-basin'], mantle: ['mc-foundry'], concord: ['civ-umbra', 'ffc-lantern-guard'], choir: ['civ-umbra', 'choir-vesper'], rustwake: ['civ-umbra', 'choir-vesper'] },
     livery: { concord: { primary: '#e8e2d2', secondary: '#3b2a5a', accent: '#b77bff' }, choir: HAULER_PAINT.choir, rustwake: { primary: '#6e5a4a', secondary: '#2f2a3e', accent: '#b77bff' } },
     speed: 90,
     laneSpeed: 1400,
@@ -75,7 +76,7 @@ export const TRAFFIC_ROLES: Record<TrafficRole, RoleDef> = {
   },
   liner: {
     label: 'liner',
-    hulls: { concord: ['civ-meridian-star', 'ffc-lantern-guard'], choir: ['civ-meridian-star', 'choir-vesper'], rustwake: ['civ-meridian-star', 'ffc-lantern-guard'] },
+    hulls: { ...polityRecord(() => ['civ-longhaul']), pelagic: ['pa-lifeline'], mantle: ['mc-keystone'], concord: ['civ-meridian-star', 'ffc-lantern-guard'], choir: ['civ-meridian-star', 'choir-vesper'], rustwake: ['civ-meridian-star', 'ffc-lantern-guard'] },
     livery: { concord: { primary: '#f4f1ea', secondary: '#1f6f8a', accent: '#ff7a1c' }, choir: { primary: '#e8dcf4', secondary: '#5d4a86', accent: '#ff3fa8' }, rustwake: HAULER_PAINT.rustwake },
     speed: 140,
     laneSpeed: 2400,
@@ -86,7 +87,7 @@ export const TRAFFIC_ROLES: Record<TrafficRole, RoleDef> = {
   },
   courier: {
     label: 'courier',
-    hulls: { concord: ['civ-swallow', 'vf31-harrier'], choir: ['civ-swallow', 'choir-psalter'], rustwake: ['civ-swallow', 'rw-scrapjack'] },
+    hulls: { ...polityRecord(() => ['civ-longhaul']), pelagic: ['pa-lifeline'], mantle: ['mc-keystone'], concord: ['civ-swallow', 'vf31-harrier'], choir: ['civ-swallow', 'choir-psalter'], rustwake: ['civ-swallow', 'rw-scrapjack'] },
     speed: 200,
     laneSpeed: 3000,
     hull: 110,
@@ -96,7 +97,7 @@ export const TRAFFIC_ROLES: Record<TrafficRole, RoleDef> = {
   },
   miner: {
     label: 'ore miner',
-    hulls: { concord: ['civ-tallow', 'sb9-warhorse'], choir: ['civ-tallow', 'choir-psalter'], rustwake: ['civ-tallow', 'sb9-warhorse'] },
+    hulls: { ...polityRecord(() => ['civ-longhaul']), pelagic: ['pa-basin'], mantle: ['mc-foundry'], concord: ['civ-tallow', 'sb9-warhorse'], choir: ['civ-tallow', 'choir-psalter'], rustwake: ['civ-tallow', 'sb9-warhorse'] },
     livery: HAULER_PAINT,
     speed: 80,
     laneSpeed: 1100,
@@ -107,7 +108,7 @@ export const TRAFFIC_ROLES: Record<TrafficRole, RoleDef> = {
   },
   patrol: {
     label: 'patrol',
-    hulls: { concord: ['vf27-kestrel'], choir: ['choir-cantor'], rustwake: ['rw-scrapjack'] },
+    hulls: { ...polityRecord(() => ['civ-longhaul']), pelagic: ['pa-skimmer'], mantle: ['mc-flint'], concord: ['vf27-kestrel'], choir: ['choir-cantor'], rustwake: ['rw-scrapjack'] },
     speed: 180,
     laneSpeed: 900,
     hull: 100,
@@ -118,7 +119,7 @@ export const TRAFFIC_ROLES: Record<TrafficRole, RoleDef> = {
   },
   pirate: {
     label: 'raider',
-    hulls: { concord: ['rw-scrapjack'], choir: ['rw-scrapjack'], rustwake: ['rw-scrapjack'] },
+    hulls: { ...polityRecord(() => ['civ-longhaul']), pelagic: ['rw-scrapjack'], mantle: ['rw-scrapjack'], concord: ['rw-scrapjack'], choir: ['rw-scrapjack'], rustwake: ['rw-scrapjack'] },
     livery: { rustwake: { primary: '#3a3230', secondary: '#7a1f1f', accent: '#ff4a2a' } },
     speed: 200,
     laneSpeed: 1200,
@@ -142,6 +143,7 @@ export const CARGO_LABEL: Record<CommodityId, string> = {
 };
 
 const NAMES: Record<EconFaction, string[]> = {
+  ...polityRecord(id => [POLITIES[id].name + ' Transit', POLITIES[id].name + ' Service']),
   concord: ['Patient Ledger', 'Good Allocation', 'Keep the Light', "Hollis's Promise", 'Grams to Spare', 'Twelfth Winter', 'Candle Years', 'Honest Weight', 'Counted Blessing', 'Service Resumes', 'Quota Maid', 'Seventh Keeping', 'Tey Standard', 'Allocation Hour', 'Sealed Heart', 'Ration Day'],
   choir: ['Seventh Intonation', 'Hymn-Carrier', 'Ascendant Tallow', 'Glass Canticle', 'Foundry Psalm', 'Matins Bell', 'Prime Interval', 'Rising Fourth', 'Vigil of Hesper', 'Quiet Choir', 'Spire-Bound', 'Descant'],
   rustwake: ['Nothing Lost', 'Scrap Heaven', 'Dregs & Glory', 'Salvage Right', 'Old Grudge', 'Barter Queen', 'Ember Daughter', 'Both Paints', 'Loud Moot', 'Haul-Song', 'Second Hand', 'Found Money', 'Unlisted', 'Sweet Dross'],
@@ -239,7 +241,7 @@ type SysLike = Pick<StarSystem, 'faction' | 'threat'> & { id?: string };
 
 /** Traffic volume multiplier by system holder (fewer sailings where it's dangerous). */
 export function systemVolume(sys: SysLike): number {
-  const base = sys.faction === 'concord' ? 1 : sys.faction === 'choir' ? 0.85 : sys.faction === 'rustwake' ? 0.95 : sys.faction === 'contested' ? 0.65 : 0.18;
+  const base = sys.faction === 'concord' ? 1 : sys.faction === 'choir' ? 0.85 : sys.faction === 'rustwake' ? 0.95 : sys.faction === 'contested' ? 0.65 : isPolity(sys.faction) ? 0.85 : 0.18;
   const world = trafficWorld && sys.id ? Math.max(0.2, 1 + trafficWorld.volume(sys.id)) : 1;
   return base * (1 - 0.3 * sys.threat) * world;
 }
@@ -257,7 +259,7 @@ export function patrolVolume(sys: SysLike): number {
 }
 
 function sysFlag(sys: StarSystem): EconFaction {
-  return sys.faction === 'concord' || sys.faction === 'choir' || sys.faction === 'rustwake' ? sys.faction : 'rustwake';
+  return isPolity(sys.faction) ? sys.faction : 'rustwake';
 }
 
 /** The belt beside the first Lantern (mirrors StarSystemView's placement). */

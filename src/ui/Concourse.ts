@@ -92,12 +92,15 @@ class ConcourseTab {
     this.api = api;
     const l = ctx.ledger();
     const st = ctx.station;
-    const stations = ctx.markets.map((m) => ({ id: m.id, faction: m.faction, kind: m.kind }));
+    const stations = ctx.markets.flatMap(m => m.faction === 'concord' || m.faction === 'choir' || m.faction === 'rustwake'
+      ? [{ id: m.id, faction: m.faction, kind: m.kind }] : []);
     const episode = loadProfile().episode;
     // NPC arcs catch up with the world first: they decide who is standing here.
     advanceNpcs(l.clock, episode);
     const placed = npcPlacement(stations);
-    this.people = peopleAt({ id: st.id, faction: st.faction, kind: st.kind }, stations, l.clock, episode, placed);
+    // Human portrait/cast pools are not alien character generators. New casts are authored separately.
+    this.people = st.faction === 'concord' || st.faction === 'choir' || st.faction === 'rustwake'
+      ? peopleAt({ id: st.id, faction: st.faction, kind: st.kind }, stations, l.clock, episode, placed) : [];
     // Captures / dev: ?talk=<id> brings a roster person here and opens the conversation.
     const q = new URLSearchParams(location.search);
     const demo = ctx.demo?.person;

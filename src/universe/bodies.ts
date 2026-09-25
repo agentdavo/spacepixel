@@ -282,7 +282,7 @@ const MOON_NAMES: Record<string, string[]> = {
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 
 function factionKey(sys: StarSystem): 'concord' | 'choir' | 'rustwake' | 'unknown' {
-  return sys.faction === 'contested' ? 'rustwake' : sys.faction;
+  return sys.faction === 'contested' ? 'rustwake' : sys.faction === 'concord' || sys.faction === 'choir' || sys.faction === 'rustwake' ? sys.faction : 'unknown';
 }
 
 // ── hand-authored anchors (the series bible's systems) ──────────────────

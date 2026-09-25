@@ -1,4 +1,5 @@
 import type { FactionId, Livery } from './Blueprint';
+import { POLITIES, POLITY_IDS } from '../content/civilizations';
 
 export interface Faction {
   id: FactionId;
@@ -15,6 +16,10 @@ export interface Faction {
  * designers specified model sheets for the ink-and-paint department.
  */
 export const FACTIONS: Record<FactionId, Faction> = {
+  ...Object.fromEntries(POLITY_IDS.map(id => [id, {
+    id, name: POLITIES[id].name, short: id.slice(0, 3).toUpperCase(), motto: '',
+    livery: { primary: '#d7dace', secondary: '#384954', accent: POLITIES[id].color, dark: '#18242c', metal: '#78838c', glass: POLITIES[id].color, glow: POLITIES[id].color, plumeCore: '#edfff9' },
+  }])) as Record<FactionId, Faction>,
   concord: {
     id: 'concord',
     name: 'Terran Directorate',

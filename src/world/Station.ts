@@ -1,4 +1,5 @@
 import { Color, Group, Matrix4, Mesh, Quaternion, Vector3 } from 'three';
+import { FACTIONS } from '../assets/Factions';
 import type { StationSite } from '@/universe/Universe';
 import { buildShip, type ShipModel } from '@/assets/ShipBuilder';
 import { stationBlueprint, BAY_Z, BAY_DEPTH, BAY_BACK, BAY_W, BAY_H } from '@/assets/blueprints/stations';
@@ -88,7 +89,7 @@ export class StationView {
     this.berths = stationBerths(site.kind);
     for (const b of this.berths) if (b.channel) this.model.setChannel(b.channel, 0); // arms stowed
 
-    const glow = new Color(site.faction === 'choir' ? '#ff5fd0' : site.faction === 'rustwake' ? '#ffb04f' : '#6fe6ff');
+    const glow = new Color(site.faction === 'choir' ? '#ff5fd0' : site.faction === 'rustwake' ? '#ffb04f' : site.faction === 'concord' ? '#6fe6ff' : FACTIONS[site.faction].livery.glow);
     const specs: LightSpec[] = [];
     // Corridor buoys: two strings framing the approach, 1.6 km out.
     const N = 16;

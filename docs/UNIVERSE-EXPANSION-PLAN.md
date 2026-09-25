@@ -1,7 +1,9 @@
 # Vanguard — universe, civilizations, fleets and languages expansion plan
 
-25 September 2026 · **proposal for David's sign-off**
+25 September 2026 · **implementation authorized for U00–U08**
 Scope clarification: **both fictional languages and real-world player localization**.
+
+David subsequently instructed: “start implement U00 through U08”. Work is underway on the isolated `codex/universe-expansion` branch. See the [implementation ledger](EXPANSION-IMPLEMENTATION.md) for delivered code, validation and outstanding production gates. Authorization to implement does not mark those gates as passed.
 
 ## Recommendation
 
@@ -220,11 +222,11 @@ U01 and the U02 concept work can proceed together after charter approval. U04 is
 - Maintain an explicit reduced-effects fallback. The current Intel native measurements still exceed the proposed 1080p/60 gate, so fleet expansion must include LOD, batching, post-pass cost and asset-streaming work before raising simultaneous visible unit counts.
 - Establish named integrated/discrete reference machines before performance sign-off. No galaxy-size claim implies that all systems or fleets run at full fidelity at once.
 
-## 12. Recommended approval package
+## 12. Authorized implementation sequence
 
-**Approve U00–U04 as the first expansion programme**, with U05–U08 as the signed direction and later production gates.
+**U00–U08 are authorized for implementation.** Build U00–U04 first to establish production quality and cost, then continue through the regional, fleet and acceptance milestones. Quality reviews remain exit criteria rather than a claim that the full expansion is already complete.
 
-The concrete sign-off choices are:
+The working implementation choices are:
 
 1. Eight peoples/lineages and ten principal civilizations as the planning target; six new concepts remain editable.
 2. Nacreans and Oruni as the first two fully playable civilization prototypes.

@@ -1,0 +1,21 @@
+✔ content registry validates references and keeps people distinct from governments (2.6134ms)
+✔ captured hull retains its tradition and crew origin (0.2388ms)
+✔ region generation is independent of manifest order and new distant content (0.9657ms)
+✔ routes reject missing endpoints and honor border closures without changing saved topology (0.8043ms)
+✔ background economy is coarse deterministic data (0.1929ms)
+✔ save import validates before mutation; future and corrupt stores remain untouched (0.4579ms)
+✔ legacy economy migration preserves assets and initializes independent standings (0.3426ms)
+✔ all polity markets return finite quotes without profitable same-station round trips (1.0335ms)
+✔ contact agreements consume actual cargo and award once across reload (0.6963ms)
+✔ essential contact meanings survive unknown language; optional meanings unlock (0.3017ms)
+✔ locale placeholders and voice asset revisions are explicit (3.6806ms)
+WebSocket server error: Port 24678 is already in use
+✔ 192-system atlas and playable pilot preserve the Reach and supply valid ports/routes (9420.0408ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10257.7186

@@ -1,4 +1,5 @@
 import type { FactionId } from '@/assets/Blueprint';
+import { PILOT_HULLS, pilotCatalog } from '../../content/pilotHulls.ts';
 
 /**
  * The ship catalogue: every flyable / purchasable hull plus the AI-only
@@ -165,6 +166,7 @@ const util = (shield: number, armour: number, engine: number, reactor: number, e
 });
 
 export const CATALOG: CatalogEntry[] = [
+  ...PILOT_HULLS.map(pilotCatalog),
   // ── Directorate progression line ─────────────────────────────────────
   {
     id: 'vf27-kestrel',

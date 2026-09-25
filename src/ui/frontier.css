@@ -1,0 +1,28 @@
+#frontier-atlas { position:fixed; inset:0; overflow:auto; z-index:100; background:#0b1420; color:#dce5e6; padding:clamp(18px,4vw,64px); font:16px/1.55 system-ui,'Yu Gothic','Noto Sans CJK JP',sans-serif; box-sizing:border-box; }
+#frontier-atlas { pointer-events:auto; }
+#frontier-atlas * { box-sizing:border-box; }
+#frontier-atlas header,#frontier-atlas section,#frontier-atlas details,#frontier-atlas footer { max-width:1400px; margin:0 auto 28px; }
+#frontier-atlas h1 { font-size:clamp(26px,4vw,48px); line-height:1.15; margin:10px 0 20px; color:#e6f5ed; }
+#frontier-atlas h2 { font-size:23px; margin:8px 0 18px; }
+#frontier-atlas h3 { font-size:14px; color:#87cabe; margin:18px 0 6px; letter-spacing:.04em; }
+#frontier-atlas p { margin:6px 0 15px; overflow-wrap:anywhere; }
+#frontier-atlas button,#frontier-atlas select,#frontier-atlas a { font:inherit; color:inherit; }
+#frontier-atlas button,#frontier-atlas select { background:#172635; border:1px solid #415c69; padding:9px 12px; border-radius:5px; cursor:pointer; max-width:100%; }
+#frontier-atlas button:hover,#frontier-atlas button[aria-pressed=true] { border-color:#a2d8c9; background:#264550; }
+#frontier-atlas :focus-visible { outline:3px solid #efbd76; outline-offset:3px; }
+#frontier-atlas a { color:#a2d8c9; text-underline-offset:4px; }
+#frontier-atlas nav { display:flex; flex-wrap:wrap; gap:12px; }
+#frontier-atlas .frontier-scope { border-left:3px solid #d9ad72; padding:12px 18px; background:#292a27; max-width:1400px; margin:24px auto; }
+#frontier-atlas .frontier-settings { display:flex; gap:20px; flex-wrap:wrap; max-width:1400px; margin:24px auto; align-items:center; }
+#frontier-atlas label { display:flex; flex-direction:column; gap:7px; }
+#frontier-atlas label:has(input) { flex-direction:row; align-items:center; }
+#frontier-atlas .frontier-regions { max-width:1400px; margin:28px auto; }
+#frontier-atlas .frontier-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:30px; max-width:1400px; margin:auto; }
+#frontier-atlas .frontier-grid section { width:100%; padding:24px; background:#101e2c; border:1px solid #2b4555; border-radius:10px; }
+#frontier-atlas .frontier-systems { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; }
+#frontier-atlas .frontier-systems button { text-align:left; overflow-wrap:anywhere; }
+#frontier-atlas .frontier-phrases,#frontier-atlas .frontier-hulls { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:16px; margin-top:20px; }
+#frontier-atlas article,#frontier-atlas .frontier-phrases p { background:#142332; border:1px solid #2b4555; border-radius:8px; padding:18px; }
+#frontier-atlas small { display:block; margin-top:8px; color:#e0b888; }
+#frontier-atlas footer { display:flex; align-items:center; flex-wrap:wrap; gap:16px; }
+@media(max-width:800px) { #frontier-atlas .frontier-grid { grid-template-columns:minmax(0,1fr); } }

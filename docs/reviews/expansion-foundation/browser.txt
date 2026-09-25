@@ -1,0 +1,2 @@
+PASS: atlas navigation, 192 systems, eight hull cards, EN/JA independence, persistence, 1280/390 expanded-text layouts; no renderer requested and no page/console errors.
+PASS: CPU-only FlightScene construction, 120 ticks, 28 systems, real dock/contact tab, keyboard cargo delivery, single payment, save/reload and berth resume. Fixture supplies were injected; this is not a flown playthrough or renderer/performance validation.

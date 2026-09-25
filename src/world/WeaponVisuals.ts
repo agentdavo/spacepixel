@@ -467,7 +467,7 @@ export class WeaponVisuals {
     const cap = ship.combat.dmg.capital;
     s.cell.value = Math.max(sc.x, sc.y, sc.z) * (cap ? 0.02 : 0.085);
     s.gain.value = cap ? 0.8 : 1.2;
-    (s.tint.value as Color).set(ship.faction === 'choir' ? '#ff6fd0' : ship.faction === 'rustwake' ? '#ffc070' : '#5fd8ff');
+    (s.tint.value as Color).set(ship.faction === 'choir' ? '#ff6fd0' : ship.faction === 'rustwake' ? '#ffc070' : ship.faction === 'concord' ? '#5fd8ff' : FACTIONS[ship.faction].livery.glow);
     s.style.value = ship.faction === 'choir' ? 1 : ship.faction === 'rustwake' ? 2 : 0;
     s.mesh.visible = true;
   }

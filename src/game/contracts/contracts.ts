@@ -1,3 +1,4 @@
+import { polityRecord } from '../../content/civilizations.ts';
 /**
  * Contracts board (batch 3 · milestone 10) — pure data + functions.
  *
@@ -868,6 +869,7 @@ function titleOf(k: Contract, idx: Map<string, ReachSystem>): string {
 }
 
 const VOICE: Record<EconFaction, { open: string[]; close: string[] }> = {
+  ...polityRecord(() => ({ open: ['A registered port contract is available.'], close: ['Payment follows verified delivery.'] })),
   concord: {
     open: ['By allocation of the Board:', 'Directorate tasking, open to independent pilots.', 'The Schedule has a gap in it, pilot. You fill it.'],
     close: ['Keep the light.', 'Fee is budgeted. Expenditure is not.', 'Sign here, and here. The Office of Continuity thanks you.'],
