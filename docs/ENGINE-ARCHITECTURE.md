@@ -4,13 +4,12 @@ Chief architecture decision, 25 September 2026. This is a code audit and staged
 refactor plan, not a claim that every original milestone is production-ready.
 It complements [game direction](GAME-DIRECTION.md).
 
-The implementation audit below is against committed baseline `2882b74` plus
-this mission-maintenance slice. A separate task, **Review weapon and shield
-audio**, is actively implementing combat/audio fixes and surround routing in
-the shared checkout. Those uncommitted changes are not included in the baseline
-claims or accepted by this audit; integrate their evidence and update output-mode
-status when that package is ready. The newly authorised Kessen assault videos
-are standalone staged demonstrations, separate from campaign acceptance.
+The initial implementation audit used baseline `2882b74`. Mission maintenance
+landed in `39d1d29` / `b0c8535`; combat correctness and spatial audio subsequently
+landed in `9b1e769` / `3cb0945`. Current audio status below reflects those commits.
+The Kessen assault videos remain standalone staged demonstrations, separate from
+campaign acceptance. The expansion foundation is isolated pending the findings
+in [the chief integration review](EXPANSION-CHIEF-REVIEW.md).
 
 ## Decision
 
@@ -32,7 +31,7 @@ missions and reliable saves take priority over a larger framework.
 | Missions | Typed definitions, predicates and a common `CampaignRunner`; `CampaignSession` connects story rules to the world. | One episode per file, static content checks, headless behavioural tests. Extract more scene orchestration only with parity evidence. |
 | Contracts | `contracts/ContractDesk.ts` runs generated operations with their own lifecycle and persistence. | Reuse runner mechanisms, preserve distinct story and contract policies. |
 | Cel shading | TSL cel materials/rim light, explicit ink channels, MRT and a post-processing pipeline. WebGPU and WebGL2 paths exist. | Rendering owns materials, GPU resources and capabilities; missions request effects through adapters. Test each backend honestly. |
-| Sound | Web Audio music, effects and voice buses; camera-relative stereo panning, dynamics and reverb. | Stereo is implemented. Native 5.1 is not. Build explicit output modes and routing before advertising surround. |
+| Sound | Web Audio buses with distinct combat/cockpit routing; stereo, headphone HRTF and optional discrete 5.1, saved controls and speaker test. | Six-channel processing is implemented and checked offline. Physical speaker mapping/levels remain unverified on this two-channel device. |
 | Saves | Profile and mission snapshot persistence; existing content order is part of the save contract. | Validate before mutation now; add versioned IDs and explicit migrations with expansion work. |
 | Universe / expansions | Seeded world and campaign data exist. A separate expansion branch is adding registries, atlas and save support. | Integrate additive content through validated registries. Branch progress is not release acceptance. |
 | Composition | `main.ts` assembles services; `FlightScene.ts` still combines many game systems. | Gradually extract session/lifecycle ownership and event adapters, keeping assembly at the outside. |
@@ -117,23 +116,34 @@ processing; `Music.ts` owns score playback; voice code owns cast recordings and
 fallbacks. Offline trailer narration is a production asset, not automatically a
 replacement for the runtime cast.
 
-Current effects use left/right pan, distance attenuation and filtering. Voice
-uses stereo panning. The offline render path writes two channels. There is no
-explicit centre, LFE or rear-channel routing and no tested six-channel output
-mode. A receiver upmixing stereo is not evidence of native 5.1.
+The current graph separates external combat from cockpit feedback. Source
+identity and actual damage layers drive distinct sounds, and beam bodies follow
+live emitters until release. The shared pool remains bounded at forty voices.
+The settings panel persists Master, Music, Effects and Dialogue levels, dynamic
+range and requested output mode.
 
-Build three clearly reported modes: stereo speakers, headphones, and native 5.1
-where the browser/device actually supports it. Headphone spatial processing is
-still a two-channel output. Probe capabilities, construct an explicit bus/channel
-map, and keep master processing compatible with the chosen channel count; simply
-changing the destination count is insufficient. Route dialogue intentionally,
-define bass-management policy, and preserve an intelligible stereo downmix.
-Optional browser speech currently bypasses parts of the controlled Web Audio
-route; deterministic export and surround need buffered audio through the mixer.
+Three modes are now implemented: default stereo speakers, two-channel headphone
+HRTF, and optional discrete 5.1. `spatial.ts` routes supported outputs to
+L/R/C/LFE/SL/SR; recorded/synthesized dialogue is centred, bass contributions are
+low-pass filtered, and a linked six-channel AudioWorklet limiter preserves
+direction. Destination capability and worklet failures produce an explained
+stereo fallback. The standard offline trailer delivery remains stereo.
 
-Acceptance: six independent channel-identification signals, correct dialogue
-placement, downmix/peak tests, fallback mode reporting, and physical speaker
-verification. Do not mark 5.1 complete from an MP4 label or code-only test.
+The audio task's real Web Audio offline checks cover source directions, six
+isolated channels, centred dialogue, HRTF sides, beam sustain/release and settings
+persistence. Native Edge exercised three combat auditions and stereo fallback.
+The physical device exposes only two channels: a connected six-speaker mapping
+and level check is still required. Receiver upmix is not native-routing evidence.
+Optional operating-system speech respects Master and Dialogue for new utterances
+but remains outside the Web Audio routing graph; deterministic/surround dialogue
+must use buffered audio through the mixer.
+
+See [combat/audio implementation and evidence](COMBAT-AUDIO-IMPROVEMENTS-2026-09-25.md).
+Its reported combined checks pass 322 tests, unchanged balance bands, ten-minute
+repeat/replay determinism for three scenarios and the production build. Coverage
+is for the existing 28 hulls; expansion integration must repeat the relevant
+matrix, balance and replay checks. Hardware acceptance and full-battle subjective
+mix review remain distinct from offline signal checks.
 
 ## Expansions and compatibility
 
@@ -163,7 +173,8 @@ localization, profile and composition files with the chief before integration.
    Test story and contract entry, failure, departure, restore, and multi-system
    continuation before deleting the old wiring.
 4. Integrate renderer lifecycle/capability work with visual and recovery evidence.
-   Implement surround as a separately tested audio feature.
+   Complete physical surround verification and gameplay mix review for the
+   implemented audio modes.
 5. Integrate expansion registries and versioned saves in small reviewed packages;
    validate old profiles and deterministic world fixtures with each package.
 
