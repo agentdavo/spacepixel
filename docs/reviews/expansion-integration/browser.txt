@@ -1,0 +1,2 @@
+PASS: atlas navigation, 192 systems, eight hull cards, EN/JA independence, persistence, 1280/390 expanded-text layouts; no renderer requested and no page/console errors.
+PASS: CPU-only FlightScene, 120 ticks, 28 systems, issuer guard, failed-save delivery rollback/retry, future contact protection, actual Threshold/Stillwater/Rustwake berth restore, legacy Marches migration, campaign/prototype location independence and invalid-berth fallback. Fixture supplies and forced berths were used; this is not a flown playthrough or renderer/performance validation.

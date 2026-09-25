@@ -8,8 +8,9 @@ The initial implementation audit used baseline `2882b74`. Mission maintenance
 landed in `39d1d29` / `b0c8535`; combat correctness and spatial audio subsequently
 landed in `9b1e769` / `3cb0945`. Current audio status below reflects those commits.
 The Kessen assault videos remain standalone staged demonstrations, separate from
-campaign acceptance. The expansion foundation is isolated pending the findings
-in [the chief integration review](EXPANSION-CHIEF-REVIEW.md).
+campaign acceptance. The bounded expansion foundation and its four review fixes
+are integrated as a prototype; combined evidence and remaining acceptance gates
+are in [the chief integration review](EXPANSION-CHIEF-REVIEW.md).
 
 ## Decision
 
@@ -33,7 +34,7 @@ missions and reliable saves take priority over a larger framework.
 | Cel shading | TSL cel materials/rim light, explicit ink channels, MRT and a post-processing pipeline. WebGPU and WebGL2 paths exist. | Rendering owns materials, GPU resources and capabilities; missions request effects through adapters. Test each backend honestly. |
 | Sound | Web Audio buses with distinct combat/cockpit routing; stereo, headphone HRTF and optional discrete 5.1, saved controls and speaker test. | Six-channel processing is implemented and checked offline. Physical speaker mapping/levels remain unverified on this two-channel device. |
 | Saves | Profile and mission snapshot persistence; existing content order is part of the save contract. | Validate before mutation now; add versioned IDs and explicit migrations with expansion work. |
-| Universe / expansions | Seeded world and campaign data exist. A separate expansion branch is adding registries, atlas and save support. | Integrate additive content through validated registries. Branch progress is not release acceptance. |
+| Universe / expansions | Validated civilization/language registries, separate 192-record survey atlas, six-system flight addition, eight hull blockouts and guarded contact persistence. | Bounded prototype integrated; native art, flown missions, fleet performance and U08 production acceptance remain open. |
 | Composition | `main.ts` assembles services; `FlightScene.ts` still combines many game systems. | Gradually extract session/lifecycle ownership and event adapters, keeping assembly at the outside. |
 
 ## Module boundaries
@@ -141,9 +142,11 @@ must use buffered audio through the mixer.
 See [combat/audio implementation and evidence](COMBAT-AUDIO-IMPROVEMENTS-2026-09-25.md).
 Its reported combined checks pass 322 tests, unchanged balance bands, ten-minute
 repeat/replay determinism for three scenarios and the production build. Coverage
-is for the existing 28 hulls; expansion integration must repeat the relevant
-matrix, balance and replay checks. Hardware acceptance and full-battle subjective
-mix review remain distinct from offline signal checks.
+was for the original 28 hulls. The subsequent combined expansion run passed 343
+tests, including the contact/damage matrix across all 36 hulls, unchanged balance
+bands and ten-minute replay checks. These do not establish new-civilization combat
+balance or native fleet performance. Hardware acceptance and full-battle
+subjective mix review remain distinct from offline signal checks.
 
 ## Expansions and compatibility
 

@@ -21,6 +21,7 @@ try {
   await page.locator('#frontier-atlas h1').waitFor({ timeout: 60000 });
   assert.equal(await page.locator('.frontier-regions button').count(), 8);
   assert.equal(await page.locator('.frontier-hulls article').count(), 8);
+  assert.equal(await page.locator('.frontier-hulls article a').first().getAttribute('href'), '/?scene=hangar&ship=pa-skimmer');
   assert.match(await page.locator('.frontier-grid').innerText(), /192 mapped systems/);
   await page.getByRole('button', { name: 'Pelagic Expanse · 26', exact: true }).click();
   assert.equal(await page.locator('.frontier-systems button').count(), 26);

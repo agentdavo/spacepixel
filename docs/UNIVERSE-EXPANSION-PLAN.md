@@ -11,7 +11,7 @@ Build an **Open Horizon expansion programme** around eight major peoples/lineage
 
 The figures below are proposed content targets, not current implementation or delivery estimates. The six new peoples and their names are working concepts for approval. Existing Directorate, Hegemony, Rustwake, Kessen and Builder canon has priority until a specific revision is signed off.
 
-The rendering/ship groundwork is recorded in [Package A acceptance](PACKAGE-A-ACCEPTANCE.md), with [six current hull sheets](reviews/package-a/index.html). That work is a foundation; it is not the universe expansion itself.
+The isolated rendering branch records its groundwork in `docs/PACKAGE-A-ACCEPTANCE.md` and `docs/reviews/package-a/index.html` at commit `02b2817`. That package is not included wholesale in the expansion integration. The existing hangar supplies model inspection in the integrated prototype.
 
 ## 1. What the code supports now
 

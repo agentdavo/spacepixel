@@ -1,0 +1,25 @@
+
+> project-vanguard@0.1.0 determinism
+> node scripts/determinism.mjs
+
+WebSocket server error: Port 24678 is already in use
+
+■ dogfight · 10 simulated min · 600 checkpoints (1/s) · 1754 ms/run
+  world: 8 ships spawned · 7492 gun shots · 312 missiles · 52 kills · final hash 126ee22e
+  PASS  same seed + script, run twice: 600/600 checkpoints bit-identical
+  PASS  recorded input replayed: 600/600 checkpoints bit-identical · replay 56.3 KB (5.63 KB/min base64, 4 commands)
+  PASS  a different seed gives a different world (hash sensitivity)
+
+■ capital · 10 simulated min · 600 checkpoints (1/s) · 2855 ms/run
+  world: 140 ships spawned · 15477 gun shots · 1367 missiles · 131 kills · final hash f71c0f5e
+  PASS  same seed + script, run twice: 600/600 checkpoints bit-identical
+  PASS  recorded input replayed: 600/600 checkpoints bit-identical · replay 56.3 KB (5.63 KB/min base64, 4 commands)
+  PASS  a different seed gives a different world (hash sensitivity)
+
+■ traffic · 10 simulated min · 600 checkpoints (1/s) · 1542 ms/run
+  world: 27 ships spawned · 6269 gun shots · 136 missiles · 25 kills · final hash db58264a
+  PASS  same seed + script, run twice: 600/600 checkpoints bit-identical
+  PASS  recorded input replayed: 600/600 checkpoints bit-identical · replay 56.3 KB (5.63 KB/min base64, 4 commands)
+  PASS  a different seed gives a different world (hash sensitivity)
+
+ALL PASS · 18.9 s

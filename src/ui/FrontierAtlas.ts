@@ -81,7 +81,7 @@ export function mountFrontierAtlas(root: HTMLElement): void {
     for (const line of CONTACT_LINES) { const sample = interpretContact(line.id, lang, save.translators[lang], save.preferences.subtitles); const p = el('p', sample.text); if (save.preferences.native) p.append(el('small', sample.native)); corpus.append(p); }
     phrasebook.append(corpus); shell.append(phrasebook);
     const hulls = el('section'); hulls.append(el('h2', t('pilot'))); const hullGrid = el('div'); hullGrid.className = 'frontier-hulls';
-    for (const h of PILOT_HULLS) { const card = el('article'); card.append(el('h3', h.name), el('p', `${POLITIES[h.polity].name} · ${h.role} · ${h.length} m`), el('p', h.notes), link(t('inspect'), `/?scene=shipreview&ship=${h.id}`)); hullGrid.append(card); }
+    for (const h of PILOT_HULLS) { const card = el('article'); card.append(el('h3', h.name), el('p', `${POLITIES[h.polity].name} · ${h.role} · ${h.length} m`), el('p', h.notes), link(t('inspect'), `/?scene=hangar&ship=${h.id}`)); hullGrid.append(card); }
     hulls.append(hullGrid); shell.append(hulls);
     const production = el('details'); production.append(el('summary', t('progress')));
     for (const m of EXPANSION_MILESTONES) production.append(el('h3', `${m.id} · ${m.name} · ${m.status}`), el('p', m.remaining)); shell.append(production);

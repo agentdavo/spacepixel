@@ -2,7 +2,7 @@
 
 25 September 2026. David authorized starting **U00 through U08**, including fictional languages and player localization. This ledger separates implemented code from production acceptance. The [expansion charter](UNIVERSE-EXPANSION-PLAN.md) remains the design brief.
 
-Branch: `codex/universe-expansion`, based on the isolated rendering Package A. This package has not been merged into the trailer/integration checkout. No native GPU capture was run during trailer production.
+Original implementation branch: `codex/universe-expansion`, based on isolated rendering Package A. Chief integration takes only the expansion foundation and four review fixes onto the current engine/combat/audio baseline. Package A ancestry is excluded. The original evidence below remains isolated-branch evidence; combined integration results are recorded in `EXPANSION-CHIEF-REVIEW.md`.
 
 ## Run and inspect
 
@@ -10,7 +10,7 @@ Branch: `codex/universe-expansion`, based on the isolated rendering Package A. T
 - `/?atlas=1`: Open Horizon survey atlas, also reachable from the title menu. This path does not create a renderer.
 - `/?scene=flight&expansion=pilot`: independent six-system flight prototype. Start at Threshold; use M to plot a gate route and G for normal docking. FIRST CONTACT at a Marches port lists supply agreements and their destinations. Buy cargo in MARKET and deliver it through FIRST CONTACT. Existing flight controls, repair and trade apply.
 - Reloading that prototype resumes at its last berth in either the Marches or the Reach. A dedicated prototype berth survives subsequent normal-campaign visits; a first prototype visit starts at Threshold. Cargo, rewards and completion receipts commit together, with delivery refused if persistence fails. Loading the normal campaign still uses the original Reach.
-- `/?scene=shipreview&ship=pa-skimmer`: inspect a prototype with the existing native hull-review scene. Other IDs are listed below. These views use the renderer and should not run concurrently with measured trailer captures.
+- `/?scene=hangar&ship=pa-skimmer`: inspect a prototype with the existing four-view hangar model sheet. Other IDs are listed below. This avoids depending on the isolated Package A ship-review scene; it is a model inspection, not a stock-fit or art acceptance claim.
 - Developer-only `own=<id>` can exercise a stock-fitted prototype in flight; it uses the existing debug ownership mechanism and adds it to that test profile's hangar. Prototype hulls are not yet sold by normal yards.
 
 The flight prototype shares the existing career ledger at its browser origin. It is an explicit development entry point, not an automatic first-contact event inserted into the twenty-episode campaign. The authored expansion's chronology remains after Open Horizon.

@@ -6,10 +6,11 @@ commit `b9b043a`. This is a bounded package review, not U08 release acceptance.
 
 ## Decision
 
-Keep the package isolated while the findings below are corrected. Do not merge
-its complete ancestry into the shared checkout. The active combat/audio package
-overlaps Package A's contact geometry, capital classification and balance work;
-those changes require explicit reconciliation.
+The bounded foundation is accepted for prototype integration after all four
+findings below were corrected and the combined checks passed. Package A ancestry
+is excluded: current combat/audio fixes are the baseline, and the existing
+hangar supplies hull inspection. The findings below document the original review
+of `0485121`, not unresolved defects in the corrected integration.
 
 The new content registries, language data, survey graph and contact rules follow
 the intended pure-content/adapter boundaries. Legacy faction and team indices
@@ -102,3 +103,53 @@ they do not establish 1080p/60 readiness. Rendering lifecycle improvements and
 visual changes must be reviewed separately from expansion content. No U08,
 complete localization, production fleet or language-voice acceptance is granted
 by this review.
+
+## Corrected integration and independent checks
+
+| Original finding | Owner fix | Integrated commit |
+| --- | --- | --- |
+| Incorrect issuer fallback | `e7b027a` | `d7de2c6` |
+| Backup quota / durable contact delivery | `3728de8` | `1965919` |
+| Future contact document preservation | `0f976f2` | `199c224` |
+| Actual Reach and Marches berth restoration | `8b084f2` | `425d67c` |
+
+Foundation `0485121` was applied as `96de95f` to engine/combat/audio baseline
+`3bff2bb`; only the expansion-plan document was taken from `b9b043a`. No Package A
+combat, point-defence cadence, renderer, resource or recovery changes were added.
+The build retains both `check:campaign` and `check:expansion`. Atlas inspection
+links use the existing `?scene=hangar&ship=<id>` four-view model sheet.
+
+The persistence reviewer independently reran the original quota and future-version
+probes against the fixes and found no new blocking defect. The primary ledger is
+written before optional backup; only the optional backup is evicted for retry;
+unrecoverable failure preserves the old primary. First Contact changes in-memory
+state only after durable persistence. Unsupported contact records round-trip
+unchanged and cannot be mutated by delivery. Known v1 corruption recovery remains.
+
+`frontierDock` records prototype berths separately from normal visits. Existing
+Marches-only saves migrate. An earlier-build save containing only a Reach
+`lastDock` cannot reveal whether it came from prototype or normal play; this
+ambiguous case uses first-entry behaviour. Generic market saves retain their
+existing session-only failure policy; the new durable transaction boundary is
+currently specific to First Contact.
+
+Chief reran the following on the combined tree, including its integration edits:
+
+- **343 tests passed**, including the dynamic contact/damage matrix for all 36
+  registered hulls and legacy contract-board snapshot parity.
+- Production build passed TypeScript, twenty-episode campaign validation and
+  expansion content validation.
+- All unchanged combat balance checks passed. These are the existing encounter
+  bands, not new-civilization encounter tuning acceptance.
+- Dogfight, capital and traffic each passed ten simulated minutes: repeat and
+  JSON replay matched all 600 one-second checkpoints; a different seed differed.
+- GPU-disabled browser checks passed atlas navigation, expanded-text layouts,
+  independent language preferences, failed delivery save/retry, future-contact
+  diagnostic, and actual system/phase/target/visible-screen restoration at
+  Threshold, Stillwater and Rustwake. First entry, old Marches migration, a normal
+  Meridian visit and invalid-berth fallback are covered.
+
+Raw combined logs are in `docs/reviews/expansion-integration/`. Browser testing
+uses fixture cargo and forced berths; it is not an ordinary-input playthrough.
+Native hull/station rendering, fleet performance, physical surround, full language
+review and U08 release acceptance remain open. Frozen V4 footage is unchanged.
