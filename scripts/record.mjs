@@ -72,7 +72,7 @@ try {
     if (trailer) trailer.overlay.fullCaptions = true;
   });
   // A film, not a UI: no skip hint.
-  await page.addStyleTag({ content: '.cn-skip { display: none !important; } .cinema { z-index: 1000 !important; }' });
+  await page.addStyleTag({ content: '.cn-skip { display: none !important; } .cinema { z-index: 1000 !important; }' + (args.includes('--suppress-narration') ? '.cn-narration,.cn-slate-s {display:none!important}' : '') });
 
   const first = Math.round(from * fps);
   const last = Math.round(to * fps);
