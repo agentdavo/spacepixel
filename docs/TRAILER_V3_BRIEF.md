@@ -54,7 +54,8 @@ consequence or imply a weapon did damage that came from a debug hook.
 ## Approved narrator script
 
 The narrator is a calm witness to history, not an announcer. David's subsequent
-feedback in the voice task prefers a softly spoken woman with a smooth voice;
+feedback in the voice task prefers a softly spoken woman with a smooth voice,
+subsequently refined to a younger woman with an English-dub anime delivery;
 the initial male recordings are provisional and must not lock the final cast.
 Audition the available female voices and use the selected trailer narrator at
 natural 1.0x playback throughout, without changing the game-wide cast. Measure lines
