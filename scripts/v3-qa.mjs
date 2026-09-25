@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+import {readFileSync,writeFileSync} from 'node:fs';
+import {dirname,join} from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+const [video,ledgerPath]=process.argv.slice(2);
+const ledger=JSON.parse(readFileSync(ledgerPath,'utf8')),out=dirname(video);
+const run=(cmd,args)=>{const r=spawnSync(cmd,args,{encoding:'utf8',maxBuffer:32*1024*1024});if(r.status!==0)throw new Error(r.stderr||String(r.error));return r;};
+const probe=JSON.parse(run('ffprobe',['-v','error','-show_streams','-show_format','-of','json',video]).stdout);
+writeFileSync(join(out,'ffprobe.json'),JSON.stringify(probe,null,2));
+const v=probe.streams.find(s=>s.codec_type==='video'),a=probe.streams.find(s=>s.codec_type==='audio');
+if(v.width!==1280||v.height!==720||v.avg_frame_rate!=='30/1'||v.codec_name!=='h264'||v.pix_fmt!=='yuv420p')throw new Error('Video format');
+if(Number(v.nb_frames)!==Math.round(ledger.duration*30))throw new Error('Frame count');
+if(!a||a.codec_name!=='aac'||a.sample_rate!=='48000'||a.channels!==2)throw new Error('Required stereo 48k AAC audio missing or invalid');
+const bytes=readFileSync(video),faststart=bytes.indexOf(Buffer.from('moov'))<bytes.indexOf(Buffer.from('mdat'));
+if(!faststart)throw new Error('Faststart missing');
+const samples=ledger.shots.flatMap(s=>[s.at+s.duration*.25,s.at+s.duration*.75]);
+const filter=samples.map(t=>`eq(n,${Math.floor(t*30)})`).join('+');
+run('ffmpeg',['-hide_banner','-loglevel','error','-y','-i',video,'-vf',`select='${filter}',scale=320:180,drawtext=font=Arial:text='%{pts\\:hms}':fontsize=13:fontcolor=white:box=1:boxcolor=black@0.7:x=8:y=8,tile=4x${Math.ceil(samples.length/4)}:padding=4:margin=4`,'-frames:v','1',join(out,'contact-sheet.jpg')]);
+const av=run('ffmpeg',['-hide_banner','-i',video,'-vf','blackdetect=d=0.2:pix_th=0.025:pic_th=0.98',...(a?['-af','ebur128=peak=true']:[]),'-f','null','-']).stderr;
+writeFileSync(join(out,'av-analysis.txt'),av);
+const report={frames:Number(v.nb_frames),duration:Number(v.duration),width:v.width,height:v.height,fps:30,audio:!!a,faststart,sha256:createHash('sha256').update(bytes).digest('hex'),gameplaySeconds:ledger.shots.filter(s=>s.gameplay).reduce((n,s)=>n+s.duration,0),hudGameplaySeconds:ledger.shots.filter(s=>s.gameplay&&s.hud).reduce((n,s)=>n+s.duration,0),samples};
+if(report.gameplaySeconds<70||report.hudGameplaySeconds<70)throw new Error('Gameplay/HUD coverage below 70 seconds');
+writeFileSync(join(out,'qa.json'),JSON.stringify(report,null,2));console.log(report);

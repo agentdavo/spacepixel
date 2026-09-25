@@ -18,6 +18,7 @@ const from = Number(opt('from', '0'));
 const replayPath = opt('replay', '');
 const replay = replayPath ? JSON.parse(readFileSync(replayPath, 'utf8')) : null;
 const camera = opt('camera', '');
+const cameraScale = Number(opt('camera-scale', '1'));
 const pilot = args.includes('--pilot');
 const plan = opt('inputs', '') ? JSON.parse(readFileSync(opt('inputs', ''), 'utf8')) : [];
 if (existsSync(`${out}/events.jsonl`)) throw new Error('Choose a new output directory; capture logs cannot be appended to old takes');
@@ -62,7 +63,7 @@ try {
   });
   const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
   const scenery = await page.evaluate(() => window.__v3.S.loreFlight?.provenance ?? null);
-  writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, pilot, initial, scenery, kind: 'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot option reads aim and sends ordinary mouse/keyboard controls.', inputs: plan }, null, 2));
+  writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, cameraScale, pilot, initial, scenery, kind: 'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot option reads aim and sends ordinary mouse/keyboard controls.', inputs: plan }, null, 2));
   let ended = false;
   let cameraApplied = false;
   let f = -1;
@@ -70,7 +71,7 @@ try {
     const tick = await page.evaluate(() => window.__v3.S.simTick);
     if (tick / 60 >= seconds) break;
     if (!cameraApplied && camera && tick / 60 >= from - 1) {
-      await page.evaluate(({camera}) => { const { S, target:t } = window.__v3; S.director.cut(camera,{position:t.flight.position,velocity:t.flight.velocity,radius:t.radius},Infinity); }, {camera});
+      await page.evaluate(({camera,cameraScale}) => { const { S, target:t } = window.__v3; S.director.cut(camera,{position:t.flight.position,velocity:t.flight.velocity,radius:t.radius*cameraScale},Infinity); }, {camera,cameraScale});
       cameraApplied = true;
     }
     for (const cue of plan) {
@@ -86,8 +87,8 @@ try {
         return { yaw:Math.atan2(v.x,v.z),pitch:Math.atan2(v.y,Math.hypot(v.x,v.z)),range,locked:S.lock.locked };
       });
       if (aim) {
-        const clamp=x=>Math.max(-0.95,Math.min(0.95,x));
-        await page.mouse.move(640*(1+clamp(aim.yaw*2)),360*(1-clamp(aim.pitch*2)));
+        const joystick=e=>{const control=Math.min(0.95,Math.abs(e)*2.5);return Math.sign(e)*(0.06+0.94*(-0.35+Math.sqrt(0.1225+2.6*control))/1.3);};
+        await page.mouse.move(640*(1-joystick(aim.yaw)),360*(1-joystick(aim.pitch)));
         if (Math.abs(aim.yaw)<0.14 && Math.abs(aim.pitch)<0.14 && aim.range<1500) await page.keyboard.down('Space'); else await page.keyboard.up('Space');
         if (aim.range>1000) await page.keyboard.down('KeyW'); else await page.keyboard.up('KeyW');
         if (aim.range<350) await page.keyboard.down('KeyS'); else await page.keyboard.up('KeyS');
@@ -96,7 +97,7 @@ try {
     }
     f++;
     if (probe && f % 30 !== 0) {
-      await page.evaluate(() => { const S = window.__v3.S; S.simStep(); S.simStep(); S.update({ dt: 1/30, time: S.simTick/60, alpha: 0, frame: S.simTick/2, ticks: 2 }); });
+      await page.evaluate(async () => { const S = window.__v3.S, {input}=await import('/src/core/Input.ts'); input.sample(S.simTick/60); input.beginTick(true); S.simStep(); input.beginTick(false); S.simStep(); input.endTicks(2,false); S.update({ dt: 1/30, time: S.simTick/60, alpha: 0, frame: S.simTick/2, ticks: 2 }); });
     } else await page.evaluate(() => window.__VANGUARD__.hooks.step(1));
     const sample = await page.evaluate(() => {
       const v = window.__v3, S = v.S, t = v.target;

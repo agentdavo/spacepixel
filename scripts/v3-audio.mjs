@@ -25,10 +25,10 @@ try {
   const page=await browser.newPage();
   await page.goto('http://127.0.0.1:5418/__audio.html');
   const audit=[];
-  for(const stem of ['music','sfx']) {
+  for(const stem of (process.argv.includes('--sfx-only') ? ['sfx'] : ['music','sfx'])) {
     const result=await page.evaluate(async ({frames,ledger,stem})=>{
       const {renderCapturedStem}=await import('/src/audio/offline.ts');
-      return renderCapturedStem(frames,ledger.duration,stem,ledger.music);
+      return renderCapturedStem(frames,ledger.duration,stem,ledger.music??[]);
     },{frames,ledger,stem});
     writeFileSync(`${out}/v3-${stem}.wav`,Buffer.from(result.wav,'base64'));
     delete result.wav; audit.push(result); console.log(result);
