@@ -31,7 +31,7 @@ improvements. Existing task history and raw production media remain available.
 | Vanguard — Trailer & Cinematic Capture | Capture provenance, shot continuity, film assembly and delivery | Diagnose V4 00:42–00:48 with collision owner; identify actual source shot/tape and distinguish camera, replay and simulation faults. Preserve V4; reshoot only after the underlying issue is understood. |
 | Vanguard — Dialogue & Voice Production | Plain-language lore, recorded dialogue and voice assets | Write objective lines as action, visible object and reason; introduce gate function before lore names. Preserve Chapter I ferry/picket identity: the player joins Vanguard in Chapter II. Coordinate final text/timing with mission and audio owners before recording. |
 | Vanguard — Point Defence & Combat Verification | Independent weapon/interception verification | Supply reproducible contact and interception cases to the combat owner. Do not maintain a competing combat implementation or duplicate collision ownership. |
-| Vanguard — Collision Physics & Capital Breakup | Ship-to-ship contact, collision response/damage, structural breakup and avoidance interfaces | Investigate the reported trailer interval first. Implement bounded fixes and prove high-speed, glancing, unequal-mass and capital-capital cases, deterministic replay and measured many-ship cost. |
+| Vanguard — Collisions & Breakup | Ship-to-ship contact, collision response/damage, structural breakup and avoidance interfaces | Investigate the reported trailer interval first. Implement bounded fixes and prove high-speed, glancing, unequal-mass and capital-capital cases, deterministic replay and measured many-ship cost. |
 
 ## Priority order
 
