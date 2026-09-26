@@ -225,6 +225,14 @@ export class CampaignSession {
   }
 
   dispose(): void {
+    // A retry reuses the scene's fleet: this attempt's ships leave with it
+    // (parked like the free-flight cast), so they cannot fight in, or be
+    // credited as kills to, the next attempt.
+    for (const s of this.host.fleet.ships) {
+      if (!s.alive || this.runner.tagOf(s) === undefined) continue;
+      s.alive = false;
+      s.model.root.visible = false;
+    }
     for (const p of this.pieces) {
       p.group.removeFromParent();
       p.dispose();
