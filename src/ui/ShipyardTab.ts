@@ -2,7 +2,7 @@ import './outfit.css';
 import { registerDockTab, type DockContext, type DockTabApi } from './DockScreen';
 import { HullSheet } from './HullSheet';
 import { getAudio } from '@/audio';
-import { SAVE_FAILURE } from '@/game/CareerStore';
+import { saveFailureMessage } from '@/game/CareerStore';
 import { loadProfile } from '@/game/Profile';
 import { outfitter } from '@/game/outfitting/Outfitter';
 import { computeFit, slotsFor, stockFit } from '@/game/outfitting/fit';
@@ -116,7 +116,7 @@ class ShipyardTab {
   }
 
   private done(r: { error?: string; message?: string }, ok: () => boolean): void {
-    const error = r.error ?? (ok() ? undefined : SAVE_FAILURE);
+    const error = r.error ?? (ok() ? undefined : saveFailureMessage());
     if (error) {
       this.note = { text: error, cls: 'err' };
       getAudio().ui('move');

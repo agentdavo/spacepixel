@@ -1,5 +1,5 @@
 import type { Livery } from '@/assets/Blueprint';
-import { readCareer, writeCareer } from './CareerStore';
+import { readCareer, writeCareer, blockCareerWrites, careerWritable } from './CareerStore';
 
 /**
  * The pilot profile: per-viewer conveniences (custom livery, callsign),
@@ -77,13 +77,14 @@ export function loadLedger(): TradeLedger {
       return normaliseLedger(parsed);
     }
   } catch {
-    /* storage unavailable */
+    blockCareerWrites();
   }
   return newLedger();
 }
 
 /** Primary career persistence takes precedence over the optional migration backup. */
 export function saveLedger(l: TradeLedger): boolean {
+  if (!careerWritable()) return false;
   try {
     const career = readCareer();
     if (career) return writeCareer(l, career.hangar);
@@ -155,12 +156,13 @@ export function loadHangar(): Hangar {
     const raw = localStorage.getItem(HANGAR_KEY);
     if (raw) return normaliseHangar(JSON.parse(raw));
   } catch {
-    /* storage unavailable */
+    blockCareerWrites();
   }
   return newHangar();
 }
 
 export function saveHangar(h: Hangar): boolean {
+  if (!careerWritable()) return false;
   try {
     const career = readCareer();
     if (career) return writeCareer(career.ledger, h);

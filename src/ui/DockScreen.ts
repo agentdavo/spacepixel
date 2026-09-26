@@ -26,7 +26,7 @@ import {
 } from '@/game/economy';
 import { getAudio } from '@/audio';
 import { loadCrew, repairMultiplier } from '@/game/crew';
-import { SAVE_FAILURE } from '@/game/CareerStore';
+import { saveFailureMessage } from '@/game/CareerStore';
 
 /**
  * The docked screen (docking & trade): a DOM overlay in the CRT/OVA style of
@@ -286,7 +286,7 @@ export class DockScreen {
   }
 
   private saveFailed(): void {
-    this.say(SAVE_FAILURE, 'err');
+    this.say(saveFailureMessage(), 'err');
     getAudio().ui('move');
     this.render();
   }

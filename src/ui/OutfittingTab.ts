@@ -1,7 +1,7 @@
 import './outfit.css';
 import { registerDockTab, type DockContext, type DockTabApi } from './DockScreen';
 import { getAudio } from '@/audio';
-import { SAVE_FAILURE } from '@/game/CareerStore';
+import { saveFailureMessage } from '@/game/CareerStore';
 import { outfitter } from '@/game/outfitting/Outfitter';
 import { computeFit, slotDraw, slotsFor, type FitSummary, type Slot } from '@/game/outfitting/fit';
 import { activeShip, buyItem, entryOf, itemsAt, sellItem, RESALE, type Lock } from '@/game/outfitting/hangar';
@@ -137,7 +137,7 @@ class OutfittingTab {
   }
 
   private result(r: { error?: string; message?: string }, commit: () => boolean): void {
-    const error = r.error ?? (commit() ? undefined : SAVE_FAILURE);
+    const error = r.error ?? (commit() ? undefined : saveFailureMessage());
     if (error) {
       this.note = { text: error, cls: 'err' };
       getAudio().ui('move');

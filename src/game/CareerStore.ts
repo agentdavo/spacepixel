@@ -4,6 +4,11 @@
  */
 export const CAREER_KEY = 'vanguard.career.v1';
 export interface CareerRecord { version: 1; ledger: object; hangar: object }
+// A session that started from fallback objects must never overwrite the real
+// career if access later recovers. Only a fresh page can reconcile all owners.
+let loadFailed = false;
+export function blockCareerWrites(): void { loadFailed = true; }
+export function careerWritable(): boolean { return !loadFailed; }
 
 export function readCareer(): CareerRecord | null {
   const raw = localStorage.getItem(CAREER_KEY);
@@ -18,6 +23,7 @@ export function readCareer(): CareerRecord | null {
 
 /** setItem is the single commit point: failure leaves the previous pair intact. */
 export function writeCareer(ledger: object, hangar: object): boolean {
+  if (!careerWritable()) return false;
   try {
     readCareer(); // Never overwrite an unreadable/future record with defaults.
     localStorage.setItem(CAREER_KEY, JSON.stringify({ version: 1, ledger, hangar }));
@@ -25,4 +31,8 @@ export function writeCareer(ledger: object, hangar: object): boolean {
   } catch { return false; }
 }
 
-export const SAVE_FAILURE = 'COULD NOT SAVE — NOTHING CHANGED. FREE STORAGE AND TRY AGAIN.';
+export function saveFailureMessage(): string {
+  return loadFailed
+    ? 'COULD NOT SAVE — SAVE DATA WAS NOT LOADED. RESTORE STORAGE ACCESS AND RELOAD BEFORE TRADING.'
+    : 'COULD NOT SAVE — NOTHING CHANGED. CHECK BROWSER STORAGE AND TRY AGAIN.';
+}

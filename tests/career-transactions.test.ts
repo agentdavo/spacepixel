@@ -96,7 +96,7 @@ test('failed reads, malformed and future career records cannot be replaced with 
 test('Outfitter failure never changes the live money/fit or settles; successful repair survives reload', () => {
   const s = storage(), o = new Outfitter(), r = refit();
   const ledger = profile.loadLedger(), hangar = o.hangar;
-  const host = { ledger, player: { hull: 55, hullMax: 110 } };
+  const host = { ledger, player: { hull: 55, hullMax: 110 }, inEpisode: () => false };
   o.bind(host); o.flying = { uid: hangar.active, hull: hangar.ships[0].hull, fit: hangar.ships[0].fit };
   let settles = 0; o.settle = () => { settles++; };
   s.failWrite = true;
@@ -170,4 +170,35 @@ test('market, rearm and repair failure never applies world-trade/hull effects or
   d.trade('medical', 'buy', 1);
   assert.equal(worldTrades, 1); assert.equal(ledger.cargo.medical, 1);
   assert.equal(profile.loadLedger().cargo.medical, 1);
+});
+
+test('failed startup load stays write-locked after access recovers; only a fresh session can save', async () => {
+  storage(); const r = refit();
+  for (const migrated of [false, true]) {
+    const s = storage();
+    s.values.set(LEDGER, JSON.stringify(r.ledger)); s.values.set(HANGAR, JSON.stringify(r.hangar));
+    if (migrated) s.values.set(PAIR, JSON.stringify({ version: 1, ledger: r.ledger, hangar: r.hangar }));
+    const before = new Map(s.values);
+    s.failRead = true;
+    const fallbackLedger = profile.loadLedger(), o = new Outfitter();
+    o.bind({ ledger: fallbackLedger, player: { hull: 55, hullMax: 110 } });
+    s.failRead = false;
+    // Even an unrelated successful read cannot authorize stale session objects.
+    assert.deepEqual(profile.loadLedger(), r.ledger);
+    assert.deepEqual(profile.loadHangar(), r.hangar);
+    assert.equal(o.commitRepair({ ...fallbackLedger, credits: fallbackLedger.credits - 100 }, 1), false);
+    assert.equal(profile.saveLedger(fallbackLedger), false, 'pagehide also stays locked');
+    assert.equal(profile.saveHangar(o.hangar), false);
+    assert.equal(profile.saveCareer(fallbackLedger, o.hangar), false);
+    assert.deepEqual(s.values, before);
+    const { saveFailureMessage } = await vite.ssrLoadModule('/src/game/CareerStore.ts');
+    assert.match(saveFailureMessage(), /RELOAD BEFORE TRADING/);
+  }
+  // A new module lifetime models a fresh page, with every owner rehydrated.
+  const fresh = await createServer({ logLevel: 'error', appType: 'custom', server: { middlewareMode: true, hmr: false, watch: null } });
+  try {
+    const p = await fresh.ssrLoadModule('/src/game/Profile.ts');
+    assert.deepEqual(p.loadLedger(), r.ledger); assert.deepEqual(p.loadHangar(), r.hangar);
+    assert.equal(p.saveCareer(p.loadLedger(), p.loadHangar()), true);
+  } finally { await fresh.close(); }
 });

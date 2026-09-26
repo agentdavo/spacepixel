@@ -3,7 +3,7 @@ import { registerDockTab, type DockContext, type DockTabApi } from './DockScreen
 import { drawPortrait } from './Portrait';
 import { Subtitles } from './Subtitles';
 import { getAudio } from '@/audio';
-import { SAVE_FAILURE } from '@/game/CareerStore';
+import { saveFailureMessage } from '@/game/CareerStore';
 import { getVoice } from '@/audio/voice';
 import { COMMODITY, cargoUsed, repairCost, type CommodityId, type TradeLedger } from '@/game/economy';
 import { KIND_LABEL, TIER_LABEL, hops, type Contract } from '@/game/contracts/contracts';
@@ -480,7 +480,7 @@ class GuildTab {
         }
         if (!this.ctx.commitRepair?.({ ...this.l(), credits: this.l().credits - cost }, 1)) {
           bad();
-          this.say(SAVE_FAILURE, 'err');
+          this.say(saveFailureMessage(), 'err');
           break;
         }
         ok();
@@ -579,7 +579,7 @@ class GuildTab {
             this.say(res.message ?? 'FITTED', 'ok');
           } else {
             bad();
-            this.say(SAVE_FAILURE, 'err');
+            this.say(saveFailureMessage(), 'err');
           }
         }
         break;

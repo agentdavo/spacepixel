@@ -23,6 +23,13 @@ instead of being overwritten with fallback defaults. Legacy migration does
 not alter profile, contract, world or expansion stores. Existing future contact
 subdocuments survive normalisation and transaction save/load.
 
+If either career half fails to load, all career writes (including pagehide)
+remain locked for the rest of that page's lifetime. Restored storage access or
+an unrelated successful read cannot authorize stale fallback objects. The error
+asks the player to restore storage access and reload; a fresh page rehydrates
+all owners before allowing transactions. This closes the failed-load/recovered-
+storage overwrite found by independent review.
+
 Outfitter stages the outgoing owned ship's condition and effective hold size,
 saves the candidate pair, then changes the live ship. Ordinary and Wardens'
 repairs persist the condition and payment together before changing live hull.
