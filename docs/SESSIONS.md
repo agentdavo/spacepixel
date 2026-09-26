@@ -72,8 +72,11 @@ pass (4v4 sweep 51 % Concord). Milestone status is in ROADMAP *Batch 6*.
   shader rewritten, final look unconfirmed), capital facing outline / low-cell
   density, collapse, regen, fire columns, beam cut lines. Faction shell
   styles (crystal Choir, scrap Rustwake). Run `npm run perf` on a GPU.
-- Station batteries (bastion turrets are visual-only `scanPose`; the lead's
-  `StationDefence` is an unwired pure model and was not ported).
+- Station batteries: now sim turrets (`src/sim/StationDefence.ts`, ported
+  from the lead's model onto the capitals' rig / targeting / subsystem
+  machinery). Still left: player lock and HUD brackets on them, missiles and
+  beams vs stations, docking arms / comms, and a native look at the posed
+  batteries and their muzzle flashes.
 - Kill paths: wreck pieces only for capitals (fighters / gunships keep the
   wing-shear death); pieces do not collide; launchers only on capitals.
 - Balance watch: stock Valiant vs Vesper now loses ~1–2 / 10 seeds (INFO);
