@@ -1,0 +1,240 @@
+{
+  "sourceBase": "a38865a",
+  "voicePrerequisite": "d10650ac5ce0daa11567750d9da7872fc58e8248",
+  "sourceFiles": {
+    "src/ui/CombatFeedback.ts": "a4d0827f09cf1a8a7999f3e60a4d647543c2ae1e42e274d6f4a56662f0edf9ad",
+    "src/ui/CombatHud.ts": "1b728ca851f362922322e54473e4ea7dc2493277b6befa1b0b94c37426ac2828",
+    "src/world/scenes/FlightScene.ts": "13423587ea5ae8fa315d020d1f1695eb16347c2cb6e8b55a63494d008977ed8a",
+    "scripts/combat-readability-capture.mjs": "ee9375e935253f4224c61ca90694a639631ac51b7310fc4ef8333adfda20d104",
+    "scripts/combat-readability-mix.mjs": "ecd0ad71fd626bdfd08c4f75bb825e756f6c860bbc198ce117b91b24708a5a34"
+  },
+  "baseline": {
+    "source": "a38865adf6c7c0073fa316b8b0cc40b05192c68c",
+    "sourceFiles": {
+      "src/audio/index.ts": "0d45412c8a00ea10951711b70056dc29baeee52e74b06bbb21233fc87a846871",
+      "src/audio/AudioEngine.ts": "9e5073c37574b4f2adcc8927ef92a67c1f38b36208f4d8507f694bf21df80c63",
+      "src/ui/CombatHud.ts": "a2377735b99de33124d7ca018e9221a6c9bde4500b8f108da0a21ed06531edad",
+      "src/game/campaign/episodes/ep04-black-light.ts": "ee5bcd3a612160ca18da863d08098e95bfb4e453cb349f4b93171efa7ff7739e",
+      "public/voice/manifest.json": "c9dd6b5c37c7484f380dec261e2b734ae643517d3e041b5beb17516309836dc2"
+    },
+    "hardware": {
+      "backend": "WebGPU",
+      "adapter": {
+        "vendor": "intel",
+        "architecture": "xe-lpg",
+        "device": "",
+        "description": ""
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0"
+    },
+    "tapePath": "C:\\Users\\David(J)Smith\\.codex\\worktrees\\vanguard-v41-capture\\spacepixel\\scratchpad\\delivery\\v4.1\\convoy-probe-1\\take.vgr",
+    "tapeSha256": "879885cac18261a2c0c94f2dd94c9e3d3c4ed2ef87181b064428dbc7b21327e1",
+    "from": 38,
+    "until": 60,
+    "captureFps": 10,
+    "simulationHz": 60,
+    "images": 220,
+    "errors": [],
+    "policy": "Unchanged ordinary-input EP04 replay. Native player camera/HUD. Shipping VoiceBox clip duration/subtitle reveal; cue log recorded for separate offline mix. No physical listening claim."
+  },
+  "improved": {
+    "source": "5b1858296f5e5fe50ec98e94dfd1915cc771336c",
+    "sourceFiles": {
+      "src/audio/index.ts": "0d45412c8a00ea10951711b70056dc29baeee52e74b06bbb21233fc87a846871",
+      "src/audio/AudioEngine.ts": "9e5073c37574b4f2adcc8927ef92a67c1f38b36208f4d8507f694bf21df80c63",
+      "src/ui/CombatHud.ts": "1b728ca851f362922322e54473e4ea7dc2493277b6befa1b0b94c37426ac2828",
+      "src/game/campaign/episodes/ep04-black-light.ts": "f6ca3e4e91ef44a1cb75c949424c79509181248c0114e151f7ed4856b471c54c",
+      "public/voice/manifest.json": "e0f82ff2ab60f5f6eeef9f56aa701c6574f6aca95e3e3af864c0aa5e34d6f76e"
+    },
+    "hardware": {
+      "backend": "WebGPU",
+      "adapter": {
+        "vendor": "intel",
+        "architecture": "xe-lpg",
+        "device": "",
+        "description": ""
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0"
+    },
+    "tapePath": "C:\\Users\\David(J)Smith\\.codex\\worktrees\\vanguard-v41-capture\\spacepixel\\scratchpad\\delivery\\v4.1\\convoy-probe-1\\take.vgr",
+    "tapeSha256": "879885cac18261a2c0c94f2dd94c9e3d3c4ed2ef87181b064428dbc7b21327e1",
+    "from": 38,
+    "until": 60,
+    "captureFps": 10,
+    "simulationHz": 60,
+    "images": 220,
+    "errors": [],
+    "policy": "Unchanged ordinary-input EP04 replay. Native player camera/HUD. Shipping VoiceBox clip duration/subtitle reveal; cue log recorded for separate offline mix. No physical listening claim."
+  },
+  "comparison": {
+    "sameWorldHashes": true,
+    "sameWeaponEvents": true,
+    "sameAudioFrames": true,
+    "worldChecks": 60,
+    "weaponEvents": 323,
+    "audioFrames": 1800
+  },
+  "mix": {
+    "baseline": {
+      "peak": 0.634364128112793,
+      "peakDbFS": -3.9532276677541685,
+      "clipped": 0,
+      "rmsDbFS": [
+        -19.57615408706431,
+        -19.668577543573015
+      ],
+      "maxVoices": 36,
+      "starts": [
+        {
+          "at": 0.1,
+          "renderedAt": 0.10666666666666667,
+          "duration": 6.239,
+          "clip": "52rmogzr0wqx",
+          "text": "Well, look at this! A Directorate babysitter in a museum piece. Welcome to the Rustwake, Kestrel!"
+        },
+        {
+          "at": 7.516666666666667,
+          "renderedAt": 7.52,
+          "duration": 5.765,
+          "clip": "18ruxtn1870oco",
+          "text": "Three tankers of Ember-skim, forty kilos each. Don't shoot anything glowing black. It's mine."
+        },
+        {
+          "at": 14.666666666666666,
+          "renderedAt": 14.666666666666666,
+          "duration": 5.552,
+          "clip": "1xzq1kvx5s8no",
+          "text": "Audit corvette. Commander Aubrac, Office of Continuity. I'm here to count the grams. Ignore me."
+        },
+        {
+          "at": 21.95,
+          "renderedAt": 21.952,
+          "duration": 4.622,
+          "clip": "c673jc16t44b5",
+          "text": "Everybody ignores the auditor, love. Right up until she finds something."
+        },
+        {
+          "at": 27.933333333333334,
+          "renderedAt": 27.936,
+          "duration": 4.247461538461536,
+          "text": "EBON SIGNATURE, TANKER TWO. CONTAINMENT NOMINAL."
+        },
+        {
+          "at": 32.96666666666667,
+          "renderedAt": 32.970666666666666,
+          "duration": 5.284,
+          "clip": "3jjf9tkzmunq",
+          "text": "Look at her hold through your gun camera. See how the edges of things go violet? That's black light."
+        },
+        {
+          "at": 38.06666666666667,
+          "renderedAt": 38.06933333333333,
+          "duration": 6.081499999999997,
+          "text": "CHOIR CARRIER. INTONATION. FIVE CONTACTS. TWO PSALTER TORPEDO BOMBERS."
+        },
+        {
+          "at": 44.93333333333333,
+          "renderedAt": 44.93866666666667,
+          "duration": 5.866,
+          "clip": "14msp8htrqcau",
+          "text": "Hymn-singers! Clan Marsh, guns out! Kestrel, the Psalters want the tankers, not you!"
+        },
+        {
+          "at": 57.63333333333333,
+          "renderedAt": 57.64266666666666,
+          "duration": 5.941,
+          "clip": "1db0g21b19mfy",
+          "text": "Kestrel, you're leaking! I can patch that for forty grams. Thirty. Twenty for the pretty plane."
+        }
+      ],
+      "policy": "Actual captured events + VoiceBox cast/synth cues at recorded sim times. Shipping default stereo/full mix, Nexus score. Offline 48kHz; no physical listening assessment."
+    },
+    "improved": {
+      "peak": 0.6343643069267273,
+      "peakDbFS": -3.953225219384515,
+      "clipped": 0,
+      "rmsDbFS": [
+        -19.409563548231528,
+        -19.432043930190815
+      ],
+      "maxVoices": 36,
+      "starts": [
+        {
+          "at": 0.1,
+          "renderedAt": 0.10666666666666667,
+          "duration": 5.207,
+          "clip": "e2701j16wypbw",
+          "text": "Kestrel, join my ship, the Magpie's Due. We're escorting three fuel tankers to the gate."
+        },
+        {
+          "at": 6.916666666666667,
+          "renderedAt": 6.922666666666666,
+          "duration": 5.989,
+          "clip": "26qffja59y44",
+          "text": "They carry fuel for the gates. Keep at least two tankers alive. Bring all three home if you can."
+        },
+        {
+          "at": 14.266666666666667,
+          "renderedAt": 14.272,
+          "duration": 5.552,
+          "clip": "1xzq1kvx5s8no",
+          "text": "Audit corvette. Commander Aubrac, Office of Continuity. I'm here to count the grams. Ignore me."
+        },
+        {
+          "at": 21.55,
+          "renderedAt": 21.557333333333332,
+          "duration": 4.622,
+          "clip": "c673jc16t44b5",
+          "text": "Everybody ignores the auditor, love. Right up until she finds something."
+        },
+        {
+          "at": 27.533333333333335,
+          "renderedAt": 27.541333333333334,
+          "duration": 4.247461538461536,
+          "text": "EBON SIGNATURE, TANKER TWO. CONTAINMENT NOMINAL."
+        },
+        {
+          "at": 32.56666666666667,
+          "renderedAt": 32.576,
+          "duration": 5.284,
+          "clip": "3jjf9tkzmunq",
+          "text": "Look at her hold through your gun camera. See how the edges of things go violet? That's black light."
+        },
+        {
+          "at": 38.06666666666667,
+          "renderedAt": 38.06933333333333,
+          "duration": 4.493846153846152,
+          "text": "ENEMY FIGHTERS APPROACHING. TORPEDO BOMBERS WILL FOLLOW."
+        },
+        {
+          "at": 43.35,
+          "renderedAt": 43.36,
+          "duration": 5.055,
+          "clip": "saevobxenazs",
+          "text": "Kestrel, destroy the raiders. Hit the torpedo bombers before they reach our tankers!"
+        },
+        {
+          "at": 57.63333333333333,
+          "renderedAt": 57.64266666666666,
+          "duration": 5.941,
+          "clip": "1db0g21b19mfy",
+          "text": "Kestrel, you're leaking! I can patch that for forty grams. Thirty. Twenty for the pretty plane."
+        }
+      ],
+      "policy": "Actual captured events + VoiceBox cast/synth cues at recorded sim times. Shipping default stereo/full mix, Nexus score. Offline 48kHz; no physical listening assessment."
+    }
+  },
+  "artifacts": {
+    "baseline/evidence.json": "3096bf6c22c2a0d07ec53fb1d8ec7d5fa78b13330f2fc807a5ed144766787541",
+    "improved/evidence.json": "c76c745ac9aa03e54da89389d06a77d75a4a626dd69a69daa10eca565c567164",
+    "baseline/mix.wav": "cc125971bf45745b3219ab241157ac98d8f49829928aae8d099ddc8f6a0ab416",
+    "improved/mix.wav": "b218767c4d28a585549d7b7e7131ce08fdf07619223f773280953622d04dca08",
+    "baseline/review.mp4": "42b8824511e87c02c929d01a97fb84f3b176806f6db9ecc40bec7f790c71612f",
+    "improved/review.mp4": "69d9c0c1f7d1a64744b5bbd7dbab8fca713ed6d7afc0ad0ce2a338a490e87323"
+  },
+  "tests": {
+    "targetedPassed": 12,
+    "typecheck": "pass",
+    "build": "pass"
+  }
+}

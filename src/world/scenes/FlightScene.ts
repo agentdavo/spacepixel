@@ -672,7 +672,7 @@ export class FlightScene implements GameScene, FlightHostScene {
     if (!this.fastForward) {
       if (this.fxOn) this.combatFx.consume(dt);
       this.visuals.consume();
-      this.combatHud.consume(this.weapons.events, this.player, this.simTime);
+      this.combatHud.consume(this.weapons.events, this.player, this.simTime, this.missiles.events);
       this.radio.update(dt, {
         player: this.player,
         ships: this.fleet.ships,

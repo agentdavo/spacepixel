@@ -6,6 +6,8 @@ import { BLEED_AT, FACING, FACING_NAMES, ZONE_NAMES, isOnline, type DamageState,
 import { AIM_SPHERE } from '@/sim/Subsystems';
 import { hostile } from '@/sim/Fleet';
 import type { WeaponEvent } from '@/sim/Weapons';
+import type { MissileEvent } from '@/sim/Missiles';
+import { CombatFeedback, impactLabel } from './CombatFeedback';
 import { HUD, claimRect, targetBottom, weaponsRect } from './hudLayout';
 import { hudLabels } from './HudLabels';
 
@@ -82,6 +84,7 @@ export class CombatHud {
   /** Last time each subsystem was struck by the player (hit flash on its bracket). */
   private struck = new Map<Subsystem, number>();
   private clock = 0;
+  private impacts = new CombatFeedback();
 
   constructor(root: HTMLElement) {
     this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
@@ -119,8 +122,9 @@ export class CombatHud {
    * DESTROYED" for mounts the player's side knocks out), own losses, and hit
    * flashes on struck subsystems. `time` = sim clock (s).
    */
-  consume(events: readonly WeaponEvent[], player: ShipEntity, time: number): void {
+  consume(events: readonly WeaponEvent[], player: ShipEntity, time: number, missiles: readonly MissileEvent[] = []): void {
     this.clock = time;
+    this.impacts.consume(events, missiles, time);
     for (const e of events) {
       const s = e.ship;
       const sub = e.sub;
@@ -178,7 +182,31 @@ export class CombatHud {
       this.targetPanel(player, target, time);
       this.subBrackets(player, target, cam, world, time);
     }
+    this.impactLines(player, showTarget ? target : null, time);
     this.killPathLines(time);
+  }
+
+  /** Two short, stable readouts; critical hits survive the next shield spark. */
+  private impactLines(player: ShipEntity, target: ShipEntity | null, time: number): void {
+    const c = this.ctx;
+    const x = this.w / 2;
+    c.textAlign = 'center';
+    for (const [ship, prefix, y] of [[player, 'YOU', this.h / 2 + 54], [target, 'TARGET', this.h / 2 + 74]] as const) {
+      if (!ship) continue;
+      const cue = this.impacts.get(ship, time);
+      if (!cue) continue;
+      const facing = cue.facing >= 0 ? `${FACING_NAMES[cue.facing]} ` : '';
+      const text = `${prefix} · ${facing}${impactLabel(cue)}`;
+      const width = c.measureText(text).width + 16;
+      c.globalAlpha = Math.min(1, (cue.until - time) * 5);
+      c.fillStyle = 'rgba(0,10,6,0.85)';
+      c.fillRect(x - width / 2, y - 13, width, 18);
+      hudLabels.obstacle(x - width / 2, y - 13, width, 18);
+      c.fillStyle = cue.state === 'absorbed' ? CYAN : cue.state === 'bleed' ? AMBER : RED;
+      c.fillText(text, x, y);
+    }
+    c.globalAlpha = 1;
+    c.textAlign = 'left';
   }
 
   /** The kill-path callout and the salvage prompt, centred under the reticle. */
