@@ -21,7 +21,7 @@
 import { createServer } from 'vite';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const args = process.argv.slice(2);
@@ -55,10 +55,17 @@ try {
       { name: 'charge (default)', pilot: DEFAULT_HUD_PILOT },
       { name: 'retreat to recharge', pilot: { ...DEFAULT_HUD_PILOT, breakBelow: 0.5, rejoinAbove: 0.95 } },
     ];
+    // --counterfactual candle-engage: DIAGNOSTIC what-if, not ordinary-input evidence — the
+    // episode wingman receives "engage at will" (the order the wing keys acknowledge but never deliver to him).
+    const { issueOrder } = await server.ssrLoadModule('/src/sim/ai/index.ts');
+    const counterfactual = opt('counterfactual', '') === 'candle-engage'
+      ? { name: 'candle-engage', tick: (S, runner) => { if (S.simTick === 0) issueOrder(runner.shipsTagged('candle'), 'engageAtWill', S.player); } }
+      : undefined;
+    if (counterfactual) console.log('COUNTERFACTUAL candle-engage — diagnostic only, not ordinary-input evidence');
     for (const p of policies) {
       const rows = [];
       for (let s = 1; s <= sweep; s++) {
-        const r = route.runEpisode({ seed: s, pilot: p.pilot });
+        const r = route.runEpisode({ seed: s, pilot: p.pilot, counterfactual });
         const start = r.events.find((e) => e.kind === 'flag' && e.detail === 'thieves')?.t ?? NaN;
         const death = r.events.find((e) => e.kind === 'kill' && e.detail.startsWith('Vanguard 1'))?.t;
         rows.push({ seed: s, outcome: r.outcome, t: r.outcomeTick / 60, survived: death === undefined ? null : death - start, rustwake: r.stats.kills.rustwake ?? 0 });
@@ -81,6 +88,7 @@ try {
     check('EP01 success by ordinary input', A.outcome === 'success', `outcome ${A.outcome} at tick ${A.outcomeTick} (${(A.outcomeTick / 60).toFixed(3)} s) · hull ${A.player.hull.toFixed(1)}/${A.player.hullMax} · Rustwake kills ${A.stats.kills.rustwake ?? 0} (player ${A.stats.playerKills})`);
     check('no Lantern jump, station contact or hull contact on the route', !A.jumped && A.stats.hullContacts === 0, `closest station ${A.stats.minStationDistance.toFixed(0)} m`);
     const tapePath = `${out}/ep01-seed${seed}.vgr`;
+    const shown = relative(root, tapePath).split('\\').join('/');
     writeFileSync(tapePath, JSON.stringify(A.take));
     writeFileSync(`${out}/ep01-seed${seed}-result.json`, JSON.stringify({ source, dirtySrc: dirty, seed, pilot: DEFAULT_HUD_PILOT, outcome: A.outcome, outcomeTick: A.outcomeTick, ticks: A.ticks, player: A.player, stats: A.stats, objectives: A.objectives, flags: A.flags, events: A.events, checkpoints: A.take.checks.length }, null, 1));
 
@@ -131,7 +139,7 @@ try {
     check('resume: refit preserved', JSON.stringify(r2.hangar.ships[0].fit) === JSON.stringify(expected.fit), `${gunSlot} = ${r2.hangar.ships[0].fit[gunSlot]}`);
     const WS = await server.ssrLoadModule('/src/game/world/WorldState.ts');
     check('resume: world records Episode 1 as flown', !!WS.fact(WS.loadWorld(), 'story.ep1.done'), 'story.ep1.done');
-    console.log(`\nsource ${source}${dirty ? ' (+ uncommitted src changes)' : ''} · tape ${tapePath}`);
+    console.log(`\nsource ${source}${dirty ? ' (+ uncommitted src changes)' : ''} · tape ${shown}`);
   }
 } catch (e) {
   console.error(e);
