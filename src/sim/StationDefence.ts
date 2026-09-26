@@ -258,6 +258,8 @@ export class StationDefences implements Installations {
       const got = keep.get(st)!;
       st.defence = got === NONE ? null : got;
     }
+    // Dropped stations go back to their idle scan rather than a frozen sim pose.
+    for (const st of this.byStation.keys()) if (!keep.has(st)) (st as StationInstallation).defence = null;
     this.byStation = keep;
     const live = new Set(keep.values());
     for (let i = this.list.length - 1; i >= 0; i--) if (!live.has(this.list[i])) this.list.splice(i, 1);

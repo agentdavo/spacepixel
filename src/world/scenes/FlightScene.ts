@@ -565,7 +565,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.reachTime = time;
     this.traffic.setSystem(this.view);
     // Arm this system's stations (the list changes on a jump or when an outpost is built / torn down).
-    this.stationGuns.sync(this.view.stations);
+    // Free flight only for now: campaign missions keep their accepted balance and replay evidence.
+    this.stationGuns.sync(this.campaign ? [] : this.view.stations);
     if (this.jumpPhase === 'none') {
       // Traffic writes its haulers' controls (and scripts raiders) before the fighter AI.
       this.traffic.enabled = !this.campaign && this.trafficOn;

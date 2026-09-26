@@ -299,4 +299,8 @@ test('sync arms the system\'s stations in order, leaves unarmed ones alone and d
   assert.equal(a.defence, first, 'unchanged list: nothing rebuilt');
   stations.sync([b, c]);
   assert.deepEqual(stations.list.map((d: Any) => d.key), ['c']);
+  assert.equal(a.defence, null, 'a dropped station goes back to its idle scan');
+  stations.sync([]);
+  assert.equal(stations.list.length, 0);
+  assert.equal(c.defence, null, 'a campaign (empty list) disarms every station');
 });
