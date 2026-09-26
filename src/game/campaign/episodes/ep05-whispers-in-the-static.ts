@@ -18,12 +18,12 @@ export const EP05: CampaignMission = {
     'I asked for you by airframe. Your core hears things. — Y. Aubrac',
   ),
   objectives: [
-    obj('relieve', 'Relieve the picket at Null Station 2', (c) => c.distanceTo('station') < 1000),
-    obj('north', 'Recover the recorder from Survey Buoy North', (c) => c.distanceTo('buoyN') < 200),
-    obj('void', 'Recover the recorder from Survey Buoy Void', (c) => c.distanceTo('buoyV') < 200),
-    obj('listen', 'Hold at the dead ring\'s throat and listen', (c) => c.flag('throat-held'), { setsFlag: 'burst' }),
+    obj('relieve', 'Relieve the picket at Null Station 2', (c) => c.distanceTo('station') < 1000, { navigation: { kind: 'setpiece', tag: 'station' } }),
+    obj('north', 'Recover the recorder from Survey Buoy North', (c) => c.distanceTo('buoyN') < 200, { navigation: { kind: 'setpiece', tag: 'buoyN' } }),
+    obj('void', 'Recover the recorder from Survey Buoy Void', (c) => c.distanceTo('buoyV') < 200, { navigation: { kind: 'setpiece', tag: 'buoyV' } }),
+    obj('listen', 'Hold at the dead ring\'s throat and listen', (c) => c.flag('throat-held'), { navigation: { kind: 'setpiece', tag: 'throat' }, setsFlag: 'burst' }),
     obj('measure', 'Survive Psalm\'s Measure', (c) => c.kills('choir') >= 3 && c.flag('depart:psalm')),
-    obj('home', 'Return to Null Station 2', (c) => c.distanceTo('station') < 1000),
+    obj('home', 'Return to Null Station 2', (c) => c.distanceTo('station') < 1000, { navigation: { kind: 'setpiece', tag: 'station' } }),
     psalmWithdraws('psalm-withdraws', 3),
   ],
   spawns: [

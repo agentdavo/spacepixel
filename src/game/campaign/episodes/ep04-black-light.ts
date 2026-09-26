@@ -18,10 +18,10 @@ export const EP04: CampaignMission = {
     'Do not shoot anything that glows black. That is the cargo.',
   ),
   objectives: [
-    obj('formup', 'Form up on the Magpie\'s Due', (c) => c.distanceTo('magpie') < 800),
-    obj('raid', 'Break the Choir raid on the convoy', (c) => c.kills('choir') >= 5, { failed: (c) => c.aliveCount('tankers') < 2, setsFlag: 'raid-broken' }),
-    obj('torpedoes', 'Intercept the second torpedo run', (c) => c.kills('choir') >= 7, { failed: (c) => c.aliveCount('tankers') < 2 }),
-    obj('lantern', 'See the convoy to the Rustwake Lantern buoy', (c) => c.flag('tankers-arrived'), { failed: (c) => c.aliveCount('tankers') < 2 }),
+    obj('formup', 'Form up on the Magpie\'s Due', (c) => c.distanceTo('magpie') < 800, { navigation: { kind: 'ship', tag: 'magpie' } }),
+    obj('raid', 'Break the Choir raid on the convoy', (c) => c.kills('choir') >= 5, { navigation: { kind: 'group', tag: 'tankers' }, failed: (c) => c.aliveCount('tankers') < 2, setsFlag: 'raid-broken' }),
+    obj('torpedoes', 'Intercept the second torpedo run', (c) => c.kills('choir') >= 7, { navigation: { kind: 'group', tag: 'tankers' }, failed: (c) => c.aliveCount('tankers') < 2 }),
+    obj('lantern', 'See the convoy to the Rustwake Lantern buoy', (c) => c.flag('tankers-arrived'), { navigation: { kind: 'group', tag: 'tankers' }, failed: (c) => c.aliveCount('tankers') < 2 }),
     obj('every-gram', 'Lose no tankers', (c) => c.flag('tankers-arrived'), { optional: true, failed: (c) => c.aliveCount('tankers') < 3 }),
   ],
   spawns: [
