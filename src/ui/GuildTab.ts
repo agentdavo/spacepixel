@@ -3,6 +3,7 @@ import { registerDockTab, type DockContext, type DockTabApi } from './DockScreen
 import { drawPortrait } from './Portrait';
 import { Subtitles } from './Subtitles';
 import { getAudio } from '@/audio';
+import { SAVE_FAILURE } from '@/game/CareerStore';
 import { getVoice } from '@/audio/voice';
 import { COMMODITY, cargoUsed, repairCost, type CommodityId, type TradeLedger } from '@/game/economy';
 import { KIND_LABEL, TIER_LABEL, hops, type Contract } from '@/game/contracts/contracts';
@@ -477,8 +478,12 @@ class GuildTab {
           bad();
           break;
         }
+        if (!this.ctx.commitRepair?.({ ...this.l(), credits: this.l().credits - cost }, 1)) {
+          bad();
+          this.say(SAVE_FAILURE, 'err');
+          break;
+        }
         ok();
-        this.setL({ ...this.l(), credits: this.l().credits - cost });
         this.ctx.setHull(1);
         this.say(`HULL WHOLE — ${sh(cost)}. THE WARDENS SAID THE WORDS.`, 'ok');
         break;
@@ -569,10 +574,13 @@ class GuildTab {
           bad();
           this.say(res.error, 'err');
         } else {
-          ok();
-          o.commit(res);
-          this.ctx.setLedger(o.ledger);
-          this.say(res.message ?? 'FITTED', 'ok');
+          if (o.commit(res)) {
+            ok();
+            this.say(res.message ?? 'FITTED', 'ok');
+          } else {
+            bad();
+            this.say(SAVE_FAILURE, 'err');
+          }
         }
         break;
       }

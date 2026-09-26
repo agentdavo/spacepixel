@@ -2,6 +2,7 @@ import './outfit.css';
 import { registerDockTab, type DockContext, type DockTabApi } from './DockScreen';
 import { HullSheet } from './HullSheet';
 import { getAudio } from '@/audio';
+import { SAVE_FAILURE } from '@/game/CareerStore';
 import { loadProfile } from '@/game/Profile';
 import { outfitter } from '@/game/outfitting/Outfitter';
 import { computeFit, slotsFor, stockFit } from '@/game/outfitting/fit';
@@ -114,12 +115,12 @@ class ShipyardTab {
     this.render();
   }
 
-  private done(r: { error?: string; message?: string }, ok: () => void): void {
-    if (r.error) {
-      this.note = { text: r.error, cls: 'err' };
+  private done(r: { error?: string; message?: string }, ok: () => boolean): void {
+    const error = r.error ?? (ok() ? undefined : SAVE_FAILURE);
+    if (error) {
+      this.note = { text: error, cls: 'err' };
       getAudio().ui('move');
     } else {
-      ok();
       this.note = { text: r.message ?? 'DONE', cls: 'ok' };
       getAudio().ui('confirm');
       this.api?.say(r.message ?? '', 'ok');
@@ -133,11 +134,11 @@ class ShipyardTab {
     const ctx = this.ctx!;
     const r = buyHull(o.hangar, ctx.ledger(), e.id, ctx.station, { tradeIn, condition: o.condition() });
     this.done(r, () => {
-      o.commit(r);
-      ctx.setLedger(o.ledger);
+      if (!o.commit(r)) return false;
       // Select the new ship in your hangar.
       this.collect();
       this.sel = Math.max(0, this.rows.findIndex((x) => x.kind === 'owned' && x.ship.uid === o.hangar.active));
+      return true;
     });
   }
 
@@ -145,10 +146,7 @@ class ShipyardTab {
     const o = outfitter()!;
     const ctx = this.ctx!;
     const r = switchShip(o.hangar, ctx.ledger(), s.uid, o.condition());
-    this.done(r, () => {
-      o.commit(r);
-      ctx.setLedger(o.ledger);
-    });
+    this.done(r, () => o.commit(r));
   }
 
   private sell(s: OwnedShip): void {
@@ -162,10 +160,7 @@ class ShipyardTab {
     }
     this.armedSell = null;
     const r = sellShip(o.hangar, ctx.ledger(), s.uid);
-    this.done(r, () => {
-      o.commit(r);
-      ctx.setLedger(o.ledger);
-    });
+    this.done(r, () => o.commit(r));
   }
 
   private render(): void {

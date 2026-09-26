@@ -1,4 +1,5 @@
 import type { Livery } from '@/assets/Blueprint';
+import { readCareer, writeCareer } from './CareerStore';
 
 /**
  * The pilot profile: per-viewer conveniences (custom livery, callsign),
@@ -68,6 +69,8 @@ const LEDGER_KEY = 'vanguard.trade.v1';
 
 export function loadLedger(): TradeLedger {
   try {
+    const career = readCareer();
+    if (career) return normaliseLedger(career.ledger);
     const raw = localStorage.getItem(LEDGER_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -81,6 +84,10 @@ export function loadLedger(): TradeLedger {
 
 /** Primary career persistence takes precedence over the optional migration backup. */
 export function saveLedger(l: TradeLedger): boolean {
+  try {
+    const career = readCareer();
+    if (career) return writeCareer(l, career.hangar);
+  } catch { return false; }
   const backupKey = `${LEDGER_KEY}.pre-expansion`;
   let previous: string | null = null;
   try { previous = localStorage.getItem(LEDGER_KEY); } catch { /* still attempt the primary write */ }
@@ -143,6 +150,8 @@ const HANGAR_KEY = 'vanguard.hangar.v1';
 
 export function loadHangar(): Hangar {
   try {
+    const career = readCareer();
+    if (career) return normaliseHangar(career.hangar);
     const raw = localStorage.getItem(HANGAR_KEY);
     if (raw) return normaliseHangar(JSON.parse(raw));
   } catch {
@@ -151,10 +160,18 @@ export function loadHangar(): Hangar {
   return newHangar();
 }
 
-export function saveHangar(h: Hangar): void {
+export function saveHangar(h: Hangar): boolean {
   try {
+    const career = readCareer();
+    if (career) return writeCareer(career.ledger, h);
     localStorage.setItem(HANGAR_KEY, JSON.stringify(h));
+    return true;
   } catch {
-    /* storage unavailable — the hangar lasts for this session only */
+    return false;
   }
+}
+
+/** Migrate on the first successful shop operation, preserving both legacy keys. */
+export function saveCareer(ledger: TradeLedger, hangar: Hangar): boolean {
+  return writeCareer(ledger, hangar);
 }
