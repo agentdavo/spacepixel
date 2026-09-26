@@ -175,6 +175,39 @@ Options for the mission owner and the chief include:
 
 Choosing among these is a design decision. This work does not make it.
 
+### Wing-order fix and re-measure
+
+The chief fixed the wing-order defect. `CampaignSession` tracks its `wing`-role
+ships. `FlightScene.onWingOrder` now also calls `campaign.orderWing(order)`, and
+a story wingman joins on the lead's standing order. The headless route mirrors
+FlightScene's 1–4 keys (`HeadlessFlight.simKey`). A pilot's wing key is stamped
+on the take as a `key` command and replayed from the tape. The `HudPilot`
+option `wingOrder` presses the key once, on the first HUD frame that shows a
+hostile. That is ordinary input: one keypress the player can make.
+
+Mission data and balance are unchanged. Existing tapes contain no wing keys,
+so they are unaffected, and the seed-22 take still wins and replays exactly.
+
+`node scripts/first-session-route.mjs --sweep 100`, seeds 1–100:
+
+| Pilot policy | Wins | Median survival after the cutters appear | Mean cutters destroyed |
+|---|---:|---:|---:|
+| Charge (no order) | 1/100 | 7.87 s | 1.05 |
+| Retreat to recharge (no order) | 1/100 | 14.37 s | 0.28 |
+| Charge + **3 engage at will** | **75/100** | 14.65 s | 2.88 |
+| Charge + 2 attack my target | 0/100 | 7.70 s | 1.17 |
+| Retreat + **3 engage at will** | **83/100** | 17.47 s | 2.81 |
+
+Key 2 is not broken. A trace of seed 5 shows Candle taking the order and
+attacking the player's locked cutter. Focusing both ships on one cutter
+leaves the other two free to kill the Kestrel. Key 3 lets Candle pick his
+own target, which splits the cutters' attention.
+
+EP01 is winnable once the player gives the wing an order, but nothing
+in the episode tells the player to. The remaining design question is whether
+EP01 should teach the order. For example, Candle could ask for "engage at
+will" at `thieves`, or the objective text could mention the 3 key.
+
 ## B. Kessen cameos (Episodes 10 and 19)
 
 Reproduce with `node scripts/kessen-cameo-route.mjs --fixture`. Output is in

@@ -21,10 +21,10 @@ import { Weapons } from './Weapons';
 import { Missiles, type LockState } from './Missiles';
 import { Capitals } from './Capitals';
 import { gunOf, gunRange, leadSpeedOf } from './Combat';
-import { issueOrder, setFormation, updateAI } from './ai';
+import { issueOrder, setFormation, updateAI, type Order } from './ai';
 import { StateHasher, hashWorld } from './StateHash';
 import { REPLAY_HZ, REPLAY_VERSION, ReplayCursor, ReplayTake, copyControls, quantizeControls, type ReplayFile } from './Replay';
-import { DEFAULT_HUD_PILOT, HudPilot, controlsFromDevices, type HudPilotOptions, type HudView } from './HudPilot';
+import { DEFAULT_HUD_PILOT, HudPilot, controlsFromDevices, type HudPilotOptions, type HudView, type WingKey } from './HudPilot';
 
 /**
  * Headless campaign episodes (Episode 1, "The Long Dark", by default) flown
@@ -140,6 +140,8 @@ export class HeadlessFlight implements FlightHostScene {
   simTick = 0;
   simTime = 0;
   campaign: CampaignSession | null = null;
+  /** The lead's standing wing order (FlightScene.wingOrder). */
+  wingOrder: Order = 'formUp';
   readonly wingmen: ShipEntity[] = [];
   private readonly wingSlots: Vector3[] = [];
   readonly bandits: Bandit[] = [];
@@ -361,6 +363,15 @@ export class HeadlessFlight implements FlightHostScene {
   }
 
   /** FlightScene.simStep's campaign branch (no docking, no jump in progress). */
+  /** FlightScene.simKey's wing-order branch (1–4): the parked free-flight wing and the episode's own wingmen. */
+  simKey(code: string): void {
+    const i = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(code);
+    if (i < 0) return;
+    this.wingOrder = (['formUp', 'attackMyTarget', 'engageAtWill', 'coverMe'] as const)[i];
+    issueOrder(this.wingmen, this.wingOrder, this.player);
+    this.campaign?.orderWing(this.wingOrder);
+  }
+
   simStep(): void {
     const dt = DT;
     const time = this.simTime;
@@ -520,6 +531,7 @@ export function headlessSession(mission: CampaignMission, host: FlightHostScene)
     codex: { destroy() {}, unlock: () => false },
     pieces: [] as SetPiece[],
     statics: [] as ShipEntity[],
+    wing: [] as ShipEntity[],
     stationary: new WeakSet<ShipEntity>(),
     departing: [],
     frame,
@@ -577,11 +589,20 @@ export function runEpisode(o: RouteOptions = {}): RouteResult {
     const c: ControlState = S.player.controls;
     if (cursor) {
       if (cursor.done) break;
+      // The tape's sim keys (wing orders) run before their tick, as FlightScene's ReplayDirector plays them.
+      for (const cmd of cursor.due()) if (cmd.c === 'key' && typeof cmd.a === 'string') S.simKey(cmd.a);
       cursor.next(c);
     } else {
       // The HUD frame is sampled every second tick (30 Hz); edges fire on its first tick only.
       const first = i % 2 === 0;
       if (first && i > 0) devices = pilot.decide(pilotView(S, runner, o.objectiveRoute), S.simTime);
+      // A wing key is a keydown: recorded on the tape (FlightScene's replay.external('key')) and applied before the tick.
+      if (first)
+        for (const k of devices.keys)
+          if (k.startsWith('Digit')) {
+            take?.command('key', k as WingKey);
+            S.simKey(k);
+          }
       copyControls(quantizeControls(controlsFromDevices(devices, first, scratch)), c);
     }
     take?.input.push(c);

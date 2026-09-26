@@ -54,6 +54,10 @@ try {
     const policies = [
       { name: 'charge (default)', pilot: DEFAULT_HUD_PILOT },
       { name: 'retreat to recharge', pilot: { ...DEFAULT_HUD_PILOT, breakBelow: 0.5, rejoinAbove: 0.95 } },
+      // Ordinary input: one wing key the first time a hostile shows on the radar.
+      { name: 'charge + 3 engage at will', pilot: { ...DEFAULT_HUD_PILOT, wingOrder: 'Digit3' } },
+      { name: 'charge + 2 attack my target', pilot: { ...DEFAULT_HUD_PILOT, wingOrder: 'Digit2' } },
+      { name: 'retreat + 3 engage at will', pilot: { ...DEFAULT_HUD_PILOT, breakBelow: 0.5, rejoinAbove: 0.95, wingOrder: 'Digit3' } },
     ];
     // --counterfactual candle-engage: DIAGNOSTIC what-if, not ordinary-input evidence — the
     // episode wingman receives "engage at will" (the order the wing keys acknowledge but never deliver to him).

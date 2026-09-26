@@ -328,7 +328,11 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.capitals.register(this.cathedral, { launchBlueprint: 'choir-cantor', maxFighters: 3 });
     this.carrier = this.fleet.spawn('cvs07-hesperus-dawn', 'concord', ORIGIN.clone().add(new Vector3(-2400, -500, -1800)), fwd, { name: 'Hesperus Dawn' });
     this.capitals.register(this.carrier, { launchBlueprint: 'vf27-kestrel', maxFighters: 2 });
-    this.onWingOrder = (o) => issueOrder(this.wingmen.map((w) => w.ship), o, this.player);
+    this.onWingOrder = (o) => {
+      issueOrder(this.wingmen.map((w) => w.ship), o, this.player);
+      // Story episodes park the free-flight wing: the order has to reach the episode's own wingmen.
+      this.campaign?.orderWing(o);
+    };
 
     this.visuals = new WeaponVisuals(this.weapons, this.missiles);
     this.scene.add(this.visuals.group);

@@ -3,7 +3,7 @@ import type { WorldSpace } from '@/core/WorldSpace';
 import type { Fleet, ShipEntity, Team } from '@/sim/Fleet';
 import type { Weapons } from '@/sim/Weapons';
 import type { Capitals } from '@/sim/Capitals';
-import { brainOf, issueOrder, setFormation } from '@/sim/ai';
+import { brainOf, issueOrder, setFormation, type Order } from '@/sim/ai';
 import { postFx } from '@/render/post/PostFx';
 import { createSetPiece, type SetPiece, type SetPieceFrame } from '@/world/setpieces';
 import { Comms } from '@/ui/Comms';
@@ -34,6 +34,8 @@ export interface FlightHostScene {
   currentSystemId(): string;
   jumpCount(): number;
   gatePosition(i: number): Vector3 | null;
+  /** The lead's standing wing order (the 1–4 keys); story wingmen join on it. */
+  readonly wingOrder?: Order;
 }
 
 const _v = new Vector3();
@@ -44,6 +46,8 @@ export class CampaignSession {
   readonly codex: Codex;
   private pieces: SetPiece[] = [];
   private statics: ShipEntity[] = [];
+  /** Story wingmen ('wing' role): they take the lead's wing orders like the free-flight wing. */
+  private wing: ShipEntity[] = [];
   private stationary = new WeakSet<ShipEntity>();
   private departing: { ship: ShipEntity; t: number; dir: Vector3 }[] = [];
   private frame: SetPieceFrame;
@@ -143,9 +147,17 @@ export class CampaignSession {
     if (spec.role === 'wing') {
       const wing = this.host.fleet.ships.filter((x) => x.alive && x !== p && x.team === p.team && brainOf(x).order === 'formUp');
       setFormation([...wing, s], 'fingerFour', 45);
-      issueOrder([s], 'formUp', p);
+      issueOrder([s], this.host.wingOrder ?? 'formUp', p);
+      this.wing.push(s);
     }
     return s;
+  }
+
+  /** The lead's wing order (1–4 keys) reaches this episode's wingmen. */
+  orderWing(order: Order): void {
+    const alive = this.wing.filter((s) => s.alive);
+    this.wing = alive;
+    if (alive.length) issueOrder(alive, order, this.host.player);
   }
 
   private buildPiece(spec: Parameters<CampaignHost['spawnSetPiece']>[0], pos: Vector3): SetPieceHandle {
@@ -233,6 +245,7 @@ export class CampaignSession {
       s.alive = false;
       s.model.root.visible = false;
     }
+    this.wing.length = 0;
     for (const p of this.pieces) {
       p.group.removeFromParent();
       p.dispose();

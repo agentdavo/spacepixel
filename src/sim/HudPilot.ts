@@ -45,7 +45,9 @@ export interface HudView {
 }
 
 /** The devices a player holds this frame. `mouse` is the cursor offset from centre (−1..1, +x right, +y down). */
-export type PilotKey = 'KeyW' | 'KeyS' | 'ShiftLeft' | 'Space' | 'KeyF' | 'KeyT';
+export type PilotKey = 'KeyW' | 'KeyS' | 'ShiftLeft' | 'Space' | 'KeyF' | 'KeyT' | WingKey;
+/** FlightScene's wing-order keys: 1 form on me · 2 attack my target · 3 engage at will · 4 cover me. */
+export type WingKey = 'Digit1' | 'Digit2' | 'Digit3' | 'Digit4';
 export interface DeviceInput {
   mouse: { x: number; y: number };
   keys: Set<PilotKey>;
@@ -62,6 +64,8 @@ export interface HudPilotOptions {
   breakBelow?: number;
   /** Turn back in once the shield bar is back above this fraction (default 0.9). */
   rejoinAbove?: number;
+  /** Wing key pressed once, the first HUD frame a hostile shows on the radar (unset: never gives an order). */
+  wingOrder?: WingKey;
 }
 
 export const DEFAULT_HUD_PILOT: HudPilotOptions = { fireCone: 0.06, missileEvery: 3, targetEvery: 0.5 };
@@ -105,6 +109,7 @@ export class HudPilot {
   private retreating = false;
   private lastMissile = -1e9;
   private lastTarget = -1e9;
+  private ordered = false;
 
   constructor(readonly options: HudPilotOptions = DEFAULT_HUD_PILOT) {}
 
@@ -188,6 +193,10 @@ export class HudPilot {
     if (v.marker === null && !v.target && v.hostilesPresent && !keys.has('KeyT') && time - this.lastTarget >= this.options.targetEvery) {
       keys.add('KeyT');
       this.lastTarget = time;
+    }
+    if (this.options.wingOrder && !this.ordered && v.hostilesPresent) {
+      keys.add(this.options.wingOrder);
+      this.ordered = true;
     }
     return { mouse, keys };
   }

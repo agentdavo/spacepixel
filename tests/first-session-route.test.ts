@@ -50,3 +50,25 @@ test('the pilot sees exactly the HUD view on EP01: stationary +Z start, Survey B
   assert.equal(hud.hostilesPresent, false);
   S.disposeCampaign();
 });
+
+test('wing keys reach the episode wingman (Candle), not only the parked free-flight wing, and go on the tape', async () => {
+  const { brainOf } = await server.ssrLoadModule('/src/sim/ai/index.ts');
+  const S = new R.HeadlessFlight(1994);
+  const session = S.beginCampaign(MISSIONS[0]);
+  S.simStep();
+  const [candle] = session.runner.shipsTagged('candle');
+  assert.ok(candle && candle.alive);
+  assert.equal(brainOf(candle).order, 'formUp');
+  S.simKey('Digit3');
+  assert.equal(brainOf(candle).order, 'engageAtWill');
+  S.simKey('Digit1');
+  assert.equal(brainOf(candle).order, 'formUp');
+  S.disposeCampaign();
+
+  // Recorded as a 'key' command when the pilot presses it, and replayed from the tape.
+  const A = R.runEpisode({ seed: 22, record: true, seconds: 70, pilot: { fireCone: 0.06, missileEvery: 3, targetEvery: 0.5, wingOrder: 'Digit3' } });
+  const keys = A.take.commands.filter((c: any) => c.c === 'key');
+  assert.deepEqual(keys.map((c: any) => c.a), ['Digit3']);
+  const B = R.runEpisode({ seed: 22, replay: JSON.parse(JSON.stringify(A.take)) });
+  assert.deepEqual(B.hashes, A.hashes);
+});
