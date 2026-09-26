@@ -1,0 +1,244 @@
+{
+  "source": "1de365200a0a96cfc53f3ecd068df139d091ce3b",
+  "renderer": "native Edge WebGPU / GPUDevice",
+  "viewport": [
+    1280,
+    720
+  ],
+  "rawRoot": "C:\\Users\\David(J)Smith\\.codex\\worktrees\\objective-navigation\\spacepixel\\scratchpad\\objective-navigation-native",
+  "checks": [
+    {
+      "episode": "ep04-black-light",
+      "take": "ep04-take-2",
+      "replay": "ep04-replay-1",
+      "seconds": 40.233333333333334,
+      "ticks": 2414,
+      "framesCompared": 1207,
+      "checkpointsMatched": 40,
+      "desyncAt": -1,
+      "exactInputNavigationClearanceMatch": true,
+      "tapeSha256": "b7fbb10647060a8eb3a65b818d4320b8085807214292e1ecfada9e9ae8dffb0b",
+      "eventsSha256": "ed31c84080cdfb5fbdb2a37912fcb4984e464cbc715063023b1a03e37351ad61",
+      "harnessSha256": "4e3529194986f5e9ad7256f7b0a10a38398d98c5cd71897646bc8d46c9992f20",
+      "commands": [
+        {
+          "t": 0,
+          "c": "episode",
+          "a": "ep04-black-light"
+        }
+      ],
+      "query": "scene=flight&record=30&demo=0&hud=1&quality=high&dynres=0&traffic=0&planes=0&seed=1994&score=nexus&voice=off",
+      "transitions": [
+        {
+          "at": 0.03333333333333333,
+          "tick": 2,
+          "objective": "formup",
+          "tag": "magpie",
+          "label": "Magpie's Due"
+        },
+        {
+          "at": 39.233333333333334,
+          "tick": 2354,
+          "objective": "raid",
+          "tag": "tankers-1",
+          "label": "Marsh Tanker 1"
+        }
+      ],
+      "firstArrivalTick": null,
+      "minimumRestBoundsGap": null
+    },
+    {
+      "episode": "ep05-whispers-in-the-static",
+      "take": "ep05-take-1",
+      "replay": "ep05-replay-1",
+      "seconds": 88.1,
+      "ticks": 5286,
+      "framesCompared": 2643,
+      "checkpointsMatched": 88,
+      "desyncAt": -1,
+      "exactInputNavigationClearanceMatch": true,
+      "tapeSha256": "a1b5266e6b1e5d6154a336252966bf77b7dc7a3c4199ff453aa8191b54f1240c",
+      "eventsSha256": "a0677a69cb86aa8d6ea09e250cf6236915c980422d31b3f515d7ef60335f13ac",
+      "harnessSha256": "4e3529194986f5e9ad7256f7b0a10a38398d98c5cd71897646bc8d46c9992f20",
+      "commands": [
+        {
+          "t": 0,
+          "c": "episode",
+          "a": "ep05-whispers-in-the-static"
+        }
+      ],
+      "query": "scene=flight&record=30&demo=0&hud=1&quality=high&dynres=0&traffic=0&planes=0&seed=1994&score=nexus&voice=off",
+      "transitions": [
+        {
+          "at": 0.03333333333333333,
+          "tick": 2,
+          "objective": "relieve",
+          "tag": "station",
+          "label": "Null Picket Station 2"
+        },
+        {
+          "at": 4.966666666666667,
+          "tick": 298,
+          "objective": "north",
+          "tag": "buoyN",
+          "label": "Survey Buoy North"
+        },
+        {
+          "at": 27.233333333333334,
+          "tick": 1634,
+          "objective": "void",
+          "tag": "buoyV",
+          "label": "Survey Buoy Void"
+        },
+        {
+          "at": 52.56666666666667,
+          "tick": 3154,
+          "objective": "listen",
+          "tag": "throat",
+          "label": "Ring throat"
+        },
+        {
+          "at": 87.1,
+          "tick": 5226,
+          "objective": "measure",
+          "tag": null,
+          "label": null
+        }
+      ],
+      "firstArrivalTick": null,
+      "minimumRestBoundsGap": null
+    },
+    {
+      "episode": "ep02-fossil-fire",
+      "take": "ep02-take-1",
+      "replay": "ep02-replay-1",
+      "seconds": 35,
+      "ticks": 2100,
+      "framesCompared": 1050,
+      "checkpointsMatched": 35,
+      "desyncAt": -1,
+      "exactInputNavigationClearanceMatch": true,
+      "tapeSha256": "7d473c39e1c07cf271a07c002a83be0d68e9a7941b18df66b5e094d3d23c7064",
+      "eventsSha256": "caedcfaf80709a35d80292b69b246b22ecb43597a6297bdcd00ee64ed3ed8936",
+      "harnessSha256": "4e3529194986f5e9ad7256f7b0a10a38398d98c5cd71897646bc8d46c9992f20",
+      "commands": [
+        {
+          "t": 0,
+          "c": "episode",
+          "a": "ep02-fossil-fire"
+        }
+      ],
+      "query": "scene=flight&record=30&demo=0&hud=1&quality=high&dynres=0&traffic=0&planes=0&seed=1994&score=nexus&voice=off",
+      "transitions": [
+        {
+          "at": 0.03333333333333333,
+          "tick": 2,
+          "objective": "raid",
+          "tag": null,
+          "label": null
+        }
+      ],
+      "firstArrivalTick": 1514,
+      "minimumRestBoundsGap": 483.0599886317948
+    },
+    {
+      "episode": "ep10-the-fall-of-the-bastion",
+      "take": "ep10-take-1",
+      "replay": "ep10-replay-1",
+      "seconds": 25,
+      "ticks": 1500,
+      "framesCompared": 750,
+      "checkpointsMatched": 25,
+      "desyncAt": -1,
+      "exactInputNavigationClearanceMatch": true,
+      "tapeSha256": "36587de0a9feed1b155dfb00405bb5cc29535415f351a6cd2cfd821a08217132",
+      "eventsSha256": "8a0438093de616e8def236bbf42f4957bea432e46a48a4a702f39b46c92b72c0",
+      "harnessSha256": "4e3529194986f5e9ad7256f7b0a10a38398d98c5cd71897646bc8d46c9992f20",
+      "commands": [
+        {
+          "t": 0,
+          "c": "episode",
+          "a": "ep10-the-fall-of-the-bastion"
+        }
+      ],
+      "query": "scene=flight&record=30&demo=0&hud=1&quality=high&dynres=0&traffic=0&planes=0&seed=1994&score=nexus&voice=off",
+      "transitions": [
+        {
+          "at": 0.03333333333333333,
+          "tick": 2,
+          "objective": "intercept",
+          "tag": null,
+          "label": null
+        }
+      ],
+      "firstArrivalTick": null,
+      "minimumRestBoundsGap": 57.05466537588602
+    }
+  ],
+  "checkpoints": 188,
+  "screenshots": [
+    {
+      "path": "ep04-magpie-20s.jpg",
+      "raw": "ep04-take-2/f_00600.jpg",
+      "sha256": "ca2e43044aeb5ee202138630a3a78b13a64a15155e047e578d3794e7df8c98db"
+    },
+    {
+      "path": "ep04-convoy-40s.jpg",
+      "raw": "ep04-take-2/f_01200.jpg",
+      "sha256": "98db9850062dbddc30acf1a9576b61254071d58a15eaee42eb64656e4970c535"
+    },
+    {
+      "path": "ep05-north-10s.jpg",
+      "raw": "ep05-take-1/f_00300.jpg",
+      "sha256": "c4618992ebb1b2478cf6e7fab032b6213a966a43362cf8c7f682f7b78bac0488"
+    },
+    {
+      "path": "ep05-void-30s.jpg",
+      "raw": "ep05-take-1/f_00900.jpg",
+      "sha256": "986e8449b7aad2703b43aec7da6fb8d75f5dadbc4ef7ed7cf95495c2971d5f5a"
+    },
+    {
+      "path": "ep05-throat-70s.jpg",
+      "raw": "ep05-take-1/f_02100.jpg",
+      "sha256": "2c6aee72914ff2782bbc366ad3d2cae02dd34adb57c5fc15bc57e4f22ab5b45c"
+    },
+    {
+      "path": "ep05-combat-no-nav-88s.jpg",
+      "raw": "ep05-take-1/f_02642.jpg",
+      "sha256": "0ae5c628cd68801815e51817dd0caf7b1612948419c981ffb459b014d46c4b7c"
+    },
+    {
+      "path": "ep02-arrived-25s.jpg",
+      "raw": "ep02-take-1/f_00756.jpg",
+      "sha256": "df927796f4cf45c1a11c39db059805fcf564ed96fcbf08f491d46ed52a61d785"
+    },
+    {
+      "path": "ep02-hold-35s.jpg",
+      "raw": "ep02-take-1/f_01049.jpg",
+      "sha256": "df6ebfd2bca3807d0ec1e8b0b70737f960c7277b2c361b9646e2fc0a961a9a63"
+    },
+    {
+      "path": "ep10-after-grace-2s.jpg",
+      "raw": "ep10-take-1/f_00063.jpg",
+      "sha256": "8cd654f56eda58d4ab171ff41ba7992715c2b55290d61591141e23465fb69e8e"
+    },
+    {
+      "path": "ep10-hold-25s.jpg",
+      "raw": "ep10-take-1/f_00749.jpg",
+      "sha256": "773602dfd5a4a34961b79ab7156e7f4a3fe037bd4a5869c483348b873d833561"
+    }
+  ],
+  "incompleteTakes": [
+    {
+      "take": "ep04-take-1",
+      "reason": "35-second pilot duration ended before form-up; moving marker correct, route still active. Replaced by longer fresh take2."
+    }
+  ],
+  "limitations": [
+    "60 Hz simulation / 30 Hz HUD audit; probe renders 3D once per simulation second, not a performance or smooth-video test.",
+    "Read-only observations; ordinary mouse/keyboard controls; no flags/poses/kills injected. Only episode-start tape command.",
+    "EP04/05 stop at combat; no native victory, death/retry or station return claim.",
+    "EP02 precombat approach/arrival/hold only; EP10 initial hold only. Combat-dependent halt/resume/evacuation remain CPU covered.",
+    "No human voice listening; voice=off. No trailer change."
+  ]
+}

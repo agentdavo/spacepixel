@@ -1,0 +1,63 @@
+{
+  "source": "1de365200a0a96cfc53f3ecd068df139d091ce3b",
+  "episode": "ep02-fossil-fire",
+  "renderer": {
+    "backend": "WebGPU",
+    "device": "GPUDevice",
+    "queue": true
+  },
+  "eventsSha256": "caedcfaf80709a35d80292b69b246b22ecb43597a6297bdcd00ee64ed3ed8936",
+  "frames": 1050,
+  "ticks": 2100,
+  "firstTick": 1,
+  "lastTick": 2100,
+  "seconds": 35,
+  "pair": [
+    "barge",
+    "indomitable"
+  ],
+  "ids": [
+    10,
+    9
+  ],
+  "contacts": {
+    "fighter": 0,
+    "capital": 0,
+    "hull": 0
+  },
+  "contactsInvolvingSubjects": [],
+  "minimumGap": 483.0599886317948,
+  "minimumGapTick": 1643,
+  "maxAnchorDrift": 0,
+  "maxAnchorSpeed": 0,
+  "maxTargetError": 0,
+  "firstArrival": {
+    "tick": 1514,
+    "seconds": 25.233333333333334,
+    "distance": 99.06436406646039,
+    "loggedDistance": 99.06436406646039,
+    "speed": 82.15313001266352
+  },
+  "final": [
+    {
+      "tag": "barge",
+      "alive": true,
+      "hull": 8000,
+      "shield": 2400,
+      "speed": 5e-324
+    },
+    {
+      "tag": "indomitable",
+      "alive": true,
+      "hull": 48000,
+      "shield": 9000,
+      "speed": 0
+    }
+  ],
+  "flags": [
+    "barge-arrived"
+  ],
+  "outcome": "running",
+  "scope": "Fresh native approach/external-arrival/hold before combat; no halt/resume or mission completion claim.",
+  "passed": true
+}

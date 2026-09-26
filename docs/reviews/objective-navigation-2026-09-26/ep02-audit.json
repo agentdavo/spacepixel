@@ -1,0 +1,354 @@
+{
+  "passed": true,
+  "source": "1de365200a0a96cfc53f3ecd068df139d091ce3b",
+  "episode": "ep02-fossil-fire",
+  "renderer": {
+    "backend": "WebGPU",
+    "device": "GPUDevice",
+    "queue": true
+  },
+  "frames": 1050,
+  "ticks": 2100,
+  "duration": 35,
+  "probe": true,
+  "stop": {
+    "stopObjective": "",
+    "ended": false,
+    "lastTick": 2100,
+    "stopAtTick": null,
+    "reason": "Duration limit; inspect whether required route completed"
+  },
+  "replay": {
+    "mode": "record",
+    "tick": 2100,
+    "ticks": 2100,
+    "seconds": 35,
+    "seeking": false,
+    "paused": false,
+    "ended": false,
+    "desyncAt": -1,
+    "checksOk": 0
+  },
+  "tape": {
+    "ticks": 2100,
+    "checks": 35,
+    "commands": [
+      {
+        "t": 0,
+        "c": "episode",
+        "a": "ep02-fossil-fire"
+      }
+    ]
+  },
+  "transitions": [
+    {
+      "tick": 2,
+      "at": 0.03333333333333333,
+      "objective": "raid",
+      "outcome": "running",
+      "tag": null,
+      "label": null,
+      "position": null,
+      "distance": null,
+      "calls": [
+        {
+          "name": "Lysowick",
+          "position": [
+            2414610.1490812395,
+            151086.98893804103,
+            -1129171.896482994
+          ],
+          "mission": false
+        }
+      ],
+      "labels": [
+        {
+          "method": "add",
+          "id": "nav",
+          "lines": [
+            "LANTERN → LYSOWICK  2.6 km"
+          ]
+        }
+      ],
+      "dwells": []
+    }
+  ],
+  "screenshots": [
+    "f_00000.jpg",
+    "f_00063.jpg",
+    "f_00300.jpg",
+    "f_00600.jpg",
+    "f_00756.jpg",
+    "f_00900.jpg",
+    "f_01049.jpg"
+  ],
+  "nativeScope": "ordinary mouse/keyboard controls, fresh mission, read-only observations; no combat-completion claim",
+  "clearance": {
+    "first": {
+      "tick": 1,
+      "ships": [
+        {
+          "id": 10,
+          "tag": "barge",
+          "alive": true,
+          "team": "concord",
+          "position": [
+            2413746.730808585,
+            151036.98893804103,
+            -1126148.9142035125
+          ],
+          "velocity": [
+            52.781507721726186,
+            0,
+            -105.38815661037282
+          ],
+          "orientation": [
+            0,
+            0.9731727205342154,
+            0,
+            0.23007576145268716
+          ],
+          "hull": 8000,
+          "shield": 2400,
+          "centre": [
+            2413744.715678347,
+            151050.80757636577,
+            -1126144.890618922
+          ],
+          "enclosingRadius": 93.71116370333301
+        },
+        {
+          "id": 9,
+          "tag": "indomitable",
+          "alive": true,
+          "team": "neutral",
+          "position": [
+            2413445.8511167895,
+            150586.98893804103,
+            -1117347.1577342357
+          ],
+          "velocity": [
+            0,
+            0,
+            0
+          ],
+          "orientation": [
+            0,
+            0.9996543976126223,
+            0.026288501930409564,
+            0
+          ],
+          "hull": 48000,
+          "shield": 9000,
+          "centre": [
+            2413445.8511167895,
+            150823.29146517106,
+            -1117379.7830715403
+          ],
+          "enclosingRadius": 1214.441735973546
+        }
+      ],
+      "routes": [
+        {
+          "tag": "barge",
+          "halted": false,
+          "target": [
+            2413445.8511167895,
+            150586.98893804103,
+            -1119147.1577342357
+          ],
+          "distances": [
+            {
+              "id": 10,
+              "alive": true,
+              "distance": 7022.650656553657
+            }
+          ]
+        }
+      ],
+      "flags": [],
+      "outcome": "running"
+    },
+    "last": {
+      "tick": 2100,
+      "ships": [
+        {
+          "id": 10,
+          "tag": "barge",
+          "alive": true,
+          "team": "concord",
+          "position": [
+            2413446.091549356,
+            150587.17226278584,
+            -1119150.2501584205
+          ],
+          "velocity": [
+            5e-324,
+            5e-324,
+            0
+          ],
+          "orientation": [
+            -0.0025641633451748075,
+            -0.04864476711470682,
+            0.6465686699336395,
+            0.7612989339010923
+          ],
+          "hull": 8000,
+          "shield": 2400,
+          "centre": [
+            2413432.839263505,
+            150589.70242769015,
+            -1119155.6520037777
+          ],
+          "enclosingRadius": 93.71116370333301
+        },
+        {
+          "id": 9,
+          "tag": "indomitable",
+          "alive": true,
+          "team": "neutral",
+          "position": [
+            2413445.8511167895,
+            150586.98893804103,
+            -1117347.1577342357
+          ],
+          "velocity": [
+            0,
+            0,
+            0
+          ],
+          "orientation": [
+            0,
+            0.9996543976126223,
+            0.026288501930409564,
+            0
+          ],
+          "hull": 48000,
+          "shield": 9000,
+          "centre": [
+            2413445.8511167895,
+            150823.29146517106,
+            -1117379.7830715403
+          ],
+          "enclosingRadius": 1214.441735973546
+        }
+      ],
+      "routes": [
+        {
+          "tag": "barge",
+          "halted": false,
+          "target": [
+            2413445.8511167895,
+            150586.98893804103,
+            -1119147.1577342357
+          ],
+          "distances": [
+            {
+              "id": 10,
+              "alive": true,
+              "distance": 3.1071696316292323
+            }
+          ]
+        }
+      ],
+      "flags": [
+        "barge-arrived"
+      ],
+      "outcome": "running"
+    },
+    "samples": 2100,
+    "pairContacts": 0,
+    "minRestBoundsGap": {
+      "tick": 2100,
+      "gap": 483.0599886317948
+    },
+    "allContactCount": 0,
+    "arrival": {
+      "tick": 1514,
+      "ships": [
+        {
+          "id": 10,
+          "tag": "barge",
+          "alive": true,
+          "team": "concord",
+          "position": [
+            2413453.5170802036,
+            150592.83372928647,
+            -1119245.7519513487
+          ],
+          "velocity": [
+            -6.357389910164709,
+            -4.847016222497465,
+            81.76323622598717
+          ],
+          "orientation": [
+            -0.00256509159765287,
+            -0.04864555546669462,
+            0.6465686106208381,
+            0.7612989307744176
+          ],
+          "hull": 8000,
+          "shield": 2400,
+          "centre": [
+            2413440.2648077607,
+            150595.36389438048,
+            -1119251.1538295108
+          ],
+          "enclosingRadius": 93.71116370333301
+        },
+        {
+          "id": 9,
+          "tag": "indomitable",
+          "alive": true,
+          "team": "neutral",
+          "position": [
+            2413445.8511167895,
+            150586.98893804103,
+            -1117347.1577342357
+          ],
+          "velocity": [
+            0,
+            0,
+            0
+          ],
+          "orientation": [
+            0,
+            0.9996543976126223,
+            0.026288501930409564,
+            0
+          ],
+          "hull": 48000,
+          "shield": 9000,
+          "centre": [
+            2413445.8511167895,
+            150823.29146517106,
+            -1117379.7830715403
+          ],
+          "enclosingRadius": 1214.441735973546
+        }
+      ],
+      "routes": [
+        {
+          "tag": "barge",
+          "halted": false,
+          "target": [
+            2413445.8511167895,
+            150586.98893804103,
+            -1119147.1577342357
+          ],
+          "distances": [
+            {
+              "id": 10,
+              "alive": true,
+              "distance": 99.06436406646039
+            }
+          ]
+        }
+      ],
+      "flags": [
+        "barge-arrived"
+      ],
+      "outcome": "running"
+    }
+  }
+}

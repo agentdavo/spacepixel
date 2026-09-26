@@ -67,7 +67,14 @@ Episode 1, runner and snapshot regressions also pass.
 These are CPU fixtures that supply positions and kills to the real runner.
 They are not ordinary-input playthrough evidence or collision acceptance.
 
-## Pending native acceptance
+## Native acceptance follow-up
+
+The scoped ordinary-input follow-up is now complete on combined source
+`1de3652`: [native report and evidence](OBJECTIVE-NAVIGATION-NATIVE.md).
+EP04 form-up and EP05 survey/dwell/combat marker removal passed, with fresh
+recordings and tick-zero replay validation. The steps below were the original
+acceptance plan; unobserved combat, failure/retry and completion remain labelled
+CPU-only in the follow-up report.
 
 After Chief integrates mission clearance and allocates the GPU, use an isolated
 browser profile on the merged source. Start Episodes 4 and 5 through the normal
@@ -84,4 +91,5 @@ Use ordinary flight controls, preserving a replay and source revision:
 3. Report any unobserved dead-member/completion cases as CPU-only coverage;
    do not describe these unit fixtures as an ordinary flight demonstration.
 
-No browser, GPU capture or native acceptance was run for this handoff.
+No browser or GPU capture was run for the initial implementation handoff
+`4135eea`; the linked follow-up records the later native proof separately.

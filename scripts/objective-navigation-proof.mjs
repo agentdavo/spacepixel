@@ -1,0 +1,266 @@
+#!/usr/bin/env node
+/** V3 deterministic staged gameplay: stock healthy ships, normal simulation after setup. */
+import { chromium } from 'playwright';
+import { createServer } from 'vite';
+import { mkdirSync, writeFileSync, appendFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+
+const args = process.argv.slice(2);
+const opt = (k, d) => args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : d;
+const out = resolve(opt('out', 'scratchpad/delivery/v3/proof'));
+const port = Number(opt('port', '5410'));
+const seconds = Number(opt('seconds', '180'));
+const probe = args.includes('--probe');
+const contactAudit = args.includes('--contact-audit');
+const scenario = opt('scenario', 'capital');
+const from = Number(opt('from', '0'));
+const replayPath = opt('replay', '');
+const replay = replayPath ? JSON.parse(readFileSync(replayPath, 'utf8')) : null;
+const camera = opt('camera', '');
+const cameraScale = Number(opt('camera-scale', '1'));
+const cameraTag = opt('camera-tag','');
+// Fixed world-space viewing direction for a steady native track shot. The
+// subject's position stays live; its simulation velocity is never modified.
+const trackDirectionArg = opt('camera-track-direction', '');
+const cameraTrackDirection = trackDirectionArg ? trackDirectionArg.split(',').map(Number) : null;
+if (cameraTrackDirection && (camera !== 'track' || trackDirectionArg.split(',').some(v => !v.trim()) || cameraTrackDirection.length !== 3 || !cameraTrackDirection.every(Number.isFinite) || !Number.isFinite(Math.hypot(...cameraTrackDirection)) || Math.hypot(...cameraTrackDirection) < 1e-6 || Math.hypot(cameraTrackDirection[0], cameraTrackDirection[2]) < 1e-6)) {
+  throw new Error('--camera-track-direction requires --camera track and three finite, nonzero, nonvertical world-space components x,y,z');
+}
+const pilot = args.includes('--pilot');
+const episode = opt('episode', replay?.commands?.find(c=>c.c==='episode')?.a??'');
+const route = opt('route','') ? JSON.parse(readFileSync(opt('route',''),'utf8')) : [];
+const routeUntil = Number(opt('route-until','1e9'));
+const plan = opt('inputs', '') ? JSON.parse(readFileSync(opt('inputs', ''), 'utf8')) : [];
+if (existsSync(`${out}/events.jsonl`)) throw new Error('Choose a new output directory; capture logs cannot be appended to old takes');
+mkdirSync(out, { recursive: true });
+// Include the episode modules and their helpers: missions.ts is now only a facade.
+const campaignSources = readdirSync('src/game/campaign', { recursive: true })
+  .filter(p => p.endsWith('.ts')).map(p => `src/game/campaign/${p.replaceAll('\\', '/')}`).sort();
+// Contact, flight and breakup changes intentionally invalidate old motion proof.
+// Include future solver modules automatically when recording replacement takes.
+const simulationSources = readdirSync('src/sim', { recursive: true })
+  .filter(p => p.endsWith('.ts')).map(p => `src/sim/${p.replaceAll('\\', '/')}`).sort();
+const sourceFiles = Object.fromEntries(['scripts/v3-gameplay.mjs','src/cinema/gameplaySetup.ts','src/cinema/loreFlightSetup.ts','src/world/scenes/FlightScene.ts','src/world/EventTap.ts','src/world/HullCollisions.ts','src/game/CampaignSession.ts','src/game/CampaignRunner.ts',...campaignSources,...simulationSources,'src/ui/Comms.ts','src/ui/FlightNavigation.ts','src/ui/FlightHud.ts','src/ui/HudLabels.ts'].map(p => [p,createHash('sha256').update(readFileSync(p)).digest('hex')]));
+writeFileSync(`${out}/capture-harness.mjs`, readFileSync(fileURLToPath(import.meta.url)));
+writeFileSync(`${out}/original-capture-harness.mjs`, readFileSync('scripts/v3-gameplay.mjs'));
+const server = await createServer({ cacheDir: `node_modules/.vite-v3-${port}`, server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: { ignored:['**/*'] } }, logLevel: 'warn', plugins: [{ name: 'v3-replay', configureServer(s) { s.middlewares.use((req,res,next) => { if (req.url !== '/__v3-tape.json') return next(); res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(replay)); }); } }] });
+await server.listen();
+const browser = await chromium.launch({ channel: 'msedge', args: ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--use-angle=d3d11'] });
+try {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+  const held = new Set();
+  const keyState = async (key,down) => { if(held.has(key)===down)return; if(down)held.add(key);else held.delete(key);await page.keyboard[down?'down':'up'](key); };
+  const pageErrors = [];
+  page.on('pageerror', e => { pageErrors.push(e.message); console.error('PAGEERROR', e.message); });
+  const q = new URLSearchParams(replay?.header.boot ?? 'scene=flight&record=30&demo=0&hud=1&quality=high&dynres=0&traffic=0&planes=0&seed=1994&score=nexus&voice=off');
+  if (!replay && scenario === 'capital') { q.set('own','ffl3-valiant'); q.set('bridge','1'); q.set('captureSetup','v3-capital'); }
+  if (!replay) for (const [k,v] of new URLSearchParams(opt('query',''))) q.set(k,v);
+  if (replay) { q.set('replay','/__v3-tape.json'); q.set('rseek',String(plan.length || args.includes('--replay-from-start') ? 0 : Math.max(0,from-10))); }
+  const query = q.toString();
+  await page.goto(`http://127.0.0.1:${port}/?${query}`, { waitUntil: 'commit' });
+  await page.waitForFunction(() => window.__VANGUARD__?.error || (window.__VANGUARD__?.ready && window.__VANGUARD__?.hooks?.step), null, { timeout: 300000 });
+  const status = await page.evaluate(() => { const v=window.__VANGUARD__, device=v.hooks.renderer().backend.device; return { error:v.error, backend:v.backend, device:device?.constructor.name, queue:!!device?.queue }; });
+  if (status.error || status.backend !== 'WebGPU' || !status.queue) throw new Error(JSON.stringify(status));
+  await page.evaluate(() => document.fonts.ready);
+  await page.addStyleTag({ content: `.hud-debug,.hud-graph,.replay-deck,.replay-toast {display:none!important}${args.includes('--clean') ? '#ui-root {visibility:hidden!important}' : ''}` });
+  if (episode && !replay) await page.evaluate(async id => { const {MISSIONS}=await import('/src/game/campaign/missions.ts'); const m=MISSIONS.find(m=>m.id===id); if(!m)throw new Error('Unknown episode'); void window.__VANGUARD__.hooks.scene.startCampaign(m); },episode);
+  if (replay) {
+    while (await page.evaluate(() => window.__VANGUARD__.hooks.replay.state().seeking)) await page.evaluate(() => window.__VANGUARD__.hooks.step(1));
+  }
+  const initial = await page.evaluate(async contactAudit => {
+    const S = window.__VANGUARD__.hooks.scene;
+    const { snapshotAudioFrame } = await import('/src/cinema/recording.ts');
+    const target = S.lock.target;
+    const subjects = S.fleet.ships.filter(s => s.alive);
+    window.__v3 = { S, target, subjects, audio: [], ticks: [], inputs: [], contacts: [], contactAudit, deadAt: null };
+    const originalTick = S.simStep.bind(S);
+    S.simStep = () => {
+      const result = originalTick();
+      const v = window.__v3;
+      v.inputs.push({ tick: S.simTick, ...S.player.controls });
+      // Per-tick read-only clearance facts, including the first spawn tick.
+      if (contactAudit && [2, 10].includes(S.campaign?.mission.episode)) {
+        const runner = S.campaign.runner;
+        const actors = S.campaign.mission.episode === 2
+          ? [...runner.shipsTagged('barge'), ...runner.shipsTagged('indomitable')]
+          : runner.shipsTagged('lifeboats');
+        const ships = actors.map(s => ({
+          id: s.id, tag: runner.tagOf(s), alive: s.alive, team: s.team,
+          position: s.flight.position.toArray(), velocity: s.flight.velocity.toArray(),
+          orientation: s.flight.orientation.toArray(), hull: s.hull, shield: s.shield,
+          centre: s.model.bounds.getCenter(s.flight.position.clone()).applyQuaternion(s.flight.orientation).add(s.flight.position).toArray(),
+          enclosingRadius: s.model.bounds.getSize(s.flight.position.clone()).length() / 2,
+        }));
+        const routes = runner.escorts.map(e => ({
+          tag: e.tag, halted: e.halted, target: e.target?.toArray() ?? null,
+          distances: e.ships.map(s => ({ id: s.id, alive: s.alive, distance: e.target ? s.flight.position.distanceTo(e.target) : null })),
+        }));
+        (v.clearance ??= []).push({ tick: S.simTick, ships, routes, flags: [...runner.flags], outcome: runner.outcome });
+      }
+      for (const e of S.weapons.events) v.ticks.push({ tick: S.simTick, kind: e.kind, ship: e.ship?.id, shooter: e.shooter?.id, sub: e.sub?.id, amount: e.amount, cause: e.cause, turret: e.turret });
+      if (contactAudit) {
+        for (const e of S.hulls.fighters.events) v.contacts.push({ tick:S.simTick, kind:'fighter', a:e.a.id, b:e.b.id, impact:e.impact, damage:e.damage, point:e.point.toArray(), normal:e.normal.toArray() });
+        for (const e of S.hulls.capitals.events) v.contacts.push({ tick:S.simTick, kind:'capital', a:e.a.id, b:e.b.id, closing:e.closing, impulse:e.impulse, energy:e.energy, damageA:e.damageA, damageB:e.damageB, point:e.point.toArray(), normal:e.normal.toArray() });
+        for (const e of S.hulls.events) v.contacts.push({ tick:S.simTick, kind:'hull', a:S.fleet.ships.find(s=>s.flight.position===e.body.position)?.id, b:e.host.owner?.id, impact:e.impact, slide:e.slide, point:e.point.toArray(), normal:e.normal.toArray() });
+      }
+      if (!S.campaign && target && !target.alive && v.deadAt === null) v.deadAt = S.simTick / 60;
+      return result;
+    };
+    const audioUpdate = S.audio.update.bind(S.audio);
+    S.audio.update = f => { window.__v3.audio.push({ tick: S.simTick, ...snapshotAudioFrame(f), player: { ...f.player, position: { ...f.player.position }, velocity: { ...f.player.velocity } }, jumpPhase: f.jumpPhase, combatIntensity: f.combatIntensity }); audioUpdate(f); };
+    return subjects.map(s => ({ id: s.id, name: s.name, blueprint: s.model.blueprint.id, pos: s.flight.position.toArray(), orientation: s.flight.orientation.toArray(), hull: s.hull, hullMax: s.hullMax, shield: s.shield, shieldMax: s.shieldMax, loadout: s.combat.loadout }));
+  }, contactAudit);
+  // Read-only observers of real HUD submissions. No flags, poses, kills or
+  // objective/snapshot state are written. Each wrapper delegates unchanged.
+  await page.evaluate(async () => {
+    const S = window.__v3.S;
+    const audit = window.__navAudit = { calls: [], labels: [] };
+    const update = S.update.bind(S);
+    S.update = (...args) => { audit.calls = []; audit.labels = []; return update(...args); };
+    const drawNav = S.hud.drawNav.bind(S.hud);
+    S.hud.drawNav = (...args) => {
+      audit.calls.push({ name: args[0], position: args[1].toArray(), mission: args[6] ?? false });
+      return drawNav(...args);
+    };
+    const { hudLabels } = await import('/src/ui/HudLabels.ts');
+    for (const method of ['add', 'edge']) {
+      const original = hudLabels[method].bind(hudLabels);
+      hudLabels[method] = (request) => {
+        if (request.id === 'nav' || request.id === 'edge:nav') audit.labels.push({ method, id: request.id, lines: request.lines?.map(l => l.text) ?? [] });
+        return original(request);
+      };
+    }
+  });
+  const scenery = await page.evaluate(() => window.__v3.S.loreFlight?.provenance ?? null);
+  writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, cameraScale, cameraTag, cameraTrackDirection, pilot, episode, route, routeUntil, fastPreroll:args.includes("--fast-preroll"), replayFromStart:args.includes("--replay-from-start"), initial, scenery, kind: episode?'native campaign gameplay':'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot/route options read positions and send ordinary mouse/keyboard controls. Episode starts through the normal recorded campaign API before the first tick; mission flags are never forced.', inputs: plan }, null, 2));
+  if (contactAudit) writeFileSync(`${out}/contact-audit-policy.json`, JSON.stringify({ source:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(), contacts:'Copied after every 60 Hz physics tick, including zero-damage contacts; pooled vectors copied immediately.', motion:'Every output video frame (30 Hz), campaign ships only. Model sphere uses model.radius about model.bounds centre transformed by ship orientation and world position, not targeting radius. Rest-pose bounds do not guarantee articulated-appendage clearance.', mutations:'None: diagnostics only.' },null,2));
+  let ended = false;
+  let previousNavigation = '';
+  let previousClearance = '';
+  let firstPairTick = null;
+  let graceCaptured = false;
+  let stopAtTick = null;
+  let lastTick = 0;
+  const stopObjective = opt('stop-objective', '');
+  let cameraApplied = false;
+  let f = -1;
+  let outputFrames = 0;
+  let routeIndex = 0;
+  const joystick=e=>{const control=Math.min(0.95,Math.abs(e)*2.5);return Math.sign(e)*(0.06+0.94*(-0.35+Math.sqrt(0.1225+2.6*control))/1.3);};
+  for (let attempt = 0; attempt < (seconds+15) * 30 && !ended; attempt++) {
+    const tick = await page.evaluate(() => window.__v3.S.simTick);
+    if (tick / 60 >= seconds) break;
+    if (!cameraApplied && camera && tick / 60 >= from - 1) {
+      await page.evaluate(({camera,cameraScale,cameraTag,cameraTrackDirection}) => {
+        const { S, target } = window.__v3;
+        const t = cameraTag ? S.campaign?.runner.shipsTagged(cameraTag)[0] : target;
+        if (cameraTag && !t) throw new Error('Missing camera subject ' + cameraTag);
+        if (cameraTrackDirection && !t) throw new Error('Steady track requires a camera subject');
+        if (camera === 'tactical') S.director.tacticalHeight = 1800 * cameraScale;
+        // Native track normalizes this vector, falling back to player heading
+        // below 1 m/s. Length 2 avoids that fallback without touching the ship.
+        const velocity = cameraTrackDirection
+          ? t.flight.velocity.clone().fromArray(cameraTrackDirection).divideScalar(Math.hypot(...cameraTrackDirection)).multiplyScalar(2)
+          : t?.flight.velocity;
+        S.director.cut(camera, t ? {position:t.flight.position, velocity, radius:t.radius*cameraScale} : null, Infinity, S.player.flight);
+      }, {camera,cameraScale,cameraTag,cameraTrackDirection});
+      cameraApplied = true;
+    }
+    for (const cue of plan) {
+      if (tick === Math.round(cue.at*60)) await page.keyboard.down(cue.key);
+      if (tick === Math.round((cue.at+(cue.dur ?? 1/30))*60)) await page.keyboard.up(cue.key);
+    }
+    if (route.length && !replay && tick/60<routeUntil) {
+      const waypoint=route[routeIndex];
+      const nav=await page.evaluate(w=>{const S=window.__v3.S,r=S.campaign.runner,p=S.player.flight,t=r.resolve({at:'tag',tag:w.tag,offset:[0,0,0]});if(!t)throw new Error('Missing route tag '+w.tag);const d=t.clone().sub(p.position),range=d.length();d.applyQuaternion(p.orientation.clone().invert());return{range,yaw:Math.atan2(d.x,d.z),pitch:Math.atan2(d.y,Math.hypot(d.x,d.z)),throttle:p.throttle,maxSpeed:p.spec.maxSpeed,targetSpeed:r.shipsTagged(w.tag)[0]?.flight.speed??0};},waypoint);
+      if(nav.range<waypoint.within && routeIndex<route.length-1)routeIndex++;
+      await page.mouse.move(640*(1-joystick(nav.yaw)),360*(1-joystick(nav.pitch)));
+      const angle=Math.hypot(nav.yaw,nav.pitch),desired=angle>0.6?0.1:Math.max(0,Math.min(1,(nav.targetSpeed+(nav.range-waypoint.within*0.45)*0.7)/nav.maxSpeed));
+      for(const [key,down] of [['KeyW',nav.throttle<desired-0.025],['KeyS',nav.throttle>desired+0.025],['ShiftLeft',nav.range>3000&&angle<0.08],['Space',false],['KeyF',false]])await keyState(key,down);
+    } else if (pilot && !replay) {
+      await page.keyboard.up('ShiftLeft');
+      const aim = await page.evaluate(() => {
+        const S=window.__v3.S, t=S.lock.target, p=S.player.flight;
+        if (!t?.alive) return null;
+        if(S.campaign){const tag=S.campaign.runner.tagOf(t);const spec=S.campaign.mission.spawns.find(s=>tag===s.tag||tag?.startsWith(s.tag+'-'));if(spec?.role!=='hostile')return null;}
+        const range=t.flight.position.distanceTo(p.position);
+        const v=t.flight.position.clone().addScaledVector(t.flight.velocity,range/2000).sub(p.position).applyQuaternion(p.orientation.clone().invert());
+        return { yaw:Math.atan2(v.x,v.z),pitch:Math.atan2(v.y,Math.hypot(v.x,v.z)),range,locked:S.lock.locked };
+      });
+      if (aim) {
+        await page.keyboard.up('KeyT');
+        await page.mouse.move(640*(1-joystick(aim.yaw)),360*(1-joystick(aim.pitch)));
+        if (Math.abs(aim.yaw)<0.14 && Math.abs(aim.pitch)<0.14 && aim.range<1500) await page.keyboard.down('Space'); else await page.keyboard.up('Space');
+        if (aim.range>1000) await page.keyboard.down('KeyW'); else await page.keyboard.up('KeyW');
+        if (aim.range<350) await page.keyboard.down('KeyS'); else await page.keyboard.up('KeyS');
+        if (aim.locked && tick%180===0) await page.keyboard.down('KeyF'); else await page.keyboard.up('KeyF');
+      } else {
+        await page.keyboard.up('Space'); await page.keyboard.up('KeyF');
+        if (tick%30===0) await page.keyboard.down('KeyT'); else await page.keyboard.up('KeyT');
+      }
+    }
+    f++;
+    if ((probe || (args.includes('--fast-preroll') && tick/60<from-5)) && f % 30 !== 0) {
+      await page.evaluate(async () => { const S = window.__v3.S, {input}=await import('/src/core/Input.ts'); input.sample(S.simTick/60); input.beginTick(true); S.simStep(); input.beginTick(false); S.simStep(); input.endTicks(2,false); S.update({ dt: 1/30, time: S.simTick/60, alpha: 0, frame: S.simTick/2, ticks: 2 }); });
+    } else await page.evaluate(() => window.__VANGUARD__.hooks.step(1));
+    const sample = await page.evaluate(() => {
+      const v = window.__v3, S = v.S, t = S.campaign ? S.lock.target : v.target;
+      const frame = { tick: S.simTick, at: S.simTick/60, audio: v.audio.splice(0), events: v.ticks.splice(0), camera: S.cameraLabel(), controls: v.inputs.splice(0) };
+      if (v.contactAudit) {
+        frame.contacts = v.contacts.splice(0);
+        frame.clearance = v.clearance?.splice(0) ?? [];
+        frame.motion = S.fleet.ships.filter(s=>S.campaign?.runner.tagOf(s)).map(s=>({ id:s.id, tag:S.campaign.runner.tagOf(s), alive:s.alive, position:s.flight.position.toArray(), centre:s.model.bounds.getCenter(s.flight.position.clone()).applyQuaternion(s.flight.orientation).add(s.flight.position).toArray(), orientation:s.flight.orientation.toArray(), velocity:s.flight.velocity.toArray(), modelRadius:s.model.radius, hull:s.hull, shield:s.shield }));
+      }
+      if (S.simTick % 60 === 0) frame.state = { player: { hull: S.player.hull, shield: S.player.shield }, target: t && { alive: t.alive, hull: t.hull, shield: t.shield, facings: t.combat.dmg.facings, subsystems: t.combat.dmg.subsystems.map(s => ({ id: s.id, hp: s.hp, destroyed: s.destroyed })), structure: t.combat.dmg.structure }, wrecks: S.fleet.destruction.wrecks.map(w => ({ ship: w.ship.id, cause: w.cause, position: w.position.toArray(), age: w.age })), deadAt: v.deadAt };
+      if (frame.state && S.campaign) frame.state.campaign={mission:S.campaign.mission.id,time:S.campaign.runner.time,state:[...S.campaign.runner.state],flags:[...S.campaign.runner.flags],outcome:S.campaign.runner.outcome,comms:S.campaign.comms.typedEl.textContent,position:S.player.flight.position.toArray(),ships:S.campaign.runner.snapshot().ships};
+      if (S.campaign) {
+        const runner = S.campaign.runner;
+        const nav = runner.navigation();
+        const active = runner.mission.objectives.find((o, i) => !o.hidden && !o.optional && runner.state[i] === 'active');
+        frame.navigation = {
+          objective: active?.id ?? null, outcome: runner.outcome,
+          tag: nav?.tag ?? null, label: nav?.label ?? null, position: nav?.position.toArray() ?? null,
+          distance: nav ? nav.position.distanceTo(S.player.flight.position) : null,
+          calls: window.__navAudit.calls, labels: window.__navAudit.labels,
+          dwells: runner.dwells.map(d => ({ tag: d.tag, progress: d.progress })),
+        };
+      }
+      return frame;
+    });
+    lastTick = sample.tick;
+    const navigationKey = JSON.stringify([sample.navigation?.objective, sample.navigation?.tag, sample.navigation?.outcome]);
+    const navigationChanged = navigationKey !== previousNavigation;
+    previousNavigation = navigationKey;
+    if (navigationChanged) console.log('NAVIGATION', JSON.stringify({ tick: sample.tick, ...sample.navigation }));
+    const clearance = sample.clearance?.at(-1);
+    const clearanceKey = JSON.stringify([clearance?.ships.map(s => s.id), clearance?.flags]);
+    let clearanceMilestone = !!clearance && clearanceKey !== previousClearance;
+    previousClearance = clearanceKey;
+    if (firstPairTick === null) firstPairTick = sample.clearance?.find(c => c.ships.length === 2)?.tick ?? null;
+    if (firstPairTick !== null && !graceCaptured && sample.tick >= firstPairTick + 126) {
+      graceCaptured = true;
+      clearanceMilestone = true;
+    }
+    if (clearanceMilestone) console.log('CLEARANCE', JSON.stringify(clearance));
+    if (stopObjective && sample.navigation?.objective === stopObjective && stopAtTick === null) stopAtTick = sample.tick + 60;
+    ended = stopAtTick !== null && sample.tick >= stopAtTick;
+    const frame = Math.round(sample.at*30)-1;
+    if (sample.at > from) {
+      outputFrames++;
+      appendFileSync(`${out}/events.jsonl`, JSON.stringify({ frame, ...sample })+'\n');
+      if (!probe || f % 300 === 0 || navigationChanged || clearanceMilestone || ended || sample.tick >= Math.round(seconds*60)) await page.screenshot({ path: `${out}/f_${String(frame).padStart(5,'0')}.jpg`, type: 'jpeg', quality: 94 });
+    }
+    if (sample.state && sample.tick % 600 === 0) console.log(JSON.stringify({ at: sample.at, player: sample.state.player, target: sample.state.target && { hull: sample.state.target.hull, shield: sample.state.target.shield, alive: sample.state.target.alive }, wrecks: sample.state.wrecks.length, deadAt: sample.state.deadAt, campaign: sample.state.campaign && {state:sample.state.campaign.state,flags:sample.state.campaign.flags,comms:sample.state.campaign.comms} }));
+    if(!replay && sample.tick%600===0)writeFileSync(`${out}/take-checkpoint.vgr`,JSON.stringify(await page.evaluate(()=>window.__VANGUARD__.hooks.replay.clip(1e9))));
+  }
+  writeFileSync(out + '/navigation-stop.json', JSON.stringify({ stopObjective, ended, lastTick, stopAtTick, reason: ended ? 'Observed requested objective transition plus one second' : 'Duration limit; inspect whether required route completed' }, null, 2));
+  const replayStatus = await page.evaluate(() => window.__VANGUARD__.hooks.replay.state());
+  if (pageErrors.length || outputFrames !== Math.round(((ended ? lastTick / 60 : seconds)-from)*30) || replayStatus.desyncAt >= 0 || replayStatus.tick < (ended ? lastTick : Math.round(seconds*60))) throw new Error(`Capture validation failed: ${JSON.stringify({replayStatus,pageErrors,outputFrames})}`);
+  const tape = replay ?? await page.evaluate(() => window.__VANGUARD__.hooks.replay.clip(1e9));
+  writeFileSync(`${out}/take.vgr`, JSON.stringify(tape));
+  writeFileSync(`${out}/replay-status.json`, JSON.stringify(replayStatus, null, 2));
+  console.log('DONE', out);
+} finally { await browser.close(); await server.close(); }
