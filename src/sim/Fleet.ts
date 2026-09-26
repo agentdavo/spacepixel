@@ -89,6 +89,31 @@ export interface Shootables {
   nearestThreat(from: Vector3, team: Team, range: number, pos: Vector3, vel: Vector3): number;
 }
 
+/** One bolt's hit on a fixed installation (Installations.shoot). */
+export interface InstallationHit {
+  /** The installation struck (StationDefence.ts). */
+  station: object | null;
+  /** Universe impact point and outward normal. */
+  point: Vector3;
+  normal: Vector3;
+  shielded: boolean;
+  facing: number;
+  strength: number;
+  bleed: number;
+  /** The subsystem the hit struck (a battery), and whether it died. */
+  sub: Subsystem | null;
+  destroyed: boolean;
+}
+
+/**
+ * Fixed installations that can be shot: station batteries and their shields
+ * (StationDefence.ts). Registered by their owner so gunfire tests against them.
+ */
+export interface Installations {
+  /** Swept test of a bolt a → a + d fired by `team` (ship `owner`), nearer than segment t `maxT`; applies damage, fills `out`, returns true on a hit. */
+  shoot(a: Vector3, d: Vector3, team: Team, owner: number, damage: number, type: DamageType, maxT: number, out: InstallationHit): boolean;
+}
+
 export function emptyControls(): ControlState {
   return {
     pitch: 0,
@@ -113,6 +138,8 @@ export class Fleet {
   onEvent: ((kind: HitEventKind, ship: ShipEntity, point: Vector3, normal: Vector3, shooter: ShipEntity | null, sub: Subsystem | null, facing: number, hit?: HitResult) => void) | null = null;
   /** Shoot-down-able ordnance (set by Missiles). */
   ordnance: Shootables | null = null;
+  /** Shootable fixed installations: station batteries (set by StationDefences). */
+  installations: Installations | null = null;
 
   /** The world's root PRNG; every system and entity forks its own stream from it (Rng.ts). */
   readonly rng: Rng;

@@ -1,6 +1,8 @@
-import { Group, Vector3 } from 'three';
+import { Group, Quaternion, Vector3 } from 'three';
 import type { ControlState } from '@/core/Input';
 import { BLUEPRINTS } from '@/assets/blueprints';
+import { buildShip } from '@/assets/ShipBuilder';
+import { stationBlueprint } from '@/assets/blueprints/stations';
 import { generateUniverse } from '@/universe/generate';
 import { piracy } from '@/universe/traffic';
 import { SYSTEM_OFFSET, type StarSystemView } from '@/world/StarSystemView';
@@ -11,6 +13,7 @@ import { Fleet, emptyControls, type ShipEntity } from './Fleet';
 import { Weapons } from './Weapons';
 import { Missiles, type LockState } from './Missiles';
 import { Capitals } from './Capitals';
+import { StationDefences, hashStation } from './StationDefence';
 import { FighterCollisions } from './FighterCollisions';
 import { issueOrder, setFormation, updateAI } from './ai';
 import { Rng } from './Rng';
@@ -31,19 +34,21 @@ import { REPLAY_HZ, REPLAY_VERSION, ReplayCursor, ReplayTake, copyControls, pars
  *              fitted turrets) with fighters on both sides
  *   traffic    a lawless system's timetable (haulers, patrols, raiders)
  *              with an ambush staged on the player
+ *   station    player + wing under a Concord bastion's batteries (station
+ *              fire control, shield shell and battery hits) vs Cantor waves
  *
  * For each: run A (recording the player's per-tick ControlState into a
  * replay take), run B (same seed, same script) and run C (same seed, input
  * from A's replay after a JSON round trip) must hash identically every
  * simulated second; run D (seed + 1) must not (the hash is sensitive).
  * The same frame order as FlightScene.tick: traffic → AI → capitals →
- * turrets → flight → collisions → targeting → weapons → missiles.
+ * station batteries → turrets → flight → collisions → targeting → weapons → missiles.
  */
 const DT = 1 / REPLAY_HZ;
 const ORIGIN = new Vector3(2_400_000, 150_000, -1_100_000);
 
-export type ScenarioName = 'dogfight' | 'capital' | 'traffic';
-export const SCENARIOS: ScenarioName[] = ['dogfight', 'capital', 'traffic'];
+export type ScenarioName = 'dogfight' | 'capital' | 'traffic' | 'station';
+export const SCENARIOS: ScenarioName[] = ['dogfight', 'capital', 'traffic', 'station'];
 
 // ── scripted player ───────────────────────────────────────────────────────
 
@@ -127,6 +132,8 @@ interface World {
   turrets: ShipTurrets | null;
   bumps: FighterCollisions;
   traffic: Traffic | null;
+  /** Armed stations (the station scenario). */
+  stations?: StationDefences;
   player: ShipEntity;
   wing: ShipEntity[];
   lock: LockState;
@@ -271,7 +278,51 @@ function trafficWorld(seed: number): World {
   };
 }
 
-const WORLDS: Record<ScenarioName, (seed: number) => World> = { dogfight: dogfightWorld, capital: capitalWorld, traffic: trafficWorld };
+function stationWorld(seed: number): World {
+  const w = baseWorld(seed);
+  const stations = new StationDefences(w.fleet, w.weapons);
+  const at = v(0, -500, 2600);
+  stations.register('det-bastion', 'concord', buildShip(stationBlueprint('bastion', 'concord', 7)), at, new Quaternion(), { roe: 'free' });
+  const fwd = new Vector3(0, 0, 1);
+  const { player, wing } = spawnFlight(w, v(0, 0, 0), fwd);
+  issueOrder(wing, 'engageAtWill', player);
+  const waves: ShipEntity[] = [];
+  let wave = 0;
+  let dead = 0;
+  // Cantors run in on the bastion from all round, through its batteries' arcs.
+  const spawnWave = () => {
+    wave++;
+    const a = wave * 2.39;
+    const c = at.clone().add(new Vector3(Math.cos(a) * 3200, Math.sin(a * 1.3) * 900, Math.sin(a) * 3200));
+    const to = at.clone().sub(c).normalize();
+    for (let i = 0; i < 3; i++) {
+      const pos = c.clone().add(new Vector3((i - 1) * 60, i * 12, -i * 40));
+      const reuse = waves.find((s) => !s.alive);
+      if (reuse) {
+        revive(reuse, pos, to, 180);
+        reuse.target = null;
+      } else waves.push(w.fleet.spawn('choir-cantor', 'choir', pos, to, { name: `Cantor ${waves.length + 1}` }));
+    }
+  };
+  spawnWave();
+  return {
+    ...w,
+    turrets: null,
+    traffic: null,
+    stations,
+    player,
+    wing,
+    upkeep: () => {
+      if (!waves.some((s) => s.alive)) spawnWave();
+      for (const s of [player, ...wing]) {
+        if (s.alive) continue;
+        if (++dead % 240 === 0) revive(s, v(0, 0, 0), fwd, 150);
+      }
+    },
+  };
+}
+
+const WORLDS: Record<ScenarioName, (seed: number) => World> = { dogfight: dogfightWorld, capital: capitalWorld, traffic: trafficWorld, station: stationWorld };
 
 // ── one tick (FlightScene order) ─────────────────────────────────────────
 
@@ -298,6 +349,7 @@ function tick(w: World, i: number): void {
   if (w.traffic) w.traffic.update(DT, w.player, w.weapons.events);
   updateAI(w.fleet, DT, t);
   w.capitals.step(DT);
+  w.stations?.step(DT);
   w.turrets?.step(DT, w.lock.target);
   w.fleet.step(DT);
   w.bumps.step(w.fleet.ships, DT, (s, d) => w.fleet.damage(s, d));
@@ -365,7 +417,12 @@ export function runScenario(scenario: ScenarioName, seed: number, o: RunOptions)
     }
     for (const e of w.missiles.events) if (e.kind === 'launch') stats.missiles++;
     if ((i + 1) % REPLAY_HZ === 0) {
-      const h = hashWorld(w.fleet, w.weapons, w.missiles, H);
+      let h = hashWorld(w.fleet, w.weapons, w.missiles, H);
+      if (w.stations?.list.length) {
+        H.reset().u32(h);
+        for (const d of w.stations.list) hashStation(H, d);
+        h = H.digest();
+      }
       hashes.push(h);
       take?.checks.push([i + 1, h]);
     }

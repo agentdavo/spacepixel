@@ -1,5 +1,5 @@
 import { Vector3 } from 'three';
-import type { Fleet, HitEventKind, ShipEntity, Team } from './Fleet';
+import type { Fleet, HitEventKind, InstallationHit, ShipEntity, Team } from './Fleet';
 import type { FactionId } from '@/assets/Blueprint';
 import { GUNS, GUN_INDEX, GUN_LIST, type DamageType, type GunSpec } from './Loadouts';
 import { facingStrength, type Subsystem } from './Damage';
@@ -126,6 +126,11 @@ const _f = new Vector3();
 const _s = new Vector3();
 const _u = new Vector3();
 const _hit = createRayHit();
+const _z = new Vector3();
+const _ih: InstallationHit = { station: null, point: new Vector3(), normal: new Vector3(), shielded: false, facing: -1, strength: -1, bleed: 0, sub: null, destroyed: false };
+
+/** Who fired a bolt: a ship, or a station battery (StationDefence: negative id). */
+export type BoltOwner = Pick<ShipEntity, 'id' | 'faction' | 'team'>;
 
 export class Weapons {
   // Bolt pool (structure of arrays).
@@ -280,7 +285,7 @@ export class Weapons {
    * turret system spawned itself: at the barrel muzzle, `dir` along the shot,
    * `vel` = the carrying ship's (the flash rides the barrel).
    */
-  muzzleFlash(pos: Vector3, dir: Vector3, vel: Vector3, shooter: ShipEntity, gun: GunSpec): void {
+  muzzleFlash(pos: Vector3, dir: Vector3, vel: Vector3, shooter: ShipEntity | null, gun: GunSpec): void {
     // Turret systems step before Weapons (which clears the event list): queue, emit on the next step.
     if (this.flashCount >= this.flashes.length) return;
     const e = this.flashes[this.flashCount++];
@@ -291,7 +296,7 @@ export class Weapons {
     e.gun = gun;
   }
 
-  spawnBolt(pos: Vector3, vel: Vector3, life: number, damage: number, owner: ShipEntity, gun: GunSpec = GUNS.laser): void {
+  spawnBolt(pos: Vector3, vel: Vector3, life: number, damage: number, owner: BoltOwner, gun: GunSpec = GUNS.laser): void {
     const i = this.head;
     this.head = (this.head + 1) % BOLT_CAPACITY;
     this.px[i] = pos.x;
@@ -377,6 +382,31 @@ export class Weapons {
         }
       }
       const gun = GUN_LIST[this.gun[i]];
+      // Fixed installations (station shields and batteries), when nearer than any ship.
+      const inst = this.fleet.installations;
+      if (inst && inst.shoot(_a, _d, TEAM_LIST[tm], this.owner[i], this.damage[i], gun.type, hitShip ? hitT : 1, _ih)) {
+        _f.set(this.vx[i], this.vy[i], this.vz[i]);
+        const shooter = ships.find((x) => x.id === this.owner[i]) ?? null;
+        const e = this.emit(_ih.shielded ? 'shield' : 'hit', _ih.point, _ih.normal, _z, null, shooter, gun);
+        if (e) {
+          e.facing = _ih.facing;
+          e.strength = _ih.strength;
+          e.bleed = _ih.bleed;
+          e.amount = this.damage[i];
+          e.shielded = _ih.shielded;
+          subOnEvent(e, _ih.sub);
+        }
+        if (_ih.destroyed && _ih.sub) {
+          const k = this.emit('subsystem', _ih.point, _ih.normal, _z, null, shooter);
+          if (k) {
+            k.sub = _ih.sub;
+            k.subHp = 0;
+            k.facing = _ih.facing;
+          }
+        }
+        this.life[i] = 0;
+        continue;
+      }
       if (hitShip) {
         _f.set(this.vx[i], this.vy[i], this.vz[i]);
         const shooter = ships.find((x) => x.id === this.owner[i]) ?? null;

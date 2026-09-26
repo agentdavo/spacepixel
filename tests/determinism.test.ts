@@ -24,7 +24,7 @@ async function det() {
   return server.ssrLoadModule('/src/sim/determinism.ts');
 }
 
-for (const scenario of ['dogfight', 'capital', 'traffic']) {
+for (const scenario of ['dogfight', 'capital', 'traffic', 'station']) {
   test(`determinism: ${scenario} — same seed, same script, recorded replay → bit-identical`, async () => {
     const d = await det();
     const r = d.checkScenario(scenario, 0.5);

@@ -6,7 +6,7 @@
  *   node scripts/determinism.mjs --minutes 2  # quicker
  *   node scripts/determinism.mjs capital      # one scenario
  *
- * For each scenario (dogfight · capital · traffic) the world is flown four
+ * For each scenario (dogfight · capital · traffic · station) the world is flown four
  * times at the fixed 60 Hz step with a scripted player: A records a replay,
  * B repeats the seed + script, C flies the player from A's replay (after a
  * JSON round trip), D uses the next seed. Pass: A = B = C bit-for-bit at
