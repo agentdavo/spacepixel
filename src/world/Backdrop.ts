@@ -156,6 +156,8 @@ export class Backdrop {
     const sky = new Mesh(new SphereGeometry(SKY_RADIUS, 64, 32), skyMat);
     sky.renderOrder = -1000;
     sky.frustumCulled = false;
+    // ?skydome=0 hides the painted dome (perf ablation: its fBm runs under every pixel).
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('skydome') === '0') sky.visible = false;
     this.group.add(sky);
 
     // Hero sparkle stars.
