@@ -10,7 +10,7 @@ is not relabelled as footage of these later changes.
 | Clear objective navigation | Integration & QA, `4135eea`; native source `1de3652` | EP04 switches from Magpie to the live convoy at 39.233 s. EP05 advances through all four survey destinations, completes the 20 s listening dwell and clears navigation for combat at 87.1 s. Four fresh native tapes replay all 188 checkpoints without desynchronization. |
 | Durable dock transactions | Chief, `a397133` / `3133487`; native proof `1d751d2` | Atomic money/hangar record, visible rejection and successful-only replay commands integrated. Fifteen transaction/legacy checks and all 26 native failure/retry/reload cases pass. Independent review closed guild repair and stale-default overwrite defects. |
 | Combat instructions and damage readability | Voice, `d10650a`; Combat & Spatial Audio, integrated `1de3652` | Eight plain-language cues, six recorded clips and shield/hull impact labels integrated. Matched native EP04 takes pass all 60 replay checks each with identical combat events and no browser errors. Eight follow-up tests pass. |
-| Measured presentation | Rendering & Ship Art | Current-hardware measurements and one bounded improvement in progress; no performance or visual acceptance claimed yet. |
+| Measured presentation | Rendering & Ship Art, `codex/measured-presentation` (not integrated) | Ink shortcut measured on current hardware; the mixed 720p/1080p result does not justify shipping it, so the candidate is not accepted. The existing shader is to be restored on that branch; profiling tools and visual evidence are retained. Integration waits for the bounded report and a `src/` diff limited to tooling. |
 
 ## Integration policy
 
@@ -26,6 +26,12 @@ validators passed. Logs are recorded in `reviews/mission-loop/combined-tests.txt
 and `combined-build.txt`. This run includes the transaction,
 navigation, clearance and cue changes; later presentation additions require
 their own targeted validation before final combined acceptance.
+
+Re-run on the source tree of `e6b16d2` (after the native navigation/clearance
+proof and combat readability integration): **396 tests passed** and the
+production build with both content validators passed. Final combined validation
+is still to be run after the Rendering branch and the main-branch README commit
+`280ca41` are merged.
 
 ## Supporting reviews
 
