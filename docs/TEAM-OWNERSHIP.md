@@ -76,7 +76,7 @@ Physical 5.1 speakers remain unverified on the available two-channel device.
 Package A's historical hardware frame-time targets and visual signoff remain
 open even when individual correctness fixes are integrated.
 
-## 26 September check-in and next work order
+## 26 September initial check-in and work order
 
 All eight peer tasks were asked for fresh status and their next bounded
 deliverable and supplied substantive replies from known evidence.
@@ -115,3 +115,33 @@ the combat/audio owner already reviewed that integration independently.
 
 This is the coordinated next queue, not a claim these deliverables are already
 implemented. Use one source owner per slice and one native GPU capture at a time.
+
+## Dependable mission loop — implementation and acceptance
+
+David authorised priorities 1–5, with mission reliability first. Their current
+acceptance record is [MISSION-LOOP-REVIEW.md](MISSION-LOOP-REVIEW.md).
+
+- **Chief:** integrated atomic career transactions and the failed-startup write
+  lock; owns final combined validation and branch consolidation.
+- **Integration & QA:** delivered typed objective navigation plus four fresh
+  ordinary-input route sections and matching replays (188/188 checkpoints).
+- **Collisions & Breakup:** delivered EP02 external rendezvous and EP10 lifeboat
+  spacing; independently audited all native clearance ticks. No further solver
+  changes belong in this slice.
+- **Trailer & Cinematic Capture:** supplied the actual dock-control proof as
+  support for mission reliability: all 26 storage-failure/retry/reload cases pass.
+- **Combat & Spatial Audio / Dialogue & Voice Production:** delivered clearer
+  objective lines, six replacement cast clips and shield/hull impact feedback,
+  with matched encounter evidence. Physical surround and human listening remain
+  separate acceptance questions.
+- **Point Defence & Combat Verification:** independently reviewed persistence,
+  reproduced the stale-default overwrite defect and confirmed the write-lock fix.
+- **Rendering & Ship Art:** measured an ink shortcut on current hardware. The
+  mixed 720p/1080p result does not justify shipping it; retain profiling tools
+  and visual evidence, restore the existing shader, and finish the bounded report.
+- **Kessen & Campaign Integration:** remains on the later cameo queue. No new
+  expansion or lore scope was added to the five-priority mission-loop work.
+
+Completed source owners are idle/read-only. Only Rendering is finishing its
+evidence package; chief retains integration ownership. Subsequent work should
+start from the consolidated source on a fresh assigned branch.
