@@ -352,7 +352,7 @@ speaker first, then kinds they care about, then recency).
 Captures: `?npc=odile:shut,magpie:hunted` (arc steps), `?rivalstate=ismene:hiding:4[:tier[:met]]`,
 `?npcmemory=1` (seed a few remembered events), `?rival=<id>` (force an
 intercept), `?docktab=threads`. World changes made in conversation are
-recorded on the replay tape (`world` command); rivals and arcs ticking in
+recorded on the replay tape (`world-patch` command); rivals and arcs ticking in
 flight are part of the fixed-step sim and replay by themselves.
 
 ![Magpie's thread at Quilegard](docs/screenshots/npc-concourse-magpie.jpg)
