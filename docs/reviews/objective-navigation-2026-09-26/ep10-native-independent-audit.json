@@ -1,0 +1,62 @@
+{
+  "source": "1de365200a0a96cfc53f3ecd068df139d091ce3b",
+  "episode": "ep10-the-fall-of-the-bastion",
+  "renderer": {
+    "backend": "WebGPU",
+    "device": "GPUDevice",
+    "queue": true
+  },
+  "eventsSha256": "8a0438093de616e8def236bbf42f4957bea432e46a48a4a702f39b46c92b72c0",
+  "frames": 750,
+  "ticks": 1500,
+  "firstTick": 1,
+  "lastTick": 1500,
+  "seconds": 25,
+  "pair": [
+    "lifeboats-1",
+    "lifeboats-2"
+  ],
+  "ids": [
+    13,
+    14
+  ],
+  "contacts": {
+    "fighter": 0,
+    "capital": 0,
+    "hull": 0
+  },
+  "contactsInvolvingSubjects": [],
+  "minimumGap": 57.05466537588602,
+  "minimumGapTick": 1,
+  "maxAnchorDrift": 0,
+  "maxAnchorSpeed": 0,
+  "maxTargetError": 0,
+  "firstArrival": null,
+  "initialMemberDelta": [
+    240,
+    12,
+    -45
+  ],
+  "final": [
+    {
+      "tag": "lifeboats-1",
+      "alive": true,
+      "hull": 8000,
+      "shield": 2400,
+      "speed": 0
+    },
+    {
+      "tag": "lifeboats-2",
+      "alive": true,
+      "hull": 8000,
+      "shield": 2400,
+      "speed": 5e-324
+    }
+  ],
+  "flags": [
+    "halt:lifeboats"
+  ],
+  "outcome": "running",
+  "scope": "Fresh native initial hold through launch grace; no combat/resume/evacuation completion claim.",
+  "passed": true
+}

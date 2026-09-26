@@ -1,0 +1,250 @@
+{
+  "passed": true,
+  "source": "1de365200a0a96cfc53f3ecd068df139d091ce3b",
+  "episode": "ep05-whispers-in-the-static",
+  "renderer": {
+    "backend": "WebGPU",
+    "device": "GPUDevice",
+    "queue": true
+  },
+  "frames": 2643,
+  "ticks": 5286,
+  "duration": 88.1,
+  "probe": true,
+  "stop": {
+    "stopObjective": "measure",
+    "ended": true,
+    "lastTick": 5286,
+    "stopAtTick": 5286,
+    "reason": "Observed requested objective transition plus one second"
+  },
+  "replay": {
+    "mode": "record",
+    "tick": 5286,
+    "ticks": 5286,
+    "seconds": 88.1,
+    "seeking": false,
+    "paused": false,
+    "ended": false,
+    "desyncAt": -1,
+    "checksOk": 0
+  },
+  "tape": {
+    "ticks": 5286,
+    "checks": 88,
+    "commands": [
+      {
+        "t": 0,
+        "c": "episode",
+        "a": "ep05-whispers-in-the-static"
+      }
+    ]
+  },
+  "transitions": [
+    {
+      "tick": 2,
+      "at": 0.03333333333333333,
+      "objective": "relieve",
+      "outcome": "running",
+      "tag": "station",
+      "label": "Null Picket Station 2",
+      "position": [
+        2383222.704063722,
+        150173.3276356943,
+        -1097012.8373650054
+      ],
+      "distance": 1810.6534198668608,
+      "calls": [
+        {
+          "name": "Null Picket Station 2",
+          "position": [
+            2383222.704063722,
+            150173.3276356943,
+            -1097012.8373650054
+          ],
+          "mission": true
+        }
+      ],
+      "labels": [
+        {
+          "method": "edge",
+          "id": "edge:nav",
+          "lines": [
+            "NULL PICKET STATION 2  1.8 km"
+          ]
+        }
+      ],
+      "dwells": [
+        {
+          "tag": "throat",
+          "progress": 0
+        }
+      ]
+    },
+    {
+      "tick": 298,
+      "at": 4.966666666666667,
+      "objective": "north",
+      "outcome": "running",
+      "tag": "buoyN",
+      "label": "Survey Buoy North",
+      "position": [
+        2379722.704063722,
+        151873.3276356943,
+        -1092312.8373650054
+      ],
+      "distance": 6979.229061747341,
+      "calls": [
+        {
+          "name": "Survey Buoy North",
+          "position": [
+            2379722.704063722,
+            151873.3276356943,
+            -1092312.8373650054
+          ],
+          "mission": true
+        }
+      ],
+      "labels": [
+        {
+          "method": "edge",
+          "id": "edge:nav",
+          "lines": [
+            "SURVEY BUOY NORTH  7.0 km"
+          ]
+        }
+      ],
+      "dwells": [
+        {
+          "tag": "throat",
+          "progress": 0
+        }
+      ]
+    },
+    {
+      "tick": 1634,
+      "at": 27.233333333333334,
+      "objective": "void",
+      "outcome": "running",
+      "tag": "buoyV",
+      "label": "Survey Buoy Void",
+      "position": [
+        2384122.704063722,
+        149973.3276356943,
+        -1087312.8373650054
+      ],
+      "distance": 7007.73550307904,
+      "calls": [
+        {
+          "name": "Survey Buoy Void",
+          "position": [
+            2384122.704063722,
+            149973.3276356943,
+            -1087312.8373650054
+          ],
+          "mission": true
+        }
+      ],
+      "labels": [
+        {
+          "method": "edge",
+          "id": "edge:nav",
+          "lines": [
+            "SURVEY BUOY VOID  7.0 km"
+          ]
+        }
+      ],
+      "dwells": [
+        {
+          "tag": "throat",
+          "progress": 0
+        }
+      ]
+    },
+    {
+      "tick": 3154,
+      "at": 52.56666666666667,
+      "objective": "listen",
+      "outcome": "running",
+      "tag": "throat",
+      "label": "Ring throat",
+      "position": [
+        2383222.704063722,
+        150373.3276356943,
+        -1083312.8373650054
+      ],
+      "distance": 4344.663434457801,
+      "calls": [
+        {
+          "name": "Ring throat",
+          "position": [
+            2383222.704063722,
+            150373.3276356943,
+            -1083312.8373650054
+          ],
+          "mission": true
+        }
+      ],
+      "labels": [
+        {
+          "method": "edge",
+          "id": "edge:nav",
+          "lines": [
+            "RING THROAT  4.3 km"
+          ]
+        }
+      ],
+      "dwells": [
+        {
+          "tag": "throat",
+          "progress": 0
+        }
+      ]
+    },
+    {
+      "tick": 5226,
+      "at": 87.1,
+      "objective": "measure",
+      "outcome": "running",
+      "tag": null,
+      "label": null,
+      "position": null,
+      "distance": null,
+      "calls": [],
+      "labels": [],
+      "dwells": [
+        {
+          "tag": "throat",
+          "progress": 1
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    "f_00000.jpg",
+    "f_00148.jpg",
+    "f_00300.jpg",
+    "f_00600.jpg",
+    "f_00816.jpg",
+    "f_00900.jpg",
+    "f_01200.jpg",
+    "f_01500.jpg",
+    "f_01576.jpg",
+    "f_01800.jpg",
+    "f_02100.jpg",
+    "f_02400.jpg",
+    "f_02612.jpg",
+    "f_02642.jpg"
+  ],
+  "nativeScope": "ordinary mouse/keyboard controls, fresh mission, read-only observations; no combat-completion claim",
+  "dwell": {
+    "began": {
+      "t": 67.13333333333334,
+      "value": 0.0016666666666666666
+    },
+    "held": {
+      "t": 87.1,
+      "value": 1
+    }
+  }
+}

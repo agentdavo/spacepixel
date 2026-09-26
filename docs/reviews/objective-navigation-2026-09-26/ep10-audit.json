@@ -1,0 +1,282 @@
+{
+  "passed": true,
+  "source": "1de365200a0a96cfc53f3ecd068df139d091ce3b",
+  "episode": "ep10-the-fall-of-the-bastion",
+  "renderer": {
+    "backend": "WebGPU",
+    "device": "GPUDevice",
+    "queue": true
+  },
+  "frames": 750,
+  "ticks": 1500,
+  "duration": 25,
+  "probe": true,
+  "stop": {
+    "stopObjective": "",
+    "ended": false,
+    "lastTick": 1500,
+    "stopAtTick": null,
+    "reason": "Duration limit; inspect whether required route completed"
+  },
+  "replay": {
+    "mode": "record",
+    "tick": 1500,
+    "ticks": 1500,
+    "seconds": 25,
+    "seeking": false,
+    "paused": false,
+    "ended": false,
+    "desyncAt": -1,
+    "checksOk": 0
+  },
+  "tape": {
+    "ticks": 1500,
+    "checks": 25,
+    "commands": [
+      {
+        "t": 0,
+        "c": "episode",
+        "a": "ep10-the-fall-of-the-bastion"
+      }
+    ]
+  },
+  "transitions": [
+    {
+      "tick": 2,
+      "at": 0.03333333333333333,
+      "objective": "intercept",
+      "outcome": "running",
+      "tag": null,
+      "label": null,
+      "position": null,
+      "distance": null,
+      "calls": [
+        {
+          "name": "Lysowick",
+          "position": [
+            2420259.436224216,
+            148848.5192216467,
+            -1092937.0980541597
+          ],
+          "mission": false
+        }
+      ],
+      "labels": [
+        {
+          "method": "add",
+          "id": "nav",
+          "lines": [
+            "LANTERN → LYSOWICK  2.6 km"
+          ]
+        }
+      ],
+      "dwells": []
+    }
+  ],
+  "screenshots": [
+    "f_00000.jpg",
+    "f_00063.jpg",
+    "f_00300.jpg",
+    "f_00600.jpg",
+    "f_00749.jpg"
+  ],
+  "nativeScope": "ordinary mouse/keyboard controls, fresh mission, read-only observations; no combat-completion claim",
+  "clearance": {
+    "first": {
+      "tick": 1,
+      "ships": [
+        {
+          "id": 13,
+          "tag": "lifeboats-1",
+          "alive": true,
+          "team": "concord",
+          "position": [
+            2417504.352113886,
+            147848.5192216467,
+            -1090392.996419156
+          ],
+          "velocity": [
+            112.17845857971045,
+            0,
+            39.10797144675479
+          ],
+          "orientation": [
+            0,
+            0.5791408814594523,
+            0,
+            0.8152274771021698
+          ],
+          "hull": 8000,
+          "shield": 2400,
+          "centre": [
+            2417500.10293165,
+            147862.33785997145,
+            -1090394.477781083
+          ],
+          "enclosingRadius": 93.71116370333301
+        },
+        {
+          "id": 14,
+          "tag": "lifeboats-2",
+          "alive": true,
+          "team": "concord",
+          "position": [
+            2417744.352113886,
+            147860.5192216467,
+            -1090437.996419156
+          ],
+          "velocity": [
+            112.17845857971045,
+            0,
+            39.10797144675479
+          ],
+          "orientation": [
+            0,
+            0.5791408814594523,
+            0,
+            0.8152274771021698
+          ],
+          "hull": 8000,
+          "shield": 2400,
+          "centre": [
+            2417740.10293165,
+            147874.33785997145,
+            -1090439.477781083
+          ],
+          "enclosingRadius": 93.71116370333301
+        }
+      ],
+      "routes": [
+        {
+          "tag": "lifeboats",
+          "halted": false,
+          "target": [
+            2411804.352113886,
+            148648.5192216467,
+            -1101792.996419156
+          ],
+          "distances": [
+            {
+              "id": 13,
+              "alive": true,
+              "distance": 12770.66952042844
+            },
+            {
+              "id": 14,
+              "alive": true,
+              "distance": 12839.02523558545
+            }
+          ]
+        }
+      ],
+      "flags": [
+        "halt:lifeboats"
+      ],
+      "outcome": "running"
+    },
+    "last": {
+      "tick": 1500,
+      "ships": [
+        {
+          "id": 13,
+          "tag": "lifeboats-1",
+          "alive": true,
+          "team": "concord",
+          "position": [
+            2417623.0116503895,
+            147851.69606288878,
+            -1090353.8660816897
+          ],
+          "velocity": [
+            0,
+            0,
+            0
+          ],
+          "orientation": [
+            -0.024688640747552545,
+            0.5856958770817562,
+            -0.01189669812631699,
+            0.8100674534636989
+          ],
+          "hull": 8000,
+          "shield": 2400,
+          "centre": [
+            2417618.605638253,
+            147865.37665944328,
+            -1090356.0185414338
+          ],
+          "enclosingRadius": 93.71116370333301
+        },
+        {
+          "id": 14,
+          "tag": "lifeboats-2",
+          "alive": true,
+          "team": "concord",
+          "position": [
+            2417863.0129284044,
+            147863.66595613403,
+            -1090398.8649020882
+          ],
+          "velocity": [
+            -5e-324,
+            0,
+            -5e-324
+          ],
+          "orientation": [
+            -0.024586353631518034,
+            0.5856968383935317,
+            -0.011969379531626188,
+            0.810068798723019
+          ],
+          "hull": 8000,
+          "shield": 2400,
+          "centre": [
+            2417858.6101797502,
+            147877.34777270904,
+            -1090401.0162847782
+          ],
+          "enclosingRadius": 93.71116370333301
+        }
+      ],
+      "routes": [
+        {
+          "tag": "lifeboats",
+          "halted": true,
+          "target": [
+            2411804.352113886,
+            148648.5192216467,
+            -1101792.996419156
+          ],
+          "distances": [
+            {
+              "id": 13,
+              "alive": true,
+              "distance": 12858.671347601177
+            },
+            {
+              "id": 14,
+              "alive": true,
+              "distance": 12928.634829014478
+            }
+          ]
+        }
+      ],
+      "flags": [
+        "halt:lifeboats"
+      ],
+      "outcome": "running"
+    },
+    "samples": 1500,
+    "pairContacts": 0,
+    "minRestBoundsGap": {
+      "tick": 1,
+      "gap": 57.05466537588602
+    },
+    "allContactCount": 0,
+    "initialMemberDelta": [
+      240,
+      12,
+      -45
+    ]
+  }
+}

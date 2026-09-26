@@ -1,0 +1,125 @@
+{
+  "passed": true,
+  "source": "1de365200a0a96cfc53f3ecd068df139d091ce3b",
+  "episode": "ep04-black-light",
+  "renderer": {
+    "backend": "WebGPU",
+    "device": "GPUDevice",
+    "queue": true
+  },
+  "frames": 1207,
+  "ticks": 2414,
+  "duration": 40.233333333333334,
+  "probe": true,
+  "stop": {
+    "stopObjective": "raid",
+    "ended": true,
+    "lastTick": 2414,
+    "stopAtTick": 2414,
+    "reason": "Observed requested objective transition plus one second"
+  },
+  "replay": {
+    "mode": "record",
+    "tick": 2414,
+    "ticks": 2414,
+    "seconds": 40.233333333333334,
+    "seeking": false,
+    "paused": false,
+    "ended": false,
+    "desyncAt": -1,
+    "checksOk": 0
+  },
+  "tape": {
+    "ticks": 2414,
+    "checks": 40,
+    "commands": [
+      {
+        "t": 0,
+        "c": "episode",
+        "a": "ep04-black-light"
+      }
+    ]
+  },
+  "transitions": [
+    {
+      "tick": 2,
+      "at": 0.03333333333333333,
+      "objective": "formup",
+      "outcome": "running",
+      "tag": "magpie",
+      "label": "Magpie's Due",
+      "position": [
+        2381371.389675815,
+        151315.48126772358,
+        -1095371.9675140267
+      ],
+      "distance": 901.0349984933597,
+      "calls": [
+        {
+          "name": "Magpie's Due",
+          "position": [
+            2381371.389675815,
+            151315.48126772358,
+            -1095371.9675140267
+          ],
+          "mission": true
+        }
+      ],
+      "labels": [
+        {
+          "method": "edge",
+          "id": "edge:nav",
+          "lines": [
+            "MAGPIE'S DUE  0.9 km"
+          ]
+        }
+      ],
+      "dwells": []
+    },
+    {
+      "tick": 2354,
+      "at": 39.233333333333334,
+      "objective": "raid",
+      "outcome": "running",
+      "tag": "tankers-1",
+      "label": "Marsh Tanker 1",
+      "position": [
+        2382214.7614214635,
+        151265.4739055745,
+        -1085775.7676490473
+      ],
+      "distance": 955.1538018627022,
+      "calls": [
+        {
+          "name": "Marsh Tanker 1",
+          "position": [
+            2382214.7614214635,
+            151265.4739055745,
+            -1085775.7676490473
+          ],
+          "mission": true
+        }
+      ],
+      "labels": [
+        {
+          "method": "add",
+          "id": "nav",
+          "lines": [
+            "MARSH TANKER 1  1.0 km"
+          ]
+        }
+      ],
+      "dwells": []
+    }
+  ],
+  "screenshots": [
+    "f_00000.jpg",
+    "f_00300.jpg",
+    "f_00600.jpg",
+    "f_00900.jpg",
+    "f_01176.jpg",
+    "f_01200.jpg",
+    "f_01206.jpg"
+  ],
+  "nativeScope": "ordinary mouse/keyboard controls, fresh mission, read-only observations; no combat-completion claim"
+}
