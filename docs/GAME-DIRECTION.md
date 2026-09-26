@@ -16,6 +16,12 @@ verified. The V4.1 pickup keeps the remaining shots, narration, score and durati
 The collision task owns physical response and damage; the integration task owns
 escort arrival; the trailer task owns the corrected capture and edit.
 
+V4.1 is now delivered and accepted as that bounded correction. Fresh EP04
+capture on `2d8d559` passed dense contact and replay checks; chief verified the
+199-file portable package and integrated delivery `ebf0046` as `53335bc`.
+See [V4.1 delivery](TRAILER_V41_DELIVERY.md). This completes the pickup; broader
+art, performance and ordinary-mission acceptance retain their separate gates.
+
 David's review of V3 says the picture is roughly acceptable but insufficiently
 cinematic, and the narration needs a full rewrite that makes sense to a
 twelve-year-old hearing it once. `TRAILER_V4_SCRIPT.md` is the current chief

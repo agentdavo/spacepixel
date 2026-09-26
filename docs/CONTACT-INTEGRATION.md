@@ -75,3 +75,11 @@ The trailer owner must record and replay a fresh ordinary-input Episode 4 take
 on the accepted combined source, verify convoy clearance and motion, and then
 replace only V4's 42.5–48.5 seconds with a continuous, restrained tracking shot.
 V4 and its frozen source evidence remain preserved.
+
+That gate closed on 26 September: fresh EP04 capture on combined source
+`2d8d559` passed 48 replay checkpoints with diagnostics both on and off. All
+180 selected frames match the original inputs, poses and contacts, with zero
+convoy contacts, five intact escort hulls and minimum model-sphere clearance
+133.26 m. V4.1 delivered as `ebf0046`, accepted in `53335bc`; this is interval
+evidence, not campaign-wide route certification. EP02/EP10 placement remains
+the next bounded clearance work.

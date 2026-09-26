@@ -144,3 +144,19 @@ task branches have been retired.** The only ongoing source branch is the
 V4.1 capture task, alongside the canonical integration branch and original
 upstream-tracking baseline. Its camera/telemetry changes return through chief
 review before recording. No remote branch was deleted or pushed.
+
+## V4.1 closure — 26 September
+
+Capture support was reviewed and integrated as `2d8d559`. Fresh ordinary-input
+EP04 footage passed replay with auditing on and off; all 180 selected frames
+were qualified. Delivery documentation `ebf0046` merged as `53335bc`.
+Chief independently verified all 199 portable manifest files against their
+source and copied them to `scratchpad/delivery/v4.1/final/`. The film is 114 s,
+3420 frames, 720p30; only source frames 1275–1454 were replaced. See
+[V4.1 delivery](TRAILER_V41_DELIVERY.md) for exact provenance and limitations.
+
+The clean capture worktree was detached at `ebf0046`; its fully merged branch
+was retired. **Thirteen completed local task branches have now been retired.**
+Only the canonical integration branch and original upstream-tracking baseline
+remain. Worktrees, raw media and old deliveries are preserved; no remote push
+or branch deletion was performed. The next queue is in [team ownership](TEAM-OWNERSHIP.md).
