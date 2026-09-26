@@ -155,11 +155,22 @@ export interface CampaignContext {
   objectiveDone(id: string): boolean;
 }
 
+/** Presentation only; never changes the objective predicate or its arrival radius. */
+export interface ObjectiveNavigation {
+  /** Exact set-piece/ship tag, or a declared spawn group's base tag. */
+  kind: 'setpiece' | 'ship' | 'group';
+  tag: string;
+  /** Optional short HUD name; otherwise use the actual target's display name. */
+  label?: string;
+}
+
 export interface CampaignObjective {
   id: string;
   text: string;
   /** Set-piece tag to mark while this visible objective is active. */
   navTag?: string;
+  /** Explicit live target. Use either this or the legacy set-piece navTag. */
+  navigation?: ObjectiveNavigation;
   optional?: boolean;
   /** Hidden until activated (twists). */
   hidden?: boolean;

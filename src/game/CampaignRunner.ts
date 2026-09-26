@@ -1,5 +1,6 @@
 import { Vector3 } from 'three';
 import { validateRunnerSnapshot } from './campaign/validateRunnerSnapshot.ts';
+import { resolveObjectiveNavigation, type NavigationDestination } from './campaign/ObjectiveNavigation.ts';
 import type { FactionId } from '@/assets/Blueprint';
 import type { ShipEntity } from '@/sim/Fleet';
 import type {
@@ -157,14 +158,8 @@ export class CampaignRunner {
   }
 
   /** Derived each frame so completed, hidden and failed objectives cannot leave stale markers. */
-  navigation(): { tag: string; label: string; position: Vector3 } | undefined {
-    if (this.outcome !== 'running') return;
-    const objective = this.mission.objectives.find((o, i) => !o.hidden && this.state[i] === 'active' && o.navTag);
-    if (!objective) return;
-    const piece = this.pieces.find((p) => p.tag === objective.navTag);
-    if (!piece) return;
-    const label = piece.spec.params?.label;
-    return { tag: piece.tag, label: typeof label === 'string' ? label : objective.text, position: piece.position };
+  navigation(): NavigationDestination | undefined {
+    return resolveObjectiveNavigation(this.mission, this.state, this.outcome, this.tagged, this.pieces);
   }
 
   /** Immediate spawns, then set pieces (which may be placed relative to them); start codex + chatter. */

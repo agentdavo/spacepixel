@@ -42,6 +42,7 @@ import type { FactionId } from '@/assets/Blueprint';
 import type { StarSystem } from '@/universe/Universe';
 import type { Universe } from '@/universe/Universe';
 import { FlightHud } from '@/ui/FlightHud';
+import { flightNavigation } from '@/ui/FlightNavigation';
 import { CombatHud } from '@/ui/CombatHud';
 import { SALVAGE_RANGE, SALVAGE_SPEED, claimSalvage, lots, salvageRate, stepSalvage } from '@/game/salvage';
 import { StarMap } from '@/ui/StarMap';
@@ -822,16 +823,15 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.hud.update(view, this.camera, this.world, time);
     if (this.tactical) {
       const markers = this.view.gates.map((g) => ({ label: `LANTERN → ${this.universe.systems.get(g.link.to)!.name.toUpperCase()}`, pos: g.center, radius: g.gate.radius }));
-      const destination = this.campaign?.runner.navigation();
+      const destination = flightNavigation(this.campaign?.runner);
       if (destination) markers.unshift({ label: destination.label.toUpperCase(), pos: destination.position, radius: 200 });
       this.hud.drawTactical(this.player, this.fleet, this.camera, this.world, this.orderStatus, markers);
     }
     else if (this.jumpPhase === 'none') {
       this.hud.drawTargets(this.player, this.fleet, this.lock, this.camera, this.world, time);
-      const destination = this.campaign?.runner.navigation();
       const nav = this.docking.phase === 'cleared' ? undefined : this.navGate();
-      if (destination) this.hud.drawNav(destination.label, destination.position, view.position, this.camera, this.world, time, true);
-      else if (nav) this.hud.drawNav(this.universe.systems.get(nav.link.to)!.name, nav.center, view.position, this.camera, this.world, time);
+      const destination = flightNavigation(this.campaign?.runner, nav ? { label: this.universe.systems.get(nav.link.to)!.name, position: nav.center } : undefined);
+      if (destination) this.hud.drawNav(destination.label, destination.position, view.position, this.camera, this.world, time, destination.mission);
     }
     this.combatHud.turrets = this.turrets.status(this.player);
     this.combatHud.hangar = this.turrets.hangarStatus(this.player);
