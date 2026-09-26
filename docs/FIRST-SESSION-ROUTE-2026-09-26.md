@@ -308,3 +308,19 @@ at a time. Use a new `--out` directory for every run. These commands have
 - `src/game/CampaignSession.ts`: the retry fix.
 - `tests/first-session-route.test.ts` and
   `tests/kessen-cameo-lifecycle.test.ts`.
+
+### EP01 teaches the order
+
+Added at the `thieves` flag, straight after the SYSTEM contact call:
+
+- **Candle's new line:** "Three of them, one of you. Give me the word and
+  I'll take one. Press three: engage at will."
+- **Voice clip:** recorded with the cast's Piper voice (key `1a7fs5h13h0n0y`,
+  4.158 s). Only that clip was added. The manifest keeps every other entry,
+  and voice coverage is 1632/1632.
+- **Objective text:** now "Drive the scavengers off the school tender
+  (3: wing engage at will)".
+
+Nobody has listened to the clip yet; it has only been checked with the
+automated coverage tool. The line changes dialogue only, and the seed-22 take
+still replays exactly.

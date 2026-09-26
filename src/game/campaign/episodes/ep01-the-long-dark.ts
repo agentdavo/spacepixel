@@ -21,7 +21,7 @@ export const EP01: CampaignMission = {
     obj('buoy1', 'Follow the survey buoys into the Graveyard (1/3)', (c) => c.distanceTo('buoy1') < 300, { navTag: 'buoy1' }),
     obj('buoy2', 'Follow the survey buoys (2/3)', (c) => c.distanceTo('buoy2') < 300, { navTag: 'buoy2' }),
     obj('buoy3', 'Follow the survey buoys (3/3)', (c) => c.distanceTo('buoy3') < 300, { navTag: 'buoy3', setsFlag: 'thieves' }),
-    obj('thieves', 'Drive the scavengers off the school tender', (c) => c.kills('rustwake') >= 3),
+    obj('thieves', 'Drive the scavengers off the school tender (3: wing engage at will)',(c) => c.kills('rustwake') >= 3),
     obj('beacon', 'Approach the Timetable beacon at the Great Lantern', (c) => c.distanceTo('timetable') < 400, { navTag: 'timetable' }),
     obj('yards', 'Deliver airframe 0413 to Anchorage Yards', (c) => c.distanceTo('yards') < 600, { navTag: 'yards' }),
   ],
@@ -55,6 +55,7 @@ export const EP01: CampaignMission = {
     ]),
     beat('thieves', onFlag('thieves'), [
       say('system', 'CONTACTS IN THE WRECKS. RUSTWAKE TRANSPONDERS. THREE.'),
+      say('candle', 'Three of them, one of you. Give me the word and I\'ll take one. Press three: engage at will.'),
       say('candle', 'Cutters. They\'re stripping the school tender. That\'s a grave, you thieving— forgive me.'),
       say('candle', 'Weapons free, Four-One-Three. Shoot the living. Leave the dead be.'),
     ], 2),
