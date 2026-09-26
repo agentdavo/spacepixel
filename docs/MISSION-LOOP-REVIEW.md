@@ -31,6 +31,7 @@ their own targeted validation before final combined acceptance.
 
 - [Mission clearance](MISSION-CLEARANCE-REVIEW.md)
 - [Objective navigation](OBJECTIVE-NAVIGATION.md)
+- [Native routes, replay and independent clearance audit](OBJECTIVE-NAVIGATION-NATIVE.md)
 - [Career transactions](CAREER-TRANSACTIONS.md)
 - [Native dock failure/retry/reload proof](DOCK-TRANSACTION-PROOF.md)
 - [Mission cue script and recordings](MISSION-CUES-REVIEW.md)
@@ -42,6 +43,9 @@ verified SHA-256 `9d042a48376e60794bf11fcaef550f5fb848864591b7330a9486f05028397e
 Combat review video/audio pairs and their verified manifest are retained in
 `scratchpad/combat-readability/`. These ignored media files are local deliverables;
 the source, review reports and compact evidence are committed.
+All 147 raw navigation/clearance artifacts were also copied and independently
+hash-verified against their recorded manifest in
+`scratchpad/objective-navigation-native/` (55,273,163 bytes, excluding the manifest).
 
 The scope is these concrete mission-loop changes, not certification of all
 twenty campaign episodes or every future expansion. Physical surround speakers

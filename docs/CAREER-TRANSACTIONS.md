@@ -51,6 +51,9 @@ actual Fleet refit application, repair persistence, replay command acceptance,
 and market/service UI side-effect ordering. Existing expansion persistence and
 outfitting tests remain part of the focused regression set. Native dock UI
 fault-injection proof is a separate gate and is not implied by headless tests.
+That gate subsequently passed all 26 actual-control cases: legacy and migrated
+saves, denied reads/writes, retry, reload, and failed-startup write protection.
+See [the native dock report](DOCK-TRANSACTION-PROOF.md) for fixture setup and limits.
 
 ## Scope
 

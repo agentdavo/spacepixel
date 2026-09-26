@@ -65,8 +65,12 @@ and sets `lifeboats-arrived` at 53.63 s. Both lifeboats stop in their existing
 - Full suite: 377/377 passed before adding the final old-save compatibility
   case; that case was then verified in the focused suite.
 - Production build: TypeScript, campaign/expansion validation and Vite pass.
-- Native GPU and ordinary-player-input acceptance remain pending the chief's
-  shared GPU allocation. No browser or GPU was used for this work.
+- The implementation handoff used CPU checks. Subsequent native input recordings
+  on integrated `1de3652` confirm EP02 approach/arrival/hold for 35 s and EP10's
+  initial lifeboat hold for 25 s, with no contacts involving either protected
+  pair. Independent raw-data review and same-source replay pass. Combat-dependent
+  halt/resume and resumed evacuation remain CPU-only coverage; see the
+  [native route report](OBJECTIVE-NAVIGATION-NATIVE.md) for exact scope.
 
 Run the bounded regression with:
 
