@@ -15,6 +15,7 @@ existing callers can keep importing from the same entry point.
 | Campaign types / supported content vocabulary | `campaign/types.ts` |
 | Plot-armour and fallback-system tables | `campaign/runtimePolicy.ts` |
 | Objective evaluation, scheduling, runner snapshot mechanics | `game/CampaignRunner.ts` |
+| Current objective's copied HUD destination | `campaign/ObjectiveNavigation.ts` and `ui/FlightNavigation.ts` |
 | Story-specific interaction with fleet, AI, effects and comms | `game/CampaignSession.ts` |
 | Generated operation policy and persistence | `game/contracts/ContractDesk.ts` |
 | New physical/visual set-piece behaviour | Its set-piece implementation and session adapter |
@@ -31,8 +32,10 @@ only when it represents genuinely shared mission behaviour.
    requires a migration, even if the visible text is unchanged.
 2. Declare ship/set-piece tags before relying on them. Group-prefix references
    are allowed where the runner allows them; `navTag` requires an exact set-piece
-   tag. Deferred references are statically valid but must also be available at
-   the time they are used in play.
+   tag. New `navigation` metadata supports exact `ship`, declared `group`, or
+   `setpiece` targets and an optional label. A group marker follows its first
+   surviving authored member. Deferred references are statically valid but must
+   also be available at the time they are used in play.
 3. Use world-space offsets in metres. The historical `ahead(x,y,z)` helper adds
    the player's initial position; it does **not** rotate by the ship's heading.
 4. Run `npm run check:campaign` for catalog and reference errors, then
@@ -43,6 +46,25 @@ only when it represents genuinely shared mission behaviour.
 6. Play or replay the changed route with a recorded seed, source revision and
    input trace. Inspect objective visibility, navigation, radio timing, actual
    shield/hull outcomes and completion. Record the actual renderer used.
+
+## Navigation and escort clearance
+
+Use `navigation: { kind: 'group', tag: 'tankers' }` for a moving convoy, or
+`navigation: { kind: 'setpiece', tag: 'buoyN' }` for a survey point. Only the
+active visible required objective drives the marker; hidden and optional cues
+do not redirect it. In a mission with authored navigation, an objective without
+a destination clears the mission marker instead of pointing at an unrelated
+jump gate. See [objective navigation](OBJECTIVE-NAVIGATION.md) for examples.
+
+For a transfer to a large ship, author `routeArrival` with a world-axis offset
+and radius outside the host hull. Guidance and arrival use the same endpoint.
+Do not use the host centre as a rendezvous merely because its tag is convenient.
+Use `memberOffsets` when the default formation cannot accommodate the group's
+hulls; check actual contact after launch grace as well as conservative bounds.
+`stationary: true` is available for a neutral static anchor that must hold its
+position. It does not freeze hostile or provoked combat actors. Existing saved
+positions are preserved, so a content fix does not automatically repair an old
+overlapping save. See [clearance evidence](MISSION-CLEARANCE-REVIEW.md).
 
 ## What validation does and does not establish
 
