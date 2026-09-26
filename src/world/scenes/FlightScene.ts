@@ -24,6 +24,7 @@ import { EventTap } from '../EventTap';
 import { Weapons } from '@/sim/Weapons';
 import { Missiles, type LockState } from '@/sim/Missiles';
 import { Capitals } from '@/sim/Capitals';
+import { StationDefences } from '@/sim/StationDefence';
 import { selectedSubsystem } from '@/sim/Combat';
 import { loadProfile } from '@/game/Profile';
 import { WeaponVisuals } from '../WeaponVisuals';
@@ -95,7 +96,8 @@ import '@/ui/ContactTab'; // frontier supply agreements; only visible at Marches
  * input; `update` is presentation only, once per frame.
  *
  * Tick order (deliberately flat; src/sim/determinism.ts flies the same):
- *   replay (commands, controls) → traffic → AI → capitals → turrets →
+ *   replay (commands, controls) → traffic → AI → capitals → station
+ *   batteries → turrets →
  *   fleet flight → docking → hull contacts → gates / jump → targeting →
  *   weapons → missiles → campaign / contracts → bookkeeping → per-tick
  *   presentation feeds (particles, flashes, barks, cutaways, kill-cam
@@ -167,6 +169,8 @@ export class FlightScene implements GameScene, FlightHostScene {
   private jumpTo = '';
   private gateSide = new Map<GateInstance, number>();
   readonly capitals: Capitals;
+  /** Station batteries in this system (bastions): armed from `view.stations` every tick, stepped after the capitals. */
+  readonly stationGuns: StationDefences;
   private cathedral!: ShipEntity;
   private carrier!: ShipEntity;
   private mission: MissionRunner | null = null;
@@ -289,6 +293,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       this.paintPlanes();
     }
     this.capitals = new Capitals(this.fleet, this.weapons);
+    this.stationGuns = new StationDefences(this.fleet, this.weapons);
     this.turrets = new ShipTurrets(this.fleet, this.weapons, this.capitals);
 
     // Start 2.6 km short of the first Lantern, flying at it.
@@ -559,6 +564,8 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.player.target = this.lock.target; // "attack my target" reads this
     this.reachTime = time;
     this.traffic.setSystem(this.view);
+    // Arm this system's stations (the list changes on a jump or when an outpost is built / torn down).
+    this.stationGuns.sync(this.view.stations);
     if (this.jumpPhase === 'none') {
       // Traffic writes its haulers' controls (and scripts raiders) before the fighter AI.
       this.traffic.enabled = !this.campaign && this.trafficOn;
@@ -566,6 +573,7 @@ export class FlightScene implements GameScene, FlightHostScene {
       updateAI(this.fleet, dt, time, this.hulls.obstacles);
       this.wingDock.update(dt, this.docking, this.player, this.fleet, this.hulls.obstacles, this.wingOrder);
       this.capitals.step(dt);
+      this.stationGuns.step(dt);
       this.turrets.step(dt, this.lock.target);
       this.campaign?.preStep(dt);
       this.contracts.preStep(dt);

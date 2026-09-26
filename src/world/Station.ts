@@ -13,6 +13,7 @@ import { berthLights, stationBerths, type StationBerth } from './berths/sites';
 import type { SurfacePortSite } from '@/universe/Universe';
 import type { PlanetPreset } from './Planet';
 import { createDrive, poseTurret, rigFromInfo, scanPose, type TurretDrive, type TurretRig } from '@/sim/TurretRig';
+import type { StationDefence } from '@/sim/StationDefence';
 
 /**
  * A dockable station in the world (docking & trade). Universe-positioned
@@ -25,7 +26,10 @@ import { createDrive, poseTurret, rigFromInfo, scanPose, type TurretDrive, type 
  *  - orbital ports: the landing-corridor tether dropping from the anchor to
  *    the atmosphere, climber lights pulsing down it;
  *  - clamp gantries and the mooring pylon for big hulls (world/berths): arms
- *    stowed until a hull comes alongside, walkway lights running out.
+ *    stowed until a hull comes alongside, walkway lights running out;
+ *  - battery turrets (bastions): posed from the sim's drives when the flight
+ *    scene has armed the station (`defence`, sim/StationDefence), else an
+ *    idle scan.
  *
  * Frame: the station faces +Z = `site.axis` (bay end), +Y = `site.up`.
  * Everything is built with an explicit basis — never Object3D.lookAt with
@@ -142,15 +146,22 @@ export class StationView {
   }
 
   private ringLights: LightPoints | null = null;
-  /** Battery turrets (bastions): no fire control here, they just scan their arcs. */
+  /** Battery turrets (bastions) with no fire control attached: they just scan their arcs. */
   private guns: { rig: TurretRig; drive: TurretDrive }[] | null = null;
+  /** The station's batteries in the sim (StationDefences.sync), null when unarmed / not in a combat scene. */
+  defence: StationDefence | null = null;
 
   update(time: number): void {
     this.model.setChannel('spin', (time * this.spinRate + (this.site.seed % 97) / 97) % 1);
-    this.guns ??= [...this.model.turrets.values()].map((t) => ({ rig: rigFromInfo(t), drive: createDrive() }));
-    for (const g of this.guns) {
-      scanPose(g.rig, time, g.drive);
-      poseTurret(this.model, g.rig, g.drive);
+    if (this.defence) {
+      // Fire control owns the mounts: traverse, elevation, recoil and wrecks come from the sim drives.
+      for (const b of this.defence.batteries) poseTurret(this.model, b.rig, b.drive);
+    } else {
+      this.guns ??= [...this.model.turrets.values()].map((t) => ({ rig: rigFromInfo(t), drive: createDrive() }));
+      for (const g of this.guns) {
+        scanPose(g.rig, time, g.drive);
+        poseTurret(this.model, g.rig, g.drive);
+      }
     }
     this.lights.update(time);
     this.ringLights?.update(time);
