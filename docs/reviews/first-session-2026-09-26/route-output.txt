@@ -1,0 +1,22 @@
+PASS  EP01 objective buoy1 completed  tick 664 · 11.07 s
+PASS  EP01 objective buoy2 completed  tick 1397 · 23.28 s
+PASS  EP01 objective buoy3 completed  tick 2241 · 37.35 s
+PASS  EP01 objective thieves completed  tick 3425 · 57.08 s
+PASS  EP01 objective beacon completed  tick 4393 · 73.22 s
+PASS  EP01 objective yards completed  tick 5280 · 88.00 s
+PASS  EP01 success by ordinary input  outcome success at tick 5280 (88.000 s) · hull 15.9/110 · Rustwake kills 3 (player 3)
+PASS  no Lantern jump, station contact or hull contact on the route  closest station 10349 m
+PASS  fresh tape replays deterministically  93/93 checkpoints · replay outcome success at tick 5280 · 5610 ticks · 5506 bytes
+PASS  fresh career starts at Episode 1 with 2,500 shares
+PASS  berthed and saved at the home Directorate station  anchorage-bastion-0
+PASS  market buy committed  48 sh → 2452 sh, 3 pallets
+PASS  market sell committed  43 sh → 2495 sh, 2 pallets
+PASS  refit Pulse Laser Pair Mk II affordable and committed atomically  gun:gun = g-laser-mk2 · 915 sh
+PASS  resume: Episode 2 pending, prologue remembered
+PASS  resume: balance, cargo and berth preserved  915 sh · 2 pallets · anchorage-bastion-0
+PASS  resume: refit preserved  gun:gun = g-laser-mk2
+PASS  resume: world records Episode 1 as flown  story.ep1.done
+
+source 8c791b24f6a8583399373e9e550b96fd8518bf2c · tape docs/reviews/first-session-2026-09-26/ep01-seed22.vgr
+
+ALL PASS
