@@ -4,7 +4,7 @@ import type { Fleet, ShipEntity } from '@/sim/Fleet';
 import type { ChaseCamera } from '@/sim/ChaseCamera';
 import { applyFraming, cameraOverride, framingFor, viewFor, type ShipView } from '@/game/shipyard/flight';
 import { CATALOG_BY_ID, type CatalogEntry } from '@/game/shipyard/catalog';
-import { loadHangar, saveHangar, saveLedger } from '@/game/Profile';
+import { loadHangar, saveHangar, saveCareer } from '@/game/Profile';
 import type { TradeLedger } from '@/game/economy';
 import { applyFit } from './apply';
 import { computeFit, stockFit, type Fit, type FitResult } from './fit';
@@ -76,10 +76,10 @@ export class Outfitter {
   }
 
   /** The hull the pilot flies now: the active one, or a fleet Kestrel during story episodes if the active hull is too big. */
-  private seat(): { uid: string; hull: string; fit: Fit; condition: number } {
-    const a = this.active();
+  private seat(hangar = this.hangar): { uid: string; hull: string; fit: Fit; condition: number } {
+    const a = activeShip(hangar);
     if (!(this.episode || this.host?.inEpisode()) || entryOf(a).length <= EPISODE_MAX_LENGTH) return a;
-    const own = this.hangar.ships.find((s) => entryOf(s).length <= EPISODE_MAX_LENGTH);
+    const own = hangar.ships.find((s) => entryOf(s).length <= EPISODE_MAX_LENGTH);
     if (own) return own;
     const k = CATALOG_BY_ID['vf27-kestrel'];
     return { uid: 'fleet', hull: k.id, fit: stockFit(k), condition: 1 };
@@ -130,7 +130,7 @@ export class Outfitter {
    * changed, rebuild (swap) when the active hull changed. Call after any
    * shop operation, and when an episode starts or ends.
    */
-  settle(episode?: boolean): void {
+  settle(episode?: boolean, persistCondition = true): void {
     if (episode !== undefined) this.episode = episode;
     const h = this.host;
     if (!h) return;
@@ -148,7 +148,7 @@ export class Outfitter {
     const old = this.hangar.ships.find((s) => s.uid === cur?.uid);
     if (old && h.player.hullMax > 0) {
       old.condition = Math.max(0.05, Math.min(1, h.player.hull / h.player.hullMax));
-      saveHangar(this.hangar);
+      if (persistCondition) saveHangar(this.hangar);
     }
     const p = h.player;
     const next = this.build(h.fleet, want, p.flight.position.clone(), p.flight.forward(new Vector3()), { name: p.name, team: p.team });
@@ -158,14 +158,33 @@ export class Outfitter {
   }
 
   /** Apply a shop result: ledger + hangar persist, the flying ship follows. */
-  commit(r: ShopResult): void {
+  commit(r: ShopResult): boolean {
     const h = this.host;
-    if (r.error || !h) return;
-    this.hangar = r.hangar;
-    saveHangar(this.hangar);
-    h.ledger = r.ledger;
-    this.settle();
-    saveLedger(h.ledger);
+    if (r.error || !h) return false;
+    const hangar = this.withCondition(r.hangar);
+    let ledger = syncHold(hangar, r.ledger);
+    if (this.seat(hangar).uid === 'fleet') ledger = { ...ledger, capacity: 16 };
+    if (!saveCareer(ledger, hangar)) return false;
+    this.hangar = hangar;
+    h.ledger = ledger;
+    this.settle(undefined, false);
+    return true;
+  }
+
+  private withCondition(hangar: Hangar, condition = this.condition()): Hangar {
+    condition = Math.max(0.05, Math.min(1, condition));
+    return { ...hangar, ships: hangar.ships.map(s => s.uid === this.flying?.uid ? { ...s, condition } : s) };
+  }
+
+  /** Repair money and owned hull condition cross the same durable boundary. */
+  commitRepair(ledger: TradeLedger, condition: number): boolean {
+    const h = this.host;
+    if (!h) return false;
+    const hangar = this.withCondition(this.hangar, condition);
+    if (!saveCareer(ledger, hangar)) return false;
+    this.hangar = hangar;
+    h.ledger = ledger;
+    return true;
   }
 
   /** Current hull condition 0..1 of the flying ship. */

@@ -26,8 +26,10 @@ export const EP02: CampaignMission = {
   ],
   spawns: [
     spawn(HARRIER, 'concord', 1, ahead(-50, 10, -60), 'candle', 'Brother Oduya · Candle', 'wing'),
-    spawn(LANTERN_GUARD, 'concord', 1, ahead(300, -50, 700), 'barge', 'Warden Barge Saint Hollis', 'escort', { routeTo: 'indomitable' }),
-    spawn(INDOMITABLE, 'concord', 1, ahead(0, -500, 9500), 'indomitable', 'BB-01 Indomitable', 'static'),
+    // Transfer outside the bow, clear of the complete 2.17 km hull. The same
+    // point/radius drives flight and delivery; the host is at anchor here.
+    spawn(LANTERN_GUARD, 'concord', 1, ahead(300, -50, 700), 'barge', 'Warden Barge Saint Hollis', 'escort', { routeTo: 'indomitable', routeArrival: { offset: [0, 0, -1800], radius: 100 } }),
+    spawn(INDOMITABLE, 'concord', 1, ahead(0, -500, 9500), 'indomitable', 'BB-01 Indomitable', 'static', { stationary: true }),
     spawn(SCRAPJACK, 'rustwake', 4, ahead(-2600, 500, 3800), 'raidersA', 'Raider', 'hostile', { delay: 40 }),
     spawn(SCRAPJACK, 'rustwake', 4, by('barge', 2400, -300, -1800), 'raidersB', 'Raider', 'hostile', { whenFlag: 'halt:barge', delay: 10 }),
   ],

@@ -1,6 +1,7 @@
 import './outfit.css';
 import { registerDockTab, type DockContext, type DockTabApi } from './DockScreen';
 import { getAudio } from '@/audio';
+import { saveFailureMessage } from '@/game/CareerStore';
 import { outfitter } from '@/game/outfitting/Outfitter';
 import { computeFit, slotDraw, slotsFor, type FitSummary, type Slot } from '@/game/outfitting/fit';
 import { activeShip, buyItem, entryOf, itemsAt, sellItem, RESALE, type Lock } from '@/game/outfitting/hangar';
@@ -135,12 +136,12 @@ class OutfittingTab {
     }
   }
 
-  private result(r: { error?: string; message?: string }, commit: () => void): void {
-    if (r.error) {
-      this.note = { text: r.error, cls: 'err' };
+  private result(r: { error?: string; message?: string }, commit: () => boolean): void {
+    const error = r.error ?? (commit() ? undefined : saveFailureMessage());
+    if (error) {
+      this.note = { text: error, cls: 'err' };
       getAudio().ui('move');
     } else {
-      commit();
       this.note = { text: r.message ?? 'FITTED', cls: 'ok' };
       getAudio().ui('confirm');
       this.api?.say(r.message ?? '', 'ok');
@@ -157,10 +158,7 @@ class OutfittingTab {
     const off = this.offers[this.pick];
     if (!s || !off) return;
     const r = buyItem(o.hangar, ctx.ledger(), o.hangar.active, s.id, off.item.id, ctx.station);
-    this.result(r, () => {
-      o.commit(r);
-      ctx.setLedger(o.ledger);
-    });
+    this.result(r, () => o.commit(r));
   }
 
   private strip(): void {
@@ -169,10 +167,7 @@ class OutfittingTab {
     const s = this.slots[this.slot];
     if (!s) return;
     const r = sellItem(o.hangar, ctx.ledger(), o.hangar.active, s.id);
-    this.result(r, () => {
-      o.commit(r);
-      ctx.setLedger(o.ledger);
-    });
+    this.result(r, () => o.commit(r));
   }
 
   private render(): void {

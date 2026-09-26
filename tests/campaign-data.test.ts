@@ -96,7 +96,7 @@ test('navigation ignores hidden or unresolved destinations and missions without 
     runner.begin();
     assert.equal(runner.navigation(), undefined);
   }
-  for (const m of MISSIONS.slice(1)) {
+  for (const m of MISSIONS.filter(m => !m.objectives.some(o => o.navigation || o.navTag))) {
     const runner = new CampaignRunner(m, fakeHost());
     runner.begin();
     assert.equal(runner.navigation(), undefined, m.id);

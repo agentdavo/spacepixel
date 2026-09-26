@@ -106,6 +106,12 @@ export interface SpawnSpec {
   /** AI role. 'escort' ships fly a route to `routeTo` tag and must survive. */
   role?: 'hostile' | 'wing' | 'escort' | 'static' | 'capital';
   routeTo?: string;
+  /** World-axis offset from routeTo, shared by guidance and the arrival check. */
+  routeArrival?: { offset: [number, number, number]; radius: number };
+  /** Explicit world-axis offsets per member; omitted groups retain the standard wedge. */
+  memberOffsets?: [number, number, number][];
+  /** Static actor starts at rest and holds position while neutral. */
+  stationary?: boolean;
   /** Seconds after mission start (reinforcement waves). */
   delay?: number;
   /** Spawn only when this flag is set. */
@@ -155,11 +161,22 @@ export interface CampaignContext {
   objectiveDone(id: string): boolean;
 }
 
+/** Presentation only; never changes the objective predicate or its arrival radius. */
+export interface ObjectiveNavigation {
+  /** Exact set-piece/ship tag, or a declared spawn group's base tag. */
+  kind: 'setpiece' | 'ship' | 'group';
+  tag: string;
+  /** Optional short HUD name; otherwise use the actual target's display name. */
+  label?: string;
+}
+
 export interface CampaignObjective {
   id: string;
   text: string;
   /** Set-piece tag to mark while this visible objective is active. */
   navTag?: string;
+  /** Explicit live target. Use either this or the legacy set-piece navTag. */
+  navigation?: ObjectiveNavigation;
   optional?: boolean;
   /** Hidden until activated (twists). */
   hidden?: boolean;

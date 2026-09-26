@@ -80,6 +80,24 @@ export function validateMission(mission: CampaignMission, catalogs: MissionCatal
     if (o.navTag !== undefined && !pieceTags.has(o.navTag)) {
       error('unknown-nav-tag', `objectives[${i}].navTag`, `Navigation requires an exact set-piece tag: ${o.navTag}`);
     }
+    const nav = o.navigation;
+    if (!nav) return;
+    const path = `objectives[${i}].navigation`;
+    if (o.navTag !== undefined) error('conflicting-navigation', path, 'Use navigation or navTag, not both.');
+    if (nav.label !== undefined) id(nav.label, `${path}.label`);
+    // Navigation resolves only runner-owned targets, not generic host tags.
+    const exists = nav.kind === 'setpiece' ? pieceTags.has(nav.tag) : mission.spawns.some(s => {
+      if (!Number.isInteger(s.count) || s.count < 1) return false;
+      const base = s.tag || s.blueprint;
+      if (nav.kind === 'group') return nav.tag === base;
+      if (nav.kind !== 'ship') return false;
+      if (s.tag && s.count === 1) return nav.tag === s.tag;
+      if (!nav.tag.startsWith(`${base}-`)) return false;
+      const suffix = nav.tag.slice(base.length + 1);
+      const member = Number(suffix);
+      return String(member) === suffix && Number.isInteger(member) && member >= 1 && member <= s.count;
+    });
+    if (!exists) error('unknown-navigation-target', `${path}.tag`, `No declared ${nav.kind} navigation target: ${nav.tag}`);
   });
   mission.spawns.forEach((s, i) => {
     const path = `spawns[${i}]`;
@@ -88,6 +106,18 @@ export function validateMission(mission: CampaignMission, catalogs: MissionCatal
     if (s.delay !== undefined) number(s.delay, `${path}.delay`);
     place(s.place, `${path}.place`);
     if (s.routeTo !== undefined) tag(s.routeTo, `${path}.routeTo`);
+    if (s.routeArrival !== undefined) {
+      if (s.role !== 'escort' || !s.routeTo) error('invalid-route-arrival', `${path}.routeArrival`, 'An external arrival point requires an escort route.');
+      vector(s.routeArrival.offset, `${path}.routeArrival.offset`);
+      number(s.routeArrival.radius, `${path}.routeArrival.radius`, Number.MIN_VALUE);
+    }
+    if (s.memberOffsets !== undefined) {
+      if (s.memberOffsets.length !== s.count) error('invalid-member-offsets', `${path}.memberOffsets`, 'Provide one offset for every authored member.');
+      s.memberOffsets.forEach((offset, j) => vector(offset, `${path}.memberOffsets[${j}]`));
+    }
+    if (s.stationary !== undefined && (typeof s.stationary !== 'boolean' || s.role !== 'static')) {
+      error('invalid-stationary', `${path}.stationary`, 'Only static actors can hold an authored anchor.');
+    }
   });
   mission.setpieces.forEach((p, i) => {
     const path = `setpieces[${i}]`;

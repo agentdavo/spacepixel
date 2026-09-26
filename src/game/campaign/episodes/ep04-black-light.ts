@@ -18,10 +18,10 @@ export const EP04: CampaignMission = {
     'Do not shoot anything that glows black. That is the cargo.',
   ),
   objectives: [
-    obj('formup', 'Form up on the Magpie\'s Due', (c) => c.distanceTo('magpie') < 800),
-    obj('raid', 'Break the Choir raid on the convoy', (c) => c.kills('choir') >= 5, { failed: (c) => c.aliveCount('tankers') < 2, setsFlag: 'raid-broken' }),
-    obj('torpedoes', 'Intercept the second torpedo run', (c) => c.kills('choir') >= 7, { failed: (c) => c.aliveCount('tankers') < 2 }),
-    obj('lantern', 'See the convoy to the Rustwake Lantern buoy', (c) => c.flag('tankers-arrived'), { failed: (c) => c.aliveCount('tankers') < 2 }),
+    obj('formup', 'Form up on the Magpie\'s Due', (c) => c.distanceTo('magpie') < 800, { navigation: { kind: 'ship', tag: 'magpie' } }),
+    obj('raid', 'Break the Choir raid on the convoy', (c) => c.kills('choir') >= 5, { navigation: { kind: 'group', tag: 'tankers' }, failed: (c) => c.aliveCount('tankers') < 2, setsFlag: 'raid-broken' }),
+    obj('torpedoes', 'Intercept the second torpedo run', (c) => c.kills('choir') >= 7, { navigation: { kind: 'group', tag: 'tankers' }, failed: (c) => c.aliveCount('tankers') < 2 }),
+    obj('lantern', 'See the convoy to the Rustwake Lantern buoy', (c) => c.flag('tankers-arrived'), { navigation: { kind: 'group', tag: 'tankers' }, failed: (c) => c.aliveCount('tankers') < 2 }),
     obj('every-gram', 'Lose no tankers', (c) => c.flag('tankers-arrived'), { optional: true, failed: (c) => c.aliveCount('tankers') < 3 }),
   ],
   spawns: [
@@ -39,8 +39,8 @@ export const EP04: CampaignMission = {
   ],
   chatter: [
     beat('open', START, [
-      say('magpie', 'Well, look at this! A Directorate babysitter in a museum piece. Welcome to the Rustwake, Kestrel!'),
-      say('magpie', 'Three tankers of Ember-skim, forty kilos each. Don\'t shoot anything glowing black. It\'s mine.'),
+      say('magpie', 'Kestrel, join my ship, the Magpie\'s Due. We\'re escorting three fuel tankers to the gate.'),
+      say('magpie', 'They carry fuel for the gates. Keep at least two tankers alive. Bring all three home if you can.'),
       say('ledger', 'Audit corvette. Commander Aubrac, Office of Continuity. I\'m here to count the grams. Ignore me.'),
       say('magpie', 'Everybody ignores the auditor, love. Right up until she finds something.'),
     ]),
@@ -53,13 +53,13 @@ export const EP04: CampaignMission = {
       say('magpie', 'That\'s the idea, love.'),
     ]),
     beat('raid', at(38), [
-      say('system', 'CHOIR CARRIER. INTONATION. FIVE CONTACTS. TWO PSALTER TORPEDO BOMBERS.'),
-      say('magpie', 'Hymn-singers! Clan Marsh, guns out! Kestrel, the Psalters want the tankers, not you!'),
+      say('system', 'ENEMY FIGHTERS APPROACHING. TORPEDO BOMBERS WILL FOLLOW.'),
+      say('magpie', 'Kestrel, destroy the raiders. Hit the torpedo bombers before they reach our tankers!'),
     ], 3),
     beat('bill', killsOf('choir', 3), [say('magpie', 'Ha! Put that on the Board\'s bill!')]),
     beat('second-run', onDone('raid'), [
-      say('system', 'TWO MORE. TORPEDO SOLUTION ON TANKER THREE.'),
-      say('magpie', 'Tem Marsh does not lose tankers! Tem Marsh does not— Kestrel, please!'),
+      say('system', 'TWO MORE TORPEDO BOMBERS INBOUND.'),
+      say('magpie', 'Kestrel, intercept those bombers. Keep them away from the tankers!'),
     ], 3),
     beat('manifest', onDone('torpedoes'), [
       say('ledger', 'Escort. Something\'s wrong with the manifest. Half this cargo is consigned onward, three shell accounts deep.'),

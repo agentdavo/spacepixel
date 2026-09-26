@@ -26,6 +26,7 @@ import {
 } from '@/game/economy';
 import { getAudio } from '@/audio';
 import { loadCrew, repairMultiplier } from '@/game/crew';
+import { saveFailureMessage } from '@/game/CareerStore';
 
 /**
  * The docked screen (docking & trade): a DOM overlay in the CRT/OVA style of
@@ -47,6 +48,8 @@ export interface DockContext {
   setLedger(l: TradeLedger): void;
   /** Commit durably before changing session state; false leaves both untouched. */
   commitLedger?(l: TradeLedger): boolean;
+  /** Persist payment and owned hull condition together before applying repair. */
+  commitRepair?(l: TradeLedger, hull: number): boolean;
   /** Player hull, 0..1. */
   hull(): number;
   setHull(h: number): void;
@@ -249,7 +252,7 @@ export class DockScreen {
     const r = (dir === 'buy' ? buy : sell)(ctx.ledger(), ctx.station, cid, n);
     const c = COMMODITY[cid];
     if (r.units) {
-      ctx.setLedger(r.ledger);
+      if (!ctx.commitLedger?.(r.ledger)) return this.saveFailed();
       ctx.onTrade?.(cid, dir === 'sell' ? r.units : -r.units);
       this.say(`${dir === 'buy' ? 'BOUGHT' : 'SOLD'} ${r.units} × ${c.name.toUpperCase()} ${dir === 'buy' ? 'FOR' : '—'} ${sh(r.total)}${r.error ? ` · ${r.error}` : ''}`, 'ok');
       getAudio().ui('confirm');
@@ -265,7 +268,7 @@ export class DockScreen {
     const mechanic = repairMultiplier(loadCrew());
     const r = repair(ctx.ledger(), ctx.station, ctx.hull(), ctx.hullSize?.() ?? 1, mechanic);
     if (r.cost > 0) {
-      ctx.setLedger(r.ledger);
+      if (!ctx.commitRepair?.(r.ledger, r.hull)) return this.saveFailed();
       ctx.setHull(r.hull);
       this.say(`HULL PATCHED TO ${Math.round(r.hull * 100)}% — ${sh(r.cost)}. ${mechanic < 1 ? 'TWO-COATS DOES THE LABOUR; THE YARD SELLS THE PLATE.' : 'THE WARDENS SAY THE WORDS.'}`, 'ok');
     } else this.say(ctx.hull() >= 1 ? 'HULL IS WHOLE. NOTHING TO KEEP.' : 'INSUFFICIENT SHARES FOR REPAIRS', ctx.hull() >= 1 ? '' : 'err');
@@ -276,9 +279,15 @@ export class DockScreen {
     const ctx = this.ctx!;
     const r = rearm(ctx.ledger(), ctx.station);
     if (r.cost > 0) {
-      ctx.setLedger(r.ledger);
+      if (!ctx.commitLedger?.(r.ledger)) return this.saveFailed();
       this.say(`RAILS LOADED: ${r.ledger.missiles}/${MISSILE_MAX} SALVOS — ${sh(r.cost)}`, 'ok');
     } else this.say(ctx.ledger().missiles >= MISSILE_MAX ? 'RAILS ALREADY FULL' : 'INSUFFICIENT SHARES TO REARM', ctx.ledger().missiles >= MISSILE_MAX ? '' : 'err');
+    this.render();
+  }
+
+  private saveFailed(): void {
+    this.say(saveFailureMessage(), 'err');
+    getAudio().ui('move');
     this.render();
   }
 

@@ -42,6 +42,7 @@ import type { FactionId } from '@/assets/Blueprint';
 import type { StarSystem } from '@/universe/Universe';
 import type { Universe } from '@/universe/Universe';
 import { FlightHud } from '@/ui/FlightHud';
+import { flightNavigation } from '@/ui/FlightNavigation';
 import { CombatHud } from '@/ui/CombatHud';
 import { SALVAGE_RANGE, SALVAGE_SPEED, claimSalvage, lots, salvageRate, stepSalvage } from '@/game/salvage';
 import { StarMap } from '@/ui/StarMap';
@@ -433,7 +434,9 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.outfit.settle(); // hold size, hangar complement
     // Shop results (shipyard, outfitting) change the flying ship: part of the tape.
     const commit = this.outfit.commit.bind(this.outfit);
-    this.outfit.commit = (r) => void this.replay.external('outfit', { hangar: r.hangar, ledger: r.ledger, error: r.error }, () => commit(r));
+    this.outfit.commit = (r) => this.replay.transaction('outfit', { hangar: r.hangar, ledger: r.ledger, error: r.error }, () => commit(r));
+    const commitRepair = this.outfit.commitRepair.bind(this.outfit);
+    this.outfit.commitRepair = (ledger, hull) => this.replay.transaction('repair', { ledger, hull }, () => commitRepair(ledger, hull));
     // ?dock=approach|auto|docked|launch [&station=<id|index>] [&cargo=demo]: docking captures.
     if (q.get('dock')) this.dockFlag(q.get('dock')!, q.get('station') ?? '', q.get('cargo') === 'demo');
     // ?descent=corridor|entry|clouds|below|glide|final|pad|docked|liftoff|climb|orbit [&port=<id>] [&dockt=S]
@@ -822,16 +825,15 @@ export class FlightScene implements GameScene, FlightHostScene {
     this.hud.update(view, this.camera, this.world, time);
     if (this.tactical) {
       const markers = this.view.gates.map((g) => ({ label: `LANTERN → ${this.universe.systems.get(g.link.to)!.name.toUpperCase()}`, pos: g.center, radius: g.gate.radius }));
-      const destination = this.campaign?.runner.navigation();
+      const destination = flightNavigation(this.campaign?.runner);
       if (destination) markers.unshift({ label: destination.label.toUpperCase(), pos: destination.position, radius: 200 });
       this.hud.drawTactical(this.player, this.fleet, this.camera, this.world, this.orderStatus, markers);
     }
     else if (this.jumpPhase === 'none') {
       this.hud.drawTargets(this.player, this.fleet, this.lock, this.camera, this.world, time);
-      const destination = this.campaign?.runner.navigation();
       const nav = this.docking.phase === 'cleared' ? undefined : this.navGate();
-      if (destination) this.hud.drawNav(destination.label, destination.position, view.position, this.camera, this.world, time, true);
-      else if (nav) this.hud.drawNav(this.universe.systems.get(nav.link.to)!.name, nav.center, view.position, this.camera, this.world, time);
+      const destination = flightNavigation(this.campaign?.runner, nav ? { label: this.universe.systems.get(nav.link.to)!.name, position: nav.center } : undefined);
+      if (destination) this.hud.drawNav(destination.label, destination.position, view.position, this.camera, this.world, time, destination.mission);
     }
     this.combatHud.turrets = this.turrets.status(this.player);
     this.combatHud.hangar = this.turrets.hangarStatus(this.player);
@@ -1336,6 +1338,7 @@ export class FlightScene implements GameScene, FlightHostScene {
         this.ledger = l;
         return true;
       },
+      commitRepair: (l, hull) => this.outfit.commitRepair(l, hull),
       hull: () => this.player.hull / this.player.hullMax,
       setHull: (h) => void this.replay.external('hull', h, () => (this.player.hull = h * this.player.hullMax)),
       hullSize: () => Math.sqrt(Math.max(1, this.player.hullMax / 110)),
@@ -1869,6 +1872,11 @@ export class FlightScene implements GameScene, FlightHostScene {
       case 'hull':
         this.player.hull = (a as number) * this.player.hullMax;
         break;
+      case 'repair': {
+        const r = a as { ledger: TradeLedger; hull: number };
+        this.outfit.commitRepair(r.ledger, r.hull);
+        break;
+      }
       case 'outfit': {
         const o = a as { hangar: Hangar; ledger: TradeLedger; error?: string };
         this.outfit.commit({ hangar: o.hangar, ledger: o.ledger, error: o.error } as Parameters<Outfitter['commit']>[0]);

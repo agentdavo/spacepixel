@@ -310,6 +310,16 @@ export class ReplayDirector {
     }
   }
 
+  /** Shop commands enter the tape only after their durable commit succeeds. */
+  transaction(c: string, a: unknown, fn: () => boolean): boolean {
+    if (this.mode === 'play' && !this.applying) return false;
+    this.suppress++;
+    let committed: boolean;
+    try { committed = fn(); } finally { this.suppress--; }
+    if (committed) this.note(c, a);
+    return committed;
+  }
+
   /** Record-only: a world change that already happened outside a tick (ledger, contract book). */
   note(c: string, a: unknown): void {
     if (this.mode !== 'record' || this.booting || this.suppress > 0 || this.host.inTick || this.applying) return;

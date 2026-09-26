@@ -83,3 +83,51 @@ test('story episode order is checked separately from generated mission metadata'
   const issues = validateCampaign({ title: 'Story', cast: [], codex: [], missions: [{ ...m, episode: 1 }, { ...m, episode: 1 }] });
   assert.deepEqual(issues.map(i => [i.code, i.path]), [['duplicate-mission', 'missions[1].id'], ['episode-order', 'missions[1].episode']]);
 });
+
+test('explicit navigation validates target kinds, group members, labels and conflicting legacy metadata', () => {
+  const valid = [
+    { kind: 'setpiece', tag: 'arrival' },
+    { kind: 'group', tag: 'convoy-wave' },
+    { kind: 'ship', tag: 'convoy-wave-2' },
+  ] as const;
+  for (const navigation of valid) {
+    const m = fixture();
+    m.objectives[0] = { ...m.objectives[0], navTag: undefined, navigation };
+    assert.deepEqual(validateMission(m), [], 'deferred declared targets are valid');
+  }
+  for (const navigation of [
+    { kind: 'ship', tag: 'convoy-wave' },
+    { kind: 'ship', tag: 'convoy-wave-3' },
+    { kind: 'setpiece', tag: 'convoy-wave' },
+    { kind: 'group', tag: 'convoy' },
+    { kind: 'group', tag: 'convoy-wave-1' },
+    { kind: 'setpiece', tag: 'host-station' },
+  ] as const) {
+    const m = fixture();
+    m.objectives[0] = { ...m.objectives[0], navTag: undefined, navigation };
+    assert.deepEqual(validateMission(m, { externalTags: ['host-station'] }).map(i => i.code), ['unknown-navigation-target']);
+  }
+  const m = fixture();
+  m.objectives[0].navigation = { kind: 'setpiece', tag: 'arrival', label: '  ' };
+  assert.deepEqual(validateMission(m).map(i => [i.code, i.path]), [
+    ['conflicting-navigation', 'objectives[0].navigation'],
+    ['empty-id', 'objectives[0].navigation.label'],
+  ]);
+});
+
+test('external arrival, member offsets and static anchors reject invalid authoring', () => {
+  const m = fixture();
+  m.spawns[0].routeArrival = { offset: [0, NaN, 0], radius: 0 };
+  m.spawns[0].memberOffsets = [[0, 0, 0]];
+  m.spawns[0].stationary = true;
+  assert.deepEqual(validateMission(m).map(i => i.path), [
+    'spawns[0].routeArrival.offset', 'spawns[0].routeArrival.radius',
+    'spawns[0].memberOffsets', 'spawns[0].stationary',
+  ]);
+  m.spawns[0].role = 'static';
+  m.spawns[0].routeArrival = { offset: [0, 0, -1800], radius: 100 };
+  m.spawns[0].memberOffsets = [[0, 0, 0], [240, 12, -45]];
+  assert.deepEqual(validateMission(m).map(i => i.code), ['invalid-route-arrival']);
+  delete m.spawns[0].routeArrival;
+  assert.deepEqual(validateMission(m), []);
+});
