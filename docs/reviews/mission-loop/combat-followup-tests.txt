@@ -1,0 +1,16 @@
+✔ combat audio preserves impact truth and selects audible simultaneous contacts (8655.871ms)
+✔ shield absorption, bleed, collapse and hull readouts use damage truth for guns and beams (3.3848ms)
+✔ collapse and hull cue survives event ordering, remote hits, and weaker sparks without an endless hold (0.3053ms)
+✔ intercepted and harmless missiles cannot report a target hit; warheads retain both layers (0.208ms)
+✔ HUD layout 1280×720: no two blocks overlap (3.7502ms)
+✔ HUD layout 1920×1080: no two blocks overlap (0.2608ms)
+✔ HUD layout 1600×900: no two blocks overlap (0.186ms)
+✔ clearCenter slides a centred box off a claimed panel, and stays centred when clear (0.2512ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9421.31

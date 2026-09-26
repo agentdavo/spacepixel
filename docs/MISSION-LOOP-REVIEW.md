@@ -8,8 +8,8 @@ is not relabelled as footage of these later changes.
 | --- | --- | --- |
 | Safe mission routes | Collisions & Breakup, `b9e7df8`; merged `43b92a3` | Actual EP02 carrier approach and EP10 lifeboat contact reproduced and corrected. CPU flight, mission predicate, hold/resume and restore cases pass; native confirmation pending. |
 | Clear objective navigation | Integration & QA, `4135eea` | EP04 live convoy targets and EP05 sequential survey markers integrated. Pure resolver and runner/authoring tests pass; ordinary-input native route proof pending. |
-| Durable dock transactions | Chief, `a397133` / `3133487` | Atomic money/hangar record, visible rejection and successful-only replay commands integrated. Fifteen transaction/legacy checks pass; independent review closed guild repair and stale-default overwrite defects. Native dock fault injection pending. |
-| Combat instructions and damage readability | Voice, `d10650a`; Combat & Spatial Audio | Eight plain-language cues and six recorded clips integrated. HUD/event readability and matched encounter evidence in progress. |
+| Durable dock transactions | Chief, `a397133` / `3133487`; native proof `1d751d2` | Atomic money/hangar record, visible rejection and successful-only replay commands integrated. Fifteen transaction/legacy checks and all 26 native failure/retry/reload cases pass. Independent review closed guild repair and stale-default overwrite defects. |
+| Combat instructions and damage readability | Voice, `d10650a`; Combat & Spatial Audio, integrated `1de3652` | Eight plain-language cues, six recorded clips and shield/hull impact labels integrated. Matched native EP04 takes pass all 60 replay checks each with identical combat events and no browser errors. Eight follow-up tests pass. |
 | Measured presentation | Rendering & Ship Art | Current-hardware measurements and one bounded improvement in progress; no performance or visual acceptance claimed yet. |
 
 ## Integration policy
@@ -32,7 +32,16 @@ their own targeted validation before final combined acceptance.
 - [Mission clearance](MISSION-CLEARANCE-REVIEW.md)
 - [Objective navigation](OBJECTIVE-NAVIGATION.md)
 - [Career transactions](CAREER-TRANSACTIONS.md)
+- [Native dock failure/retry/reload proof](DOCK-TRANSACTION-PROOF.md)
 - [Mission cue script and recordings](MISSION-CUES-REVIEW.md)
+- [Combat readability and matched encounter](COMBAT-READABILITY-2026-09-26.md)
+
+The complete dock evidence archive is also copied to the canonical workspace at
+`scratchpad/dock-proof/dock-transaction-proof-26-pass.zip`; chief independently
+verified SHA-256 `9d042a48376e60794bf11fcaef550f5fb848864591b7330a9486f05028397e9f`.
+Combat review video/audio pairs and their verified manifest are retained in
+`scratchpad/combat-readability/`. These ignored media files are local deliverables;
+the source, review reports and compact evidence are committed.
 
 The scope is these concrete mission-loop changes, not certification of all
 twenty campaign episodes or every future expansion. Physical surround speakers

@@ -34,7 +34,7 @@ missions and reliable saves take priority over a larger framework.
 | Contracts | `contracts/ContractDesk.ts` runs generated operations with their own lifecycle and persistence. | Reuse runner mechanisms, preserve distinct story and contract policies. |
 | Cel shading | TSL cel materials/rim light, explicit ink channels, MRT and a post-processing pipeline. WebGPU and WebGL2 paths exist. | Rendering owns materials, GPU resources and capabilities; missions request effects through adapters. Test each backend honestly. |
 | Sound | Web Audio buses with distinct combat/cockpit routing; stereo, headphone HRTF and optional discrete 5.1, saved controls and speaker test. | Six-channel processing is implemented and checked offline. Physical speaker mapping/levels remain unverified on this two-channel device. |
-| Saves | Profile and mission snapshot persistence; existing content order is part of the save contract. | Validate before mutation now; add versioned IDs and explicit migrations with expansion work. |
+| Saves | Profile and mission snapshots; atomic versioned career envelope for money plus hangar, with legacy migration on the first paired transaction. Failed initial reads lock writes until a fresh load. | Persist before changing live equipment or acknowledging purchases. Existing mission content order remains part of the save contract; expansion IDs and migrations remain staged work. |
 | Universe / expansions | Validated civilization/language registries, separate 192-record survey atlas, six-system flight addition, eight hull blockouts and guarded contact persistence. | Bounded prototype integrated; native art, flown missions, fleet performance and U08 production acceptance remain open. |
 | Composition | `main.ts` assembles services; `FlightScene.ts` still combines many game systems. | Gradually extract session/lifecycle ownership and event adapters, keeping assembly at the outside. |
 
@@ -90,6 +90,27 @@ caller's fresh-start fallback. Valid saves retain their existing schema and
 index semantics. This is not rollback for exceptions thrown by host callbacks.
 
 See [mission authoring](MISSION-AUTHORING.md) for the everyday workflow.
+
+## Dependable loop follow-through — 26 September
+
+Objective navigation is authored alongside each episode and resolved through a
+pure `ObjectiveNavigation` adapter. The HUD reads copied positions from the
+current required objective; it does not own progression or save marker state.
+EP04 follows the live convoy, and EP05 exposes successive survey destinations.
+Optional route-arrival and formation metadata correct EP02's carrier transfer
+and EP10's lifeboat spacing without introducing episode switches in the solver.
+
+Dock purchases, fitting and paid repairs use an explicit acceptance result.
+Money and hangar changes share one `CareerStore` commit point; live changes,
+success cues and replay commands follow successful persistence. Read failure
+during startup cannot silently replace an existing career with fallback defaults.
+The native dock matrix covers failure, retry and reload through real controls.
+These boundaries make mission and economy defects reproducible without a GPU;
+ordinary-flight and presentation captures supply the separate native checks.
+
+Current acceptance and its limits are recorded in
+[the mission-loop review](MISSION-LOOP-REVIEW.md), including the unchanged
+boundaries around guild/world stores and multi-tab concurrency.
 
 ## Rendering ownership
 
