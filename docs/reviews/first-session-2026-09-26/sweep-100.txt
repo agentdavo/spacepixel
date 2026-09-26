@@ -1,0 +1,2 @@
+charge (default): 1/100 wins (seeds 22 @ 88.00 s) · median survival after contact 7.87 s · mean Rustwake kills 1.05
+retreat to recharge: 1/100 wins (seeds 13 @ 169.22 s) · median survival after contact 14.37 s · mean Rustwake kills 0.28

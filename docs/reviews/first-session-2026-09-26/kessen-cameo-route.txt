@@ -1,0 +1,10 @@
+EP10 seed 1994: outcome failure at 118.03 s · closest approach to cameo 12388 m
+  t=97.050 s (tick 5823) · cameo groups 0 → 1 · player 12388 m · ≈2.9 px tall-equivalent (bounding radius 25.3 m) · flags bastion-destroyed
+  events: 0.017 flag halt:lifeboats · 55.017 flag depart:allocation · 72.017 flag bastion-attack · 97.033 flag bastion-destroyed
+EP19 seed 1994: outcome failure at 50.25 s · closest approach to cameo 59 m
+  t=0.017 s (tick 1) · cameo groups 0 → 1 · player 4918 m · ≈7.6 px tall-equivalent (bounding radius 26.2 m) · flags -
+  events: 44.217 flag tune-meridian-held
+EP19 [FIXTURE: player plot armour] seed 1994: outcome running · closest approach to cameo 59 m
+  t=0.017 s (tick 1) · cameo groups 0 → 1 · player 4918 m · ≈7.6 px tall-equivalent (bounding radius 26.2 m) · flags -
+  t=88.617 s (tick 5317) · cameo groups 1 → 0 · system lysowick, jump phase tunnel · flags tune-meridian-held,leg2
+  events: 44.217 flag tune-meridian-held · 86.433 jump crossed Lantern ring to lysowick · 88.617 flag leg2 · 88.617 arrive lysowick (jump 1) · 97.333 jump crossed Lantern ring to meridian · 99.517 arrive meridian (jump 2)

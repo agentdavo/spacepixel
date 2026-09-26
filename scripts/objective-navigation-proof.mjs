@@ -30,6 +30,8 @@ if (cameraTrackDirection && (camera !== 'track' || trackDirectionArg.split(',').
   throw new Error('--camera-track-direction requires --camera track and three finite, nonzero, nonvertical world-space components x,y,z');
 }
 const pilot = args.includes('--pilot');
+// --hud-pilot ['{"breakBelow":0.5}']: HudPilot options (JSON, optional) for the HUD-following first-time player.
+const hudPilot = args.includes('--hud-pilot') ? JSON.parse(args[args.indexOf('--hud-pilot') + 1]?.startsWith('{') ? args[args.indexOf('--hud-pilot') + 1] : '{}') : null;
 const episode = opt('episode', replay?.commands?.find(c=>c.c==='episode')?.a??'');
 const route = opt('route','') ? JSON.parse(readFileSync(opt('route',''),'utf8')) : [];
 const routeUntil = Number(opt('route-until','1e9'));
@@ -135,7 +137,7 @@ try {
     }
   });
   const scenery = await page.evaluate(() => window.__v3.S.loreFlight?.provenance ?? null);
-  writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, cameraScale, cameraTag, cameraTrackDirection, pilot, episode, route, routeUntil, fastPreroll:args.includes("--fast-preroll"), replayFromStart:args.includes("--replay-from-start"), initial, scenery, kind: episode?'native campaign gameplay':'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot/route options read positions and send ordinary mouse/keyboard controls. Episode starts through the normal recorded campaign API before the first tick; mission flags are never forced.', inputs: plan }, null, 2));
+  writeFileSync(`${out}/provenance.json`, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceFiles, renderer:status, query, seed: 1994, fps: 30, probe, from, seconds, replayPath, camera, cameraScale, cameraTag, cameraTrackDirection, pilot, hudPilot, episode, route, routeUntil, fastPreroll:args.includes("--fast-preroll"), replayFromStart:args.includes("--replay-from-start"), initial, scenery, kind: episode?'native campaign gameplay':'deterministic staged gameplay', policy: 'No health/shield/damage/death/pose writes after initial setup. Normal FlightScene simulation and stock fits. Pilot/route options read positions and send ordinary mouse/keyboard controls. Episode starts through the normal recorded campaign API before the first tick; mission flags are never forced.', inputs: plan }, null, 2));
   if (contactAudit) writeFileSync(`${out}/contact-audit-policy.json`, JSON.stringify({ source:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(), contacts:'Copied after every 60 Hz physics tick, including zero-damage contacts; pooled vectors copied immediately.', motion:'Every output video frame (30 Hz), campaign ships only. Model sphere uses model.radius about model.bounds centre transformed by ship orientation and world position, not targeting radius. Rest-pose bounds do not guarantee articulated-appendage clearance.', mutations:'None: diagnostics only.' },null,2));
   let ended = false;
   let previousNavigation = '';
@@ -173,7 +175,23 @@ try {
       if (tick === Math.round(cue.at*60)) await page.keyboard.down(cue.key);
       if (tick === Math.round((cue.at+(cue.dur ?? 1/30))*60)) await page.keyboard.up(cue.key);
     }
-    if (route.length && !replay && tick/60<routeUntil) {
+    if (hudPilot && !replay) {
+      // src/sim/HudPilot.ts: the same HUD-only policy the headless EP01 route flies
+      // (scripts/first-session-route.mjs), sent as real mouse/keyboard events.
+      const d = await page.evaluate(async opts => {
+        const S = window.__v3.S;
+        if (!window.__hudPilot) {
+          const { HudPilot, DEFAULT_HUD_PILOT } = await import('/src/sim/HudPilot.ts');
+          const { hudViewOf } = await import('/src/sim/episodeRoute.ts');
+          window.__hudPilot = { pilot: new HudPilot({ ...DEFAULT_HUD_PILOT, ...opts }), hudViewOf };
+        }
+        const { pilot, hudViewOf } = window.__hudPilot;
+        const r = pilot.decide(hudViewOf(S), S.campaign ? S.campaign.runner.time : S.simTime);
+        return { mouse: r.mouse, keys: [...r.keys], mode: pilot.mode };
+      }, hudPilot);
+      await page.mouse.move(640 * (1 + d.mouse.x), 360 * (1 + d.mouse.y));
+      for (const key of ['KeyW', 'KeyS', 'ShiftLeft', 'Space', 'KeyF', 'KeyT']) await keyState(key, d.keys.includes(key));
+    } else if (route.length && !replay && tick/60<routeUntil) {
       const waypoint=route[routeIndex];
       const nav=await page.evaluate(w=>{const S=window.__v3.S,r=S.campaign.runner,p=S.player.flight,t=r.resolve({at:'tag',tag:w.tag,offset:[0,0,0]});if(!t)throw new Error('Missing route tag '+w.tag);const d=t.clone().sub(p.position),range=d.length();d.applyQuaternion(p.orientation.clone().invert());return{range,yaw:Math.atan2(d.x,d.z),pitch:Math.atan2(d.y,Math.hypot(d.x,d.z)),throttle:p.throttle,maxSpeed:p.spec.maxSpeed,targetSpeed:r.shipsTagged(w.tag)[0]?.flight.speed??0};},waypoint);
       if(nav.range<waypoint.within && routeIndex<route.length-1)routeIndex++;

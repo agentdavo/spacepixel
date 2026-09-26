@@ -1,0 +1,182 @@
+{
+ "source": "8c791b24f6a8583399373e9e550b96fd8518bf2c",
+ "dirtySrc": false,
+ "seed": 22,
+ "pilot": {
+  "fireCone": 0.06,
+  "missileEvery": 3,
+  "targetEvery": 0.5
+ },
+ "outcome": "success",
+ "outcomeTick": 5280,
+ "ticks": 5610,
+ "player": {
+  "hull": 15.85009999999987,
+  "hullMax": 110,
+  "shield": 70,
+  "alive": true
+ },
+ "stats": {
+  "shotsFired": 136,
+  "missiles": 36,
+  "playerKills": 3,
+  "kills": {
+   "rustwake": 3
+  },
+  "hullContacts": 0,
+  "minStationDistance": 10348.55098735653,
+  "minGateLateralAtPlane": 4134.7820655746755
+ },
+ "objectives": [
+  {
+   "id": "buoy1",
+   "state": "done"
+  },
+  {
+   "id": "buoy2",
+   "state": "done"
+  },
+  {
+   "id": "buoy3",
+   "state": "done"
+  },
+  {
+   "id": "thieves",
+   "state": "done"
+  },
+  {
+   "id": "beacon",
+   "state": "done"
+  },
+  {
+   "id": "yards",
+   "state": "done"
+  }
+ ],
+ "flags": [
+  "thieves"
+ ],
+ "events": [
+  {
+   "tick": 664,
+   "t": 11.067,
+   "kind": "objective",
+   "detail": "buoy1: active → done"
+  },
+  {
+   "tick": 664,
+   "t": 11.067,
+   "kind": "objective",
+   "detail": "buoy2: locked → active"
+  },
+  {
+   "tick": 1397,
+   "t": 23.283,
+   "kind": "objective",
+   "detail": "buoy2: active → done"
+  },
+  {
+   "tick": 1397,
+   "t": 23.283,
+   "kind": "objective",
+   "detail": "buoy3: locked → active"
+  },
+  {
+   "tick": 2241,
+   "t": 37.35,
+   "kind": "objective",
+   "detail": "buoy3: active → done"
+  },
+  {
+   "tick": 2241,
+   "t": 37.35,
+   "kind": "objective",
+   "detail": "thieves: locked → active"
+  },
+  {
+   "tick": 2241,
+   "t": 37.35,
+   "kind": "flag",
+   "detail": "thieves"
+  },
+  {
+   "tick": 2243,
+   "t": 37.383,
+   "kind": "pilot",
+   "detail": "marker → search"
+  },
+  {
+   "tick": 2485,
+   "t": 41.417,
+   "kind": "pilot",
+   "detail": "search → combat"
+  },
+  {
+   "tick": 2725,
+   "t": 45.417,
+   "kind": "kill",
+   "detail": "Scav Cutter 1 (rustwake) by Vanguard 1"
+  },
+  {
+   "tick": 3137,
+   "t": 52.283,
+   "kind": "kill",
+   "detail": "Scav Cutter 2 (rustwake) by Vanguard 1"
+  },
+  {
+   "tick": 3425,
+   "t": 57.083,
+   "kind": "kill",
+   "detail": "Scav Cutter 3 (rustwake) by Vanguard 1"
+  },
+  {
+   "tick": 3425,
+   "t": 57.083,
+   "kind": "objective",
+   "detail": "thieves: active → done"
+  },
+  {
+   "tick": 3425,
+   "t": 57.083,
+   "kind": "objective",
+   "detail": "beacon: locked → active"
+  },
+  {
+   "tick": 3427,
+   "t": 57.117,
+   "kind": "pilot",
+   "detail": "combat → marker"
+  },
+  {
+   "tick": 4393,
+   "t": 73.217,
+   "kind": "objective",
+   "detail": "beacon: active → done"
+  },
+  {
+   "tick": 4393,
+   "t": 73.217,
+   "kind": "objective",
+   "detail": "yards: locked → active"
+  },
+  {
+   "tick": 5280,
+   "t": 88,
+   "kind": "objective",
+   "detail": "yards: active → done"
+  },
+  {
+   "tick": 5280,
+   "t": 88,
+   "kind": "outcome",
+   "detail": "success · hull 14.4%"
+  },
+  {
+   "tick": 5281,
+   "t": 88.017,
+   "kind": "pilot",
+   "detail": "marker → search"
+  }
+ ],
+ "checkpoints": 93
+}
