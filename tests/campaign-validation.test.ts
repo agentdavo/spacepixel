@@ -83,3 +83,20 @@ test('story episode order is checked separately from generated mission metadata'
   const issues = validateCampaign({ title: 'Story', cast: [], codex: [], missions: [{ ...m, episode: 1 }, { ...m, episode: 1 }] });
   assert.deepEqual(issues.map(i => [i.code, i.path]), [['duplicate-mission', 'missions[1].id'], ['episode-order', 'missions[1].episode']]);
 });
+
+test('external arrival, member offsets and static anchors reject invalid authoring', () => {
+  const m = fixture();
+  m.spawns[0].routeArrival = { offset: [0, NaN, 0], radius: 0 };
+  m.spawns[0].memberOffsets = [[0, 0, 0]];
+  m.spawns[0].stationary = true;
+  assert.deepEqual(validateMission(m).map(i => i.path), [
+    'spawns[0].routeArrival.offset', 'spawns[0].routeArrival.radius',
+    'spawns[0].memberOffsets', 'spawns[0].stationary',
+  ]);
+  m.spawns[0].role = 'static';
+  m.spawns[0].routeArrival = { offset: [0, 0, -1800], radius: 100 };
+  m.spawns[0].memberOffsets = [[0, 0, 0], [240, 12, -45]];
+  assert.deepEqual(validateMission(m).map(i => i.code), ['invalid-route-arrival']);
+  delete m.spawns[0].routeArrival;
+  assert.deepEqual(validateMission(m), []);
+});

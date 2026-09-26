@@ -3,6 +3,7 @@ import type { ShipEntity } from '../../sim/Fleet';
 import { createPilotState, flyToPoint, type PilotState } from '../../sim/ai/Pilot.ts';
 import type { EscortRoute } from '../CampaignRunner';
 import type { CampaignMission, SpawnSpec } from './types';
+import { memberOffset } from './EscortPlacement.ts';
 
 // Two Lantern Guard rest-pose bounding spheres total 187.43 m. Add 20 m
 // clearance and both 8 m stop tolerances, then round up to a 240 m lane.
@@ -35,9 +36,9 @@ export class EscortGuidance {
       if (spec.role !== 'escort' || !spec.routeTo) continue;
       const members = routes.get(spec.routeTo) ?? [];
       for (let member = 0; member < spec.count; member++) {
-        // Same initial wedge as CampaignRunner.releaseSpawns. Keep its lateral
+        // Same member placement as CampaignRunner.releaseSpawns. Keep its lateral
         // ordering when spreading ships into their destination lanes.
-        const x = spec.place.offset[0] + (member % 2 ? 1 : -1) * Math.ceil(member / 2) * 60;
+        const x = spec.place.offset[0] + memberOffset(spec, member)[0];
         members.push({ spec, member, x, order });
       }
       routes.set(spec.routeTo, members);

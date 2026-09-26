@@ -29,7 +29,7 @@ export const EP10: CampaignMission = {
   spawns: [
     ...squad('kade', 'jackpot', 'sparrow', 'salt'),
     spawn(LANTERN_GUARD, 'concord', 1, by('bastion', 400, 300, 200), 'allocation', 'Allocation Launch', 'static'),
-    spawn(LANTERN_GUARD, 'concord', 2, by('bastion', -300, -200, -600), 'lifeboats', 'Lifeboat Corvette', 'escort', { routeTo: 'lane' }),
+    spawn(LANTERN_GUARD, 'concord', 2, by('bastion', -300, -200, -600), 'lifeboats', 'Lifeboat Corvette', 'escort', { routeTo: 'lane', memberOffsets: [[0, 0, 0], [240, 12, -45]] }),
     spawn(CANTOR, 'choir', 6, ahead(0, 800, 11000), 'strike', 'Choir Strike', 'hostile', { whenFlag: 'bastion-attack', delay: 6 }),
     spawn(PSALTER, 'choir', 4, ahead(1800, 400, 12000), 'bombers', 'Psalter', 'hostile', { whenFlag: 'bastion-attack', delay: 12 }),
     spawn(CATHEDRAL, 'choir', 2, ahead(-4000, 2000, 16000), 'cathedrals', 'Cathedral', 'capital', { whenFlag: 'bastion-attack' }),

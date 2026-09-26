@@ -88,6 +88,18 @@ export function validateMission(mission: CampaignMission, catalogs: MissionCatal
     if (s.delay !== undefined) number(s.delay, `${path}.delay`);
     place(s.place, `${path}.place`);
     if (s.routeTo !== undefined) tag(s.routeTo, `${path}.routeTo`);
+    if (s.routeArrival !== undefined) {
+      if (s.role !== 'escort' || !s.routeTo) error('invalid-route-arrival', `${path}.routeArrival`, 'An external arrival point requires an escort route.');
+      vector(s.routeArrival.offset, `${path}.routeArrival.offset`);
+      number(s.routeArrival.radius, `${path}.routeArrival.radius`, Number.MIN_VALUE);
+    }
+    if (s.memberOffsets !== undefined) {
+      if (s.memberOffsets.length !== s.count) error('invalid-member-offsets', `${path}.memberOffsets`, 'Provide one offset for every authored member.');
+      s.memberOffsets.forEach((offset, j) => vector(offset, `${path}.memberOffsets[${j}]`));
+    }
+    if (s.stationary !== undefined && (typeof s.stationary !== 'boolean' || s.role !== 'static')) {
+      error('invalid-stationary', `${path}.stationary`, 'Only static actors can hold an authored anchor.');
+    }
   });
   mission.setpieces.forEach((p, i) => {
     const path = `setpieces[${i}]`;
