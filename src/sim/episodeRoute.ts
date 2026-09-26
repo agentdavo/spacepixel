@@ -532,6 +532,7 @@ export function headlessSession(mission: CampaignMission, host: FlightHostScene)
     pieces: [] as SetPiece[],
     statics: [] as ShipEntity[],
     wing: [] as ShipEntity[],
+    engage: [] as { ship: ShipEntity; flag: string }[],
     stationary: new WeakSet<ShipEntity>(),
     departing: [],
     frame,

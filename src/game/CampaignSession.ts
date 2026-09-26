@@ -1,6 +1,6 @@
 import { Vector3, type PerspectiveCamera, type Scene } from 'three';
 import type { WorldSpace } from '@/core/WorldSpace';
-import type { Fleet, ShipEntity, Team } from '@/sim/Fleet';
+import { hostile, type Fleet, type ShipEntity, type Team } from '@/sim/Fleet';
 import type { Weapons } from '@/sim/Weapons';
 import type { Capitals } from '@/sim/Capitals';
 import { brainOf, issueOrder, setFormation, type Order } from '@/sim/ai';
@@ -48,6 +48,8 @@ export class CampaignSession {
   private statics: ShipEntity[] = [];
   /** Story wingmen ('wing' role): they take the lead's wing orders like the free-flight wing. */
   private wing: ShipEntity[] = [];
+  /** Story wingmen waiting to engage at will on a flag (SpawnSpec.engageOn); each fires once. */
+  private engage: { ship: ShipEntity; flag: string }[] = [];
   private stationary = new WeakSet<ShipEntity>();
   private departing: { ship: ShipEntity; t: number; dir: Vector3 }[] = [];
   private frame: SetPieceFrame;
@@ -149,6 +151,7 @@ export class CampaignSession {
       setFormation([...wing, s], 'fingerFour', 45);
       issueOrder([s], this.host.wingOrder ?? 'formUp', p);
       this.wing.push(s);
+      if (spec.engageOn) this.engage.push({ ship: s, flag: spec.engageOn });
     }
     return s;
   }
@@ -210,6 +213,17 @@ export class CampaignSession {
   update(dt: number, time: number): void {
     for (const e of this.host.weapons.events) if (e.kind === 'kill' && e.ship) this.runner.onKill(e.ship);
     this.runner.update(dt);
+    // Scripted "engage at will" (e.g. EP01's Candle when the cutters arrive), once per wingman, after
+    // the flag and once a hostile is present. Issued at the end of the tick, where a 1-4 keypress lands
+    // (before the next AI step): an order given after this tick's AI has run leaves him on patrol.
+    if (this.engage.length)
+      this.engage = this.engage.filter((e) => {
+        if (!e.ship.alive) return false;
+        if (!this.runner.flags.has(e.flag)) return true;
+        if (!this.host.fleet.ships.some((x) => x.alive && hostile(x, e.ship))) return true;
+        issueOrder([e.ship], 'engageAtWill', this.host.player);
+        return false;
+      });
     const f = this.frame;
     f.dt = dt;
     f.time = time;
@@ -246,6 +260,7 @@ export class CampaignSession {
       s.model.root.visible = false;
     }
     this.wing.length = 0;
+    this.engage.length = 0;
     for (const p of this.pieces) {
       p.group.removeFromParent();
       p.dispose();

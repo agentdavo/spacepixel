@@ -116,6 +116,8 @@ export interface SpawnSpec {
   delay?: number;
   /** Spawn only when this flag is set. */
   whenFlag?: string;
+  /** 'wing' only: switch to "engage at will" once, when this flag is set (the lead's later orders still apply). */
+  engageOn?: string;
 }
 
 export type SetPieceKind =

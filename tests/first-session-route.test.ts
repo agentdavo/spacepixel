@@ -7,9 +7,10 @@ import { MISSIONS } from '../src/game/campaign/missions.ts';
 /**
  * Headless EP01 by ordinary input (scripts/first-session-route.mjs): the
  * HUD-following pilot's recorded take completes every objective in order and
- * replays bit-for-bit from the tape alone. Seed 22 is the one winning seed
- * of 1–100 for this pilot (see docs/FIRST-SESSION-ROUTE-2026-09-26.md);
- * a change to combat, AI, flight or the episode will move it.
+ * replays bit-for-bit from the tape alone. Seed 22 wins for this pilot (75 of
+ * seeds 1–100 do since Candle engages on his own; see
+ * docs/FIRST-SESSION-ROUTE-2026-09-26.md); a change to combat, AI, flight or
+ * the episode may move it.
  */
 let server: ViteDevServer;
 let R: any;
@@ -71,4 +72,18 @@ test('wing keys reach the episode wingman (Candle), not only the parked free-fli
   assert.deepEqual(keys.map((c: any) => c.a), ['Digit3']);
   const B = R.runEpisode({ seed: 22, replay: JSON.parse(JSON.stringify(A.take)) });
   assert.deepEqual(B.hashes, A.hashes);
+});
+
+test('EP01: Candle engages at will on his own once the cutters are present (no key pressed)', async () => {
+  const { brainOf } = await server.ssrLoadModule('/src/sim/ai/index.ts');
+  const seen: string[] = [];
+  const watch = { name: 'observe', tick: (S: any, runner: any) => {
+    const [c] = runner.shipsTagged('candle');
+    if (c && S.simTick % 30 === 0) seen.push(`${runner.flags.has('thieves') ? 'T' : '-'}${S.fleet.ships.some((x: any) => x.alive && x.team === 'rustwake') ? 'H' : '-'}:${brainOf(c).order}`);
+  } };
+  const A = R.runEpisode({ seed: 22, seconds: 50, record: true, counterfactual: watch });
+  assert.equal(A.take.commands.filter((c: any) => c.c === 'key').length, 0, 'no wing key on the tape');
+  assert.ok(!seen.some((x) => x.startsWith('--') && x.endsWith('engageAtWill')), 'not before the flag');
+  assert.ok(!seen.some((x) => x.startsWith('T-') && x.endsWith('engageAtWill')), 'not into empty space before the cutters arrive');
+  assert.ok(seen.some((x) => x === 'TH:engageAtWill'), 'engaged once they are present');
 });

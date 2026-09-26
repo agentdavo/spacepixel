@@ -30,7 +30,7 @@ function harness(mission: CampaignMission, snapshot?: RunnerSnapshot) {
   // velocity, teams, anchor and escort controls); omit only DOM/presentation.
   const session = Object.assign(Object.create(CampaignSession.prototype), {
     host: { player, fleet, capitals: { register() {} } },
-    statics: [], wing: [], stationary: new WeakSet(), departing: [],
+    statics: [], wing: [], engage: [], stationary: new WeakSet(), departing: [],
     escortGuidance: new EscortGuidance(mission),
   });
   const host = {

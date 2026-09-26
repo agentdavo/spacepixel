@@ -309,18 +309,42 @@ at a time. Use a new `--out` directory for every run. These commands have
 - `tests/first-session-route.test.ts` and
   `tests/kessen-cameo-lifecycle.test.ts`.
 
-### EP01 teaches the order
+### EP01: Candle engages on his own
 
-Added at the `thieves` flag, straight after the SYSTEM contact call:
+**Superseded:** the earlier "press three" cue and objective hint have been
+removed.
 
-- **Candle's new line:** "Three of them, one of you. Give me the word and
-  I'll take one. Press three: engage at will."
-- **Voice clip:** recorded with the cast's Piper voice (key `1a7fs5h13h0n0y`,
-  4.158 s). Only that clip was added. The manifest keeps every other entry,
-  and voice coverage is 1632/1632.
-- **Objective text:** now "Drive the scavengers off the school tender
-  (3: wing engage at will)".
+A human first playthrough (26 September) was destroyed quickly. A key the
+player has to know about in the middle of the fight was not enough. So in
+EP01, Candle now engages without being asked:
 
-Nobody has listened to the clip yet; it has only been checked with the
-automated coverage tool. The line changes dialogue only, and the seed-22 take
-still replays exactly.
+- **Mission data:** new `SpawnSpec.engageOn` option (wing role only). When
+  the flag is set and a hostile is present, the wingman is switched to
+  "engage at will" once. The lead's later 1–4 orders still apply.
+- **EP01 uses it:** Candle's spawn has `engageOn: 'thieves'`.
+- **New line:** "I'm on them, Four-One-Three. Shoot what's in front of you.
+  I'll take the rest." It was recorded with the cast voice (key
+  `1070jmu18c88tb`, 4.104 s). The earlier clip was removed, and voice
+  coverage is 1632/1632.
+- **Objective text:** back to "Drive the scavengers off the school tender".
+
+**Timing matters.** The engage is issued at the end of the tick, where a
+keypress lands (before the next AI step). Issuing the same order in
+`preStep`, after the tick's AI has run, won only 6/40. Before the AI step it
+won 27/40. After the AI step, Candle seems to be left on a committed patrol
+while the cutters open fire. Issuing it on the flag alone, before any hostile
+exists, sends him patrolling into empty space (12/100). The AI owner should
+note that any `issueOrder` made after the AI step has this weakness.
+
+Re-measured with `--sweep 100`, seeds 1–100:
+
+| Pilot policy | Wins |
+|---|---:|
+| Charge, no key pressed | **75/100** (was 1/100) |
+| Retreat to recharge, no key pressed | **83/100** (was 1/100) |
+| Charge + 3 | 75/100 (identical: Candle is already engaged) |
+| Charge + 2 attack my target | 0/100 (the player's own order still wins) |
+
+The seed-22 take still wins and replays exactly. The HUD pilot aims better
+than a person, so a human first-time win rate will be lower. A native
+attended run is still needed to confirm it.
