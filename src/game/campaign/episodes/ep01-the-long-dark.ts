@@ -41,8 +41,8 @@ export const EP01: CampaignMission = {
   chatter: [
     beat('open', START, [
       say('system', 'CORE WAKING. GOOD MORNING, PILOT. TIMETABLE NOMINAL.'),
-      say('candle', 'Hm. It hasn\'t said "good morning" to anyone in forty years. It likes you, Four-One-Three.'),
-      say('candle', 'Brother Oduya, flying chase. Before we light, the Keepings. Humour an old warden.'),
+      say('candle', 'I\'m Brother Oduya. Fly to Survey buoy one. We\'re taking your fighter to Anchorage Yards.'),
+      say('candle', 'I\'ll follow you through the wrecks. Keep clear of the old hulls.'),
       say('candle', 'First keeping: the seal holds. Second: the feed runs clean. Third: the fire is fed and not starved.'),
       say('candle', 'Fourth: the cold is let out. Fifth: the old words are said. Sixth: we do not ask the engine why.'),
       say('candle', 'Seventh: we thank it, and we go. Go on, Four-One-Three. Go.'),

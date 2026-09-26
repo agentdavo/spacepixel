@@ -39,8 +39,8 @@ export const EP04: CampaignMission = {
   ],
   chatter: [
     beat('open', START, [
-      say('magpie', 'Well, look at this! A Directorate babysitter in a museum piece. Welcome to the Rustwake, Kestrel!'),
-      say('magpie', 'Three tankers of Ember-skim, forty kilos each. Don\'t shoot anything glowing black. It\'s mine.'),
+      say('magpie', 'Kestrel, join my ship, the Magpie\'s Due. We\'re escorting three fuel tankers to the gate.'),
+      say('magpie', 'They carry fuel for the gates. Keep at least two tankers alive. Bring all three home if you can.'),
       say('ledger', 'Audit corvette. Commander Aubrac, Office of Continuity. I\'m here to count the grams. Ignore me.'),
       say('magpie', 'Everybody ignores the auditor, love. Right up until she finds something.'),
     ]),
@@ -53,13 +53,13 @@ export const EP04: CampaignMission = {
       say('magpie', 'That\'s the idea, love.'),
     ]),
     beat('raid', at(38), [
-      say('system', 'CHOIR CARRIER. INTONATION. FIVE CONTACTS. TWO PSALTER TORPEDO BOMBERS.'),
-      say('magpie', 'Hymn-singers! Clan Marsh, guns out! Kestrel, the Psalters want the tankers, not you!'),
+      say('system', 'ENEMY FIGHTERS APPROACHING. TORPEDO BOMBERS WILL FOLLOW.'),
+      say('magpie', 'Kestrel, destroy the raiders. Hit the torpedo bombers before they reach our tankers!'),
     ], 3),
     beat('bill', killsOf('choir', 3), [say('magpie', 'Ha! Put that on the Board\'s bill!')]),
     beat('second-run', onDone('raid'), [
-      say('system', 'TWO MORE. TORPEDO SOLUTION ON TANKER THREE.'),
-      say('magpie', 'Tem Marsh does not lose tankers! Tem Marsh does not— Kestrel, please!'),
+      say('system', 'TWO MORE TORPEDO BOMBERS INBOUND.'),
+      say('magpie', 'Kestrel, intercept those bombers. Keep them away from the tankers!'),
     ], 3),
     beat('manifest', onDone('torpedoes'), [
       say('ledger', 'Escort. Something\'s wrong with the manifest. Half this cargo is consigned onward, three shell accounts deep.'),
