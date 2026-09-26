@@ -114,3 +114,20 @@ test('explicit navigation validates target kinds, group members, labels and conf
     ['empty-id', 'objectives[0].navigation.label'],
   ]);
 });
+
+test('external arrival, member offsets and static anchors reject invalid authoring', () => {
+  const m = fixture();
+  m.spawns[0].routeArrival = { offset: [0, NaN, 0], radius: 0 };
+  m.spawns[0].memberOffsets = [[0, 0, 0]];
+  m.spawns[0].stationary = true;
+  assert.deepEqual(validateMission(m).map(i => i.path), [
+    'spawns[0].routeArrival.offset', 'spawns[0].routeArrival.radius',
+    'spawns[0].memberOffsets', 'spawns[0].stationary',
+  ]);
+  m.spawns[0].role = 'static';
+  m.spawns[0].routeArrival = { offset: [0, 0, -1800], radius: 100 };
+  m.spawns[0].memberOffsets = [[0, 0, 0], [240, 12, -45]];
+  assert.deepEqual(validateMission(m).map(i => i.code), ['invalid-route-arrival']);
+  delete m.spawns[0].routeArrival;
+  assert.deepEqual(validateMission(m), []);
+});

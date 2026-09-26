@@ -1,6 +1,7 @@
 import { Vector3 } from 'three';
 import { validateRunnerSnapshot } from './campaign/validateRunnerSnapshot.ts';
 import { resolveObjectiveNavigation, type NavigationDestination } from './campaign/ObjectiveNavigation.ts';
+import { memberOffset } from './campaign/EscortPlacement.ts';
 import type { FactionId } from '@/assets/Blueprint';
 import type { ShipEntity } from '@/sim/Fleet';
 import type {
@@ -211,15 +212,17 @@ export class CampaignRunner {
     this.releaseSpawns();
     if (this.pendingPieces.length) this.releasePieces();
 
-    // Escorts: refresh routes; flag arrival when every survivor is within 800 m.
+    // Guidance and completion use the same destination, including an authored
+    // external transfer point. Ordinary routes retain their 800 m arrival zone.
     for (const e of this.escorts) {
       e.halted = this.halted.has(e.tag);
+      const spec = this.mission.spawns.find((s) => s.tag === e.tag);
       if (!e.target) {
-        const spec = this.mission.spawns.find((s) => s.tag === e.tag);
-        if (spec?.routeTo) e.target = this.resolve({ at: 'tag', tag: spec.routeTo, offset: [0, 0, 0] });
+        if (spec?.routeTo) e.target = this.resolve({ at: 'tag', tag: spec.routeTo, offset: spec.routeArrival?.offset ?? [0, 0, 0] });
       }
       const alive = e.ships.filter((s) => s.alive);
-      if (e.target && alive.length && alive.every((s) => s.flight.position.distanceTo(e.target!) < 800)) this.setFlag(`${e.tag}-arrived`);
+      const radius = spec?.routeArrival?.radius ?? 800;
+      if (e.target && alive.length && alive.every((s) => s.flight.position.distanceTo(e.target!) < radius)) this.setFlag(`${e.tag}-arrived`);
     }
     // Beacon dwell zones.
     for (const d of this.dwells) {
@@ -319,7 +322,7 @@ export class CampaignRunner {
       this.released.add(index);
       for (let i = 0; i < s.count; i++) {
         // Loose wedge so groups don't spawn inside each other.
-        const pos = base.clone().add(new Vector3((i % 2 ? 1 : -1) * Math.ceil(i / 2) * 60, (i % 3) * 12, -Math.ceil(i / 2) * 45));
+        const pos = base.clone().add(new Vector3(...memberOffset(s, i)));
         const ship = this.host.spawnShip(s, i, pos);
         this.tagged.push({ tag: tagFor(s, i), ship, spawn: index, member: i });
       }

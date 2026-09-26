@@ -44,6 +44,7 @@ export class CampaignSession {
   readonly codex: Codex;
   private pieces: SetPiece[] = [];
   private statics: ShipEntity[] = [];
+  private stationary = new WeakSet<ShipEntity>();
   private departing: { ship: ShipEntity; t: number; dir: Vector3 }[] = [];
   private frame: SetPieceFrame;
   /** Codex titles unlocked during this mission (for the debrief). */
@@ -133,6 +134,11 @@ export class CampaignSession {
     s.plotArmour = PLOT_ARMOUR.some((t) => tag === t || tag.startsWith(t + '-'));
     if (spec.role === 'capital') this.host.capitals.register(s, { launchBlueprint: null });
     if (spec.role === 'static') this.statics.push(s);
+    if (spec.role === 'static' && spec.stationary) {
+      this.stationary.add(s);
+      s.flight.velocity.set(0, 0, 0);
+      s.flight.throttle = 0;
+    }
     if (spec.role === 'escort') this.escortGuidance.register(s, spec, i);
     if (spec.role === 'wing') {
       const wing = this.host.fleet.ships.filter((x) => x.alive && x !== p && x.team === p.team && brainOf(x).order === 'formUp');
@@ -170,7 +176,7 @@ export class CampaignSession {
       if (!s.alive || s.team !== 'neutral') continue; // provoked statics fight like anyone else
       const c = s.controls;
       c.pitch = c.yaw = c.roll = 0;
-      c.throttleSet = 0.35;
+      c.throttleSet = this.stationary.has(s) ? 0 : 0.35;
       c.fire = false;
       c.afterburner = false;
     }

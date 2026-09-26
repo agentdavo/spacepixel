@@ -106,6 +106,12 @@ export interface SpawnSpec {
   /** AI role. 'escort' ships fly a route to `routeTo` tag and must survive. */
   role?: 'hostile' | 'wing' | 'escort' | 'static' | 'capital';
   routeTo?: string;
+  /** World-axis offset from routeTo, shared by guidance and the arrival check. */
+  routeArrival?: { offset: [number, number, number]; radius: number };
+  /** Explicit world-axis offsets per member; omitted groups retain the standard wedge. */
+  memberOffsets?: [number, number, number][];
+  /** Static actor starts at rest and holds position while neutral. */
+  stationary?: boolean;
   /** Seconds after mission start (reinforcement waves). */
   delay?: number;
   /** Spawn only when this flag is set. */
